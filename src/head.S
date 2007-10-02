@@ -7,6 +7,7 @@
 #include "spr.h"
 #include "tlb.h"
 #include "asm.h"
+#include "assym.s"
 
 .text
 
@@ -164,6 +165,31 @@ _start:
 	mr	%r22, %r11
 	bl	tlb1_inval_entry
 
+/*
+ * set up a stack
+ * -TODO: eventually this needs to be allocated per core--
+ *        need to programmatically compute this
+ *        from some base
+ */
+	lis	%r1, uv_stack_top@ha
+	addi	%r1, %r1, uv_stack_top@l
+	addi	%r1, %r1, -4
+
+/* 
+ * set SPRG0 to point to the pcpu struct
+ * (for the exception handlers)
+ * -TODO: this will need to be per-core eventually
+ */
+	lis	%r21, pcpu@ha
+	addi	%r21, %r21, pcpu@l
+	mtsprg0	%r21
+
+/*
+ * Intialise exception vector offsets
+ */
+	bl	ivor_setup
+
+	.long 0
 
 _busy_loop:
 	b	_busy_loop
@@ -183,3 +209,78 @@ tlb1_inval_entry:
 	isync
 	msync
 	blr
+
+ivor_setup:
+	/* Set base address of interrupt handler routines */
+	lis	%r21, interrupt_vector_base@h
+	mtspr	SPR_IVPR, %r21
+
+	li	%r21, int_critical_input@l
+	mtspr	SPR_IVOR0, %r21
+	li	%r21, int_program@l
+	mtspr	SPR_IVOR6, %r21
+
+#if 0
+	/* Assign interrupt handler routines offsets */
+	li	%r21, int_machine_check@l
+	mtspr	SPR_IVOR1, %r21
+	li	%r21, int_data_storage@l
+	mtspr	SPR_IVOR2, %r21
+	li	%r21, int_instr_storage@l
+	mtspr	SPR_IVOR3, %r21
+	li	%r21, int_external_input@l
+	mtspr	SPR_IVOR4, %r21
+	li	%r21, int_alignment@l
+	mtspr	SPR_IVOR5, %r21
+	li	%r21, int_syscall@l
+	mtspr	SPR_IVOR8, %r21
+	li	%r21, int_decrementer@l
+	mtspr	SPR_IVOR10, %r21
+	li	%r21, int_fixed_interval_timer@l
+	mtspr	SPR_IVOR11, %r21
+	li	%r21, int_watchdog@l
+	mtspr	SPR_IVOR12, %r21
+	li	%r21, int_data_tlb_error@l
+	mtspr	SPR_IVOR13, %r21
+	li	%r21, int_inst_tlb_error@l
+	mtspr	SPR_IVOR14, %r21
+	li	%r21, int_debug@l
+	mtspr	SPR_IVOR15, %r21
+#endif
+
+	blr
+
+
+	.data
+	.align 12 /* page align */
+pcpu:
+	.space PCPU_SIZE
+
+	/* For now allocate 4 pages for the 4 exception stacks
+	 * normal, critical, machine check, debug.
+	 * Eventually, these stacks need to be in a per hypervisor
+         * data area.
+         */
+
+	.section .bss
+	.align 12  /* page align */
+uv_stack_bottom:
+	.space 4096
+	.globl uv_stack_top
+uv_stack_top:
+except_stack_bottom:
+	.space 4096
+	.globl except_stack_top
+except_stack_top:
+crit_except_stack_bottom:
+	.space 4096
+	.globl crit_except_stack_top
+crit_except_stack_top:
+machchk_except_stack_bottom:
+	.space 4096
+	.globl machchk_except_stack_top
+machchk_except_stack_top:
+dbg_except_stack_bottom:
+	.space 4096
+	.globl dbg_except_stack_top
+dbg_except_stack_top:

@@ -65,11 +65,10 @@
 #include "assym.s"
 #include "trap_booke.h"
 
-/*
- * NOTICE: This is not a standalone file.  to use it, #include it in
- * your port's locore.S, like so:
+/* TODO
+ *    -need to find out why critical could clobber srr0/1
+ *    -add debug level
  *
- *	#include <powerpc/e500/trap_subr.S>
  */
 
 /*
@@ -396,12 +395,19 @@ INTERRUPT(int_alignment)
 	FRAME_SETUP(SPR_SPRG1, PC_TEMPSAVE, EXC_ALI)
 	b	trap_common
 
+#endif
 
 INTERRUPT(int_program)
-	STANDARD_PROLOG(SPR_SPRG1, PC_TEMPSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PC_TEMPSAVE, EXC_PGM)
-	b	trap_common
+	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_PGM)
+foobar:
+	b	foobar
 
+#if 0
+	b	trap_common
+#endif
+
+#if 0
 
 /****************************************
  * System call

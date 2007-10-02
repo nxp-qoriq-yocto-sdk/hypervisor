@@ -1,4 +1,12 @@
  
+----------------------------------------------------------
+Build Options
+
+  -need compile time option for number of cores/thread
+    -this specifies number of core-private data areas needed
+
+----------------------------------------------------------
+
   Hypervisor runs as GS=0. Within it's virtual
   address space, everything is identity (1:1).
  
@@ -11,7 +19,10 @@
   Physical Memory map
      
     0x00000000   core dispatch table
-    0x00001000   hypervisor code + globally shared data
+    0x00001000   hypervisor code
+                 globally shared data
+                 per-cpu data
+                 per-cpu uv stack
  
  
   Per core virtual memory map

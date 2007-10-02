@@ -2,14 +2,21 @@
 #ifndef _PCPU_H
 #define	_PCPU_H
 
+/*
+ * TODO: TLB
+ */
+
 #include "uvtypes.h"
 
-#define CRITICAL_SAVE_REGS 10
+#define CPUSAVE_LEN   8 
 
 typedef struct {
     int            coreid;
     register_t     uvstack;
-    register_t     critsave[CRITICAL_SAVE_REGS ];
+    register_t     normsave[CPUSAVE_LEN];
+    register_t     critsave[CPUSAVE_LEN+2];   /* why +2 ? */
+    register_t     machksave[CPUSAVE_LEN];
+    register_t     dbgsave[CPUSAVE_LEN];
 } pcpu_t;
 
 #define CPUSAVE_R28     0               /* where r28 gets saved */

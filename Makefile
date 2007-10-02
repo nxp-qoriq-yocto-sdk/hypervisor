@@ -35,6 +35,8 @@ OBJS = src/head.o src/exceptions.o src/interrupts.o
 SRCS_C = src/genassym.c src/interrupts.c
 SRCS_S = src/head.S src/exceptions.S
 
+all: uv.uImage uv.map
+
 
 uv.uImage: uv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
@@ -51,8 +53,8 @@ uv.bin: uv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 uv: $(OBJS)
-	$(LD) $(LD_OPTS) -o $@ $(OBJS)
-#	$(LD) $(LD_OPTS) -T uv.lds -o $@ $(OBJS)
+	$(LD) $(LD_OPTS) -T uv.lds -o $@ $(OBJS)
+#	$(LD) $(LD_OPTS) -o $@ $(OBJS)
 
 # compile and gen dependecy file
 %.o : %.c
@@ -83,6 +85,9 @@ src/assym.s: src/genassym.o
 # include the dependecy files
 -include $(SRCS_C:.c=.P)
 -include $(SRCS_S:.S=.P)
+
+uv.map: uv
+	nm -n uv > $@	
  
 clean:
 	rm -f uv src/*.o src/*.P src/*.d *.bin *.uImage *.gz src/assym.s

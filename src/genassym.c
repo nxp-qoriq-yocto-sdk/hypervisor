@@ -47,7 +47,11 @@ ASSYM(CPUSAVE_ESR, CPUSAVE_ESR*4);
 ASSYM(CPUSAVE_SRR0, CPUSAVE_SRR0*4);
 ASSYM(CPUSAVE_SRR1, CPUSAVE_SRR1*4);
 
+ASSYM(PCPU_SIZE, sizeof(pcpu_t));
 ASSYM(PCPU_CRITSAVE, offsetof(pcpu_t, critsave));
+ASSYM(PCPU_NORMSAVE, offsetof(pcpu_t, normsave));
+ASSYM(PCPU_MACHKSAVE, offsetof(pcpu_t, machksave));
+ASSYM(PCPU_DBGSAVE, offsetof(pcpu_t, dbgsave));
 ASSYM(UVSTACK, offsetof(pcpu_t, uvstack));
 
 ASSYM(FRAMELEN, FRAMELEN);
@@ -64,6 +68,13 @@ ASSYM(FRAME_XER, offsetof(trapframe_t, xer));
 ASSYM(FRAME_SRR0, offsetof(trapframe_t, srr0));
 ASSYM(FRAME_SRR1, offsetof(trapframe_t, srr1));
 ASSYM(FRAME_EXC, offsetof(trapframe_t, exc));
+
+
+/*
+##################################################################################
+      everything below here is #ifdefed out
+##################################################################################
+*/
 
 #if 0
 
