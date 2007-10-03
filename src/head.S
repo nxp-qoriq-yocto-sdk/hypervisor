@@ -189,7 +189,7 @@ _start:
  */
 	bl	ivor_setup
 
-	.long 0
+	.long   0
 
 _busy_loop:
 	b	_busy_loop

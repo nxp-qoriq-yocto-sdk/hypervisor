@@ -30,9 +30,9 @@ LD=$(CROSS_COMPILE)ld
 LD_OPTS=-m elf32ppc -Bstatic
 GENASSYM=tools/genassym.sh
 
-OBJS = src/head.o src/exceptions.o src/interrupts.o
+OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o
 
-SRCS_C = src/genassym.c src/interrupts.c
+SRCS_C = src/genassym.c src/interrupts.c src/trap.c
 SRCS_S = src/head.S src/exceptions.S
 
 all: uv.uImage uv.map

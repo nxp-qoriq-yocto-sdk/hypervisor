@@ -60,6 +60,7 @@ typedef struct {
 	register_t esr;
 	int exc;
 } trapframe_t;
+
 /*
  * This is to ensure alignment of the stackpointer
  */

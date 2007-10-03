@@ -109,6 +109,12 @@
  *     permanent entries, and within this prolog we do not dereference any
  *     locations potentially not in the TLB
  */
+
+/*
+ * TODO: switch to uv stack if int taken in _guest_ mode 
+ *
+ */
+
 #define STANDARD_PROLOG(sprg_sp, savearea, isrr0, isrr1)		\
 	mtspr	sprg_sp, %r1;		/* Save SP */			\
 	GET_CPUINFO(%r1);		/* Per-cpu structure */		\
@@ -390,22 +396,23 @@ INTERRUPT(int_external_input)
 	b	trapexit
 
 
+/****************************************
+ * Alignment
+ ****************************************/
 INTERRUPT(int_alignment)
 	STANDARD_PROLOG(SPR_SPRG1, PC_TEMPSAVE, SPR_SRR0, SPR_SRR1)
 	FRAME_SETUP(SPR_SPRG1, PC_TEMPSAVE, EXC_ALI)
 	b	trap_common
-
 #endif
 
+
+/****************************************
+ * Program
+ ****************************************/
 INTERRUPT(int_program)
 	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
 	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_PGM)
-foobar:
-	b	foobar
-
-#if 0
 	b	trap_common
-#endif
 
 #if 0
 
@@ -762,6 +769,7 @@ INTERRUPT(int_debug)
 	FRAME_LEAVE(SPR_CSRR0, SPR_CSRR1)
 	rfci
 
+#endif
 
 /********************************
  * Common trap code
@@ -773,34 +781,8 @@ trap_common:
 
 	.globl	trapexit		/* exported for db_backtrace use */
 trapexit:
-	/* disable interrupts */
-	wrteei	0
-
-	/* Test AST pending - makes sense for user process only */
-	lwz	%r5, FRAME_SRR1+8(%r1)
-	mtcr	%r5
-	bf	17, 1f
-
-	GET_CPUINFO(%r3)
-	lwz	%r4, PC_CURTHREAD(%r3)
-	lwz	%r4, TD_FLAGS(%r4)
-	lis	%r5, (TDF_ASTPENDING|TDF_NEEDRESCHED)@h
-	ori	%r5, %r5, (TDF_ASTPENDING|TDF_NEEDRESCHED)@l
-	and.	%r4, %r4, %r5
-	beq	1f
-
-	/* re-enable interrupts before calling ast() */
-	wrteei	1
-
-	addi	%r3, %r1, 8
-	bl	ast
-	.globl	asttrapexit	/* db_backtrace code sentinel #2 */
-asttrapexit:
-	b	trapexit		/* test ast ret value ? */
-1:
 	FRAME_LEAVE(SPR_SRR0, SPR_SRR1)
 	rfi
 
 
 
-#endif
