@@ -193,34 +193,34 @@
 	mfspr	%r31, sprg_sp;		/* get saved SP */		\
 	/* establish a new stack frame and put everything on it */	\
 	stwu	%r31, -FRAMELEN(%r1);					\
-	stw	%r0, FRAME_0+8(%r1);	/* save r0 in the trapframe */	\
-	stw	%r31, FRAME_1+8(%r1);	/* save SP   "      "       */	\
-	stw	%r2, FRAME_2+8(%r1);	/* save r2   "      "       */	\
+	stw	%r0, FRAME_0(%r1);	/* save r0 in the trapframe */	\
+	stw	%r31, FRAME_1(%r1);	/* save SP   "      "       */	\
+	stw	%r2, FRAME_2(%r1);	/* save r2   "      "       */	\
 	mflr	%r31;		 					\
-	stw	%r31, FRAME_LR+8(%r1);	/* save LR   "      "       */	\
-	stw	%r30, FRAME_CR+8(%r1);	/* save CR   "      "       */	\
+	stw	%r31, FRAME_LR(%r1);	/* save LR   "      "       */	\
+	stw	%r30, FRAME_CR(%r1);	/* save CR   "      "       */	\
 	GET_CPUINFO(%r2);						\
 	lwz	%r30, (savearea+CPUSAVE_R30)(%r2); /* get saved r30 */	\
 	lwz	%r31, (savearea+CPUSAVE_R31)(%r2); /* get saved r31 */	\
 	/* save R3-31 */						\
-	stmw	%r3,  FRAME_3+8(%r1) ;					\
+	stmw	%r3,  FRAME_3(%r1) ;					\
 	/* save DEAR, ESR */						\
 	lwz	%r28, (savearea+CPUSAVE_DEAR)(%r2);			\
 	lwz	%r29, (savearea+CPUSAVE_ESR)(%r2);			\
-	stw	%r28, FRAME_DEAR+8(1);					\
-	stw	%r29, FRAME_ESR+8(1);					\
+	stw	%r28, FRAME_DEAR(1);					\
+	stw	%r29, FRAME_ESR(1);					\
 	/* save XER, CTR, exc number */					\
 	mfxer	%r3;							\
 	mfctr	%r4;							\
-	stw	%r3, FRAME_XER+8(1);					\
-	stw	%r4, FRAME_CTR+8(1);					\
+	stw	%r3, FRAME_XER(1);					\
+	stw	%r4, FRAME_CTR(1);					\
 	li	%r5, exc;						\
-	stw	%r5, FRAME_EXC+8(1);					\
+	stw	%r5, FRAME_EXC(1);					\
 	/* save xSSR0-1 */						\
 	lwz	%r30, (savearea+CPUSAVE_SRR0)(%r2);			\
 	lwz	%r31, (savearea+CPUSAVE_SRR1)(%r2);			\
-	stw	%r30, FRAME_SRR0+8(1);					\
-	stw	%r31, FRAME_SRR1+8(1)
+	stw	%r30, FRAME_SRR0(1);					\
+	stw	%r31, FRAME_SRR1(1)
 
 
 /*
@@ -233,23 +233,23 @@
  */
 #define	FRAME_LEAVE(isrr0, isrr1)					\
 	/* restore CTR, XER, LR, CR */					\
-	lwz	%r4, FRAME_CTR+8(%r1);					\
-	lwz	%r5, FRAME_XER+8(%r1);					\
-	lwz	%r6, FRAME_LR+8(%r1);					\
-	lwz	%r7, FRAME_CR+8(%r1);					\
+	lwz	%r4, FRAME_CTR(%r1);					\
+	lwz	%r5, FRAME_XER(%r1);					\
+	lwz	%r6, FRAME_LR(%r1);					\
+	lwz	%r7, FRAME_CR(%r1);					\
 	mtctr	%r4;							\
 	mtxer	%r5;							\
 	mtlr	%r6;							\
 	mtcr	%r7;							\
 	/* restore xSRR0-1 */						\
-	lwz	%r30, FRAME_SRR0+8(%r1);				\
-	lwz	%r31, FRAME_SRR1+8(%r1);				\
+	lwz	%r30, FRAME_SRR0(%r1);				\
+	lwz	%r31, FRAME_SRR1(%r1);				\
 	mtspr	isrr0, %r30;						\
 	mtspr	isrr1, %r31;						\
 	/* restore R2-31, SP */						\
-	lmw	%r2, FRAME_2+8(%r1) ;					\
-	lwz	%r0, FRAME_0+8(%r1);					\
-	lwz	%r1, FRAME_1+8(%r1);					\
+	lmw	%r2, FRAME_2(%r1) ;					\
+	lwz	%r0, FRAME_0(%r1);					\
+	lwz	%r1, FRAME_1(%r1);					\
 	isync
 
 /*
@@ -748,9 +748,9 @@ INTERRUPT(int_debug)
 	cmplw	cr0, %r3, %r4
 	bge	1f
 	/* Disable single-stepping for the interrupt handlers. */
-	lwz	%r3, FRAME_SRR1+8(%r1);
+	lwz	%r3, FRAME_SRR1(%r1);
 	rlwinm  %r3,%r3,0,23,21
-	stw	%r3, FRAME_SRR1+8(%r1);
+	stw	%r3, FRAME_SRR1(%r1);
 	/* Restore srr0 and srr1 as they could have been clobbered. */
 	lwz     %r3, (PC_CRITSAVE+CPUSAVE_SRR0+8)(%r2);
 	mtspr   SPR_SRR0, %r3
@@ -776,7 +776,7 @@ INTERRUPT(int_debug)
  ********************************/
 trap_common:
 	/* Call C trap dispatcher */
-	addi	%r3, %r1, 8
+	mr	%r3, %r1
 	bl	trap
 
 	.globl	trapexit		/* exported for db_backtrace use */

@@ -64,7 +64,7 @@ typedef struct {
 /*
  * This is to ensure alignment of the stackpointer
  */
-#define	FRAMELEN	roundup(sizeof(trapframe_t) + 8, 16)
+#define	FRAMELEN	roundup(sizeof(trapframe_t), 16)
 #define	trapframe(td)	((td)->td_frame)
 
 #if 0
