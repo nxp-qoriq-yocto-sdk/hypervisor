@@ -215,13 +215,9 @@ ivor_setup:
 	lis	%r21, interrupt_vector_base@h
 	mtspr	SPR_IVPR, %r21
 
+	/* Assign interrupt handler routines offsets */
 	li	%r21, int_critical_input@l
 	mtspr	SPR_IVOR0, %r21
-	li	%r21, int_program@l
-	mtspr	SPR_IVOR6, %r21
-
-#if 0
-	/* Assign interrupt handler routines offsets */
 	li	%r21, int_machine_check@l
 	mtspr	SPR_IVOR1, %r21
 	li	%r21, int_data_storage@l
@@ -232,6 +228,8 @@ ivor_setup:
 	mtspr	SPR_IVOR4, %r21
 	li	%r21, int_alignment@l
 	mtspr	SPR_IVOR5, %r21
+	li	%r21, int_program@l
+	mtspr	SPR_IVOR6, %r21
 	li	%r21, int_syscall@l
 	mtspr	SPR_IVOR8, %r21
 	li	%r21, int_decrementer@l
@@ -246,7 +244,20 @@ ivor_setup:
 	mtspr	SPR_IVOR14, %r21
 	li	%r21, int_debug@l
 	mtspr	SPR_IVOR15, %r21
-#endif
+	li	%r21, int_perf_mon@l
+	mtspr	SPR_IVOR35, %r21
+	li	%r21, int_doorbell@l
+	mtspr	SPR_IVOR36, %r21
+	li	%r21, int_doorbell_critical@l
+	mtspr	SPR_IVOR37, %r21
+	li	%r21, int_guest_doorbell@l
+	mtspr	SPR_IVOR38, %r21
+	li	%r21, int_guest_doorbell_critical@l
+	mtspr	SPR_IVOR39, %r21
+	li	%r21, int_hypercall@l
+	mtspr	SPR_IVOR40, %r21
+	li	%r21, int_ehpriv@l
+	mtspr	SPR_IVOR41, %r21
 
 	blr
 

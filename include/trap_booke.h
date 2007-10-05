@@ -27,24 +27,26 @@
 
 /* IVORs for exeception handling */
 
-#define	EXC_CRIT	0
-#define	EXC_MCHK	1
-#define	EXC_DSI		2
-#define	EXC_ISI		3
-#define	EXC_EXI		4
-#define	EXC_ALI		5
-#define	EXC_PGM		6
-#define	EXC_FPU		7	/* e500: not supported */
-#define	EXC_SC		8
-#define	EXC_APU		9	/* e500: not supported */
-#define	EXC_DECR	10
-#define	EXC_FIT		11
-#define	EXC_WDOG	12
-#define	EXC_DTMISS	13
-#define	EXC_ITMISS	14
-#define	EXC_DEBUG	15
-
-#define	EXC_SAU		32	/* e500-specific: SPE APU unavailable */
-#define	EXC_PERF	35	/* e500-specific: Performance monitor */
+#define	EXC_CRIT	0    /* critical input */
+#define	EXC_MCHK	1    /* machine check, error report */
+#define	EXC_DSI		2    /* data storage */
+#define	EXC_ISI		3    /* instruction storage */
+#define	EXC_EXI		4    /* external input */
+#define	EXC_ALI		5    /* alignment */
+#define	EXC_PGM		6    /* program-- illegal, privileged, trap */
+#define	EXC_SC		8    /* system call */
+#define	EXC_DECR	10   /* decrementer */
+#define	EXC_FIT		11   /* fixed interval */
+#define	EXC_WDOG	12   /* watchdog */
+#define	EXC_DTLB	13   /* data tlb error */
+#define	EXC_ITLB	14   /* instruction tlb error */
+#define	EXC_DEBUG	15   /* debug */
+#define	EXC_PERF	35   /* performance monitor */
+#define	EXC_DOORBELL	36   /* doorbell */
+#define	EXC_DOORBELLC	37   /* doorbell critical */
+#define	EXC_GDOORBELL	38   /* guest doorbell */
+#define	EXC_GDOORBELLC	39   /* guest doorbell critical, machine check */
+#define	EXC_HCALL	40   /* hcall */
+#define	EXC_EHPRIV	41   /* hypervisor privilege trap */
 
 #define	EXC_LAST	255

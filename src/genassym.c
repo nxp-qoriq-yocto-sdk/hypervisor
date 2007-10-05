@@ -48,8 +48,8 @@ ASSYM(CPUSAVE_SRR0, CPUSAVE_SRR0*4);
 ASSYM(CPUSAVE_SRR1, CPUSAVE_SRR1*4);
 
 ASSYM(PCPU_SIZE, sizeof(pcpu_t));
-ASSYM(PCPU_CRITSAVE, offsetof(pcpu_t, critsave));
 ASSYM(PCPU_NORMSAVE, offsetof(pcpu_t, normsave));
+ASSYM(PCPU_CRITSAVE, offsetof(pcpu_t, critsave));
 ASSYM(PCPU_MACHKSAVE, offsetof(pcpu_t, machksave));
 ASSYM(PCPU_DBGSAVE, offsetof(pcpu_t, dbgsave));
 ASSYM(UVSTACK, offsetof(pcpu_t, uvstack));
