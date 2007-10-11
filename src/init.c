@@ -1,10 +1,15 @@
 
+static void  core_init(void);
 
-#if 0
-void init(unsigned long hv_devtree_ptr, unsigned long  )
+extern void tlb1_init(void);
+
+
+void init(unsigned long devtree_ptr)
 {
 
-    core_hw_init();
+    core_init();
+
+#if 0
 
     if (first instance) {
         platform_hw_init();
@@ -19,8 +24,16 @@ void init(unsigned long hv_devtree_ptr, unsigned long  )
 
     /* run_guest() never returns */
 
+#endif
+
 }
 
 
-void core_init()
-#endif
+static void core_init(void)
+{
+    /* set up a TLB entry for CCSR space */
+    tlb1_init();
+
+}
+
+

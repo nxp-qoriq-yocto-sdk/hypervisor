@@ -35,6 +35,17 @@
 #ifndef _SPR_H
 #define	_SPR_H
 
+
+#if !defined(_ASM)
+#define mtspr(reg, val)                                                 \
+        __asm __volatile("mtspr %0,%1" : : "K"(reg), "r"(val))
+#define mfspr(reg)                                                      \
+        ( { register_t val;                                             \
+          __asm __volatile("mfspr %0,%1" : "=r"(val) : "K"(reg));       \
+          val; } )
+#endif
+
+
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
 #define	SPR_SRR0		0x01a	/* 26 Save/Restore Register 0 */

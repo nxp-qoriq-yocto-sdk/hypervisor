@@ -3,10 +3,11 @@
 #define	_PCPU_H
 
 /*
- * TODO: TLB
+ * Per-cpu data structures
  */
 
 #include "uvtypes.h"
+#include "vcpu.h"
 
 #define CPUSAVE_LEN   8 
 
@@ -17,6 +18,7 @@ typedef struct {
     register_t     critsave[CPUSAVE_LEN];
     register_t     machksave[CPUSAVE_LEN];
     register_t     dbgsave[CPUSAVE_LEN+2];  /* +2 because the dbg handler saves srr0/1 */
+    vcpu_t         vcpu;     /* virtual cpu state-- as the guest sees it */
 } pcpu_t;
 
 #define CPUSAVE_R28     0               /* where r28 gets saved */

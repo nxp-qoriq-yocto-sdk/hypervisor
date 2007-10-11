@@ -11,6 +11,13 @@
 
 .text
 
+/*
+ * Assumptions at start are that hardware is in
+ * a state as defined by the ePAPR
+ *   R3 :  ptr to device tree
+ *
+ */
+
 .globl _start
 _start:
 
@@ -152,12 +159,10 @@ _start:
 	mtspr   SPR_SRR1, %r21
 	rfi
 
-#if 0
-	/* Save kernel load address for later use */
-	lis	%r24, kernload@ha
-	addi	%r24, %r24, kernload@l
+	/* Save load address for later use */
+	lis	%r24, uvload@ha
+	addi	%r24, %r24, uvload@l
 	stw	%r25, 0(%r24)
-#endif
 
 /*
  * Invalidate temp mapping
@@ -184,12 +189,16 @@ _start:
 	addi	%r21, %r21, pcpu@l
 	mtsprg0	%r21
 
-/*
- * Intialise exception vector offsets
- */
+
 	bl	ivor_setup
 
-	.long   0
+	bl	init
+
+	bl	start_guest
+
+/*	.long   0 */
+
+        mr      1,1   /* this is a magic inst that cause the Simics sim to stop */
 
 _busy_loop:
 	b	_busy_loop
@@ -273,25 +282,28 @@ pcpu:
          * data area.
          */
 
+GLOBAL(uvload)
+        .long
+
 	.section .bss
 	.align 12  /* page align */
 uv_stack_bottom:
 	.space 4096
-	.globl uv_stack_top
-uv_stack_top:
+
+GLOBAL(uv_stack_top)
 except_stack_bottom:
 	.space 4096
-	.globl except_stack_top
-except_stack_top:
+
+GLOBAL(except_stack_top)
 crit_except_stack_bottom:
 	.space 4096
-	.globl crit_except_stack_top
-crit_except_stack_top:
+
+GLOBAL(crit_except_stack_top)
 machchk_except_stack_bottom:
 	.space 4096
-	.globl machchk_except_stack_top
-machchk_except_stack_top:
+
+GLOBAL(machchk_except_stack_top)
 dbg_except_stack_bottom:
 	.space 4096
-	.globl dbg_except_stack_top
-dbg_except_stack_top:
+
+GLOBAL(dbg_except_stack_top)

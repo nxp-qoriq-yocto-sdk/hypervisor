@@ -28,6 +28,7 @@
 #ifndef	_MACHINE_TLB_H_
 #define	_MACHINE_TLB_H_
 
+
 /*  PowerPC E500 MAS registers */
 #define MAS0_TLBSEL(x)		((x << 28) & 0x10000000)
 #define MAS0_ESEL(x)		((x << 16) & 0x000F0000)
@@ -106,6 +107,27 @@
 #define MAS2_TLB0_ENTRY_IDX_MASK	0x0007f000
 #define MAS2_TLB0_ENTRY_IDX_SHIFT	12
 
+#define _TLB_ENTRY_IO	(MAS2_I | MAS2_G)
+#define _TLB_ENTRY_MEM	(0)
+
+#define UV_TID	0	/* TLB TID to use for UV translations */
+
+#if !defined(_ASM)
+
+#include <inttypes.h>
+typedef struct tlb_entry {
+	uint32_t mas1;
+	uint32_t mas2;
+	uint32_t mas3;
+} tlb_entry_t;
+
+#endif
+
+
+/***************************************************************************/
+ 
+/***************************************************************************/
+
 #if 0   // dont know if we need this
 
 /*
@@ -126,16 +148,15 @@
 
 #if !defined(LOCORE)
 typedef struct tlb_entry {
-	u_int32_t mas1;
-	u_int32_t mas2;
-	u_int32_t mas3;
+	uint32_t mas1;
+	uint32_t mas2;
+	uint32_t mas3;
 } tlb_entry_t;
 
-typedef u_int8_t tlbtid_t;
+typedef uint8_t tlbtid_t;
 struct pmap;
 
-int tlb1_set_entry(vm_offset_t, vm_offset_t,
-	vm_size_t, u_int32_t);
+int tlb1_set_entry(vm_offset_t, vm_offset_t, vm_size_t, u_int32_t);
 
 void __tlb1_set_entry(unsigned int, vm_offset_t, vm_offset_t,
 		vm_size_t, u_int32_t, unsigned int, unsigned int);

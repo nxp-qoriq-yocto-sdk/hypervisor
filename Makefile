@@ -6,6 +6,8 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
+CROSS_COMPILE=powerpc-e500mc-linux-gnu-
+
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
 CC_OPTS=-m32 -Wa,-me500 -Iinclude
@@ -25,14 +27,14 @@ CC_OPTS_C= -Wall \
   -mno-string \
   -fomit-frame-pointer \
   -Wdeclaration-after-statement
-#CC_OPTS_ASM=
+CC_OPTS_ASM=-D_ASM
 LD=$(CROSS_COMPILE)ld
 LD_OPTS=-m elf32ppc -Bstatic
 GENASSYM=tools/genassym.sh
 
-OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o
+OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o src/init.o src/guest.o src/tlb.o
 
-SRCS_C = src/genassym.c src/interrupts.c src/trap.c
+SRCS_C = src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tbl.c
 SRCS_S = src/head.S src/exceptions.S
 
 all: uv.uImage uv.map

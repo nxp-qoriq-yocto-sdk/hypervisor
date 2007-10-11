@@ -1,7 +1,7 @@
 
 #include "frame.h"
 
-extern void trap(struct trapframe *);
+extern void trap(trapframe_t *);
 
 
 void critical_interrupt(trapframe_t *frameptr)
