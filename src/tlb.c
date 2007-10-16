@@ -21,16 +21,10 @@ size2tsize(uint32_t size);
 #define CCSRBAR_VA              0xf0000000
 #define CCSRBAR_SIZE            0x00100000
 
-#if 0
-        /* Mapin CCSRBAR in TLB1[0] */
-        __tlb1_set_entry(0, CCSRBAR_VA, ccsrbar, CCSRBAR_SIZE,
-            _TLB_ENTRY_IO, KERNEL_TID, 0);
-#endif
-
-
 void
 tlb1_init(void)
 {
+
         uint32_t mas1, mas2, mas3, mas7;
         uint32_t tsize,tid,ts;
 
@@ -50,30 +44,7 @@ tlb1_init(void)
 
         tlb1_write_entry(0, mas1, mas2, mas3, mas7);
 
-        __asm __volatile("mr 0,0");
-
-#if 0
-        uint32_t mas0;
-
-        /* TBL1[1] is used to map the kernel. Save that entry. */
-        mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(1);
-        mtspr(SPR_MAS0, mas0);
-        __asm __volatile("isync; tlbre");
-
-        tlb1[1].mas1 = mfspr(SPR_MAS1);
-        tlb1[1].mas2 = mfspr(SPR_MAS2);
-        tlb1[1].mas3 = mfspr(SPR_MAS3);
-
-        /* Mapin CCSRBAR in TLB1[0] */
-        __tlb1_set_entry(0, CCSRBAR_VA, ccsrbar, CCSRBAR_SIZE,
-            _TLB_ENTRY_IO, KERNEL_TID, 0);
-
-        /* Setup TLB miss defaults */
-        set_mas4_defaults();
-
-        /* Reset next available TLB1 entry index. */
-        tlb1_idx = 2;
-#endif
+//        __asm __volatile("mr 0,0");
 
 }
 
