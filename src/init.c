@@ -13,7 +13,8 @@ void init(unsigned long devtree_ptr)
 
     core_init();
 
-    uart_putc(0xff);
+    printh("=======================================\n");
+    printh("Freescale Ultravisor 0.1\n");
 
 #if 0
 
