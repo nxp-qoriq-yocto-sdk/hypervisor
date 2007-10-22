@@ -1,5 +1,5 @@
 if not defined freq_mhz      {$freq_mhz      = 1188}
-if not defined memory_megs   {$memory_megs   = 1024}
+if not defined memory_megs   {$memory_megs   = 2048}
 if not defined cpu_cores     {$cpu_cores     = 8}
 if not defined use_uart0     {$use_uart0     = 1}
 if not defined use_uart1     {$use_uart1     = 1}
