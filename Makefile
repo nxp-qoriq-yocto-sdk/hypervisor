@@ -93,4 +93,4 @@ uv.map: uv
 	nm -n uv > $@	
  
 clean:
-	rm -f uv src/*.o src/*.P src/*.d *.bin *.uImage *.gz src/assym.s
+	rm -f uv src/*.o src/*.P src/*.d *.bin *.uImage *.gz src/assym.s *.map
