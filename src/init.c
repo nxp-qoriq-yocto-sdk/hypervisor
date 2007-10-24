@@ -1,17 +1,17 @@
 
 #include "uv.h"
+#include "console.h"
 
 extern void tlb1_init(void);
 
 static void  core_init(void);
 
-void uart_putc(uint8_t);
-
-
 void init(unsigned long devtree_ptr)
 {
 
     core_init();
+
+    console_init();
 
     printh("=======================================\n");
     printh("Freescale Ultravisor 0.1\n");
