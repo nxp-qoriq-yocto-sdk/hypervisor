@@ -196,8 +196,6 @@ _start:
 
 	bl	start_guest
 
-/*	.long   0 */
-
         mr      1,1   /* this is a magic inst that cause the Simics sim to stop */
 
 _busy_loop:

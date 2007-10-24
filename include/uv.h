@@ -1,1 +1,2 @@
 
+#define NULL 0
