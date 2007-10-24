@@ -1,5 +1,30 @@
  
 ----------------------------------------------------------
+Source tree
+
+   src
+   include
+   tools
+
+
+
+----------------------------------------------------------
+To do
+   -currently head.S puts the hv tlb entry in entry #15.  This
+    needs to chaange when we get 64 entries like there are supposed
+    to be
+   -tlb1init puts CCSR in entry #14
+   -ran into problem putting simple guest at physical 0x0-- somehow
+    u-boot gets hosed before
+
+----------------------------------------------------------
+
+Notes:
+
+The hypervisor is linked at 0x0 and always runs at virtual
+0x0 within the GS=0 address space.
+
+----------------------------------------------------------
 Build Options
 
   -need compile time option for number of cores/thread
@@ -42,3 +67,5 @@ Build Options
     -global data-- global across cores
     -stack creation-- needs to be unique per core
     -data-- needs to be unique per core
+
+

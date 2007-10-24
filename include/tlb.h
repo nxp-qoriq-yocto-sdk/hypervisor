@@ -102,6 +102,9 @@
 #define MAS6_SPID0_SHIFT	16
 #define MAS6_SAS		0x00000001
 
+#define MAS8_GTS_SHIFT		0x80000000
+#define MAS8_GTS_MASK		31
+
 #define MAS1_GETTID(mas1)	(((mas1) & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
 
 #define MAS2_TLB0_ENTRY_IDX_MASK	0x0007f000
@@ -119,7 +122,12 @@ typedef struct tlb_entry {
 	uint32_t mas1;
 	uint32_t mas2;
 	uint32_t mas3;
+	uint32_t mas8;
 } tlb_entry_t;
+
+void __tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa, uint32_t size,
+              uint32_t flags, unsigned int _tid, unsigned int _ts, unsigned int _gs);
+
 
 #endif
 

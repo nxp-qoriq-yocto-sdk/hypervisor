@@ -119,7 +119,7 @@ _start:
  */
 	/* Final kernel mapping, map in 16 MB of RAM */
 	lis	%r16, MAS0_TLBSEL1@h	/* Select TLB1 */
-	li	%r17, 1			/* Entry 1 */
+	li	%r17, 15		/* Entry 15 */
 	rlwimi	%r16, %r17, 16, 12, 15
 	mtspr	SPR_MAS0, %r16
 	isync
@@ -269,6 +269,20 @@ ivor_setup:
 	mtspr	SPR_IVOR41, %r21
 
 	blr
+
+/*
+ * r3 = target address of guest
+ * -this needs to change to support the full ePAPR interface
+ * 
+ */
+.globl branch_to_guest
+branch_to_guest:
+	mfmsr	%r4
+	oris	%r4, %r4, 0x1000	/* Switch to GS 1. */
+
+	mtspr	SPR_SRR0, %r3
+	mtspr	SPR_SRR1, %r4
+	rfi				/* Switch context */
 
 
 	.data

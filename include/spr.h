@@ -113,6 +113,7 @@
 #define	SPR_MAS5		0x275	/* ..8 MMU Assist Register 5 Book-E */
 #define	SPR_MAS6		0x276	/* ..8 MMU Assist Register 6 Book-E/e500 */
 #define	SPR_MAS7		0x3B0	/* ..8 MMU Assist Register 7 Book-E/e500 */
+#define	SPR_MAS8		0x277	/* ..8 MMU Assist Register 7 Book-E/e500 */
 
 #define	SPR_L1CSR0		0x3F2	/* ..8 L1 Cache Control and Status Register 0 */
 #define	  L1CSR0_DCPE		0x00010000	/* Data Cache Parity Enable */

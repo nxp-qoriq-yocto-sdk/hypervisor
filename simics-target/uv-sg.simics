@@ -1,4 +1,8 @@
 
+# dispaly options
+digit-grouping 16 8
+output-radix 16
+
 # u-boot
 $uboot  = "u-boot.bin"
 
