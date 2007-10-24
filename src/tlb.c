@@ -98,24 +98,10 @@ __tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
         /* Set supervisor rwx permission bits */
         tlb1[idx].mas3 = (pa & MAS3_RPN) | MAS3_SR | MAS3_SW | MAS3_SX;
 
-#define MAS8HACK
-#ifdef MAS8HACK
-        /* set GS bit -- for now we leave LPID at 0x0 */      
-        tlb1[idx].mas8 = 0;
-        if (_gs == 0) {
-            tlb1[idx].mas8 = 0;
-        } else {
-            tlb1[idx].mas8 = 0x80000000;
-        }
 
-/*  SRY: there seems to be a bug here-- not sure why this
-    code does not set _gs in MAS8 */
-#if 0
+        /* set GS bit */
         tlb1[idx].mas8 = 0;
         tlb1[idx].mas8 |= ((_gs << MAS8_GTS_SHIFT) & MAS8_GTS_MASK);
-#endif
-
-#endif
 
         //debugf("__tlb1_set_entry: mas1 = %08x mas2 = %08x mas3 = 0x%08x\n",
         //              tlb1[idx].mas1, tlb1[idx].mas2, tlb1[idx].mas3);
