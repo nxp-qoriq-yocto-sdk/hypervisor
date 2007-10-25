@@ -11,8 +11,9 @@
 #include "trap_booke.h"
 #include "spr.h"
 
+void branch_to_guest(register_t r3, register_t r4, register_t r5,
+                     register_t r6, register_t r7, uint32_t vaddr);
 
-void  branch_to_guest(uint32_t vaddr);
 void guest_main(void);
 
 unsigned int srr0;
@@ -54,7 +55,7 @@ void start_guest(void)
     * start the guest 
     */
 
-   branch_to_guest((uint32_t)&guest_main);
+   branch_to_guest(0,0,0,0,0,(uint32_t)&guest_main);
 
 }
 
