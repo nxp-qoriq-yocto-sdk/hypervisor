@@ -68,7 +68,7 @@
 /* TODO
  *    -watchdog should be critical
  *    -uncomment IVOR init in head.S
- *    -don't need any TLB stuff in pcpu
+ *    -don't need any TLB stuff in VCPU
  *    -debug int needs to use different SRR0/1
  *    -need separate exit for guest only exceptions, if it didn't come
  *     guest it's fatal
@@ -77,7 +77,7 @@
 /*
  * SPRG usage notes
  *
- * SPRG0 - pcpu pointer
+ * SPRG0 - VCPU pointer
  * SPRG1 - scratch - all interrupts except TLB miss, critical, machine check
  * SPRG2 - scratch - critical level
  * SPRG3 - ?
@@ -287,8 +287,8 @@ interrupt_vector_base:
  * Critical input interrupt - critical
  ****************************************/
 INTERRUPT(int_critical_input)
-	STANDARD_PROLOG(SPR_SPRG2, PCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
-	FRAME_SETUP(SPR_SPRG2, PCPU_CRITSAVE, EXC_CRIT)
+	STANDARD_PROLOG(SPR_SPRG2, VCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
+	FRAME_SETUP(SPR_SPRG2, VCPU_CRITSAVE, EXC_CRIT)
 	bl	critical_interrupt
 	FRAME_LEAVE(SPR_CSRR0, SPR_CSRR1)
 	rfci
@@ -298,8 +298,8 @@ INTERRUPT(int_critical_input)
  * Machine check interrupt - machine check
  ****************************************/
 INTERRUPT(int_machine_check)
-	STANDARD_PROLOG(SPR_SPRG8, PCPU_MACHKSAVE, SPR_MCSRR0, SPR_MCSRR1)
-	FRAME_SETUP(SPR_SPRG8, PCPU_MACHKSAVE, EXC_MCHK)
+	STANDARD_PROLOG(SPR_SPRG8, VCPU_MACHKSAVE, SPR_MCSRR0, SPR_MCSRR1)
+	FRAME_SETUP(SPR_SPRG8, VCPU_MACHKSAVE, EXC_MCHK)
 	bl	powerpc_mchk_interrupt
 	FRAME_LEAVE(SPR_MCSRR0, SPR_MCSRR1)
 	rfmci
@@ -309,8 +309,8 @@ INTERRUPT(int_machine_check)
  * Data storage interrupt - normal, guest only
  ****************************************/
 INTERRUPT(int_data_storage)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_DSI)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_DSI)
 	b	trap_common
 
 
@@ -318,8 +318,8 @@ INTERRUPT(int_data_storage)
  * Instruction storage interrupt - normal, guest only
  ****************************************/
 INTERRUPT(int_instr_storage)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_ISI)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_ISI)
 	b	trap_common
 
 
@@ -327,8 +327,8 @@ INTERRUPT(int_instr_storage)
  * External input interrupt - normal, guest only
  ****************************************/
 INTERRUPT(int_external_input)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_EXI)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_EXI)
 	b	trap_common
 
 
@@ -336,8 +336,8 @@ INTERRUPT(int_external_input)
  * Alignment - normal
  ****************************************/
 INTERRUPT(int_alignment)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_ALI)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_ALI)
 	b	trap_common
 
 
@@ -345,8 +345,8 @@ INTERRUPT(int_alignment)
  * Program - normal
  ****************************************/
 INTERRUPT(int_program)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_PGM)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_PGM)
 	b	trap_common
 
 
@@ -354,8 +354,8 @@ INTERRUPT(int_program)
  * System call - normal - should never occur
  ****************************************/
 INTERRUPT(int_syscall)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_SC)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_SC)
 	b	trap_common
 
 
@@ -363,8 +363,8 @@ INTERRUPT(int_syscall)
  * Decrementer interrupt - normal
  ****************************************/
 INTERRUPT(int_decrementer)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_DECR)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_DECR)
 	b	trap_common
 
 
@@ -372,8 +372,8 @@ INTERRUPT(int_decrementer)
  * Fixed interval timer - normal
  ****************************************/
 INTERRUPT(int_fixed_interval_timer)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_FIT)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_FIT)
 	b	trap_common
 
 
@@ -381,8 +381,8 @@ INTERRUPT(int_fixed_interval_timer)
  * Watchdog interrupt - critical
  ****************************************/
 INTERRUPT(int_watchdog)
-	STANDARD_PROLOG(SPR_SPRG2, PCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
-	FRAME_SETUP(SPR_SPRG2, PCPU_CRITSAVE, EXC_WDOG)
+	STANDARD_PROLOG(SPR_SPRG2, VCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
+	FRAME_SETUP(SPR_SPRG2, VCPU_CRITSAVE, EXC_WDOG)
 	bl	critical_interrupt
 	FRAME_LEAVE(SPR_CSRR0, SPR_CSRR1)
 	rfci
@@ -391,40 +391,40 @@ INTERRUPT(int_watchdog)
  * Data TLB error interrupt - normal, guest only
  ****************************************/
 INTERRUPT(int_data_tlb_error)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_DTLB)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_DTLB)
 	b	trap_common
 
 /****************************************
  * Inst TLB error interrupt - normal, guest only
  ****************************************/
 INTERRUPT(int_inst_tlb_error)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_ITLB)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_ITLB)
 	b	trap_common
 
 /****************************************
  * Perf monitor interrupt - normal
  ****************************************/
 INTERRUPT(int_perf_mon)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_PERF)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_PERF)
 	b	trap_common
 
 /****************************************
  * doorbell - normal
  ****************************************/
 INTERRUPT(int_doorbell)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_DOORBELL)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_DOORBELL)
 	b	trap_common
 
 /****************************************
  * doorbell critical - critical
  ****************************************/
 INTERRUPT(int_doorbell_critical)
-	STANDARD_PROLOG(SPR_SPRG2, PCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
-	FRAME_SETUP(SPR_SPRG2, PCPU_CRITSAVE, EXC_DOORBELLC)
+	STANDARD_PROLOG(SPR_SPRG2, VCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
+	FRAME_SETUP(SPR_SPRG2, VCPU_CRITSAVE, EXC_DOORBELLC)
 	bl	critical_interrupt
 	FRAME_LEAVE(SPR_CSRR0, SPR_CSRR1)
 	rfci
@@ -433,16 +433,16 @@ INTERRUPT(int_doorbell_critical)
  * guest doorbell - normal
  ****************************************/
 INTERRUPT(int_guest_doorbell)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_GDOORBELL)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_GDOORBELL)
 	b	trap_common
 
 /****************************************
  * guest doorbell critical - normal
  ****************************************/
 INTERRUPT(int_guest_doorbell_critical)
-	STANDARD_PROLOG(SPR_SPRG2, PCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
-	FRAME_SETUP(SPR_SPRG2, PCPU_CRITSAVE, EXC_GDOORBELLC)
+	STANDARD_PROLOG(SPR_SPRG2, VCPU_CRITSAVE, SPR_CSRR0, SPR_CSRR1)
+	FRAME_SETUP(SPR_SPRG2, VCPU_CRITSAVE, EXC_GDOORBELLC)
 	bl	critical_interrupt
 	FRAME_LEAVE(SPR_CSRR0, SPR_CSRR1)
 	rfci
@@ -451,16 +451,16 @@ INTERRUPT(int_guest_doorbell_critical)
  * hypercall - normal
  ****************************************/
 INTERRUPT(int_hypercall)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_HCALL)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_HCALL)
 	b	trap_common
 
 /****************************************
  * embedded hypervisor priv - normal
  ****************************************/
 INTERRUPT(int_ehpriv)
-	STANDARD_PROLOG(SPR_SPRG1, PCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
-	FRAME_SETUP(SPR_SPRG1, PCPU_NORMSAVE, EXC_EHPRIV)
+	STANDARD_PROLOG(SPR_SPRG1, VCPU_NORMSAVE, SPR_SRR0, SPR_SRR1)
+	FRAME_SETUP(SPR_SPRG1, VCPU_NORMSAVE, EXC_EHPRIV)
 	b	trap_common
 
 	.globl	interrupt_vector_top
@@ -470,9 +470,9 @@ interrupt_vector_top:
  * Debug interrupt
  ****************************************/
 INTERRUPT(int_debug)
-	STANDARD_DEBUG_PROLOG(SPR_SPRG9, PCPU_DBGSAVE, SPR_CSRR0, SPR_CSRR1)
-	FRAME_SETUP(SPR_SPRG9, PCPU_DBGSAVE, EXC_DEBUG)
-	lwz     %r3, (PCPU_DBGSAVE+CPUSAVE_SRR0)(%r2);
+	STANDARD_DEBUG_PROLOG(SPR_SPRG9, VCPU_DBGSAVE, SPR_CSRR0, SPR_CSRR1)
+	FRAME_SETUP(SPR_SPRG9, VCPU_DBGSAVE, EXC_DEBUG)
+	lwz     %r3, (VCPU_DBGSAVE+CPUSAVE_SRR0)(%r2);
 	lis	%r4, interrupt_vector_base@ha
 	addi	%r4, %r4, interrupt_vector_base@l
 	cmplw	cr0, %r3, %r4
@@ -486,9 +486,9 @@ INTERRUPT(int_debug)
 	rlwinm  %r3,%r3,0,23,21
 	stw	%r3, FRAME_SRR1(%r1);
 	/* Restore srr0 and srr1 as they could have been clobbered. */
-	lwz     %r3, (PCPU_DBGSAVE+CPUSAVE_SRR0+8)(%r2);
+	lwz     %r3, (VCPU_DBGSAVE+CPUSAVE_SRR0+8)(%r2);
 	mtspr   SPR_SRR0, %r3
-	lwz     %r4, (PCPU_DBGSAVE+CPUSAVE_SRR1+8)(%r2);
+	lwz     %r4, (VCPU_DBGSAVE+CPUSAVE_SRR1+8)(%r2);
 	mtspr   SPR_SRR1, %r4
 	b	9f
 1:

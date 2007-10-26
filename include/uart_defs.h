@@ -30,8 +30,8 @@
  * $FreeBSD: src/sys/dev/ic/ns16550.h,v 1.17 2006/05/23 00:41:12 benno Exp $
  */
 
-#ifndef _PCPU_H
-#define _PCPU_H
+#ifndef _UART_DEFS_H
+#define _UART_DEFS_H
 
 
 /*
@@ -157,4 +157,4 @@
 #define	com_xoff1	6	/* XOFF 1 character (R/W) */
 #define	com_xoff2	7	/* XOFF 2 character (R/W) */
 
-#endif /* _PCPU_H */
+#endif /* _UART_DEFS_H */

@@ -181,12 +181,12 @@ _start:
 	addi	%r1, %r1, -4
 
 /* 
- * set SPRG0 to point to the pcpu struct
+ * set SPRG0 to point to the vcpu struct
  * (for the exception handlers)
  * -TODO: this will need to be per-core eventually
  */
-	lis	%r21, pcpu@ha
-	addi	%r21, %r21, pcpu@l
+	lis	%r21, vcpu@ha
+	addi	%r21, %r21, vcpu@l
 	mtsprg0	%r21
 
 
@@ -285,8 +285,9 @@ branch_to_guest:
 
 	.data
 	.align 12 /* page align */
-pcpu:
-	.space PCPU_SIZE
+GLOBAL(vcpu)
+vcpu:
+	.space VCPU_SIZE
 
 	/* For now allocate 4 pages for the 4 exception stacks
 	 * normal, critical, machine check, debug.
