@@ -64,7 +64,33 @@ trap(trapframe_t *frameptr)
 
     printh(trapname(type));
 
+    switch (type) {
+    case EXC_CRIT:
+    case EXC_MCHK:
+    case EXC_DSI:
+    case EXC_ISI:
+    case EXC_EXI:
+    case EXC_ALI:
+    case EXC_PGM:
+    case EXC_SC:
+    case EXC_DECR:
+    case EXC_FIT:
+    case EXC_WDOG:
+    case EXC_DTLB:
+    case EXC_ITLB:
+    case EXC_DEBUG:
+    case EXC_PERF:
+    case EXC_DOORBELL:
+    case EXC_DOORBELLC:
+    case EXC_GDOORBELL:
+    case EXC_GDOORBELLC:
+    case EXC_HCALL:
+    case EXC_EHPRIV:
+    default:
    /* the statement below stops the simulator */
-    __asm__ volatile("mr 2, 2");
+        __asm__ volatile("mr 2, 2");
+        break;
+    }
+
 
 }
