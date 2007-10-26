@@ -15,71 +15,28 @@ To build/run simple guest on the bare metal
 
    cd sg
    make
-   [path-to-simics]/simics simics-target/sg.simics
+   [path-to-simics]/simics sim/sg.simics
+   
+   (will print out message on console1)
+
+
+To build/run Ultravisor with simple guest
+
+   make
+   [path-to-simics]/simics sim/uv-sg.simics
 
 
 ----------------------------------------------------------
 Current memory layout
 
+   Ultravisor at 0x20000000 phys, 0x20000000 virtual -- in GS=0 address space
+
+   Guest at 0x30000000 phys, 0x00000000 virtual, and 0x00000000 guest-physical  -- in GS=1 address space
 
 ----------------------------------------------------------
-To do
-   -currently head.S puts the hv tlb entry in entry #15.  This
-    needs to chaange when we get 64 entries like there are supposed
-    to be
-   -tlb1init puts CCSR in entry #14
-   -ran into problem putting simple guest at physical 0x0-- somehow
-    u-boot gets hosed before
+TLB/MMU
+
+   Current Simics has 16 TLB entries
+   Ultravisor take 1 TLB for itself (#15), 1 for CCSR space (#14)
 
 ----------------------------------------------------------
-
-Notes:
-
-The hypervisor is linked at 0x0 and always runs at virtual
-0x0 within the GS=0 address space.
-
-----------------------------------------------------------
-Build Options
-
-  -need compile time option for number of cores/thread
-    -this specifies number of core-private data areas needed
-
-----------------------------------------------------------
-
-  Hypervisor runs as GS=0. Within it's virtual
-  address space, everything is identity (1:1).
- 
-  LAW setup - physical
-     LAW0 - 0x00000000-0xffffffff - hypervisor - globally shared
-     LAW1 - 0x10000000-0x1fffffff - partition 1 private
-     LAW2 - 0x20000000-0x2fffffff - partition 2 private
-     LAW3 - 0x30000000-0x3fffffff - partition 1,2 shared memory segment
- 
-  Physical Memory map
-     
-    0x00000000   core dispatch table
-    0x00001000   hypervisor code
-                 globally shared data
-                 per-cpu data
-                 per-cpu uv stack
- 
- 
-  Per core virtual memory map
-    0x00000000   core dispatch table
-    0x00001000   hypervisor code
-                 global data
-                 stack
-
-  TLB usage by hypervisor
-
-     1 entry locked for HV per-cpu storange
-     1 entry locked for HV global storange
- 
-  Init to do
-    -need to setup MMU mapping(s) for the HV
-    -code-- global across cores-- read only
-    -global data-- global across cores
-    -stack creation-- needs to be unique per core
-    -data-- needs to be unique per core
-
-
