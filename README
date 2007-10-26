@@ -2,11 +2,24 @@
 ----------------------------------------------------------
 Source tree
 
-   src
-   include
-   tools
-   sim
+   src         ultravisor source
+   include     ultravisor includes
+   tools       has build tools,etc
+   sim         simics simulator scripts, images for u-boot/Linux
+   sg          simple guest -- a simple guest for testing
 
+----------------------------------------------------------
+Building and Running
+
+To build/run simple guest on the bare metal
+
+   cd sg
+   make
+   [path-to-simics]/simics simics-target/sg.simics
+
+
+----------------------------------------------------------
+Current memory layout
 
 
 ----------------------------------------------------------
