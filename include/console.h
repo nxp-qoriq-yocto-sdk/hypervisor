@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
-void printh(unsigned char *s);
-void puts_len(char *s, int len);
+void console_init(void);
+void printh(const char *s);
+void puts_len(const char *s, int len);
 size_t printf(const char *str, ...);
 
 #endif  /* _CONSOLE_H */

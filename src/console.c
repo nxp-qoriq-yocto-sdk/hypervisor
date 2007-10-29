@@ -8,7 +8,7 @@ void console_init(void)
     uart_init();
 }
 
-void printh(unsigned char *s)
+void printh(const char *s)
 {
 
     if (s == 0)
@@ -24,7 +24,7 @@ void printh(unsigned char *s)
 
 }
 
-void puts_len(char *s, int len)
+void puts_len(const char *s, int len)
 {
     while (*s && len--) {
         if (*s == '\n')

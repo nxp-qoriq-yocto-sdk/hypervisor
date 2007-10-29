@@ -26,7 +26,8 @@ CC_OPTS_C= -Wall \
   -funit-at-a-time \
   -mno-string \
   -fomit-frame-pointer \
-  -Wdeclaration-after-statement
+  -Wno-unused \
+  -Werror
 CC_OPTS_ASM=-D_ASM
 LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
