@@ -1,0 +1,7 @@
+*.s
+*.P
+*.o
+uv
+uv.bin
+uv.map
+uv.uImage
