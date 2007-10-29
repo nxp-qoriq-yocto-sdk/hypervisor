@@ -29,7 +29,7 @@ CC_OPTS_C= -Wall \
   -Wdeclaration-after-statement
 CC_OPTS_ASM=-D_ASM
 LD=$(CROSS_COMPILE)ld
-LD_OPTS=-m elf32ppc -Bstatic
+LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
 OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o src/init.o src/guest.o src/tlb.o \
@@ -56,7 +56,7 @@ uv.bin: uv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 uv: $(OBJS)
-	$(LD) $(LD_OPTS) -T uv.lds -o $@ $(OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Tuv.lds -o $@ $(OBJS) -lgcc
 #	$(LD) $(LD_OPTS) -o $@ $(OBJS)
 
 # compile and gen dependecy file
