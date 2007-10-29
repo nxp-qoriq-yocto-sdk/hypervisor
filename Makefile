@@ -10,7 +10,7 @@ CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude
+CC_OPTS=-m32 -Wa,-me500 -Iinclude -std=c99
 CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \
