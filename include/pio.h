@@ -33,7 +33,7 @@
 #ifndef _MACHINE_PIO_H_
 #define	_MACHINE_PIO_H_
 
-#include <inttypes.h>
+#include <stdint.h>
 
 /*
  * I/O macros.

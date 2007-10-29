@@ -117,7 +117,7 @@
 
 #if !defined(_ASM)
 
-#include <inttypes.h>
+#include <stdint.h>
 typedef struct tlb_entry {
 	uint32_t mas1;
 	uint32_t mas2;
