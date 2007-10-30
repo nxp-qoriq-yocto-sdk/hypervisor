@@ -60,7 +60,7 @@ void trap(trapframe_t *frameptr)
 
 	type = frameptr->exc;
 
-	printh(trapname(type));
+	puts(trapname(type));
 
 	switch (type) {
 	case EXC_CRIT:

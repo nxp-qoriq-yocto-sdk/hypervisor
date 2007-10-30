@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 void console_init(void);
-void printh(const char *s);
+int puts(const char *s);
 void puts_len(const char *s, int len);
 size_t printf(const char *str, ...);
 

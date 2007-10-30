@@ -1,37 +1,30 @@
 #include <stdarg.h>
 #include <string.h>
+#include <limits.h>
 #include "uart.h"
 #include "console.h"
 
 void console_init(void)
 {
-    uart_init();
-}
-
-void printh(const char *s)
-{
-
-    if (s == 0)
-        return;
-
-    while (*s != 0) {
-        uart_putc(*s);
-        if (*s == '\n') {
-            uart_putc('\r');
-        }
-        s++;
-    }
-
+	uart_init();
 }
 
 void puts_len(const char *s, int len)
 {
-    while (*s && len--) {
-        if (*s == '\n')
-            uart_putc('\r');
+	while (*s && len--) {
+		if (*s == '\n')
+			uart_putc('\r');
 
-        uart_putc(*s++);
-    }
+		uart_putc(*s++);
+	}
+}
+
+int puts(const char *s)
+{
+	puts_len(s, INT_MAX);
+	uart_putc('\r');
+	uart_putc('\n');
+	return 0;
 }
 
 size_t printf(const char *str, ...)
