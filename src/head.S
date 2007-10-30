@@ -185,9 +185,9 @@ _start:
  * (for the exception handlers)
  * -TODO: this will need to be per-core eventually
  */
-	lis	%r21, vcpu@ha
-	addi	%r21, %r21, vcpu@l
-	mtsprg0	%r21
+	lis	%r2, hcpu0@ha
+	addi	%r2, %r2, hcpu0@l
+	mtsprg0	%r2
 
 
 	bl	ivor_setup
@@ -282,41 +282,17 @@ branch_to_guest:
 	mtspr	SPR_SRR1, %r4
 	rfi				/* Switch context */
 
-
-	.data
-	.align 12 /* page align */
-GLOBAL(vcpu)
-vcpu:
-	.space VCPU_SIZE
-
 	/* For now allocate 4 pages for the 4 exception stacks
 	 * normal, critical, machine check, debug.
 	 * Eventually, these stacks need to be in a per hypervisor
          * data area.
          */
 
-GLOBAL(uvload)
-        .long
-
 	.section .bss
 	.align 12  /* page align */
 uv_stack_bottom:
 	.space 4096
+uv_stack_top:
 
-GLOBAL(uv_stack_top)
-except_stack_bottom:
-	.space 4096
-
-GLOBAL(except_stack_top)
-crit_except_stack_bottom:
-	.space 4096
-
-GLOBAL(crit_except_stack_top)
-machchk_except_stack_bottom:
-	.space 4096
-
-GLOBAL(machchk_except_stack_top)
-dbg_except_stack_bottom:
-	.space 4096
-
-GLOBAL(dbg_except_stack_top)
+uvload:
+        .long

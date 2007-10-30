@@ -31,9 +31,7 @@
 
 #include "tlb.h"
 #include "spr.h"
-#include "vcpu.h"
-
-extern vcpu_t *vcpu;
+#include "percpu.h"
 
 static void tlb1_write_entry(unsigned int idx);
 static unsigned int size2tsize(uint32_t size);
@@ -90,18 +88,18 @@ __tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
 
         tid = (_tid <<  MAS1_TID_SHIFT) & MAS1_TID_MASK;
         ts = (_ts) ? MAS1_TS : 0;
-        vcpu->tlb1[idx].mas1 = MAS1_VALID | MAS1_IPROT | ts | tid;
-        vcpu->tlb1[idx].mas1 |= ((tsize << MAS1_TSIZE_SHIFT) & MAS1_TSIZE_MASK);
+        hcpu->tlb1[idx].mas1 = MAS1_VALID | MAS1_IPROT | ts | tid;
+        hcpu->tlb1[idx].mas1 |= ((tsize << MAS1_TSIZE_SHIFT) & MAS1_TSIZE_MASK);
 
-        vcpu->tlb1[idx].mas2 = (va & MAS2_EPN) | flags;
+        hcpu->tlb1[idx].mas2 = (va & MAS2_EPN) | flags;
 
         /* Set supervisor rwx permission bits */
-        vcpu->tlb1[idx].mas3 = (pa & MAS3_RPN) | MAS3_SR | MAS3_SW | MAS3_SX;
+        hcpu->tlb1[idx].mas3 = (pa & MAS3_RPN) | MAS3_SR | MAS3_SW | MAS3_SX;
 
 
         /* set GS bit */
-        vcpu->tlb1[idx].mas8 = 0;
-        vcpu->tlb1[idx].mas8 |= ((_gs << MAS8_GTS_SHIFT) & MAS8_GTS_MASK);
+        hcpu->tlb1[idx].mas8 = 0;
+        hcpu->tlb1[idx].mas8 |= ((_gs << MAS8_GTS_SHIFT) & MAS8_GTS_MASK);
 
         //debugf("__tlb1_set_entry: mas1 = %08x mas2 = %08x mas3 = 0x%08x\n",
         //              tlb1[idx].mas1, tlb1[idx].mas2, tlb1[idx].mas3);
@@ -127,15 +125,15 @@ tlb1_write_entry(unsigned int idx)
 
         mtspr(SPR_MAS0, mas0);
         __asm volatile("isync");
-        mtspr(SPR_MAS1, vcpu->tlb1[idx].mas1);
+        mtspr(SPR_MAS1, hcpu->tlb1[idx].mas1);
         __asm volatile("isync");
-        mtspr(SPR_MAS2, vcpu->tlb1[idx].mas2);
+        mtspr(SPR_MAS2, hcpu->tlb1[idx].mas2);
         __asm volatile("isync");
-        mtspr(SPR_MAS3, vcpu->tlb1[idx].mas3);
+        mtspr(SPR_MAS3, hcpu->tlb1[idx].mas3);
         __asm volatile("isync");
         mtspr(SPR_MAS7, mas7);
         __asm volatile("isync");
-        mtspr(SPR_MAS8, vcpu->tlb1[idx].mas8);
+        mtspr(SPR_MAS8, hcpu->tlb1[idx].mas8);
         __asm volatile("isync; tlbwe; isync; msync");
 
         //debugf("tlb1_write_entry: e\n");;

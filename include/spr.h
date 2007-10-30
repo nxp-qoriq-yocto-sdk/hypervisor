@@ -65,6 +65,8 @@
 #define	SPR_CSRR1		0x03b	/* ..8 59 Critical SRR1 */
 #define	SPR_MCSRR0		0x23a	/* ..8 570 Machine check SRR0 */
 #define	SPR_MCSRR1		0x23b	/* ..8 571 Machine check SRR1 */
+#define	SPR_DSRR0		0x23e	/* ..8 570 Machine check SRR0 */
+#define	SPR_DSRR1		0x23f	/* ..8 571 Machine check SRR1 */
 
 #define	SPR_SVR			0x3ff	/* ..8 1023 System Version Register */
 #define	SPR_PID0		0x030	/* ..8 Process ID Register 0 */
@@ -140,6 +142,7 @@
 #define	SPR_LR			0x008	/* Link Register */
 #define	SPR_CTR			0x009	/* Count Register */
 
+#define	SPR_DEAR		0x3d5	/* Data Error Address Register */
 
 #if 0
 /*

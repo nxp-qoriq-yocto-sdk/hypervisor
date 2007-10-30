@@ -35,37 +35,29 @@
 
 #include <stddef.h>
 #include "assym.h"
-#include "vcpu.h"
+#include "percpu.h"
 #include "frame.h"
 
-ASSYM(CPUSAVE_R28, CPUSAVE_R28*4);
-ASSYM(CPUSAVE_R29, CPUSAVE_R29*4);
-ASSYM(CPUSAVE_R30, CPUSAVE_R30*4);
-ASSYM(CPUSAVE_R31, CPUSAVE_R31*4);
-ASSYM(CPUSAVE_DEAR, CPUSAVE_DEAR*4);
-ASSYM(CPUSAVE_ESR, CPUSAVE_ESR*4);
-ASSYM(CPUSAVE_SRR0, CPUSAVE_SRR0*4);
-ASSYM(CPUSAVE_SRR1, CPUSAVE_SRR1*4);
+ASSYM(HCPU_SIZE, sizeof(hcpu_t));
+ASSYM(HCPU_GCPU, offsetof(hcpu_t, gcpu));
+ASSYM(HCPU_NORMSAVE, offsetof(hcpu_t, normsave));
+ASSYM(HCPU_CRITSAVE, offsetof(hcpu_t, critsave));
+ASSYM(HCPU_MACHKSAVE, offsetof(hcpu_t, machksave));
+ASSYM(HCPU_DBGSAVE, offsetof(hcpu_t, dbgsave));
+ASSYM(HCPU_DEBUGSTACK, offsetof(hcpu_t, debugstack));
+ASSYM(HCPU_CRITSTACK, offsetof(hcpu_t, critstack));
+ASSYM(HCPU_MCHECKSTACK, offsetof(hcpu_t, mcheckstack));
 
-ASSYM(VCPU_SIZE, sizeof(vcpu_t));
-ASSYM(VCPU_NORMSAVE, offsetof(vcpu_t, normsave));
-ASSYM(VCPU_CRITSAVE, offsetof(vcpu_t, critsave));
-ASSYM(VCPU_MACHKSAVE, offsetof(vcpu_t, machksave));
-ASSYM(VCPU_DBGSAVE, offsetof(vcpu_t, dbgsave));
-ASSYM(UVSTACK, offsetof(vcpu_t, uvstack));
+ASSYM(GCPU_UVSTACK, offsetof(gcpu_t, uvstack));
 
 ASSYM(FRAMELEN, FRAMELEN);
-ASSYM(FRAME_0, offsetof(trapframe_t, fixreg[0]));
-ASSYM(FRAME_1, offsetof(trapframe_t, fixreg[1]));
-ASSYM(FRAME_2, offsetof(trapframe_t, fixreg[2]));
-ASSYM(FRAME_3, offsetof(trapframe_t, fixreg[3]));
+ASSYM(FRAME_GPREGS, offsetof(trapframe_t, gpregs[0]));
 ASSYM(FRAME_LR, offsetof(trapframe_t, lr));
-ASSYM(FRAME_CR, offsetof(trapframe_t, cr));
-ASSYM(FRAME_DEAR, offsetof(trapframe_t, dear));
-ASSYM(FRAME_ESR, offsetof(trapframe_t, esr));
 ASSYM(FRAME_CTR, offsetof(trapframe_t, ctr));
+ASSYM(FRAME_CR, offsetof(trapframe_t, cr));
 ASSYM(FRAME_XER, offsetof(trapframe_t, xer));
 ASSYM(FRAME_SRR0, offsetof(trapframe_t, srr0));
 ASSYM(FRAME_SRR1, offsetof(trapframe_t, srr1));
+ASSYM(FRAME_DEAR, offsetof(trapframe_t, dear));
+ASSYM(FRAME_ESR, offsetof(trapframe_t, esr));
 ASSYM(FRAME_EXC, offsetof(trapframe_t, exc));
-

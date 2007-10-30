@@ -1,5 +1,11 @@
 #include "uv.h"
 #include "console.h"
+#include "percpu.h"
+
+static gcpu_t noguest;
+hcpu_t hcpu0 = {
+	.gcpu = &noguest,
+};
 
 extern void tlb1_init(void);
 
