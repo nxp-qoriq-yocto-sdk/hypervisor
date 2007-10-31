@@ -34,7 +34,7 @@ add-directory "%script%/images/" -prepend
 
 ###
 
-if not defined freq_mhz      {$freq_mhz      = 1188}
+if not defined freq_mhz      {$freq_mhz      = 1333.3}
 if not defined memory_megs   {$memory_megs   = 1024}
 if not defined cpu_cores     {$cpu_cores     = 8}
 ###
@@ -82,12 +82,29 @@ foreach $phy_idx in (range 5) {
 # all memory on a single slot controller, not sure if on one CS? (kkg)
 create-and-connect-ddr-memory $system $memory_megs "A"
 
-
 instantiate-components
 
-# workaround POR values 3.2.1 (build-id: 1532)
-cpu0->pvr = 0x80230010
-cpu0->svr = 0x80A00010
+# workaround POR values 3.2.2 (build-id: 1536)
+# (MAS0[ESEL] mask is wrong thus we can only modify 16 TLB entries
+cpu0->tlb1cfg = 0x1019c010
+# CCSR is now defaults to 4Gb - 32M and size is 16M
+$ccsr_size = 0x01000000
+$ccsr_addr = 0xfe000000
+phys_mem.del-map ccsr_space
+phys_mem.add-map ccsr_space $ccsr_addr $ccsr_size
+ccsr->CCSRBAR = ($ccsr_addr >> 12)
+script-branch {
+	local $bp_id = (phys_mem.break -w (ccsr->CCSRBAR << 12))
+	while (1) {
+		wait-for-breakpoint $bp_id
+		delete $bp_id
+		echo "fixing CCSR mapping"
+		local $new_ccsr = ccsr->CCSRBAR << 12
+		phys_mem.del-map ccsr_space
+		phys_mem.add-map ccsr_space $new_ccsr $ccsr_size
+		$bp_id = (phys_mem.break -w $new_ccsr)
+	}
+}
 
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
@@ -114,8 +131,8 @@ $phys_mem.load-file $uboot 0xfff80000
 # the address has to match u-boot build/config
 ($phys_mem.add-map
         ($system:l1_cache)
-        base = 0xffd00000 length = 0x4000
-        priority = 200 offset = 0xffd00000)
+        base = 0xfdd00000 length = 0x4000
+        priority = 200 offset = 0xfdd00000)
 
 # U-boot symbols
 if $uboot_symbols != "" {

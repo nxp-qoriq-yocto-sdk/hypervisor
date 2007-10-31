@@ -46,9 +46,9 @@ static unsigned int size2tsize(uint32_t size);
  */
 
 /* hardcoded hack for now */
-#define CCSRBAR_PA              0xffe00000
+#define CCSRBAR_PA              0xfe000000
 #define CCSRBAR_VA              0xf0000000
-#define CCSRBAR_SIZE            0x00100000
+#define CCSRBAR_SIZE            0x01000000
 
 void tlb1_init(void)
 {
