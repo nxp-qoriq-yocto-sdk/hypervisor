@@ -193,13 +193,13 @@
 #define   EPC_EPR               0x80000000 /* 1 = user, 0 = kernel */
 #define   EPCBIT_EPR            32
 #define   EPC_EAS               0x40000000 /* Address Space */
-#define   EPCBIT_EAS            31
+#define   EPCBIT_EAS            33
 #define   EPC_EGS               0x20000000 /* 1 = guest, 0 = hypervisor */
-#define   EPCBIT_EGS            30
+#define   EPCBIT_EGS            34
 #define   EPC_ELPID             0x00ff0000
-#define   EPCBIT_ELPID_SHIFT    16
+#define   EPC_ELPID_SHIFT       16
 #define   EPC_EPID              0x00003fff
-#define   EPCBIT_EPID_SHIFT     0
+#define   EPC_EPID_SHIFT        0
 
 #define	SPR_DEAR		0x3d5	/* Data Error Address Register */
 

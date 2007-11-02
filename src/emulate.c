@@ -29,17 +29,291 @@
 #include <frame.h>
 #include <console.h>
 #include <guestmemio.h>
+#include <percpu.h>
+
+#define TLB1_NENTRIES 4
+
+static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
+{
+	int ra = (insn >> 16) & 31;
+	int rb = (insn >> 11) & 31;
+	
+	return regs->gpregs[rb] + (ra ? regs->gpregs[ra] : 0);
+}
+
+static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t va = get_ea_indexed(regs, insn);
+	
+	if (va & 0xff3) {
+		printf("tlbivax@0x%08x: reserved bits in EA: 0x%08x\n", regs->srr0, va);
+		return 1;
+	}
+
+	asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
+	return 0;
+}
+
+static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t va = get_ea_indexed(regs, insn);
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPID));
+	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
+
+	if (mfspr(SPR_MAS1) & MAS1_VALID) {
+		uint32_t mas3 = mfspr(SPR_MAS3);
+		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
+		               (mas3 & MAS3_RPN);
+
+		uint64_t guest = rpn - gcpu->mem_real + gcpu->mem_start;
+
+//		printf("tlbsx va 0x%08x found 0x%09llx guest 0x%09llx\n", va, rpn, guest);
+
+		mtspr(SPR_MAS7, guest >> 32);
+		mtspr(SPR_MAS3, (uint32_t)guest | (mas3 & ~MAS3_RPN));
+	}
+	
+	return 0;
+}
+
+static int emu_tlbre(trapframe_t *regs, uint32_t insn)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+	uint32_t mas0 = mfspr(SPR_MAS0);
+	int entry;
+	
+	if (mas0 & MAS0_RESERVED) {
+		printf("tlbre@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (!(mas0 & MAS0_TLBSEL1)) {
+		printf("tlbre@0x%08x: attempt to read from TLB0\n", regs->srr0);
+		return 1;
+	}
+
+	entry = (mas0 & MAS0_ESEL_TLB1MASK) >> MAS0_ESEL_SHIFT;
+	if (entry > TLB1_NENTRIES) {
+		printf("tlbre@0x%08x: attempt to read TLB1 entry %d (max %d)\n",
+		       regs->srr0, entry, TLB1_NENTRIES);
+		return 1;
+	}
+
+	asm volatile("tlbre" : :  : "memory");
+	
+	if (mfspr(SPR_MAS1) & MAS1_VALID) {
+		uint32_t mas3 = mfspr(SPR_MAS3);
+		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
+		               (mas3 & MAS3_RPN);
+
+		uint64_t guest = rpn - gcpu->mem_real + gcpu->mem_start;
+
+//		printf("tlbre mas0 0x%08x found 0x%09llx guest 0x%09llx\n",
+//		       mas0, rpn, guest);
+
+		mtspr(SPR_MAS7, guest >> 32);
+		mtspr(SPR_MAS3, (uint32_t)guest | (mas3 & ~MAS3_RPN));
+	}
+	
+	return 0;
+}
+
+static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+	uint32_t mas0 = mfspr(SPR_MAS0);
+	uint32_t mas1 = mfspr(SPR_MAS1);
+	uint32_t mas2 = mfspr(SPR_MAS2);
+	uint32_t mas3 = mfspr(SPR_MAS3);
+	uint32_t mas7 = mfspr(SPR_MAS7);
+	uint64_t guest = ((uint64_t)mas7 << 32) | (mas3 & MAS3_RPN);
+	uint64_t rpn = guest - gcpu->mem_start + gcpu->mem_real;
+
+	if (mas0 & MAS0_RESERVED) {
+		printf("tlbwe@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (mas1 & MAS1_RESERVED) {
+		printf("tlbwe@0x%08x: reserved bits in MAS1: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (mas2 & MAS2_RESERVED) {
+		printf("tlbwe@0x%08x: reserved bits in MAS2: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (mas3 & MAS3_RESERVED) {
+		printf("tlbwe@0x%08x: reserved bits in MAS3: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (mas7 & MAS7_RESERVED) {
+		printf("tlbwe@0x%08x: reserved bits in MAS7: 0x%08x\n", regs->srr0, mas0);
+		return 1;
+	}
+
+	if (mas0 & MAS0_TLBSEL1) {
+		int entry = (mas0 & MAS0_ESEL_TLB1MASK) >> MAS0_ESEL_SHIFT;
+		if (entry >= TLB1_NENTRIES) {
+			printf("tlbwe@0x%08x: attempt to write TLB1 entry %d (max %d)\n",
+			       regs->srr0, entry, TLB1_NENTRIES);
+			return 1;
+		}
+		
+		if (!(mas1 & MAS1_VALID))
+			goto ok; 
+		
+		uint64_t size =
+			1024 << (((mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT) * 2);
+
+		if (size < 4096 || size > 4096ULL * 1024 * 1024) {
+			printf("tlbwe@0x%08x: invalid size, MAS1=0x%08x\n", regs->srr0, mas1);
+			return 1;
+		}
+
+		if (rpn & (size - 1)) {	
+			printf("tlbwe@0x%08x: misaligned TLB1 entry, guest 0x%09llx, "
+			       "real 0x%09llx, size 0x%09llx\n", regs->srr0, guest, rpn, size);
+			return 1;
+		}
+
+		if (guest + size > gcpu->mem_end) {
+#if 0
+			// FIXME: lookup allowed I/O
+			printf("tlbwe@0x%08x: guest phys 0x%09llx, size 0x%09llx out of range\n",
+			       regs->srr0, guest, size);
+			return 1;
+#else
+			goto ok;
+#endif
+		}
+	} else if (!(mas1 & MAS1_VALID)) {
+		goto ok; 
+	}
+
+	if (guest < gcpu->mem_start || guest >= gcpu->mem_end) {
+#if 0
+		// FIXME: lookup allowed I/O
+		printf("tlbwe@0x%08x: guest phys 0x%09llx out of range\n",
+		       regs->srr0, guest);
+		return 1;
+#else
+		goto ok;
+#endif
+	}
+
+	mtspr(SPR_MAS7, rpn >> 32);
+	mtspr(SPR_MAS3, (uint32_t)rpn | (mas3 & ~MAS3_RPN));
+
+ok:
+	mtspr(SPR_MAS8, MAS8_GTS_MASK | mfspr(SPR_LPID));
+
+//	printf("tlbwe@0x%08x: mas0 0x%08x mas1 0x%08x mas2 0x%08x mas3 0x%08x"
+//	       " mas7 0x%08x mas8 0x%08x\n", regs->srr0, mfspr(SPR_MAS0), mfspr(SPR_MAS1),
+//	       mfspr(SPR_MAS2), mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
+
+	asm volatile("tlbwe" : : : "memory");
+	return 0;
+}
+
+static int get_spr(uint32_t insn)
+{
+	return ((insn >> 6) & 0x3e0) |
+	       ((insn >> 16) & 0x1f);
+}
+
+static int emu_mfspr(trapframe_t *regs, uint32_t insn)
+{
+	int spr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+	uint32_t ret;
+	
+	switch (spr) {
+	case SPR_TLB1CFG:
+		ret = mfspr(SPR_TLB1CFG) & ~TLBCFG_NENTRY_MASK;
+		ret |= TLB1_NENTRIES;
+		break;
+
+	default:
+		printf("mfspr@0x%08x: unknown reg %d\n", regs->srr0, spr);
+		ret = 0;
+//		return 1;
+	}
+	
+	regs->gpregs[reg] = ret;
+	return 0;
+}
+
+static int emu_mtspr(trapframe_t *regs, uint32_t insn)
+{
+	int spr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+
+	switch (spr) {
+	default:
+		printf("mtspr@0x%08x: unknown reg %d, val 0x%08x\n",
+		       regs->srr0, spr, regs->gpregs[reg]);
+//		return 1;
+	}
+	
+	return 0;
+}
 
 void hvpriv(trapframe_t *regs)
 {
-	uint32_t insn;
+	uint32_t insn, op;
+	int fault = 1;
 
 	guestmem_set_insn(regs);
-	printf("hvpriv trap from %#08x\n", regs->srr0);
-	asm volatile("" : : : "memory");
+//	printf("hvpriv trap from 0x%08x, srr1 0x%08x, eplc 0x%08x\n", regs->srr0,
+//	       regs->srr1, mfspr(SPR_EPLC));
 	insn = guestmem_in32((uint32_t *)regs->srr0);
-	printf("insn %#08x\n", insn);
 	
-	printf("hvpriv trap from %#08x, insn %#08x\n", regs->srr0, insn);
+	if (((insn >> 26) & 0x3f) != 0x1f)
+		goto bad;
+	
+	op = (insn >> 1) & 0x3ff;
+
+	switch (op) {
+	case 0x312: /* tlbivax */
+		fault = emu_tlbivax(regs, insn);
+		break;
+	
+	case 0x3b2: /* tlbre */
+		fault = emu_tlbre(regs, insn);
+		break;
+
+	case 0x392: /* tlbsx */
+		fault = emu_tlbsx(regs, insn);
+		break;
+
+	case 0x236: /* tlbsync */
+//		fault = emu_tlbsync(regs, insn);
+		break;
+
+	case 0x3d2: /* tlbwe */
+		fault = emu_tlbwe(regs, insn);
+		break;
+
+	case 0x153: /* mfspr */
+		fault = emu_mfspr(regs, insn);
+		break;
+
+	case 0x1d3: /* mtspr */
+		fault = emu_mtspr(regs, insn);
+		break;
+	}
+
+	if (__builtin_expect(fault == 0, 1)) {
+		regs->srr0 += 4;
+		return;
+	}
+
+bad:
+	printf("unhandled hvpriv trap from 0x%08x, insn 0x%08x\n", regs->srr0, insn);
 	stopsim();
 }

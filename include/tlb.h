@@ -40,6 +40,7 @@
 #define MAS0_ESEL_SHIFT		16
 #define MAS0_NV_MASK		0x00000003
 #define MAS0_NV_SHIFT		0
+#define MAS0_RESERVED           0xe000f000
 
 #define MAS1_VALID		0x80000000
 #define MAS1_IPROT		0x40000000
@@ -48,6 +49,7 @@
 #define MAS1_TS			0x00001000
 #define MAS1_TSIZE_MASK		0x00000F00
 #define MAS1_TSIZE_SHIFT	8
+#define MAS1_RESERVED           0x0000e0ff
 
 #define	TLB_SIZE_4K		1
 #define	TLB_SIZE_16K		2
@@ -70,6 +72,7 @@
 #define	MAS2_M			0x00000004
 #define	MAS2_G			0x00000002
 #define	MAS2_E			0x00000001
+#define MAS2_RESERVED           0x00000f00
 
 #define	MAS3_RPN		0xFFFFF000
 #define	MAS3_RPN_SHIFT		12
@@ -83,6 +86,7 @@
 #define	MAS3_SW			0x00000004
 #define	MAS3_UR			0x00000002
 #define	MAS3_SR			0x00000001
+#define MAS3_RESERVED           0x00000c00
 
 #define MAS4_TLBSELD1		0x10000000
 #define MAS4_TLBSELD0		0x00000000
@@ -98,12 +102,21 @@
 #define MAS4_GD			0x00000002
 #define MAS4_ED			0x00000001
 
+#define MAS5_SGS                0x80000000 /* Search GS */
+#define MAS5_SLPID              0x000000ff /* Search LPID */
+
 #define MAS6_SPID0_MASK		0x00FF0000
 #define MAS6_SPID0_SHIFT	16
 #define MAS6_SAS		0x00000001
+#define MAS6_RESERVED           0xf000fffe
+
+#define MAS7_RPN                0x0000000f
+#define MAS7_RESERVED           0xfffffff0
 
 #define MAS8_GTS_SHIFT		31
 #define MAS8_GTS_MASK		0x80000000
+#define MAS8_VF                 0x40000000 /* Virtualization Fault */
+#define MAS8_TLPID              0x000000ff
 
 #define MAS1_GETTID(mas1)	(((mas1) & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
 

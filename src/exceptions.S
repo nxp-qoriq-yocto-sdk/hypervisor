@@ -121,10 +121,10 @@
 	 * instruction addresses, so EPSC assumes data.
 	 */
 	
-	rlwimi	%r3, %r5, EPCBIT_EPID_SHIFT, EPC_EPID
-	rlwimi	%r4, %r5, EPCBIT_EPID_SHIFT, EPC_EPID
-	rlwimi	%r3, %r6, EPCBIT_ELPID_SHIFT, EPC_ELPID
-	rlwimi	%r4, %r6, EPCBIT_ELPID_SHIFT, EPC_ELPID
+	rlwimi	%r3, %r5, EPC_EPID_SHIFT, EPC_EPID
+	rlwimi	%r4, %r5, EPC_EPID_SHIFT, EPC_EPID
+	rlwimi	%r3, %r6, EPC_ELPID_SHIFT, EPC_ELPID
+	rlwimi	%r4, %r6, EPC_ELPID_SHIFT, EPC_ELPID
 
 	rlwimi	%r3, %r10, MSRBIT_PR - EPCBIT_EPR, EPC_EPR
 	rlwimi	%r4, %r10, MSRBIT_PR - EPCBIT_EPR, EPC_EPR

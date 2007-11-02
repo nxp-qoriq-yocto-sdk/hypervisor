@@ -29,7 +29,7 @@ _start:
 	nop
 
 /*
- * Use tblsx to locate the TLB1 entry that maps kernel code
+ * Use tlbsx to locate the TLB1 entry that maps kernel code
  */
 	bl	1f			/* Current address */
 1:	mflr	%r15
@@ -115,7 +115,7 @@ _start:
 	bl	tlb1_inval_entry
 
 /*
- * Setup final mapping in TLB1[1] and switch to it
+ * Setup final mapping in TLB1[15] and switch to it
  */
 	/* Final kernel mapping, map in 16 MB of RAM */
 	lis	%r16, MAS0_TLBSEL1@h	/* Select TLB1 */
