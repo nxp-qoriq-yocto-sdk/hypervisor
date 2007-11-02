@@ -340,31 +340,31 @@ void hvpriv(trapframe_t *regs)
 	op = (insn >> 1) & 0x3ff;
 
 	switch (op) {
-	case 0x312: /* tlbivax */
+	case 0x312:
 		fault = emu_tlbivax(regs, insn);
 		break;
 	
-	case 0x3b2: /* tlbre */
+	case 0x3b2:
 		fault = emu_tlbre(regs, insn);
 		break;
 
-	case 0x392: /* tlbsx */
+	case 0x392:
 		fault = emu_tlbsx(regs, insn);
 		break;
 
-	case 0x236: /* tlbsync */
+	case 0x236:
 		fault = emu_tlbsync(regs, insn);
 		break;
 
-	case 0x3d2: /* tlbwe */
+	case 0x3d2:
 		fault = emu_tlbwe(regs, insn);
 		break;
 
-	case 0x153: /* mfspr */
+	case 0x153:
 		fault = emu_mfspr(regs, insn);
 		break;
 
-	case 0x1d3: /* mtspr */
+	case 0x1d3:
 		fault = emu_mtspr(regs, insn);
 		break;
 	}
