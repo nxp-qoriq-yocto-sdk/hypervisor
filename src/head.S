@@ -275,11 +275,12 @@ ivor_setup:
  */
 .globl branch_to_guest
 branch_to_guest:
-	mfmsr	%r4
-	oris	%r4, %r4, 0x1000	/* Switch to GS 1. */
+	mfmsr	%r0
+	oris	%r0, %r0, 0x1000	/* Switch to GS 1. */
 
-	mtspr	SPR_SRR0, %r3
-	mtspr	SPR_SRR1, %r4
+	mtspr	SPR_SRR0, %r8
+	mtspr	SPR_SRR1, %r0
+	
 	rfi				/* Switch context */
 
 	/* For now allocate 4 pages for the 4 exception stacks

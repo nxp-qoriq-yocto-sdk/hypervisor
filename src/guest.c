@@ -9,7 +9,8 @@
 #include <percpu.h>
 #include "tlb.h"
 
-void  branch_to_guest(uint32_t vaddr);
+void branch_to_guest(register_t r3, register_t r4, register_t r5,
+                     register_t r6, register_t r7, uint32_t vaddr);
 
 guest_t guest;
 
@@ -30,7 +31,7 @@ void start_guest(void)
     /* set up a tlb mapping for the guest */
     __tlb1_set_entry(0, GUEST_VA, GUEST_PA, GUEST_SIZE, _TLB_ENTRY_MEM, UV_TID, 0, GUEST_GS);
 
-   branch_to_guest(GUEST_VA);
+   branch_to_guest(0x00f00000, 0, 0, 0, 0, GUEST_VA);
 
    /* this never returns */
 
