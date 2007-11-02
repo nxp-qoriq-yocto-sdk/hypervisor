@@ -54,6 +54,6 @@ static inline void guestmem_set_insn(trapframe_t *regs)
 static inline uint32_t guestmem_in32(uint32_t *ptr)
 {
 	uint32_t ret;
-	asm("ldepx %0, 0, %1" : "=r" (ret) : "r" (ptr));
+	asm("lwepx %0, 0, %1" : "=r" (ret) : "r" (ptr));
 	return ret;
 }
