@@ -105,6 +105,14 @@
 #define SPR_GSRR0		0x2bb
 #define SPR_GSRR1		0x2bb
 
+#define SPR_EHCSR               703
+#define   EHCSR_EXTGS           0x80000000
+#define   EHCSR_DTLBGS          0x40000000
+#define   EHCSR_ITLBGS          0x20000000
+#define   EHCSR_DSIGS           0x10000000
+#define   EHCSR_ISIGS           0x08000000
+#define   EHCSR_DUVD            0x04000000
+
 #define	SPR_SVR			0x3ff	/* ..8 1023 System Version Register */
 #define	SPR_PID0		0x030	/* ..8 Process ID Register 0 */
 #define	SPR_PID1		0x279	/* ..8 Process ID Register 1 */

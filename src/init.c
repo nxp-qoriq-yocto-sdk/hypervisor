@@ -1,6 +1,7 @@
 #include "uv.h"
 #include "console.h"
 #include "percpu.h"
+#include <spr.h>
 
 static gcpu_t noguest;
 hcpu_t hcpu0 = {
@@ -18,6 +19,10 @@ void init(unsigned long devtree_ptr)
 
 	printf("=======================================\n");
 	printf("Freescale Ultravisor 0.1\n");
+
+	mtspr(SPR_EHCSR,
+	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
+	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
 
 #if 0
 	if (first instance) {
