@@ -19,7 +19,7 @@ void start_guest(void)
 
 #define GUEST_PA              0x20000000
 #define GUEST_VA              0x00000000
-#define GUEST_SIZE            0x01000000
+#define GUEST_SIZE            0x10000000
 #define GUEST_TID             0x0
 #define GUEST_GS              0x1
 
