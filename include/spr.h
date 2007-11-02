@@ -144,6 +144,14 @@
 #define	SPR_IVOR40		0x218   /* hypercall */
 #define	SPR_IVOR41		0x219   /* hypervisor priv */
 
+#define SPR_GIVPR               0x390   /* guest ivor base */
+#define	SPR_GIVOR2		0x391   /* guest DSI */
+#define	SPR_GIVOR3		0x392   /* guest ISI */
+#define	SPR_GIVOR4		0x393   /* guest ext input */
+#define	SPR_GIVOR8		0x396   /* guest sys call */
+#define	SPR_GIVOR13		0x397   /* guest data tlb error */
+#define	SPR_GIVOR14		0x398   /* guest inst tlb error */
+
 #define	SPR_MAS0		0x270	/* ..8 MMU Assist Register 0 Book-E/e500 */
 #define	SPR_MAS1		0x271	/* ..8 MMU Assist Register 1 Book-E/e500 */
 #define	SPR_MAS2		0x272	/* ..8 MMU Assist Register 2 Book-E/e500 */
@@ -655,13 +663,6 @@
 #define	SPR_IVOR39		0x217   /* guest processor doorbell critical */
 #define	SPR_IVOR40		0x218   /* hypercall */
 #define	SPR_IVOR41		0x219   /* hypervisor priv */
-
-#define	SPR_GIVOR2		0x391   /* guest DSI */
-#define	SPR_GIVOR3		0x392   /* guest ISI */
-#define	SPR_GIVOR4		0x393   /* guest ext input */
-#define	SPR_GIVOR8		0x396   /* guest sys call */
-#define	SPR_GIVOR13		0x397   /* guest data tlb error */
-#define	SPR_GIVOR14		0x398   /* guest inst tlb error */
 
 #define	SPR_MAS0		0x270	/* ..8 MMU Assist Register 0 Book-E/e500 */
 #define	SPR_MAS1		0x271	/* ..8 MMU Assist Register 1 Book-E/e500 */
