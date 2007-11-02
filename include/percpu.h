@@ -5,9 +5,11 @@
  * Per-guest-cpu and Per-hypervisor-cpu data structures
  */
 
+#ifndef _ASM
 #include <stdint.h>
 #include "uvtypes.h"
 #include "tlb.h"
+#endif
 
 #define CPUSAVE_LEN 1
 #define TLB1_SIZE 16

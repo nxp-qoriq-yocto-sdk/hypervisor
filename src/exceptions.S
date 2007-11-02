@@ -26,6 +26,7 @@
  */
 
 #include <spr.h> 
+#include <percpu.h>
 #include "assym.s"
 
 /* TODO
@@ -72,7 +73,7 @@
 
 	STORE	%r1, \savearea(%r2)
 	\uvstack
-	addi	%r1, %r1, -FRAMELEN
+	addi	%r1, %r1, UVSTACK_SIZE - FRAMELEN
 
 	STORE	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
 	STORE	%r3, LONGBYTES*3 + FRAME_GPREGS(%r1)
