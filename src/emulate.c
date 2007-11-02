@@ -304,7 +304,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		goto low_ivor;
 		
 	case SPR_IVOR0...SPR_IVOR1:
-	case SPR_IVOR5...SPR_IVOR6:
+	case SPR_IVOR5...SPR_IVOR7:
 	case SPR_IVOR9...SPR_IVOR12:
 	case SPR_IVOR15:
 	low_ivor:
