@@ -19,10 +19,14 @@
 typedef uint8_t uvstack_t[UVSTACK_SIZE] __attribute__((aligned(16)));
 
 typedef struct {
-	uvstack_t uvstack;
 	uint64_t mem_start, mem_end; // guest physical address range
 	uint64_t mem_real;           // real physical start addr
 	uint32_t lpid;
+} guest_t;
+
+typedef struct {
+	uvstack_t uvstack;
+	guest_t *guest;
 } gcpu_t;
 
 typedef struct {

@@ -57,7 +57,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
-	gcpu_t *gcpu = hcpu->gcpu;
+	guest_t *guest = hcpu->gcpu->guest;
 
 	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPID));
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
@@ -67,12 +67,12 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
 		               (mas3 & MAS3_RPN);
 
-		uint64_t guest = rpn - gcpu->mem_real + gcpu->mem_start;
+		uint64_t gphys = rpn - guest->mem_real + guest->mem_start;
 
-//		printf("tlbsx va 0x%08x found 0x%09llx guest 0x%09llx\n", va, rpn, guest);
+//		printf("tlbsx va 0x%08x found 0x%09llx gphys 0x%09llx\n", va, rpn, gphys);
 
-		mtspr(SPR_MAS7, guest >> 32);
-		mtspr(SPR_MAS3, (uint32_t)guest | (mas3 & ~MAS3_RPN));
+		mtspr(SPR_MAS7, gphys >> 32);
+		mtspr(SPR_MAS3, (uint32_t)gphys | (mas3 & ~MAS3_RPN));
 	}
 	
 	return 0;
@@ -80,7 +80,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	guest_t *guest = hcpu->gcpu->guest;;
 	uint32_t mas0 = mfspr(SPR_MAS0);
 	int entry;
 	
@@ -108,13 +108,13 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
 		               (mas3 & MAS3_RPN);
 
-		uint64_t guest = rpn - gcpu->mem_real + gcpu->mem_start;
+		uint64_t gphys = rpn - guest->mem_real + guest->mem_start;
 
-//		printf("tlbre mas0 0x%08x found 0x%09llx guest 0x%09llx\n",
-//		       mas0, rpn, guest);
+//		printf("tlbre mas0 0x%08x found 0x%09llx gphys 0x%09llx\n",
+//		       mas0, rpn, gphys);
 
-		mtspr(SPR_MAS7, guest >> 32);
-		mtspr(SPR_MAS3, (uint32_t)guest | (mas3 & ~MAS3_RPN));
+		mtspr(SPR_MAS7, gphys >> 32);
+		mtspr(SPR_MAS3, (uint32_t)gphys | (mas3 & ~MAS3_RPN));
 	}
 	
 	return 0;
@@ -122,14 +122,14 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	guest_t *guest = hcpu->gcpu->guest;
 	uint32_t mas0 = mfspr(SPR_MAS0);
 	uint32_t mas1 = mfspr(SPR_MAS1);
 	uint32_t mas2 = mfspr(SPR_MAS2);
 	uint32_t mas3 = mfspr(SPR_MAS3);
 	uint32_t mas7 = mfspr(SPR_MAS7);
-	uint64_t guest = ((uint64_t)mas7 << 32) | (mas3 & MAS3_RPN);
-	uint64_t rpn = guest - gcpu->mem_start + gcpu->mem_real;
+	uint64_t gphys = ((uint64_t)mas7 << 32) | (mas3 & MAS3_RPN);
+	uint64_t rpn = gphys - guest->mem_start + guest->mem_real;
 
 	if (mas0 & MAS0_RESERVED) {
 		printf("tlbwe@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
@@ -176,16 +176,16 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		}
 
 		if (rpn & (size - 1)) {	
-			printf("tlbwe@0x%08x: misaligned TLB1 entry, guest 0x%09llx, "
-			       "real 0x%09llx, size 0x%09llx\n", regs->srr0, guest, rpn, size);
+			printf("tlbwe@0x%08x: misaligned TLB1 entry, gphys 0x%09llx, "
+			       "real 0x%09llx, size 0x%09llx\n", regs->srr0, gphys, rpn, size);
 			return 1;
 		}
 
-		if (guest + size > gcpu->mem_end) {
+		if (gphys + size > guest->mem_end) {
 #if 0
 			// FIXME: lookup allowed I/O
 			printf("tlbwe@0x%08x: guest phys 0x%09llx, size 0x%09llx out of range\n",
-			       regs->srr0, guest, size);
+			       regs->srr0, gphys, size);
 			return 1;
 #else
 			goto ok;
@@ -195,11 +195,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		goto ok; 
 	}
 
-	if (guest < gcpu->mem_start || guest >= gcpu->mem_end) {
+	if (gphys < guest->mem_start || gphys >= guest->mem_end) {
 #if 0
 		// FIXME: lookup allowed I/O
 		printf("tlbwe@0x%08x: guest phys 0x%09llx out of range\n",
-		       regs->srr0, guest);
+		       regs->srr0, gphys);
 		return 1;
 #else
 		goto ok;
