@@ -60,4 +60,6 @@ ASSYM(FRAME_SRR0, offsetof(trapframe_t, srr0));
 ASSYM(FRAME_SRR1, offsetof(trapframe_t, srr1));
 ASSYM(FRAME_DEAR, offsetof(trapframe_t, dear));
 ASSYM(FRAME_ESR, offsetof(trapframe_t, esr));
+ASSYM(FRAME_EPLC, offsetof(trapframe_t, eplc));
+ASSYM(FRAME_EPSC, offsetof(trapframe_t, epsc));
 ASSYM(FRAME_EXC, offsetof(trapframe_t, exc));

@@ -65,6 +65,7 @@
 	.macro	exception, handler, exc, name, scratch, \
 	        srr0, srr1, uvstack, savearea, ret
 	.global \name
+	.align	4
 \name:
 	mtspr	\scratch, %r2
 	mfspr	%r2, SPR_SPRG0
@@ -109,8 +110,43 @@
 	STORE	%r11, FRAME_DEAR(%r1)
 	STORE	%r12, FRAME_ESR(%r1)
 	stw	%r13, FRAME_EXC(%r1)
+	
+	andis.	%r0, %r10, MSR_GS@h
+	beq	1f
+	
+	mfspr	%r3, SPR_EPLC
+	mfspr	%r4, SPR_EPSC
+	mfspr	%r5, SPR_PID0
+	mfspr	%r6, SPR_LPID
+	
+	stw	%r3, FRAME_EPLC(%r1)
+	stw	%r4, FRAME_EPSC(%r1)
+	
+	/* Set the PID, LPID, guest/hypervisor, and user/kernel state for
+	 * external PID access.  We don't set AS0/AS1 in EPLC, as it
+	 * depends on whether it's a data or instruction access which MSR
+	 * bit we copy from.  However, we shouldn't be storing to
+	 * instruction addresses, so EPSC assumes data.
+	 */
+	
+	rlwimi	%r3, %r5, EPCBIT_EPID_SHIFT, EPC_EPID
+	rlwimi	%r4, %r5, EPCBIT_EPID_SHIFT, EPC_EPID
+	rlwimi	%r3, %r6, EPCBIT_ELPID_SHIFT, EPC_ELPID
+	rlwimi	%r4, %r6, EPCBIT_ELPID_SHIFT, EPC_ELPID
 
-	mr	%r3, %r1
+	rlwimi	%r3, %r10, MSRBIT_PR - EPCBIT_EPR, EPC_EPR
+	rlwimi	%r4, %r10, MSRBIT_PR - EPCBIT_EPR, EPC_EPR
+
+	rlwimi	%r4, %r10, MSRBIT_DS - EPCBIT_EAS, EPC_EAS
+	
+	/* Always guest access */
+	oris	%r3, %r3, EPC_EGS@h
+	oris	%r4, %r4, EPC_EGS@h
+	
+	mtspr	SPR_EPLC, %r3
+	mtspr	SPR_EPSC, %r4
+
+1:	mr	%r3, %r1
 	bl	\handler
 
 	LOAD	%r5, FRAME_LR(%r1)
@@ -126,7 +162,16 @@
 	mtxer	%r8
 	mtspr	\srr0, %r9
 	mtspr	\srr1, %r10
-	
+
+	andis.	%r0, %r10, MSR_GS@h
+	beq	2f
+
+	lwz	%r3, FRAME_EPLC(%r1)
+	lwz	%r4, FRAME_EPSC(%r1)
+	mtspr	SPR_EPLC, %r3
+	mtspr	SPR_EPSC, %r4
+
+2:
 	LOAD	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
 	LOAD	%r1, LONGBYTES*1 + FRAME_GPREGS(%r1)
 	LOAD	%r2, LONGBYTES*2 + FRAME_GPREGS(%r1)
@@ -187,24 +232,25 @@
 	.global interrupt_vector_base
 	.align 5
 interrupt_vector_base:
-	critexception 0 int_critical_input trap
-	machinecheck 1 int_machine_check trap
-	baseexception 2 int_data_storage trap
-	baseexception 3 int_instr_storage trap
-	baseexception 4 int_external_input trap
-	baseexception 5 int_alignment trap
-	baseexception 6 int_program trap
-	baseexception 8 int_syscall trap
-	baseexception 10 int_decrementer trap
-	baseexception 11 int_fixed_interval_timer trap
-	critexception 12 int_watchdog trap
-	baseexception 13 int_data_tlb_error trap
-	baseexception 14 int_inst_tlb_error trap
-	debugexception 15 int_debug trap
-	baseexception 35 int_perf_mon trap
-	baseexception 36 int_doorbell trap
-	critexception 37 int_doorbell_critical trap
-	baseexception 38 int_guest_doorbell trap
-	critexception 39 int_guest_doorbell_critical trap
-	baseexception 40 int_hypercall trap
-	baseexception 41 int_ehpriv trap
+	critexception 0 int_critical_input unknown_exception
+	machinecheck 1 int_machine_check unknown_exception
+	baseexception 2 int_data_storage unknown_exception
+	baseexception 3 int_instr_storage unknown_exception
+	baseexception 4 int_external_input unknown_exception
+	baseexception 5 int_alignment unknown_exception
+	baseexception 6 int_program unknown_exception
+	baseexception 8 int_syscall unknown_exception
+	baseexception 10 int_decrementer unknown_exception
+	baseexception 11 int_fixed_interval_timer unknown_exception
+	critexception 12 int_watchdog unknown_exception
+	baseexception 13 int_data_tlb_error unknown_exception
+	baseexception 14 int_inst_tlb_error unknown_exception
+	debugexception 15 int_debug unknown_exception
+	baseexception 35 int_perf_mon unknown_exception
+	baseexception 36 int_doorbell unknown_exception
+	critexception 37 int_doorbell_critical unknown_exception
+	baseexception 38 int_guest_doorbell unknown_exception
+	critexception 39 int_guest_doorbell_critical unknown_exception
+	baseexception 40 int_hypercall unknown_exception
+	baseexception 41 int_ehpriv hvpriv
+

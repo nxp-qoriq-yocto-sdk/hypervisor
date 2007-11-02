@@ -41,13 +41,44 @@
 #include "uvtypes.h"
 
 #define mtspr(reg, val)                                                 \
-        __asm __volatile("mtspr %0,%1" : : "K"(reg), "r"(val))
+        __asm __volatile("mtspr %0,%1" : : "K"(reg), "r"(val) : "memory")
 #define mfspr(reg)                                                      \
         ( { register_t val;                                             \
-          __asm __volatile("mfspr %0,%1" : "=r"(val) : "K"(reg));       \
+          __asm __volatile("mfspr %0,%1" : "=r"(val) : "K"(reg) : "memory");\
           val; } )
 #endif
 
+#define MSRBIT_GS               35 /* Guest State */
+#define MSRBIT_UCLE             37 /* User-mode Cache Lock Enable */
+#define MSRBIT_SPE              38 /* SPE Available */
+#define MSRBIT_WE               45 /* Wait Enable */
+#define MSRBIT_CE               46 /* Critical Enable */
+#define MSRBIT_EE               48 /* External Enable */
+#define MSRBIT_PR               49 /* User Mode */
+#define MSRBIT_FP               50 /* Floating Point Available */
+#define MSRBIT_ME               51 /* Machine Check Available */
+#define MSRBIT_FE0              52 /* Floating Point Exception 0 */
+#define MSRBIT_DE               54 /* Debug Mode Enable */
+#define MSRBIT_FE1              55 /* Floating Point Exception 1 */
+#define MSRBIT_IS               58 /* Instruction Address Space */
+#define MSRBIT_DS               59 /* Data Address Space */
+#define MSRBIT_PMM              61 /* Performance Monitor Mask */
+
+#define MSR_GS                  (1 << (63 - MSRBIT_GS))
+#define MSR_UCLE                (1 << (63 - MSRBIT_UCLE))
+#define MSR_SPE                 (1 << (63 - MSRBIT_SPE))
+#define MSR_WE                  (1 << (63 - MSRBIT_WE))
+#define MSR_CE                  (1 << (63 - MSRBIT_CE))
+#define MSR_EE                  (1 << (63 - MSRBIT_EE))
+#define MSR_PR                  (1 << (63 - MSRBIT_PR))
+#define MSR_FP                  (1 << (63 - MSRBIT_FP))
+#define MSR_ME                  (1 << (63 - MSRBIT_ME))
+#define MSR_FE0                 (1 << (63 - MSRBIT_FE0))
+#define MSR_DE                  (1 << (63 - MSRBIT_DE))
+#define MSR_FE1                 (1 << (63 - MSRBIT_FE1))
+#define MSR_IS                  (1 << (63 - MSRBIT_IS))
+#define MSR_DS                  (1 << (63 - MSRBIT_DS))
+#define MSR_PMM                 (1 << (63 - MSRBIT_PMM))
 
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
@@ -154,6 +185,21 @@
 
 #define	SPR_LR			0x008	/* Link Register */
 #define	SPR_CTR			0x009	/* Count Register */
+
+#define SPR_LPID                638     /* Logical Partition ID */
+
+#define SPR_EPLC                947     /* External PID Load Context */
+#define SPR_EPSC                948     /* External PID Store Context */
+#define   EPC_EPR               0x80000000 /* 1 = user, 0 = kernel */
+#define   EPCBIT_EPR            32
+#define   EPC_EAS               0x40000000 /* Address Space */
+#define   EPCBIT_EAS            31
+#define   EPC_EGS               0x20000000 /* 1 = guest, 0 = hypervisor */
+#define   EPCBIT_EGS            30
+#define   EPC_ELPID             0x00ff0000
+#define   EPCBIT_ELPID_SHIFT    16
+#define   EPC_EPID              0x00003fff
+#define   EPCBIT_EPID_SHIFT     0
 
 #define	SPR_DEAR		0x3d5	/* Data Error Address Register */
 
