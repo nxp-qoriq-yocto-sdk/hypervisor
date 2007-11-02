@@ -9,6 +9,21 @@ struct powerpc_exception {
 	char *name;
 };
 
+void dump_regs(trapframe_t *regs)
+{
+	printf("NIP 0x%08x MSR 0x%08x LR 0x%08x\n"
+	       "CTR 0x%08x CR 0x%08x XER 0x%08x\n",
+	       regs->srr0, regs->srr1, regs->lr,
+	       regs->ctr, regs->cr, regs->xer);
+
+	for (int i = 0; i < 32; i++) {
+		printf("r%02d 0x%08x  ", i, regs->gpregs[i]);
+		
+		if ((i & 3) == 3)
+			printf("\n");
+	}
+}
+
 static struct powerpc_exception powerpc_exceptions[] = {
 	{ EXC_CRIT, "critical input" },
 	{ EXC_MCHK, "machine check" },
@@ -49,5 +64,6 @@ static const char *trapname(int vector)
 void unknown_exception(trapframe_t *frameptr)
 {
 	printf("unknown exception: %s\n", trapname(frameptr->exc));
+	dump_regs(frameptr); 
 	stopsim();
 }
