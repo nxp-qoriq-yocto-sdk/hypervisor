@@ -1,0 +1,237 @@
+#
+# Script to run 8578/u-boot/ultravisor on simulator
+#
+
+# display options
+digit-grouping 16 8
+output-radix 16
+
+# u-boot
+$uboot  = "u-boot.8578"
+
+# simple guest
+$kernel_image  = "%script%/sg/sg.bin"
+$kernel_addr   = 0x10000000
+
+if not defined kernel_symbols	{$kernel_symbols = ""}
+if not defined uboot_symbols	{$uboot_symbols = ""}
+if not defined use_uart0	{$use_uart0 = 1}
+if not defined use_uart1	{$use_uart1 = 1}
+if not defined do_boot		{$do_boot = "yes"}
+if not defined host_name	{$host_name   = "MPC8578-simple"}
+if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
+
+if not defined kernel_addr   {$kernel_addr   = 0x1000000}
+if not defined initrd_addr   {$initrd_addr   = 0x1300000}
+if not defined dev_tree_addr {$dev_tree_addr = 0x00f00000}
+if not defined boot_command  {$boot_command  = "bootm 0x1000000 0x1300000 0xf00000"}
+if not defined mac_address   {$mac_address   = "00:01:af:07:9b:8a"}
+if not defined mac_address1  {$mac_address1  = "00:01:af:07:9b:8b"}
+if not defined mac_address2  {$mac_address2  = "00:01:af:07:9b:8c"}
+if not defined mac_address3  {$mac_address3  = "00:01:af:07:9b:8d"}
+if not defined ip_address    {$ip_address    = "10.10.0.80"}
+if not defined ip_address1   {$ip_address1   = "10.10.0.81"}
+if not defined ip_address2   {$ip_address2   = "10.10.0.82"}
+if not defined ip_address3   {$ip_address3   = "10.10.0.83"}
+if not defined service_node  {}
+if not defined kernel_cmdline {$kernel_cmdline = "console=ttyS0,115200 simicsfs=0xeff00000"}
+
+sim->handle_outside_memory = 1
+add-directory "%script%" -prepend
+add-directory "%script%/images/" -prepend
+
+@def hap_callback(user_arg, cpu, arg):
+	if arg == 0:
+		SIM_break_simulation("0 hit unknown exception")
+	elif arg == 1:
+		SIM_break_simulation("end of run-- hit spin loop")
+	elif arg == 2:
+		SIM_break_simulation("trap()-- unknown exception")
+	else:
+		SIM_break_simulation("magic: bad arg")
+
+@SIM_hap_add_callback("Core_Magic_Instruction", hap_callback, None)
+
+###
+
+if not defined freq_mhz      {$freq_mhz      = 1333.3}
+if not defined memory_megs   {$memory_megs   = 1024}
+if not defined cpu_cores     {$cpu_cores     = 8}
+###
+
+load-module mpc8578-components
+load-module memory-components
+load-module std-components
+load-module phy-components
+
+$system = (create-simple-MPC8578-board cpu_cores = $cpu_cores
+                                       cpu_frequency = $freq_mhz)
+
+if $use_uart0 == 1 {
+	$con1 = (create-std-text-console)
+	$system.connect uart0 $con1
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con1->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con1->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con1->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con1->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart1 == 1 {
+	$con2 = (create-std-text-console)
+	$system.connect uart1 $con2
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con2->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con2->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con2->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con2->x11_font   = $terminal_x11_font}
+}
+
+# Create ethernet PHYs and connect them to the MACs
+foreach $phy_idx in (range 5) {
+        # Create a generic MII transceiver identified as a Marvell 88E1011S
+        $phy[$phy_idx] = (create-phy-mii-transceiver phy_id = 0x01410c60
+                                                     mii_address = $phy_idx)
+        $system.connect (phy + $phy_idx) $phy[$phy_idx]
+}
+
+# Create memory and connect it in the DIMM slots
+# (2 slots, equal amount of memory in each slot ($memory_megs/2))
+#create-and-connect-ddr-memory $system $memory_megs "AA"
+
+# all memory on a single slot controller, not sure if on one CS? (kkg)
+create-and-connect-ddr-memory $system $memory_megs "A"
+
+
+instantiate-components
+
+# workaround POR values 3.2.2 (build-id: 1536)
+# (MAS0[ESEL] mask is wrong thus we can only modify 16 TLB entries
+cpu0->tlb1cfg = 0x1019c010
+# CCSR is now defaults to 4Gb - 32M and size is 16M
+$ccsr_size = 0x01000000
+$ccsr_addr = 0xfe000000
+phys_mem.del-map ccsr_space
+phys_mem.add-map ccsr_space $ccsr_addr $ccsr_size
+ccsr->CCSRBAR = ($ccsr_addr >> 12)
+script-branch {
+	local $bp_id = (phys_mem.break -w (ccsr->CCSRBAR << 12))
+	while (1) {
+		wait-for-breakpoint $bp_id
+		delete $bp_id
+		echo "fixing CCSR mapping"
+		local $new_ccsr = ccsr->CCSRBAR << 12
+		phys_mem.del-map ccsr_space
+		phys_mem.add-map ccsr_space $new_ccsr $ccsr_size
+		$bp_id = (phys_mem.break -w $new_ccsr)
+	}
+}
+
+
+$eth_comp = $phy[0]
+if not defined eth_cnt { $eth_cnt = eth }
+run-command-file "%simics%/targets/common/add-eth-link.include"
+
+$console = $con1
+
+###
+$system->system_info = $system_info
+
+if $service_node {
+    local $sn = ($service_node:sn)
+    ($sn.add-host name = $host_name
+                         ip = $ip_address domain = network.sim
+                         mac = $mac_address)
+}
+
+default-port-forward-target $ip_address
+
+$phys_mem = ($system:phys_mem)
+$phys_mem.load-file $uboot 0xfff80000
+
+# U-boot uses l1 cache without backing RAM
+# the address has to match u-boot build/config
+($phys_mem.add-map
+        ($system:l1_cache)
+        base = 0xfdd00000 length = 0x4000
+        priority = 200 offset = 0xfdd00000)
+
+# U-boot symbols
+if $uboot_symbols != "" {
+        local $syms = (lookup-file $uboot_symbols)
+        new-symtable uboot file = $syms
+}
+
+# Kernel symbols
+if $kernel_symbols != "" {
+        local $syms = (lookup-file $kernel_symbols)
+        new-symtable kernel file = $syms
+}
+
+if $do_boot == "yes" {
+    script-branch {
+	local $con          = ($console:con)
+        local $phys_mem     = ($system:phys_mem)
+
+        local $initrd_image = $initrd_image
+        local $initrd_addr  = $initrd_addr
+        local $kernel_image = $kernel_image
+        local $kernel_addr  = $kernel_addr
+        local $boot_command = $boot_command
+        local $cmdline      = $kernel_cmdline
+        local $mac_address  = $mac_address
+        local $mac_address1 = $mac_address1
+        local $mac_address2 = $mac_address2
+        local $mac_address3 = $mac_address3
+        local $ip_address   = $ip_address
+        local $ip_address1  = $ip_address1
+        local $ip_address2  = $ip_address2
+        local $ip_address3  = $ip_address3
+        local $dev_tree_blob= $dev_tree_blob
+        local $dev_tree_addr= $dev_tree_addr
+
+        $con.wait-for-string "autoboot:"
+        $con.input "\n"
+
+        # u-boot does not read the MAC from the PHY, but reads them directly
+        # from it's environment variables.
+
+        # First ethernet interface
+        $con.wait-then-write "=> " "setenv ethaddr " + $mac_address + "\n"
+        $con.wait-then-write "=> " "setenv ipaddr " + $ip_address + "\n"
+
+        # Looks like u-boot does not set MAC1-3 correctly
+
+        # Second ethernet interface
+        $con.wait-then-write "=> " "setenv eth1addr " + $mac_address1 + "\n"
+        $con.wait-then-write "=> " "setenv ip1addr " + $ip_address1 + "\n"
+
+        # Third ethernet interface
+        $con.wait-then-write "=> " "setenv eth2addr " + $mac_address2 + "\n"
+        $con.wait-then-write "=> " "setenv ip2addr " + $ip_address2 + "\n"
+
+        # Fourth, and last, ethernet interface
+        $con.wait-then-write "=> " "setenv eth3addr " + $mac_address3 + "\n"
+        $con.wait-then-write "=> " "setenv ip3addr " + $ip_address3 + "\n"
+
+        if $service_node {
+                $con.wait-then-write "=> " "setenv gatewayip 10.10.0.1\n"
+                $con.wait-then-write "=> " "setenv serverip 10.10.0.1\n"
+        }
+
+        # Boot the linux kernel
+        $con.wait-for-string "=> "
+        $phys_mem.load-file $kernel_image $kernel_addr
+
+	$con.input "# images has been forced into memory\n"
+
+        if ($cmdline != "") {
+            $con.wait-then-write "=> " "setenv bootargs " + $cmdline + "\n"
+        }
+
+        # Note: user must override boot_command if dev_tree_blob is set
+	$con.wait-then-write "=> " "setenv bootcmd " + $boot_command + "\n"
+#	$con.wait-then-write "=> " "boot\n"
+	$con.wait-then-write "=> " "go 0x10000000\n"
+    }
+}
