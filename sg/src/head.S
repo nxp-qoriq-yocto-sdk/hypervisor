@@ -115,11 +115,11 @@ _start:
 	bl	tlb1_inval_entry
 
 /*
- * Setup final mapping in TLB1[1] and switch to it
+ * Setup final mapping in TLB1[2] and switch to it
  */
 	/* Final kernel mapping, map in 16 MB of RAM */
 	lis	%r16, MAS0_TLBSEL1@h	/* Select TLB1 */
-	li	%r17, 1			/* Entry 1 */
+	li	%r17, 2			/* Entry 1 */
 	rlwimi	%r16, %r17, 16, 12, 15
 	mtspr	SPR_MAS0, %r16
 	isync
