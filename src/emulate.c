@@ -54,6 +54,13 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
+{
+	// FIXME: add lock so only one can be executing at a time
+	asm volatile("tlbsync" : : : "memory");
+	return 0;
+}
+
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
@@ -346,7 +353,7 @@ void hvpriv(trapframe_t *regs)
 		break;
 
 	case 0x236: /* tlbsync */
-//		fault = emu_tlbsync(regs, insn);
+		fault = emu_tlbsync(regs, insn);
 		break;
 
 	case 0x3d2: /* tlbwe */
