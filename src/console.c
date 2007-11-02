@@ -9,14 +9,19 @@ void console_init(void)
 	uart_init();
 }
 
+int putchar(int c)
+{
+	if (c == '\n')
+		uart_putc('\r');
+
+	uart_putc(c);
+	return c;
+}
+
 void puts_len(const char *s, int len)
 {
-	while (*s && len--) {
-		if (*s == '\n')
-			uart_putc('\r');
-
-		uart_putc(*s++);
-	}
+	while (*s && len--)
+		putchar(*s++);
 }
 
 int puts(const char *s)
