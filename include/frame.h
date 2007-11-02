@@ -18,4 +18,6 @@ typedef struct {
 /* PPC ABI requires 16-byte-aligned stack frames. */
 #define FRAMELEN roundup(sizeof(trapframe_t), 16)
 
+void dump_regs(trapframe_t *regs);
+
 #endif

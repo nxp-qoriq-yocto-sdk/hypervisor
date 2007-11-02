@@ -222,7 +222,7 @@ interrupt_vector_base:
 	baseexception 5 int_alignment unknown_exception
 	baseexception 6 int_program unknown_exception
 	baseexception 8 int_syscall unknown_exception
-	baseexception 10 int_decrementer unknown_exception
+	baseexception 10 int_decrementer decrementer
 	baseexception 11 int_fixed_interval_timer unknown_exception
 	critexception 12 int_watchdog unknown_exception
 	baseexception 13 int_data_tlb_error unknown_exception

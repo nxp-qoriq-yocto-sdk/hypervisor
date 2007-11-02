@@ -259,6 +259,18 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		ret = hcpu->gcpu->guest->ivor[spr - SPR_IVOR32 + 32];
 		break;
 
+	case SPR_TSR:
+		ret = mfspr(SPR_TSR);
+		break;
+
+	case SPR_TCR:
+		ret = mfspr(SPR_TCR);
+		break;
+
+	case SPR_DEC:
+		ret = mfspr(SPR_DEC);
+		break;
+
 	default:
 		printf("mfspr@0x%08x: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
@@ -277,6 +289,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 
 	switch (spr) {
 	case SPR_IVPR:
+		val &= IVPR_MASK;
 		mtspr(SPR_GIVPR, val);
 		hcpu->gcpu->guest->ivpr = val;
 		break;
@@ -310,11 +323,23 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	case SPR_IVOR9...SPR_IVOR12:
 	case SPR_IVOR15:
 	low_ivor:
-		hcpu->gcpu->guest->ivor[spr - SPR_IVOR0] = val;
+		hcpu->gcpu->guest->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
 		break;
 
 	case SPR_IVOR32...SPR_IVOR37:
-		hcpu->gcpu->guest->ivor[spr - SPR_IVOR32 + 32] = val;
+		hcpu->gcpu->guest->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
+		break;
+
+	case SPR_TSR:
+		mtspr(SPR_TSR, val);
+		break;
+
+	case SPR_TCR:
+		mtspr(SPR_TCR, val);
+		break;
+
+	case SPR_DEC:
+		mtspr(SPR_DEC, val);
 		break;
 
 	default:

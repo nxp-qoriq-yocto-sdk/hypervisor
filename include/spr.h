@@ -82,6 +82,9 @@
 
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
+
+#define SPR_DEC                 22      /* Decrementer */
+
 #define	SPR_SRR0		0x01a	/* 26 Save/Restore Register 0 */
 #define	SPR_SRR1		0x01b	/* 27 Save/Restore Register 1 */
 
@@ -102,8 +105,8 @@
 #define	SPR_DSRR0		0x23e	/* ..8 570 Machine check SRR0 */
 #define	SPR_DSRR1		0x23f	/* ..8 571 Machine check SRR1 */
 
-#define SPR_GSRR0		0x2bb
-#define SPR_GSRR1		0x2bb
+#define SPR_GSRR0               699
+#define SPR_GSRR1               700
 
 #define SPR_EHCSR               703
 #define   EHCSR_EXTGS           0x80000000
@@ -123,6 +126,9 @@
 #define	  TLBCFG_ASSOC_MASK	0xff000000 /* Associativity of TLB */
 #define	  TLBCFG_ASSOC_SHIFT	24
 #define	  TLBCFG_NENTRY_MASK	0x00000fff /* Number of entries in TLB */
+
+#define SPR_TSR                 336     /*  Timer Status Register */
+#define SPR_TCR                 340     /*  Timer Control Register */
 
 #define	SPR_IVPR		0x03f	/* Interrupt Vector Prefix Register */
 #define	SPR_IVOR0		0x190	/* Critical input */
@@ -159,6 +165,9 @@
 #define	SPR_GIVOR8		0x396   /* guest sys call */
 #define	SPR_GIVOR13		0x397   /* guest data tlb error */
 #define	SPR_GIVOR14		0x398   /* guest inst tlb error */
+
+#define IVPR_MASK               0xffff0000
+#define IVOR_MASK               0x0000fff0
 
 #define	SPR_MAS0		0x270	/* ..8 MMU Assist Register 0 Book-E/e500 */
 #define	SPR_MAS1		0x271	/* ..8 MMU Assist Register 1 Book-E/e500 */
@@ -443,8 +452,6 @@
 #define	SPR_RPA			0x3d6	/* .68 Required Physical Address Register */
 #define	SPR_PTELO		0x3d6	/* .6. Required Physical Address Register */
 
-#define	SPR_TSR			0x150	/*  Timer Status Register */
-#define	SPR_TCR			0x154	/*  Timer Control Register */
 
 #define	  TSR_ENW		  0x80000000 /* Enable Next Watchdog */
 #define	  TSR_WIS		  0x40000000 /* Watchdog Interrupt Status */
