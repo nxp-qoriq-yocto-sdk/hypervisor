@@ -35,9 +35,8 @@
  *    -don't need any TLB stuff in HCPU
  *    -need separate exit for guest only exceptions, if it didn't come
  *     guest it's fatal
- *    -debug exception should save nonvolatile registers
- *    -hypercall exception doesn't need to save volatiles
- *     (but if it doesn't, it should zero them out to avoid
+ *    -hypercall exception doesn't need to save registers
+ *     (but if it doesn't, it should zero out volatiles to avoid
  *      information leakage).
  */
 
@@ -76,17 +75,9 @@
 	addi	%r1, %r1, UVSTACK_SIZE - FRAMELEN
 
 	STORE	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
-	STORE	%r3, LONGBYTES*3 + FRAME_GPREGS(%r1)
-	STORE	%r4, LONGBYTES*4 + FRAME_GPREGS(%r1)
-	STORE	%r5, LONGBYTES*5 + FRAME_GPREGS(%r1)
-	STORE	%r6, LONGBYTES*6 + FRAME_GPREGS(%r1)
-	STORE	%r7, LONGBYTES*7 + FRAME_GPREGS(%r1)
-	STORE	%r8, LONGBYTES*8 + FRAME_GPREGS(%r1)
-	STORE	%r9, LONGBYTES*9 + FRAME_GPREGS(%r1)
-	STORE	%r10, LONGBYTES*10 + FRAME_GPREGS(%r1)
-	STORE	%r11, LONGBYTES*11 + FRAME_GPREGS(%r1)
-	STORE	%r12, LONGBYTES*12 + FRAME_GPREGS(%r1)
-	STORE	%r13, LONGBYTES*13 + FRAME_GPREGS(%r1)
+
+	/* fixme for 64-bit */
+	stmw	%r3, LONGBYTES*3 + FRAME_GPREGS(%r1)
 
 	LOAD	%r3, \savearea(%r2)
 	mfspr	%r4, \scratch
@@ -172,21 +163,11 @@
 	mtspr	SPR_EPLC, %r3
 	mtspr	SPR_EPSC, %r4
 
-2:
+2:	/* fixme for 64-bit */
+	lmw	%r2, LONGBYTES*2 + FRAME_GPREGS(%r1)
+
 	LOAD	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
 	LOAD	%r1, LONGBYTES*1 + FRAME_GPREGS(%r1)
-	LOAD	%r2, LONGBYTES*2 + FRAME_GPREGS(%r1)
-	LOAD	%r3, LONGBYTES*3 + FRAME_GPREGS(%r1)
-	LOAD	%r4, LONGBYTES*4 + FRAME_GPREGS(%r1)
-	LOAD	%r5, LONGBYTES*5 + FRAME_GPREGS(%r1)
-	LOAD	%r6, LONGBYTES*6 + FRAME_GPREGS(%r1)
-	LOAD	%r7, LONGBYTES*7 + FRAME_GPREGS(%r1)
-	LOAD	%r8, LONGBYTES*8 + FRAME_GPREGS(%r1)
-	LOAD	%r9, LONGBYTES*9 + FRAME_GPREGS(%r1)
-	LOAD	%r10, LONGBYTES*10 + FRAME_GPREGS(%r1)
-	LOAD	%r11, LONGBYTES*11 + FRAME_GPREGS(%r1)
-	LOAD	%r12, LONGBYTES*12 + FRAME_GPREGS(%r1)
-	LOAD	%r13, LONGBYTES*13 + FRAME_GPREGS(%r1)
 
 	\ret
 	.endm
