@@ -33,11 +33,11 @@ LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
-OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o src/init.o src/guest.o src/tlb.o \
-	src/uart.o src/console.o src/string.o src/sprintf.o src/emulate.o
+SRCS_C := src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
+       src/console.c src/string.c src/sprintf.c src/emulate.c
+SRCS_S := src/head.S src/exceptions.S
 
-SRCS_C = src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tbl.c src/uart.c src/console.c
-SRCS_S = src/head.S src/exceptions.S
+OBJS := $(SRCS_S:.S=.o) $(SRCS_C:.c=.o)
 
 all: uv.uImage uv.map
 
