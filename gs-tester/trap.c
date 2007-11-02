@@ -103,3 +103,9 @@ trap(trapframe_t *frameptr)
 
 
 }
+
+void unknown_exception(trapframe_t *frameptr)
+{
+	printf("unknown exception: %s\n", trapname(frameptr->exc));
+	stopsim();
+}
