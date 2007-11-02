@@ -189,14 +189,14 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		}
 
 		if (gphys + size > guest->mem_end) {
-#if 0
 			// FIXME: lookup allowed I/O
+			if (gphys > guest->mem_end)
+				goto ok;
+
+
 			printf("tlbwe@0x%08x: guest phys 0x%09llx, size 0x%09llx out of range\n",
 			       regs->srr0, gphys, size);
 			return 1;
-#else
-			goto ok;
-#endif
 		}
 	} else if (!(mas1 & MAS1_VALID)) {
 		goto ok; 
@@ -219,9 +219,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 ok:
 	mtspr(SPR_MAS8, MAS8_GTS_MASK | mfspr(SPR_LPID));
 
-//	printf("tlbwe@0x%08x: mas0 0x%08x mas1 0x%08x mas2 0x%08x mas3 0x%08x"
-//	       " mas7 0x%08x mas8 0x%08x\n", regs->srr0, mfspr(SPR_MAS0), mfspr(SPR_MAS1),
-//	       mfspr(SPR_MAS2), mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
+#if 0
+	printf("tlbwe@0x%08x: mas0 0x%08x mas1 0x%08x mas2 0x%08x mas3 0x%08x"
+	       " mas7 0x%08x mas8 0x%08x\n", regs->srr0, mfspr(SPR_MAS0), mfspr(SPR_MAS1),
+	       mfspr(SPR_MAS2), mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
+#endif
 
 	asm volatile("tlbwe" : : : "memory");
 	return 0;
