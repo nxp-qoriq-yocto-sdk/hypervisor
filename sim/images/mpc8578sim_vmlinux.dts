@@ -1,0 +1,193 @@
+/ {
+	model = "fsl,MPC8578SIM";
+	compatible = "fsl,MPC8578SIM";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	chosen {
+		linux,stdout-path = "/soc@fe000000/serial@11c100";
+		bootargs = "console=ttyS0,115200 simicsfs=0xeff00000";
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		PowerPC,8578@0 {
+			device_type = "cpu";
+			reg = <0>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <4f790d4>;
+			bus-frequency = <27bc86a4>;
+			clock-frequency = <27bc86a4>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0 10000000>;
+	};
+
+	soc@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+		ranges = <0 fe000000 400000>;
+		reg = <fe000000 1000>;
+		bus-frequency = <27bc86a4>;
+
+		memory-controller@8000 {
+			compatible = "fsl,mpc8578-memory-controller";
+			reg = <8000 1000>;
+			interrupt-parent = <1>;
+			interrupts = <12 2>;
+		};
+
+		memory-controller@9000 {
+			compatible = "fsl,mpc8578-memory-controller";
+			reg = <9000 1000>;
+			interrupt-parent = <1>;
+			interrupts = <12 2>;
+		};
+
+		i2c@118000 {
+			device_type = "i2c";
+			compatible = "fsl-i2c";
+			reg = <118000 100>;
+			interrupts = <2b 2>;
+			interrupt-parent = <1>;
+			dfsrr;
+		};
+
+		i2c@118100 {
+			device_type = "i2c";
+			compatible = "fsl-i2c";
+			reg = <118100 100>;
+			interrupts = <2b 2>;
+			interrupt-parent = <1>;
+			dfsrr;
+		};
+
+		mdio@24520 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "mdio";
+			compatible = "gianfar";
+			reg = <24520 20>;
+
+			ethernet-phy@0 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <0>;
+				linux,phandle = <2>;
+			};
+
+			ethernet-phy@1 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <1>;
+				linux,phandle = <3>;
+			};
+
+			ethernet-phy@2 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <2>;
+				linux,phandle = <4>;
+			};
+
+			ethernet-phy@3 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <3>;
+				linux,phandle = <5>;
+			};
+		};
+
+		ethernet@24000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <24000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <1d 2 1e 2 22 2>;
+			interrupt-parent = <1>;
+			phy-handle = <2>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@25000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <25000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <23 2 24 2 28 2>;
+			interrupt-parent = <1>;
+			phy-handle = <3>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@26000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <26000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <1f 2 20 2 21 2>;
+			interrupt-parent = <1>;
+			phy-handle = <4>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@27000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <27000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <25 2 26 2 27 2>;
+			interrupt-parent = <1>;
+			phy-handle = <5>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		serial@11c100 {
+			device_type = "serial";
+			compatible = "ns16550";
+			reg = <11c100 100>;
+			clock-frequency = <0>;
+			interrupts = <2a 2>;
+			interrupt-parent = <1>;
+		};
+
+		global-utilities@e0000 {
+			compatible = "fsl,mpc8572-guts";
+			reg = <e0000 1000>;
+			fsl,has-rstcr;
+		};
+
+		pic@40000 {
+			clock-frequency = <0>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			reg = <40000 40000>;
+			compatible = "chrp,open-pic";
+			device_type = "open-pic";
+			big-endian;
+			linux,phandle = <1>;
+		};
+	};
+};
