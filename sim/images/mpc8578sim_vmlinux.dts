@@ -20,9 +20,9 @@
 			i-cache-line-size = <20>;
 			d-cache-size = <8000>;
 			i-cache-size = <8000>;
-			timebase-frequency = <4f790d4>;
-			bus-frequency = <27bc86a4>;
-			clock-frequency = <27bc86a4>;
+			timebase-frequency = <d#83333333>;
+			bus-frequency = <d#666666666>;
+			clock-frequency = <d#666666666>;
 		};
 	};
 
@@ -37,19 +37,19 @@
 		device_type = "soc";
 		ranges = <0 fe000000 400000>;
 		reg = <fe000000 1000>;
-		bus-frequency = <27bc86a4>;
+		bus-frequency = <d#666666666>;
 
 		memory-controller@8000 {
 			compatible = "fsl,mpc8578-memory-controller";
 			reg = <8000 1000>;
-			interrupt-parent = <1>;
+			interrupt-parent = <&PIC>;
 			interrupts = <12 2>;
 		};
 
 		memory-controller@9000 {
 			compatible = "fsl,mpc8578-memory-controller";
 			reg = <9000 1000>;
-			interrupt-parent = <1>;
+			interrupt-parent = <&PIC>;
 			interrupts = <12 2>;
 		};
 
@@ -58,7 +58,7 @@
 			compatible = "fsl-i2c";
 			reg = <118000 100>;
 			interrupts = <2b 2>;
-			interrupt-parent = <1>;
+			interrupt-parent = <&PIC>;
 			dfsrr;
 		};
 
@@ -67,7 +67,7 @@
 			compatible = "fsl-i2c";
 			reg = <118100 100>;
 			interrupts = <2b 2>;
-			interrupt-parent = <1>;
+			interrupt-parent = <&PIC>;
 			dfsrr;
 		};
 
@@ -78,32 +78,28 @@
 			compatible = "gianfar";
 			reg = <24520 20>;
 
-			ethernet-phy@0 {
-				interrupt-parent = <1>;
+			PHY0: ethernet-phy@0 {
+				interrupt-parent = <&PIC>;
 				interrupts = <a 1>;
 				reg = <0>;
-				linux,phandle = <2>;
 			};
 
-			ethernet-phy@1 {
-				interrupt-parent = <1>;
+			PHY1: ethernet-phy@1 {
+				interrupt-parent = <&PIC>;
 				interrupts = <a 1>;
 				reg = <1>;
-				linux,phandle = <3>;
 			};
 
-			ethernet-phy@2 {
-				interrupt-parent = <1>;
+			PHY2: ethernet-phy@2 {
+				interrupt-parent = <&PIC>;
 				interrupts = <a 1>;
 				reg = <2>;
-				linux,phandle = <4>;
 			};
 
-			ethernet-phy@3 {
-				interrupt-parent = <1>;
+			PHY3: ethernet-phy@3 {
+				interrupt-parent = <&PIC>;
 				interrupts = <a 1>;
 				reg = <3>;
-				linux,phandle = <5>;
 			};
 		};
 
@@ -116,8 +112,8 @@
 			reg = <24000 1000>;
 			local-mac-address = [00 00 00 00 00 00];
 			interrupts = <1d 2 1e 2 22 2>;
-			interrupt-parent = <1>;
-			phy-handle = <2>;
+			interrupt-parent = <&PIC>;
+			phy-handle = <&PHY0>;
 			phy-connection-type = "rgmii-id";
 		};
 
@@ -130,8 +126,8 @@
 			reg = <25000 1000>;
 			local-mac-address = [00 00 00 00 00 00];
 			interrupts = <23 2 24 2 28 2>;
-			interrupt-parent = <1>;
-			phy-handle = <3>;
+			interrupt-parent = <&PIC>;
+			phy-handle = <&PHY1>;
 			phy-connection-type = "rgmii-id";
 		};
 
@@ -144,8 +140,8 @@
 			reg = <26000 1000>;
 			local-mac-address = [00 00 00 00 00 00];
 			interrupts = <1f 2 20 2 21 2>;
-			interrupt-parent = <1>;
-			phy-handle = <4>;
+			interrupt-parent = <&PIC>;
+			phy-handle = <&PHY2>;
 			phy-connection-type = "rgmii-id";
 		};
 
@@ -158,8 +154,8 @@
 			reg = <27000 1000>;
 			local-mac-address = [00 00 00 00 00 00];
 			interrupts = <25 2 26 2 27 2>;
-			interrupt-parent = <1>;
-			phy-handle = <5>;
+			interrupt-parent = <&PIC>;
+			phy-handle = <&PHY3>;
 			phy-connection-type = "rgmii-id";
 		};
 
@@ -169,7 +165,7 @@
 			reg = <11c100 100>;
 			clock-frequency = <0>;
 			interrupts = <2a 2>;
-			interrupt-parent = <1>;
+			interrupt-parent = <&PIC>;
 		};
 
 		global-utilities@e0000 {
@@ -178,7 +174,7 @@
 			fsl,has-rstcr;
 		};
 
-		pic@40000 {
+		PIC: pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
 			#address-cells = <0>;
@@ -187,7 +183,6 @@
 			compatible = "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
-			linux,phandle = <1>;
 		};
 	};
 };
