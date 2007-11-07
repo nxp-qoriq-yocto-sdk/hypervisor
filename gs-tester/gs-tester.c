@@ -15,6 +15,8 @@ void branch_to_guest(register_t r3, register_t r4, register_t r5,
                      register_t r6, register_t r7, uint32_t vaddr);
 
 void guest_main(void);
+void test_privileged_instructions(void);
+void test_givors_rw(void);
 
 unsigned int srr0;
 unsigned int srr1;
@@ -47,14 +49,20 @@ void start_guest(void)
     */
 
   
-   /* GIVOR4 */
-   mtspr(SPR_GIVOR4,0x4);
+   /* GIVOR init */
+   mtspr(SPR_GIVOR2,0x20);
+   mtspr(SPR_GIVOR3,0x30);
+   mtspr(SPR_GIVOR4,0x40);
+   mtspr(SPR_GIVOR8,0x80);
+   mtspr(SPR_GIVOR13,0x130);
+   mtspr(SPR_GIVOR14,0x140);
 
 
    /* 
     * start the guest 
     */
 
+   printf("Switching to guest state...\n");
    branch_to_guest(0,0,0,0,0,(uint32_t)&guest_main);
 
 }
@@ -67,41 +75,19 @@ void guest_main(void)
    unsigned int tmp2;
 
    printf("MSR[GS=0]\n");
-   printf("Starting tests...\n");
+   printf("Starting tests...\n\n");
 
-   /*
-    * tlbivax
-    */
-   printf("Testing tlbivax...");
-   exception_type = -1;
-   tmp=0x04;
-   __asm __volatile("tlbivax 0, %0"
-                    :
-                    : "r"(tmp));
-   if (exception_type == EXC_EHPRIV) {
-       printf("got ehpriv...PASSED\n");
-   } else {
-       printf("FAILED\n");
-   }
 
-   /*
-    * GIOVR4 read
-    */
-   printf("Testing GIVIOR4 read...");
-   exception_type = -1;
-   tmp = mfspr(SPR_GIVOR4);
-   if (tmp == 0x4 && exception_type == -1) {
-       printf("got %x...PASSED\n",tmp);
-   } else {
-       printf("FAILED...value=%04x, exception_type=%d\n",tmp,exception_type);
-   }
+   test_privileged_instructions();
+
+   test_givors_rw();
 
 
    /*
     * SRR0/GSRR0 read
     */
    printf("Testing SRR0/GSRR0 read/write...");
-   exception_type = -1;
+   exception_type = -1; /* reinit the exception type */
    tmp = mfspr(SPR_GSRR0);
    tmp2 = mfspr(SPR_SRR0);
    if (tmp != tmp2) {
@@ -121,5 +107,58 @@ void guest_main(void)
 
    /* end of simulation */
     __asm__ volatile("mr 2, 2");
+
+}
+
+void test_privileged_instructions(void)
+{
+	unsigned int tmp;
+   /*
+    * tlbivax
+    */
+   printf("Testing tlbivax...");
+   exception_type = -1;/* reinit the exception type */
+   tmp=0x04;
+   __asm __volatile("tlbivax 0, %0"
+                    :
+                    : "r"(tmp));
+   if (exception_type == EXC_EHPRIV) {
+       printf("got ehpriv...PASSED\n");
+   } else {
+       printf("FAILED\n");
+   }
+
+}
+
+#define GIVOR_TST(str,num,expected) do { \
+	unsigned int tmp; \
+	printf("Testing %s read...",str); \
+	exception_type = -1; \
+	tmp = mfspr(num); \
+	if (tmp == expected && exception_type == -1) { \
+	    printf("got 0x%x...PASSED\n",tmp); \
+	} else { \
+	    printf("FAILED...value=%04x, exception_type=%d\n",tmp,exception_type); \
+	} \
+	printf("Testing %s write...",str); \
+	exception_type = -1; \
+	mtspr(num,tmp); \
+	if (exception_type == EXC_EHPRIV) { \
+		printf("got ehpriv...PASSED\n"); \
+	} else { \
+		printf("FAILED got %d\n",exception_type); \
+	} \
+    } while (0)
+
+
+void test_givors_rw(void)
+{
+
+    GIVOR_TST("givor2",SPR_GIVOR2,0x20);
+    GIVOR_TST("givor3",SPR_GIVOR3,0x30);
+    GIVOR_TST("givor4",SPR_GIVOR4,0x40);
+    GIVOR_TST("givor8",SPR_GIVOR8,0x80);
+    GIVOR_TST("givor13",SPR_GIVOR13,0x130);
+    GIVOR_TST("givor14",SPR_GIVOR14,0x140);
 
 }
