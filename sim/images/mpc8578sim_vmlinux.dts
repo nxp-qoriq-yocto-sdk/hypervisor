@@ -7,6 +7,8 @@
 	chosen {
 		linux,stdout-path = "/soc@fe000000/serial@11c100";
 		bootargs = "console=ttyS0,115200 simicsfs=0xeff00000";
+		linux,initrd-start = <01300000>;
+		linux,initrd-end = <013ca000>;
 	};
 
 	cpus {
