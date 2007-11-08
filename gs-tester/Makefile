@@ -38,7 +38,7 @@ OBJS = head.o exceptions.o interrupts.o trap.o init.o gs-tester.o tlb.o \
 
 SRCS_C = ../src/genassym.c ../src/interrupts.c trap.c ../src/init.c ../src/tbl.c ../src/uart.c ../src/console.c \
           gs-tester.c ../src/sprintf.c ../src/string.c ../src/emulate.c
-SRCS_S = ../src/head.S ../src/exceptions.S
+SRCS_S = ../src/head.S exceptions.S
 
 all: gs-tester.uImage gs-tester.map
 
@@ -71,6 +71,14 @@ gs-tester: $(OBJS)
 # compile and gen dependecy file
 %.o : ../src/%.c
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
+	@cp $*.d $*.P; \
+	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+		-e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.P; \
+	rm -f $*.d
+
+# assemble and gen dependecy file
+%.o : %.S 
+	$(CC) -MD $(CC_OPTS) $(CC_OPTS_ASM) -c -o $@ $<
 	@cp $*.d $*.P; \
 	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
 		-e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.P; \
