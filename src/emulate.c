@@ -45,7 +45,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
 	
-	if (va & 0xff3) {
+	if (va & TLBIVAX_RESERVED) {
 		printf("tlbivax@0x%08x: reserved bits in EA: 0x%08x\n", regs->srr0, va);
 		return 1;
 	}

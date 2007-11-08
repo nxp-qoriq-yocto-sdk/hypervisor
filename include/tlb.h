@@ -128,6 +128,8 @@
 
 #define UV_TID	0	/* TLB TID to use for UV translations */
 
+#define TLBIVAX_RESERVED        0xfe3
+
 #if !defined(_ASM)
 
 #include <stdint.h>
