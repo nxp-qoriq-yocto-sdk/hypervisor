@@ -36,14 +36,10 @@ add-directory "%script%" -prepend
 add-directory "%script%/images/" -prepend
 
 @def hap_callback(user_arg, cpu, arg):
-	if arg == 0:
-		SIM_break_simulation("0 hit unknown exception")
-	elif arg == 1:
+	if arg == 21:
 		SIM_break_simulation("end of run-- hit spin loop")
-	elif arg == 2:
+	elif arg == 22:
 		SIM_break_simulation("trap()-- unknown exception")
-	else:
-		SIM_break_simulation("magic: bad arg")
 
 @SIM_hap_add_callback("Core_Magic_Instruction", hap_callback, None)
 

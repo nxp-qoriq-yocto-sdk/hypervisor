@@ -196,7 +196,7 @@ _start:
 
 	bl	start_guest
 
-        mr      1,1   /* this is a magic inst that cause the Simics sim to stop */
+        mr      21,21   /* this is a magic inst that cause the Simics sim to stop */
 
 _busy_loop:
 	b	_busy_loop

@@ -106,7 +106,7 @@ void guest_main(void)
 
 
    /* end of simulation */
-    __asm__ volatile("mr 2, 2");
+    __asm__ volatile("mr 22, 22");
 
 }
 
