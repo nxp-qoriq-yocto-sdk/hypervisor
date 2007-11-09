@@ -237,6 +237,8 @@ ivor_setup:
 	mtspr	SPR_IVOR5, %r21
 	li	%r21, int_program@l
 	mtspr	SPR_IVOR6, %r21
+	li	%r21, int_fpunavail@l
+	mtspr	SPR_IVOR7, %r21
 	li	%r21, int_syscall@l
 	mtspr	SPR_IVOR8, %r21
 	li	%r21, int_decrementer@l

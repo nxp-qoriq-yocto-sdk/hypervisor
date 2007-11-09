@@ -3,6 +3,8 @@
 #include "frame.h"
 #include "trap_booke.h"
 #include "console.h"
+#include <percpu.h>
+#include <spr.h>
 
 struct powerpc_exception {
 	int vector;
@@ -66,4 +68,19 @@ void unknown_exception(trapframe_t *frameptr)
 	printf("unknown exception: %s\n", trapname(frameptr->exc));
 	dump_regs(frameptr); 
 	stopsim();
+}
+
+void fpunavail(trapframe_t *regs)
+{
+	guest_t *guest = hcpu->gcpu->guest;
+
+	if (!(regs->srr1 & MSR_GS)) {
+		printf("FP unavailable exception from hypervisor\n");
+		dump_regs(regs);
+	}
+
+	mtspr(SPR_GSRR0, regs->srr0);
+	mtspr(SPR_GSRR1, regs->srr1);
+	regs->srr0 = guest->ivpr | guest->ivor[7];
+	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
 }
