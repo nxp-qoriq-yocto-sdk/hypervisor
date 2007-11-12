@@ -33,7 +33,7 @@ LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
-SRCS_C := src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
+SRCS_C := src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
        src/console.c src/string.c src/sprintf.c src/emulate.c src/timers.c
 SRCS_S := src/head.S src/exceptions.S
 
@@ -87,6 +87,7 @@ src/assym.s: src/genassym.o
 	$(GENASSYM) -o $@ $<
 
 # include the dependecy files
+-include src/genassym.P 
 -include $(SRCS_C:.c=.P)
 -include $(SRCS_S:.S=.P)
 
