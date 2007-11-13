@@ -97,7 +97,7 @@ trap(trapframe_t *frameptr)
         break;
     default:
    /* the statement below stops the simulator */
-        __asm__ volatile("mr 2, 2");
+        __asm__ volatile("mr 22, 22");
         break;
     }
 

@@ -110,24 +110,108 @@ void guest_main(void)
 
 }
 
+#define STR(x) #x
+
+#define test_tlbxx_no_operands(tlbinstr,masreg,masval) ({ \
+   exception_type = -1; \
+   printf("testing "STR(tlb##tlbinstr)"..."); \
+   if (masreg) \
+       mtspr(masreg, (masval)); \
+   __asm__ volatile("isync; "STR(tlb##tlbinstr)"; isync; msync;" \
+                    : : : "memory"); \
+   if (exception_type == EXC_EHPRIV) { \
+       printf("got ehpriv ...PASSED\n"); \
+   } else { \
+       printf("FAILED\n"); \
+   }\
+})
+
+#define test_tlbxx_one_operand(tlbinstr,masreg,masval,oper) ({ \
+   unsigned int tmp = oper; \
+   exception_type = -1; \
+   printf("Testing "STR(tlb##tlbinstr)"..."); \
+   if (masreg)  \
+       mtspr(masreg, (masval)); \
+   __asm__ volatile(""STR(tlb##tlbinstr)" 0, %0" \
+                    : \
+                    : "r" (tmp) \
+                    : "memory" ); \
+   if (exception_type == EXC_EHPRIV) { \
+       printf("got ehpriv...PASSED\n"); \
+   } else { \
+       printf("FAILED\n"); \
+   }\
+})
+
+#define test_msgxx(msginstr, val) ({ \
+   unsigned int tmp = val; \
+   exception_type = -1; \
+   printf("Testing "STR(msg##msginstr)"..."); \
+   __asm__ volatile(""STR(msg##msginstr)" %0" \
+                    : \
+                    : "r" (tmp)); \
+   if (exception_type == EXC_EHPRIV) { \
+       printf("got ehpriv...PASSED\n"); \
+   } else { \
+       printf("FAILED\n"); \
+   } \
+})
+
+#define test_rfxx_interrupt(rfinstr,xxsrr,exception) ({ \
+   unsigned int tmp; \
+   exception_type = -1; \
+   printf("Testing rf"STR(rfinstr)"..."); \
+   __asm__ volatile("mfmsr %0" : "=r" (tmp)); \
+   mtspr(SPR_##xxsrr##SRR1, tmp); \
+   exception_type = -1; /* ignore exceptions from xSRR1 updates */ \
+   __asm__ volatile("bl 1f \n \
+                    1: \n \
+                    mflr %0" \
+                    : "=r" (tmp)); \
+   mtspr(SPR_##xxsrr##SRR0, tmp+20); /* for rfi, return after it */ \
+   exception_type = -1; /* ignore exceptions from xSRR0 updates */ \
+   __asm__ volatile("rf"STR(rfinstr)"" ); \
+   if ((exception_type == -1 && !exception) || \
+       exception_type == EXC_EHPRIV) { \
+        printf("PASSED, exception_type = %d\n", exception_type); \
+   } else { \
+        printf("FAILED\n"); \
+   } \
+})
+
 void test_privileged_instructions(void)
 {
 	unsigned int tmp;
    /*
-    * tlbivax
+    * tlb management instructions
     */
-   printf("Testing tlbivax...");
-   exception_type = -1;/* reinit the exception type */
-   tmp=0x04;
-   __asm __volatile("tlbivax 0, %0"
-                    :
-                    : "r"(tmp));
-   if (exception_type == EXC_EHPRIV) {
-       printf("got ehpriv...PASSED\n");
-   } else {
-       printf("FAILED\n");
-   }
+   test_tlbxx_one_operand(ivax,0,0,0x04); /* tlbivax */
+   test_tlbxx_no_operands(sync,0,0); /* tlbsync */
 
+   /*
+    * tlbre and copy-back MAS0-MAS3 via tlbwe
+    */
+   test_tlbxx_no_operands(re,SPR_MAS0,MAS0_TLBSEL1 | MAS0_ESEL(0));
+   test_tlbxx_no_operands(we,0,0);
+
+   /*
+    * tlbsx 
+    */
+   test_tlbxx_one_operand(sx,SPR_MAS6,(mfspr(SPR_PID0) << MAS6_SPID0_SHIFT),0);
+
+   /*
+    * msgsnd & msgclr 
+    */
+   test_msgxx(snd,0);
+   test_msgxx(clr,0);
+
+   /*
+    * test all types return from interrupt instructions 
+    */
+   test_rfxx_interrupt(i,G,0);
+   test_rfxx_interrupt(ci,C,1);
+   test_rfxx_interrupt(mci,MC,1);
+   test_rfxx_interrupt(di,D,1);
 }
 
 #define GIVOR_TST(str,num,expected) do { \
