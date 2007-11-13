@@ -248,15 +248,15 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case SPR_IVPR:
-		ret = hcpu->gcpu->guest->ivpr;
+		ret = hcpu->gcpu->ivpr;
 		break;
 
 	case SPR_IVOR0...SPR_IVOR15:
-		ret = hcpu->gcpu->guest->ivor[spr - SPR_IVOR0];
+		ret = hcpu->gcpu->ivor[spr - SPR_IVOR0];
 		break;
 
 	case SPR_IVOR32...SPR_IVOR37:
-		ret = hcpu->gcpu->guest->ivor[spr - SPR_IVOR32 + 32];
+		ret = hcpu->gcpu->ivor[spr - SPR_IVOR32 + 32];
 		break;
 
 	case SPR_TSR:
@@ -291,7 +291,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	case SPR_IVPR:
 		val &= IVPR_MASK;
 		mtspr(SPR_GIVPR, val);
-		hcpu->gcpu->guest->ivpr = val;
+		hcpu->gcpu->ivpr = val;
 		break;
 	
 	case SPR_IVOR2:
@@ -323,11 +323,11 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	case SPR_IVOR9...SPR_IVOR12:
 	case SPR_IVOR15:
 	low_ivor:
-		hcpu->gcpu->guest->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
+		hcpu->gcpu->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
 		break;
 
 	case SPR_IVOR32...SPR_IVOR37:
-		hcpu->gcpu->guest->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
+		hcpu->gcpu->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
 		break;
 
 	case SPR_TSR:
