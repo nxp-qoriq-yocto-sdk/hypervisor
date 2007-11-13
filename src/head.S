@@ -176,9 +176,8 @@ _start:
  *        need to programmatically compute this
  *        from some base
  */
-	lis	%r1, uv_stack_top@ha
-	addi	%r1, %r1, uv_stack_top@l
-	addi	%r1, %r1, -4
+	lis	%r1, (uv_stack_top - 16)@ha
+	addi	%r1, %r1, (uv_stack_top - 16)@l
 
 /* 
  * set SPRG0 to point to the vcpu struct
@@ -189,11 +188,9 @@ _start:
 	addi	%r2, %r2, hcpu0@l
 	mtsprg0	%r2
 
-
+	bl	clear_bss
 	bl	ivor_setup
-
 	bl	init
-
 	bl	start_guest
 
         mr      21,21   /* this is a magic inst that cause the Simics sim to stop */
@@ -270,6 +267,22 @@ ivor_setup:
 
 	blr
 
+clear_bss:
+	lis	%r3, (bss_start - 4)@h
+	lis	%r4, (bss_end - 4)@h
+	ori	%r3, %r3, (bss_start - 4)@l
+	ori	%r4, %r4, (bss_end - 4)@l
+
+	sub	%r5, %r4, %r3
+	srawi	%r5, %r5, 2
+	mtctr	%r5
+
+	li	%r6, 0
+1:	stwu	%r6, 4(%r3)
+	bdnz	1b
+
+	blr
+
 /*
  * r3 = target address of guest
  * -this needs to change to support the full ePAPR interface
@@ -285,14 +298,9 @@ branch_to_guest:
 	
 	rfi				/* Switch context */
 
-	/* For now allocate 4 pages for the 4 exception stacks
-	 * normal, critical, machine check, debug.
-	 * Eventually, these stacks need to be in a per hypervisor
-         * data area.
-         */
-
 	.section .bss
-	.align 12  /* page align */
+	.align 4
+	/* Initial boot stack */
 uv_stack_bottom:
 	.space 4096
 uv_stack_top:
