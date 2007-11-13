@@ -11,29 +11,26 @@ OUTPUT_ARCH(powerpc:common)
 
 SECTIONS
 {
-    . = 0x0;
+	. = 0x0;
 
-    .text : {
-        *(.text)
-    }
+	.text : {
+		*(.text)
+	}
 
-    . = ALIGN(4096);
-    .rodata : {
-        *(.rodata)
-        *(.rodata.*)
-    }
+	. = ALIGN(4096);
+	.rodata : {
+		*(.rodata)
+		*(.rodata.*)
+	}
 
-    . = ALIGN(4096);
-    .data : {
-        *(.data)
-        *(.sdata)
-    }
+	. = ALIGN(4096);
+	.data : {
+		*(.data)
+		*(.sdata)
+	}
 
-    .bss : {
-        *(.sbss)
-        *(.bss)
-    }
-
+	.bss : {
+		*(.sbss)
+		*(.bss)
+	}
 }
-
-
