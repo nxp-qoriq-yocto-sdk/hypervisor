@@ -176,9 +176,8 @@ _start:
  *        need to programmatically compute this
  *        from some base
  */
-	lis	%r1, uv_stack_top@ha
-	addi	%r1, %r1, uv_stack_top@l
-	addi	%r1, %r1, -4
+	lis	%r1, (uv_stack_top - 16)@ha
+	addi	%r1, %r1, (uv_stack_top - 16)@l
 
 /* 
  * set SPRG0 to point to the vcpu struct
@@ -299,14 +298,9 @@ branch_to_guest:
 	
 	rfi				/* Switch context */
 
-	/* For now allocate 4 pages for the 4 exception stacks
-	 * normal, critical, machine check, debug.
-	 * Eventually, these stacks need to be in a per hypervisor
-         * data area.
-         */
-
 	.section .bss
-	.align 12  /* page align */
+	.align 4
+	/* Initial boot stack */
 uv_stack_bottom:
 	.space 4096
 uv_stack_top:
