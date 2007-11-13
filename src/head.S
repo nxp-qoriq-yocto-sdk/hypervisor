@@ -189,11 +189,9 @@ _start:
 	addi	%r2, %r2, hcpu0@l
 	mtsprg0	%r2
 
-
+	bl	clear_bss
 	bl	ivor_setup
-
 	bl	init
-
 	bl	start_guest
 
         mr      21,21   /* this is a magic inst that cause the Simics sim to stop */
@@ -267,6 +265,22 @@ ivor_setup:
 	mtspr	SPR_IVOR40, %r21
 	li	%r21, int_ehpriv@l
 	mtspr	SPR_IVOR41, %r21
+
+	blr
+
+clear_bss:
+	lis	%r3, (bss_start - 4)@h
+	lis	%r4, (bss_end - 4)@h
+	ori	%r3, %r3, (bss_start - 4)@l
+	ori	%r4, %r4, (bss_end - 4)@l
+
+	sub	%r5, %r4, %r3
+	srawi	%r5, %r5, 2
+	mtctr	%r5
+
+	li	%r6, 0
+1:	stwu	%r6, 4(%r3)
+	bdnz	1b
 
 	blr
 

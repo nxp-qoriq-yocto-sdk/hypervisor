@@ -29,8 +29,10 @@ SECTIONS
 		*(.sdata)
 	}
 
+	bss_start = .;
 	.bss : {
 		*(.sbss)
 		*(.bss)
 	}
+	bss_end = .;
 }
