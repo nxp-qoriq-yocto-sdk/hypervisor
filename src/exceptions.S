@@ -141,6 +141,15 @@
 1:	mr	%r3, %r1
 	bl	\handler
 
+	andis.	%r0, %r10, MSR_GS@h
+	beq	2f
+
+	lwz	%r3, FRAME_EPLC(%r1)
+	lwz	%r4, FRAME_EPSC(%r1)
+	mtspr	SPR_EPLC, %r3
+	mtspr	SPR_EPSC, %r4
+
+2:
 	LOAD	%r5, FRAME_LR(%r1)
 	LOAD	%r6, FRAME_CTR(%r1)
 	lwz	%r7, FRAME_CR(%r1)
@@ -155,15 +164,7 @@
 	mtspr	\srr0, %r9
 	mtspr	\srr1, %r10
 
-	andis.	%r0, %r10, MSR_GS@h
-	beq	2f
-
-	lwz	%r3, FRAME_EPLC(%r1)
-	lwz	%r4, FRAME_EPSC(%r1)
-	mtspr	SPR_EPLC, %r3
-	mtspr	SPR_EPSC, %r4
-
-2:	/* fixme for 64-bit */
+	/* fixme for 64-bit */
 	lmw	%r2, LONGBYTES*2 + FRAME_GPREGS(%r1)
 
 	LOAD	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
