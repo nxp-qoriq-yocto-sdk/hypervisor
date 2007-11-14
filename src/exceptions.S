@@ -233,8 +233,7 @@ interrupt_vector_base:
 	baseexception 35 int_perf_mon unknown_exception
 	baseexception 36 int_doorbell unknown_exception
 	critexception 37 int_doorbell_critical unknown_exception
-	baseexception 38 int_guest_doorbell unknown_exception
+	baseexception 38 int_guest_doorbell guest_doorbell
 	critexception 39 int_guest_doorbell_critical unknown_exception
 	baseexception 40 int_hypercall unknown_exception
 	baseexception 41 int_ehpriv hvpriv
-

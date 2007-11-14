@@ -204,6 +204,8 @@
 #define	SPR_LR			0x008	/* Link Register */
 #define	SPR_CTR			0x009	/* Count Register */
 
+#define SPR_PIR                 286     /* Processor ID reg */
+
 #define SPR_LPID                638     /* Logical Partition ID */
 
 #define SPR_EPLC                947     /* External PID Load Context */

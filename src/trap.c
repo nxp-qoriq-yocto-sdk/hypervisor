@@ -96,3 +96,25 @@ void reflect_trap(trapframe_t *regs)
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
 	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
 }
+
+void guest_doorbell(trapframe_t *regs)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+	unsigned long gsrr1 = mfspr(SPR_GSRR1);
+
+	assert(gsrr1 & MSR_GS);
+	assert(gsrr1 & MSR_EE);
+
+	// First, check external interrupts. (TODO).
+	if (0) {
+	}
+
+	// Then, check for a decrementer.
+	if (gcpu->pending & GCPU_PEND_DECR) {
+		printf("Running deferred guest decrementer...\n");
+		gcpu->pending &= ~GCPU_PEND_DECR;
+
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS);
+	}
+}
