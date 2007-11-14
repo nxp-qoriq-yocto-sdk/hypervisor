@@ -27,6 +27,9 @@
 
 /* IVORs for exeception handling */
 
+#ifndef TRAP_BOOKE_H
+#define TRAP_BOOKE_H
+
 #define	EXC_CRIT	0    /* critical input */
 #define	EXC_MCHK	1    /* machine check, error report */
 #define	EXC_DSI		2    /* data storage */
@@ -34,6 +37,7 @@
 #define	EXC_EXI		4    /* external input */
 #define	EXC_ALI		5    /* alignment */
 #define	EXC_PGM		6    /* program-- illegal, privileged, trap */
+#define EXC_FPUNAVAIL   7    /* fpu unavailable */
 #define	EXC_SC		8    /* system call */
 #define	EXC_DECR	10   /* decrementer */
 #define	EXC_FIT		11   /* fixed interval */
@@ -50,3 +54,5 @@
 #define	EXC_EHPRIV	41   /* hypervisor privilege trap */
 
 #define	EXC_LAST	255
+
+#endif

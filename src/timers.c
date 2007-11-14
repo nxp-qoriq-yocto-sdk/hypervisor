@@ -30,23 +30,12 @@
  */
 
 #include <frame.h>
-#include <percpu.h>
-#include <spr.h>
+#include <trap_booke.h>
 #include <console.h>
 
 void decrementer(trapframe_t *regs)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
-
-	if (!(regs->srr1 & MSR_GS)) {
-		printf("decrementer exception from hypervisor\n");
-		dump_regs(regs);
-	}
-
-	mtspr(SPR_GSRR0, regs->srr0);
-	mtspr(SPR_GSRR1, regs->srr1);
-	regs->srr0 = gcpu->ivpr | gcpu->ivor[10];
-	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
+	reflect_trap(regs);
 
 //	printf("decrementer returning, srr0 %08x, srr1 %08x, gsrr0 %08x, gsrr1 %08x\n",
 //	       regs->srr0, regs->srr1, mfspr(SPR_GSRR0), mfspr(SPR_GSRR1));

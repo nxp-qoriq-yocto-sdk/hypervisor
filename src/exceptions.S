@@ -220,9 +220,9 @@ interrupt_vector_base:
 	baseexception 2 int_data_storage unknown_exception
 	baseexception 3 int_instr_storage unknown_exception
 	baseexception 4 int_external_input unknown_exception
-	baseexception 5 int_alignment unknown_exception
-	baseexception 6 int_program unknown_exception
-	baseexception 7 int_fpunavail fpunavail
+	baseexception 5 int_alignment reflect_trap
+	baseexception 6 int_program reflect_trap
+	baseexception 7 int_fpunavail reflect_trap
 	baseexception 8 int_syscall unknown_exception
 	baseexception 10 int_decrementer decrementer
 	baseexception 11 int_fixed_interval_timer unknown_exception
