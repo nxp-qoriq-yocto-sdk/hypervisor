@@ -35,13 +35,16 @@ sim->handle_outside_memory = 1
 add-directory "%script%" -prepend
 add-directory "%script%/images/" -prepend
 
+
 @def hap_callback(user_arg, cpu, arg):
 	if arg == 21:
 		SIM_break_simulation("end of run-- hit spin loop")
 	elif arg == 22:
 		SIM_break_simulation("trap()-- unknown exception")
 
+if $want_magic_inst == 1 {
 @SIM_hap_add_callback("Core_Magic_Instruction", hap_callback, None)
+}
 
 @def clear_gs(obj, param):
 	obj.msr &= ~0x10000000

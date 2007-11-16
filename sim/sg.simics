@@ -5,6 +5,8 @@
 # simple guest
 $kernel_image  = "%script%/sg/sg.bin"
 
+# indicate that simics magic instructions are wanted
+$want_magic_inst = 1
 
 run-command-file "%script%/uvsim.include"
 
