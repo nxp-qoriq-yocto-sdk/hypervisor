@@ -132,7 +132,7 @@
 
 #if !defined(_ASM)
 
-#include <stdint.h>
+#include <uv.h>
 
 typedef struct tlb_entry {
 	uint32_t mas1;
@@ -141,7 +141,7 @@ typedef struct tlb_entry {
 	uint32_t mas8;
 } tlb_entry_t;
 
-void tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
+void tlb1_set_entry(unsigned int idx, uint32_t va, physaddr_t pa,
                     uint32_t size, uint32_t flags, unsigned int _tid,
                     unsigned int _ts, unsigned int _gs);
 void tlb1_init(void);

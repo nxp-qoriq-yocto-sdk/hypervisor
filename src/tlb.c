@@ -70,7 +70,7 @@ void tlb1_init(void)
  * Entry TID is set to _tid which must not exceed 8 bit value.
  * Entry TS is set to either 0 or MAS1_TS based on provided _ts.
  */
-void tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
+void tlb1_set_entry(unsigned int idx, uint32_t va, physaddr_t pa,
                     uint32_t size, uint32_t flags, unsigned int _tid,
                     unsigned int _ts, unsigned int _gs)
 {
@@ -95,6 +95,7 @@ void tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
 	/* Set supervisor rwx permission bits */
 	hcpu->tlb1[idx].mas3 = (pa & MAS3_RPN) | MAS3_SR | MAS3_SW | MAS3_SX;
 
+	hcpu->tlb1[idx].mas7 = pa >> 32;
 
 	/* set GS bit */
 	hcpu->tlb1[idx].mas8 = 0;
@@ -115,9 +116,6 @@ tlb1_write_entry(unsigned int idx)
 
 	//debugf("tlb1_write_entry: s\n");
 
-	/* Clear high order RPN bits */
-	mas7 = 0;
-
 	/* Select entry */
 	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(idx);
 	//debugf("tlb1_write_entry: mas0 = 0x%08x\n", mas0);
@@ -130,7 +128,7 @@ tlb1_write_entry(unsigned int idx)
 	__asm volatile("isync");
 	mtspr(SPR_MAS3, hcpu->tlb1[idx].mas3);
 	__asm volatile("isync");
-	mtspr(SPR_MAS7, mas7);
+	mtspr(SPR_MAS7, hcpu->tlb1[idx].mas7);
 	__asm volatile("isync");
 	mtspr(SPR_MAS8, hcpu->tlb1[idx].mas8);
 	__asm volatile("isync; tlbwe; isync; msync");
