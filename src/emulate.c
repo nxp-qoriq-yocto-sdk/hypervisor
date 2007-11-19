@@ -30,6 +30,7 @@
 #include <console.h>
 #include <guestmemio.h>
 #include <percpu.h>
+#include <trap_booke.h>
 
 #define TLB1_NENTRIES 4
 
@@ -403,5 +404,6 @@ void hvpriv(trapframe_t *regs)
 
 bad:
 	printf("unhandled hvpriv trap from 0x%08x, insn 0x%08x\n", regs->srr0, insn);
-	stopsim();
+	regs->exc = EXC_PGM;
+	reflect_trap(regs);
 }

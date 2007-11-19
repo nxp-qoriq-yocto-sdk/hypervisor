@@ -24,11 +24,14 @@ typedef struct {
 	uint32_t lpid;
 } guest_t;
 
+#define GCPU_PEND_DECR	0x00000001 // Decrementer event pending
+
 typedef struct {
 	uvstack_t uvstack;
 	guest_t *guest;
 	register_t ivpr;
 	register_t ivor[38];
+	int pending;
 } gcpu_t;
 
 typedef struct {

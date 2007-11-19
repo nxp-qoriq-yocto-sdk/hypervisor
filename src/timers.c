@@ -30,24 +30,21 @@
  */
 
 #include <frame.h>
+#include <trap_booke.h>
 #include <percpu.h>
-#include <spr.h>
 #include <console.h>
+#include <spr.h>
+#include <doorbell.h>
 
 void decrementer(trapframe_t *regs)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
-
-	if (!(regs->srr1 & MSR_GS)) {
-		printf("decrementer exception from hypervisor\n");
-		dump_regs(regs);
+	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
+		reflect_trap(regs);
+		return;
 	}
 
-	mtspr(SPR_GSRR0, regs->srr0);
-	mtspr(SPR_GSRR1, regs->srr1);
-	regs->srr0 = gcpu->ivpr | gcpu->ivor[10];
-	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
-
-//	printf("decrementer returning, srr0 %08x, srr1 %08x, gsrr0 %08x, gsrr1 %08x\n",
-//	       regs->srr0, regs->srr1, mfspr(SPR_GSRR0), mfspr(SPR_GSRR1));
+	// The guest has interrupts disabled, so defer it.
+	printf("Deferring guest decrementer...\n");
+	hcpu->gcpu->pending |= GCPU_PEND_DECR;
+	send_local_guest_doorbell();
 }

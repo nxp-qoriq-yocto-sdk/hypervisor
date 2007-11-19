@@ -13,9 +13,9 @@ struct powerpc_exception {
 
 void dump_regs(trapframe_t *regs)
 {
-	printf("NIP 0x%08x MSR 0x%08x LR 0x%08x\n"
+	printf("NIP 0x%08x MSR 0x%08x LR 0x%08x EXC %d\n"
 	       "CTR 0x%08x CR 0x%08x XER 0x%08x\n",
-	       regs->srr0, regs->srr1, regs->lr,
+	       regs->srr0, regs->srr1, regs->lr, regs->exc,
 	       regs->ctr, regs->cr, regs->xer);
 
 	for (int i = 0; i < 32; i++) {
@@ -63,24 +63,58 @@ static const char *trapname(int vector)
 	return "unknown";
 }
 
-void unknown_exception(trapframe_t *frameptr)
+void unknown_exception(trapframe_t *regs)
 {
-	printf("unknown exception: %s\n", trapname(frameptr->exc));
-	dump_regs(frameptr); 
-	stopsim();
+	printf("unknown exception: %s\n", trapname(regs->exc));
+	dump_regs(regs); 
+	
+	if (regs->srr0 & MSR_GS)
+		reflect_trap(regs);
+	else
+		stopsim();
 }
 
-void fpunavail(trapframe_t *regs)
+// Do not use this when entering via guest doorbell, since that saves
+// state in gsrr rather than srr, despite being directed to the
+// hypervisor.
+
+void reflect_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = hcpu->gcpu;
 
-	if (!(regs->srr1 & MSR_GS)) {
-		printf("FP unavailable exception from hypervisor\n");
+	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
+		printf("unexpected trap in hypervisor\n");
 		dump_regs(regs);
+		BUG();
 	}
+
+	assert(regs->exc >= 0 && regs->exc < sizeof(gcpu->ivor) / sizeof(int));
 
 	mtspr(SPR_GSRR0, regs->srr0);
 	mtspr(SPR_GSRR1, regs->srr1);
-	regs->srr0 = gcpu->ivpr | gcpu->ivor[7];
+
+	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
 	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
+}
+
+void guest_doorbell(trapframe_t *regs)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+	unsigned long gsrr1 = mfspr(SPR_GSRR1);
+
+	assert(gsrr1 & MSR_GS);
+	assert(gsrr1 & MSR_EE);
+
+	// First, check external interrupts. (TODO).
+	if (0) {
+	}
+
+	// Then, check for a decrementer.
+	if (gcpu->pending & GCPU_PEND_DECR) {
+		printf("Running deferred guest decrementer...\n");
+		gcpu->pending &= ~GCPU_PEND_DECR;
+
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS);
+	}
 }

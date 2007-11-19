@@ -19,5 +19,6 @@ typedef struct {
 #define FRAMELEN roundup(sizeof(trapframe_t), 16)
 
 void dump_regs(trapframe_t *regs);
+void reflect_trap(trapframe_t *regs);
 
 #endif
