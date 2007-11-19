@@ -55,20 +55,12 @@
 			interrupts = <12 2>;
 		};
 
+
 		i2c@118000 {
 			device_type = "i2c";
 			compatible = "fsl-i2c";
 			reg = <118000 100>;
-			interrupts = <2b 2>;
-			interrupt-parent = <&PIC>;
-			dfsrr;
-		};
-
-		i2c@118100 {
-			device_type = "i2c";
-			compatible = "fsl-i2c";
-			reg = <118100 100>;
-			interrupts = <2b 2>;
+			interrupts = <1e 2>;
 			interrupt-parent = <&PIC>;
 			dfsrr;
 		};
@@ -78,7 +70,7 @@
 			compatible = "ns16550";
 			reg = <11c600 100>;
 			clock-frequency = <0>;
-			interrupts = <2a 2>;
+			interrupts = <1c 2>;
 			interrupt-parent = <&PIC>;
 		};
 
