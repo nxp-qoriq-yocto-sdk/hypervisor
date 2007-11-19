@@ -5,7 +5,7 @@
 	#size-cells = <1>;
 
 	chosen {
-		linux,stdout-path = "/soc@fe000000/serial@11c100";
+		linux,stdout-path = "/soc@fe000000/serial@11c600";
 		bootargs = "console=ttyS0,115200 simicsfs=0xeff00000";
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
@@ -73,98 +73,10 @@
 			dfsrr;
 		};
 
-		mdio@24520 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "mdio";
-			compatible = "gianfar";
-			reg = <24520 20>;
-
-			PHY0: ethernet-phy@0 {
-				interrupt-parent = <&PIC>;
-				interrupts = <a 1>;
-				reg = <0>;
-			};
-
-			PHY1: ethernet-phy@1 {
-				interrupt-parent = <&PIC>;
-				interrupts = <a 1>;
-				reg = <1>;
-			};
-
-			PHY2: ethernet-phy@2 {
-				interrupt-parent = <&PIC>;
-				interrupts = <a 1>;
-				reg = <2>;
-			};
-
-			PHY3: ethernet-phy@3 {
-				interrupt-parent = <&PIC>;
-				interrupts = <a 1>;
-				reg = <3>;
-			};
-		};
-
-		ethernet@24000 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "network";
-			model = "eTSEC";
-			compatible = "gianfar";
-			reg = <24000 1000>;
-			local-mac-address = [00 00 00 00 00 00];
-			interrupts = <1d 2 1e 2 22 2>;
-			interrupt-parent = <&PIC>;
-			phy-handle = <&PHY0>;
-			phy-connection-type = "rgmii-id";
-		};
-
-		ethernet@25000 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "network";
-			model = "eTSEC";
-			compatible = "gianfar";
-			reg = <25000 1000>;
-			local-mac-address = [00 00 00 00 00 00];
-			interrupts = <23 2 24 2 28 2>;
-			interrupt-parent = <&PIC>;
-			phy-handle = <&PHY1>;
-			phy-connection-type = "rgmii-id";
-		};
-
-		ethernet@26000 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "network";
-			model = "eTSEC";
-			compatible = "gianfar";
-			reg = <26000 1000>;
-			local-mac-address = [00 00 00 00 00 00];
-			interrupts = <1f 2 20 2 21 2>;
-			interrupt-parent = <&PIC>;
-			phy-handle = <&PHY2>;
-			phy-connection-type = "rgmii-id";
-		};
-
-		ethernet@27000 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "network";
-			model = "eTSEC";
-			compatible = "gianfar";
-			reg = <27000 1000>;
-			local-mac-address = [00 00 00 00 00 00];
-			interrupts = <25 2 26 2 27 2>;
-			interrupt-parent = <&PIC>;
-			phy-handle = <&PHY3>;
-			phy-connection-type = "rgmii-id";
-		};
-
-		serial@11c100 {
+		serial@11c600 {
 			device_type = "serial";
 			compatible = "ns16550";
-			reg = <11c100 100>;
+			reg = <11c600 100>;
 			clock-frequency = <0>;
 			interrupts = <2a 2>;
 			interrupt-parent = <&PIC>;

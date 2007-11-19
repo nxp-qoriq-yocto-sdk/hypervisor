@@ -90,7 +90,7 @@ if $use_uart1 == 1 {
 }
 
 # Create ethernet PHYs and connect them to the MACs
-foreach $phy_idx in (range 5) {
+foreach $phy_idx in (range 4) {
         # Create a generic MII transceiver identified as a Marvell 88E1011S
         $phy[$phy_idx] = (create-phy-mii-transceiver phy_id = 0x01410c60
                                                      mii_address = $phy_idx)
@@ -107,28 +107,29 @@ create-and-connect-ddr-memory $system $memory_megs "A"
 
 instantiate-components
 
+# WORKAROUNDS_START =========================================================
 # workaround POR values 3.2.2 (build-id: 1536)
+
 # (MAS0[ESEL] mask is wrong thus we can only modify 16 TLB entries
 cpu0->tlb1cfg = 0x1019c010
-# CCSR is now defaults to 4Gb - 32M and size is 16M
-$ccsr_size = 0x01000000
-$ccsr_addr = 0xfe000000
-phys_mem.del-map ccsr_space
-phys_mem.add-map ccsr_space $ccsr_addr $ccsr_size
-ccsr->CCSRBAR = ($ccsr_addr >> 12)
-script-branch {
-	local $bp_id = (phys_mem.break -w (ccsr->CCSRBAR << 12))
-	while (1) {
-		wait-for-breakpoint $bp_id
-		delete $bp_id
-		echo "fixing CCSR mapping"
-		local $new_ccsr = ccsr->CCSRBAR << 12
-		phys_mem.del-map ccsr_space
-		phys_mem.add-map ccsr_space $new_ccsr $ccsr_size
-		$bp_id = (phys_mem.break -w $new_ccsr)
-	}
-}
 
+# put uarts in their correct place
+ccsr_space.del-map device = uart0
+ccsr_space.add-map device = uart0 base = 0x11C500 length = 0x100 function = 0
+ccsr_space.del-map device = uart1
+ccsr_space.add-map device = uart1 base = 0x11C600 length = 0x100 function = 0
+
+ccsr_space.del-map device = uart2
+ccsr_space.add-map device = uart2 base = 0x11D500 length = 0x100 function = 0
+ccsr_space.del-map device = uart3
+ccsr_space.add-map device = uart3 base = 0x11D600 length = 0x100 function = 0
+
+@def reset(dummy, cpu, hard_reset):
+	cpu.tlb1cfg = 0x1019c010
+
+@SIM_hap_add_callback("PPC_Processor_Reset", reset, None)
+
+# WORKAROUNDS_END =========================================================
 
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
