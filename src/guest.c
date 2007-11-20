@@ -29,9 +29,9 @@ void start_guest(void)
 	guest.mem_real = GUEST_PA;
     
     /* set up a tlb mapping for the guest */
-    __tlb1_set_entry(0, GUEST_VA, GUEST_PA, GUEST_SIZE, _TLB_ENTRY_MEM, UV_TID, 0, GUEST_GS);
+	tlb1_set_entry(0, GUEST_VA, GUEST_PA, GUEST_SIZE, _TLB_ENTRY_MEM, UV_TID, 0, GUEST_GS);
 
-   branch_to_guest(0x00f00000, 0, 0, 0, 0, GUEST_VA);
+	branch_to_guest(0x00f00000, 0, 0, 0, 0, GUEST_VA);
 
    /* this never returns */
 

@@ -133,6 +133,7 @@
 #if !defined(_ASM)
 
 #include <stdint.h>
+
 typedef struct tlb_entry {
 	uint32_t mas1;
 	uint32_t mas2;
@@ -140,71 +141,11 @@ typedef struct tlb_entry {
 	uint32_t mas8;
 } tlb_entry_t;
 
-void __tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa, uint32_t size,
-              uint32_t flags, unsigned int _tid, unsigned int _ts, unsigned int _gs);
+void tlb1_set_entry(unsigned int idx, uint32_t va, uint32_t pa,
+                    uint32_t size, uint32_t flags, unsigned int _tid,
+                    unsigned int _ts, unsigned int _gs);
+void tlb1_init(void);
 
 
 #endif
-
-
-/***************************************************************************/
- 
-/***************************************************************************/
-
-#if 0   // dont know if we need this
-
-/*
- * Maximum number of TLB1 entries used for a permanat
- * mapping of kernel region (kernel image plus statically
- * allocated data.
- */
-#define KERNEL_REGION_MAX_TLB_ENTRIES   4
-
-#define _TLB_ENTRY_IO	(MAS2_I | MAS2_G)
-#define _TLB_ENTRY_MEM	(0)
-
-#define KERNEL_TID	0	/* TLB TID to use for kernel translations */
-#define TID_KRESERVED	1	/* Number of TIDs reserved for kernel */
-#define TID_URESERVED	0	/* Number of TIDs reserve for user */
-#define TID_MIN		(TID_KRESERVED + TID_URESERVED)
-#define TID_MAX		255
-
-#if !defined(LOCORE)
-typedef struct tlb_entry {
-	uint32_t mas1;
-	uint32_t mas2;
-	uint32_t mas3;
-} tlb_entry_t;
-
-typedef uint8_t tlbtid_t;
-struct pmap;
-
-int tlb1_set_entry(vm_offset_t, vm_offset_t, vm_size_t, u_int32_t);
-
-void __tlb1_set_entry(unsigned int, vm_offset_t, vm_offset_t,
-		vm_size_t, u_int32_t, unsigned int, unsigned int);
-
-void tlb1_inval_entry(unsigned int);
-
-void tlb1_init(vm_offset_t);
-
-void tlb0_print_tlbentries_va(vm_offset_t);
-void tlb1_print_entries(void);
-void tlb1_print_tlbentries(void);
-
-void tlb0_inval_entry(vm_offset_t, unsigned int);
-
-void tlb0_print_entries(void);
-void tlb0_print_tlbentries(void);
-
-void tid_print_busy(void);
-
-void set_mas4_defaults(void);
-
-tlbtid_t tid_alloc(struct pmap *);
-void tid_free(struct pmap *);
-#endif /* !LOCORE */
-
 #endif
-
-#endif	/* _MACHINE_TLB_H_ */
