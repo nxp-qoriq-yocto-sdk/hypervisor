@@ -85,7 +85,7 @@ void reflect_trap(trapframe_t *regs)
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
 		printf("unexpected trap in hypervisor\n");
 		dump_regs(regs);
-		BUG();
+		stopsim();
 	}
 
 	assert(regs->exc >= 0 && regs->exc < sizeof(gcpu->ivor) / sizeof(int));

@@ -31,8 +31,7 @@
 #include <guestmemio.h>
 #include <percpu.h>
 #include <trap_booke.h>
-
-#define TLB1_NENTRIES 4
+#include <paging.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -62,171 +61,207 @@ static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static void fixup_tlb_sx_re(void)
+{
+	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
+		return;
+
+	unsigned long mas3 = mfspr(SPR_MAS3);
+	unsigned long mas7 = mfspr(SPR_MAS7);
+
+	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
+	                     (mas3 >> MAS3_RPN_SHIFT);
+
+//	printf("sx_re: mas0 %x mas1 %x mas3 %lx mas7 %lx grpn %lx\n",
+//	       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
+
+	unsigned long attr;
+	unsigned long rpn = vptbl_xlate(hcpu->gcpu->guest->gphys_rev,
+	                                grpn, &attr);
+
+	assert(attr & PTE_VALID);
+
+	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
+	                (mas3 & (MAS3_FLAGS | MAS3_USER)));
+	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+
+	uint32_t mas0 = mfspr(SPR_MAS0);
+
+	if (MAS0_GET_TLBSEL(mas0) == 1) {
+		gcpu_t *gcpu = hcpu->gcpu;
+		unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
+		mas0 &= ~MAS0_ESEL_MASK;
+		mas0 |= MAS0_ESEL(guest_tlb1_to_gtlb1(entry));
+
+		mtspr(SPR_MAS0, mas0);
+		mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
+		mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
+		mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
+		mtspr(SPR_MAS7, gcpu->gtlb1[entry].mas7);
+	}
+}
+
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
-	guest_t *guest = hcpu->gcpu->guest;
 
 	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPID));
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
-
-	if (mfspr(SPR_MAS1) & MAS1_VALID) {
-		uint32_t mas3 = mfspr(SPR_MAS3);
-		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
-		               (mas3 & MAS3_RPN);
-
-		uint64_t gphys = rpn - guest->mem_real + guest->mem_start;
-
-//		printf("tlbsx va 0x%08x found 0x%09llx gphys 0x%09llx\n", va, rpn, gphys);
-
-		mtspr(SPR_MAS7, gphys >> 32);
-		mtspr(SPR_MAS3, (uint32_t)gphys | (mas3 & ~MAS3_RPN));
-	}
-	
+	fixup_tlb_sx_re();
 	return 0;
 }
 
 static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 {
-	guest_t *guest = hcpu->gcpu->guest;;
+	gcpu_t *gcpu = hcpu->gcpu;
 	uint32_t mas0 = mfspr(SPR_MAS0);
-	int entry;
+	unsigned int entry, tlb;
 	
-	if (mas0 & MAS0_RESERVED) {
+	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		printf("tlbre@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
 		return 1;
 	}
 
-	if (!(mas0 & MAS0_TLBSEL1)) {
-		printf("tlbre@0x%08x: attempt to read from TLB0\n", regs->srr0);
-		return 1;
+	tlb = MAS0_GET_TLBSEL(mas0);
+	if (tlb == 0) {
+		asm volatile("tlbre" : : : "memory");
+		fixup_tlb_sx_re();
+		return 0;
 	}
 
-	entry = (mas0 & MAS0_ESEL_TLB1MASK) >> MAS0_ESEL_SHIFT;
-	if (entry > TLB1_NENTRIES) {
+	entry = MAS0_GET_TLB1ESEL(mas0);
+	if (entry >= TLB1_GSIZE) {
 		printf("tlbre@0x%08x: attempt to read TLB1 entry %d (max %d)\n",
-		       regs->srr0, entry, TLB1_NENTRIES);
+		       regs->srr0, entry, TLB1_GSIZE);
 		return 1;
 	}
 
-	asm volatile("tlbre" : :  : "memory");
-	
-	if (mfspr(SPR_MAS1) & MAS1_VALID) {
-		uint32_t mas3 = mfspr(SPR_MAS3);
-		uint64_t rpn = ((uint64_t)mfspr(SPR_MAS7) << 32) |
-		               (mas3 & MAS3_RPN);
-
-		uint64_t gphys = rpn - guest->mem_real + guest->mem_start;
-
-//		printf("tlbre mas0 0x%08x found 0x%09llx gphys 0x%09llx\n",
-//		       mas0, rpn, gphys);
-
-		mtspr(SPR_MAS7, gphys >> 32);
-		mtspr(SPR_MAS3, (uint32_t)gphys | (mas3 & ~MAS3_RPN));
-	}
-	
+	mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
+	mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
+	mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
+	mtspr(SPR_MAS7, gcpu->gtlb1[entry].mas7);
 	return 0;
 }
 
 static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
 	guest_t *guest = hcpu->gcpu->guest;
-	uint32_t mas0 = mfspr(SPR_MAS0);
-	uint32_t mas1 = mfspr(SPR_MAS1);
-	uint32_t mas2 = mfspr(SPR_MAS2);
-	uint32_t mas3 = mfspr(SPR_MAS3);
-	uint32_t mas7 = mfspr(SPR_MAS7);
-	uint64_t gphys = ((uint64_t)mas7 << 32) | (mas3 & MAS3_RPN);
-	uint64_t rpn = gphys - guest->mem_start + guest->mem_real;
+	unsigned long mas0 = mfspr(SPR_MAS0);
+	unsigned long mas1 = mfspr(SPR_MAS1);
+	unsigned long mas2 = mfspr(SPR_MAS2);
+	unsigned long mas3 = mfspr(SPR_MAS3);
+	unsigned long mas7 = mfspr(SPR_MAS7);
+	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
+	                     (mas3 >> MAS3_RPN_SHIFT);
 
-	if (mas0 & MAS0_RESERVED) {
-		printf("tlbwe@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
+	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
+		printf("tlbwe@0x%x: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas1 & MAS1_RESERVED) {
-		printf("tlbwe@0x%08x: reserved bits in MAS1: 0x%08x\n", regs->srr0, mas0);
+		printf("tlbwe@0x%x: reserved bits in MAS1: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas2 & MAS2_RESERVED) {
-		printf("tlbwe@0x%08x: reserved bits in MAS2: 0x%08x\n", regs->srr0, mas0);
+		printf("tlbwe@0x%x: reserved bits in MAS2: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas3 & MAS3_RESERVED) {
-		printf("tlbwe@0x%08x: reserved bits in MAS3: 0x%08x\n", regs->srr0, mas0);
+		printf("tlbwe@0x%x: reserved bits in MAS3: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas7 & MAS7_RESERVED) {
-		printf("tlbwe@0x%08x: reserved bits in MAS7: 0x%08x\n", regs->srr0, mas0);
+		printf("tlbwe@0x%x: reserved bits in MAS7: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
+	/* If an entry for this address exists elsewhere in any
+	 * TLB, don't let the guest create undefined behavior by
+	 * adding a duplicate entry.
+	 */
+	if (mas1 & MAS1_VALID) {
+		mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
+		mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
+		                ((mas1 >> MAS1_TS_SHIFT) & 1));
+		asm volatile("tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
+
+		unsigned long sx_mas0 = mfspr(SPR_MAS0);
+
+		if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
+			goto no_dup;
+
+		if (MAS0_GET_TLBSEL(mas0) == 0 && 
+		    (mas0 & (MAS0_TLBSEL_MASK | MAS0_ESEL_MASK)) ==
+		    (sx_mas0 & (MAS0_TLBSEL_MASK | MAS0_ESEL_MASK)))
+			goto no_dup;
+
+		if (MAS0_GET_TLBSEL(mas0) == 1 && MAS0_GET_TLBSEL(sx_mas0) == 1 &&
+		    MAS0_GET_TLB1ESEL(sx_mas0) ==
+		    guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(mas0)))
+			goto no_dup;
+
+		printf("tlbwe@0x%x: duplicate entry for vaddr 0x%lx\n",
+		       regs->srr0, mas2 & MAS2_EPN);
+
+		return 1;
+	}
+
+no_dup:	
 	if (mas0 & MAS0_TLBSEL1) {
-		int entry = (mas0 & MAS0_ESEL_TLB1MASK) >> MAS0_ESEL_SHIFT;
-		if (entry >= TLB1_NENTRIES) {
-			printf("tlbwe@0x%08x: attempt to write TLB1 entry %d (max %d)\n",
-			       regs->srr0, entry, TLB1_NENTRIES);
+		unsigned long epn = mas2 >> PAGE_SHIFT;
+		int entry = MAS0_GET_TLB1ESEL(mas0);
+
+		if (entry >= TLB1_GSIZE) {
+			printf("tlbwe@0x%x: attempt to write TLB1 entry %d (max %d)\n",
+			       regs->srr0, entry, TLB1_GSIZE);
 			return 1;
 		}
 		
-		if (!(mas1 & MAS1_VALID))
-			goto ok; 
-		
-		uint64_t size =
-			1024 << (((mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT) * 2);
+		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
+		               mas3 & (MAS3_FLAGS | MAS3_USER));
+	} else {
+		unsigned long rpn;
+		unsigned long mas8 = guest->lpid | MAS8_GTS;
+	
+		mtspr(SPR_MAS0, mas0);
+		mtspr(SPR_MAS1, mas1);
+		mtspr(SPR_MAS2, mas2);
+		mtspr(SPR_MAS3, mas3);
+		mtspr(SPR_MAS7, mas7);
 
-		if (size < 4096 || size > 4096ULL * 1024 * 1024) {
-			printf("tlbwe@0x%08x: invalid size, MAS1=0x%08x\n", regs->srr0, mas1);
-			return 1;
+		if (likely(mas1 & MAS1_VALID)) {
+			unsigned long attr;
+			unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr);
+
+
+			// If there's no valid mapping, request a virtualization
+			// fault, so a machine check can be reflected upon use.
+			if (unlikely(!(attr & PTE_VALID))) {
+				printf("tlbwe@0x%x: Invalid gphys %llx for va %lx\n",
+				       regs->srr0,
+				       ((uint64_t)grpn) << PAGE_SHIFT,
+				       mas2 & MAS2_EPN);
+				mas8 |= MAS8_VF;
+			} else {
+				mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
+				mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
+			}
+
+			mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+			mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3);
+		} else {
+			mtspr(SPR_MAS3, mas3);
+			mtspr(SPR_MAS7, mas7);
 		}
 
-		if (rpn & (size - 1)) {	
-			printf("tlbwe@0x%08x: misaligned TLB1 entry, gphys 0x%09llx, "
-			       "real 0x%09llx, size 0x%09llx\n", regs->srr0, gphys, rpn, size);
-			return 1;
-		}
-
-		if (gphys + size > guest->mem_end) {
-			// FIXME: lookup allowed I/O
-			if (gphys > guest->mem_end)
-				goto ok;
-
-
-			printf("tlbwe@0x%08x: guest phys 0x%09llx, size 0x%09llx out of range\n",
-			       regs->srr0, gphys, size);
-			return 1;
-		}
-	} else if (!(mas1 & MAS1_VALID)) {
-		goto ok; 
+		mtspr(SPR_MAS8, mas8);
+		asm volatile("tlbwe" : : : "memory");
 	}
 
-	if (gphys < guest->mem_start || gphys >= guest->mem_end) {
-#if 0
-		// FIXME: lookup allowed I/O
-		printf("tlbwe@0x%08x: guest phys 0x%09llx out of range\n",
-		       regs->srr0, gphys);
-		return 1;
-#else
-		goto ok;
-#endif
-	}
-
-	mtspr(SPR_MAS7, rpn >> 32);
-	mtspr(SPR_MAS3, (uint32_t)rpn | (mas3 & ~MAS3_RPN));
-
-ok:
-	mtspr(SPR_MAS8, MAS8_GTS_MASK | mfspr(SPR_LPID));
-
-#if 0
-	printf("tlbwe@0x%08x: mas0 0x%08x mas1 0x%08x mas2 0x%08x mas3 0x%08x"
-	       " mas7 0x%08x mas8 0x%08x\n", regs->srr0, mfspr(SPR_MAS0), mfspr(SPR_MAS1),
-	       mfspr(SPR_MAS2), mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
-#endif
-
-	asm volatile("tlbwe" : : : "memory");
 	return 0;
 }
 
@@ -245,7 +280,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	switch (spr) {
 	case SPR_TLB1CFG:
 		ret = mfspr(SPR_TLB1CFG) & ~TLBCFG_NENTRY_MASK;
-		ret |= TLB1_NENTRIES;
+		ret |= TLB1_GSIZE;
 		break;
 
 	case SPR_IVPR:
@@ -273,7 +308,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	default:
-		printf("mfspr@0x%08x: unknown reg %d\n", regs->srr0, spr);
+		printf("mfspr@0x%x: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
 //		return 1;
 	}
@@ -344,7 +379,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	default:
-		printf("mtspr@0x%08x: unknown reg %d, val 0x%08x\n",
+		printf("mtspr@0x%x: unknown reg %d, val 0x%x\n",
 		       regs->srr0, spr, val);
 //		return 1;
 	}
@@ -358,7 +393,7 @@ void hvpriv(trapframe_t *regs)
 	int fault = 1;
 
 	guestmem_set_insn(regs);
-//	printf("hvpriv trap from 0x%08x, srr1 0x%08x, eplc 0x%08x\n", regs->srr0,
+//	printf("hvpriv trap from 0x%lx, srr1 0x%lx, eplc 0x%lx\n", regs->srr0,
 //	       regs->srr1, mfspr(SPR_EPLC));
 	insn = guestmem_in32((uint32_t *)regs->srr0);
 	
@@ -397,13 +432,13 @@ void hvpriv(trapframe_t *regs)
 		break;
 	}
 
-	if (__builtin_expect(fault == 0, 1)) {
+	if (likely(!fault)) {
 		regs->srr0 += 4;
 		return;
 	}
 
 bad:
-	printf("unhandled hvpriv trap from 0x%08x, insn 0x%08x\n", regs->srr0, insn);
+	printf("unhandled hvpriv trap from 0x%x, insn 0x%08x\n", regs->srr0, insn);
 	regs->exc = EXC_PGM;
 	reflect_trap(regs);
 }

@@ -3,7 +3,11 @@
 #include "percpu.h"
 #include <spr.h>
 
-static gcpu_t noguest;
+static gcpu_t noguest = {
+	// FIXME 64-bit
+	.tlb1_free = { ~0UL, ~0UL },
+};
+
 hcpu_t hcpu0 = {
 	.gcpu = &noguest,
 };

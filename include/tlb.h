@@ -31,12 +31,16 @@
 
 /*  PowerPC E500 MAS registers */
 #define MAS0_TLBSEL(x)		((x << 28) & 0x10000000)
-#define MAS0_ESEL(x)		((x << 16) & 0x000F0000)
+#define MAS0_ESEL(x)		((x << 16) & 0x003F0000)
 
+#define MAS0_GET_TLBSEL(x)      ((x >> 28) & 3)
+#define MAS0_GET_TLB1ESEL(x)    ((x >> 16) & 63)
 #define MAS0_TLBSEL1		0x10000000
 #define MAS0_TLBSEL0		0x00000000
+#define MAS0_TLBSEL_MASK        0x30000000
 #define MAS0_ESEL_TLB1MASK	0x000F0000
 #define MAS0_ESEL_TLB0MASK	0x00030000
+#define MAS0_ESEL_MASK          0x0fff0000
 #define MAS0_ESEL_SHIFT		16
 #define MAS0_NV_MASK		0x00000003
 #define MAS0_NV_SHIFT		0
@@ -44,35 +48,37 @@
 
 #define MAS1_VALID		0x80000000
 #define MAS1_IPROT		0x40000000
-#define MAS1_TID_MASK		0x00FF0000
+#define MAS1_TID_MASK		0x3FFF0000
 #define MAS1_TID_SHIFT		16
 #define MAS1_TS			0x00001000
+#define MAS1_TS_SHIFT           12
 #define MAS1_TSIZE_MASK		0x00000F00
 #define MAS1_TSIZE_SHIFT	8
 #define MAS1_RESERVED           0x0000e0ff
 
-#define	TLB_SIZE_4K		1
-#define	TLB_SIZE_16K		2
-#define	TLB_SIZE_64K		3
-#define	TLB_SIZE_256K		4
-#define	TLB_SIZE_1M		5
-#define	TLB_SIZE_4M		6
-#define	TLB_SIZE_16M		7
-#define	TLB_SIZE_64M		8
-#define	TLB_SIZE_256M		9
-#define	TLB_SIZE_1G		10
-#define	TLB_SIZE_4G		11
+#define TLB_SIZE_4K		1
+#define TLB_SIZE_16K		2
+#define TLB_SIZE_64K		3
+#define TLB_SIZE_256K		4
+#define TLB_SIZE_1M		5
+#define TLB_SIZE_4M		6
+#define TLB_SIZE_16M		7
+#define TLB_SIZE_64M		8
+#define TLB_SIZE_256M		9
+#define TLB_SIZE_1G		10
+#define TLB_SIZE_4G		11
 
 #define	MAS2_EPN		0xFFFFF000
 #define	MAS2_EPN_SHIFT		12
-#define	MAS2_X0			0x00000040
-#define	MAS2_X1			0x00000020
+#define	MAS2_ACM		0x000000c0
+#define	MAS2_VLE		0x00000020
 #define	MAS2_W			0x00000010
 #define	MAS2_I			0x00000008
 #define	MAS2_M			0x00000004
 #define	MAS2_G			0x00000002
 #define	MAS2_E			0x00000001
 #define MAS2_RESERVED           0x00000f00
+#define MAS2_FLAGS              0x000000ff
 
 #define	MAS3_RPN		0xFFFFF000
 #define	MAS3_RPN_SHIFT		12
@@ -80,6 +86,7 @@
 #define	MAS3_U1			0x00000100
 #define	MAS3_U2			0x00000080
 #define	MAS3_U3			0x00000040
+#define MAS3_USER               0x000003c0
 #define	MAS3_UX			0x00000020
 #define	MAS3_SX			0x00000010
 #define	MAS3_UW			0x00000008
@@ -87,6 +94,7 @@
 #define	MAS3_UR			0x00000002
 #define	MAS3_SR			0x00000001
 #define MAS3_RESERVED           0x00000c00
+#define MAS3_FLAGS              0x0000003f
 
 #define MAS4_TLBSELD1		0x10000000
 #define MAS4_TLBSELD0		0x00000000
@@ -113,8 +121,7 @@
 #define MAS7_RPN                0x0000000f
 #define MAS7_RESERVED           0xfffffff0
 
-#define MAS8_GTS_SHIFT		31
-#define MAS8_GTS_MASK		0x80000000
+#define MAS8_GTS		0x80000000 /* Guest space */
 #define MAS8_VF                 0x40000000 /* Virtualization Fault */
 #define MAS8_TLPID              0x000000ff
 
@@ -123,8 +130,25 @@
 #define MAS2_TLB0_ENTRY_IDX_MASK	0x0007f000
 #define MAS2_TLB0_ENTRY_IDX_SHIFT	12
 
-#define _TLB_ENTRY_IO	(MAS2_I | MAS2_G)
-#define _TLB_ENTRY_MEM	(0)
+#define TLB_MAS2_IO	(MAS2_I | MAS2_G)
+#define TLB_MAS2_MEM	(0)
+
+#define TLB_MAS3_KERN   (MAS3_SR | MAS3_SW | MAS3_SX)
+
+#define TLB_MAS8_HV     0
+#define TLB_MAS8_GUEST  MAS8_GTS
+
+#define TLB_TSIZE_4K    1
+#define TLB_TSIZE_16K   2
+#define TLB_TSIZE_64K   3
+#define TLB_TSIZE_256K  4
+#define TLB_TSIZE_1M    5
+#define TLB_TSIZE_4M    6
+#define TLB_TSIZE_16M   7
+#define TLB_TSIZE_64M   8
+#define TLB_TSIZE_256M  9
+#define TLB_TSIZE_1G    10
+#define TLB_TSIZE_4G    11
 
 #define UV_TID	0	/* TLB TID to use for UV translations */
 
@@ -133,19 +157,46 @@
 #if !defined(_ASM)
 
 #include <uv.h>
+#include <bitops.h>
 
 typedef struct tlb_entry {
 	uint32_t mas1;
 	uint32_t mas2;
 	uint32_t mas3;
+	uint32_t mas7;
 	uint32_t mas8;
 } tlb_entry_t;
 
-void tlb1_set_entry(unsigned int idx, uint32_t va, physaddr_t pa,
-                    uint32_t size, uint32_t flags, unsigned int _tid,
-                    unsigned int _ts, unsigned int _gs);
+void guest_set_tlb1(unsigned int entry, uint32_t mas1,
+                    unsigned long epn, unsigned long grpn,
+                    uint32_t mas2flags, uint32_t mas3flags);
+unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
+void tlb1_set_entry(unsigned int idx, unsigned long va, physaddr_t pa,
+                    uint32_t size, uint32_t mas2flags, uint32_t mas3flags,
+                    unsigned int _tid, unsigned int _ts, uint32_t mas8);
 void tlb1_init(void);
 
+static inline unsigned int pages_to_tsize(unsigned long epn)
+{
+	return epn != 0 ? count_lsb_zeroes(epn) / 2 + 1 : 0;
+}
+
+static inline unsigned int natural_alignment(unsigned long epn)
+{
+	return epn != 0 ? pages_to_tsize(epn) : TLB_TSIZE_4G;
+}
+
+static inline unsigned long tsize_to_pages(unsigned int tsize)
+{
+	return tsize != 0 ? 1UL << (tsize - 1) * 2 : 0;
+}
+
+// Return the tsize of the largest page size that can be used
+// to map the specified range (in pages).
+static inline int max_page_size(unsigned long start, unsigned long num)
+{
+	return min(natural_alignment(start), pages_to_tsize(num));
+}
 
 #endif
 #endif

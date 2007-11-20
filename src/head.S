@@ -119,8 +119,8 @@ _start:
  */
 	/* Final kernel mapping, map in 16 MB of RAM */
 	lis	%r16, MAS0_TLBSEL1@h	/* Select TLB1 */
-	li	%r17, 15		/* Entry 15 */
-	rlwimi	%r16, %r17, 16, 12, 15
+	li	%r17, 63		/* Entry 63 */
+	rlwimi	%r16, %r17, 16, 10, 15
 	mtspr	SPR_MAS0, %r16
 	isync
 

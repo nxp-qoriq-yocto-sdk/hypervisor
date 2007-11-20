@@ -10,7 +10,7 @@ CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -std=gnu99
+CC_OPTS=-m32 -Wa,-me500 -Iinclude -g -std=gnu99
 CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \
@@ -34,7 +34,8 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
 SRCS_C := src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
-       src/console.c src/string.c src/sprintf.c src/emulate.c src/timers.c
+       src/console.c src/string.c src/sprintf.c src/emulate.c src/timers.c \
+       src/paging.c src/alloc.c
 SRCS_S := src/head.S src/exceptions.S
 
 OBJS := $(SRCS_S:.S=.o) $(SRCS_C:.c=.o)

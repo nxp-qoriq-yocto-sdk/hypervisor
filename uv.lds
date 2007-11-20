@@ -35,4 +35,5 @@ SECTIONS
 		*(.bss)
 	}
 	bss_end = .;
+	_end = .;
 }
