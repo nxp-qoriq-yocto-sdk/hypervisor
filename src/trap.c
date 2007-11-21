@@ -47,7 +47,7 @@ void dump_regs(trapframe_t *regs)
 		traceback(regs);
 }
 
-static struct powerpc_exception powerpc_exceptions[] = {
+static const struct powerpc_exception powerpc_exceptions[] = {
 	{ EXC_CRIT, "critical input" },
 	{ EXC_MCHK, "machine check" },
 	{ EXC_DSI, "data storage interrupt" },
@@ -74,7 +74,7 @@ static struct powerpc_exception powerpc_exceptions[] = {
 
 static const char *trapname(int vector)
 {
-	struct  powerpc_exception *pe;
+	const struct powerpc_exception *pe;
 
 	for (pe = powerpc_exceptions; pe->vector != EXC_LAST; pe++) {
 		if (pe->vector == vector)
