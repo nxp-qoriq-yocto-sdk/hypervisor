@@ -16,6 +16,12 @@ void branch_to_guest(register_t r3, register_t r4, register_t r5,
 
 guest_t guest;
 
+static const unsigned long guest_io_pages[] = {
+	0xfe11c, TLB_TSIZE_4K, // DUART
+	0xfe040, TLB_TSIZE_256K, // MPIC
+	0xfe118, TLB_TSIZE_4K, // I2C
+};
+
 void start_guest(void)
 {
 
@@ -33,14 +39,16 @@ void start_guest(void)
 	vptbl_map(guest.gphys, GUEST_EPN, GUEST_RPN,
 	          tsize_to_pages(GUEST_SIZE), PTE_ALL);
 
-	vptbl_map(guest.gphys, 0xfe000, 0xfe000,
-	          tsize_to_pages(TLB_SIZE_16M), PTE_ALL);
-
 	vptbl_map(guest.gphys_rev, GUEST_RPN, GUEST_EPN,
 	          tsize_to_pages(GUEST_SIZE), PTE_ALL);
 
-	vptbl_map(guest.gphys_rev, 0xfe000, 0xfe000,
-	          tsize_to_pages(TLB_SIZE_16M), PTE_ALL);
+	for (int i = 0; i < sizeof(guest_io_pages) / sizeof(long); i+= 2) {
+		unsigned long page = guest_io_pages[i];
+		unsigned long len = tsize_to_pages(guest_io_pages[i + 1]);
+		
+		vptbl_map(guest.gphys, page, page, len, PTE_ALL);
+		vptbl_map(guest.gphys_rev, page, page, len, PTE_ALL);
+	}
 
 	guest_set_tlb1(0, GUEST_SIZE << MAS1_TSIZE_SHIFT,
 	               GUEST_EPN, GUEST_EPN,
