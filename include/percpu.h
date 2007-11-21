@@ -12,7 +12,7 @@
 #include <uv.h>
 #endif
 
-#define CPUSAVE_LEN 1
+#define CPUSAVE_LEN 2
 #define TLB1_SIZE  64 // Physical TLB size
 #define TLB1_RSVD  62 // First TLB1 entry reserved for the hypervisor.
                       // Entries below this but above TLB1_GSIZE are

@@ -70,20 +70,20 @@
 	mtspr	\scratch, %r2
 	mfspr	%r2, SPR_SPRG0
 
-	STORE	%r1, \savearea(%r2)
+	STORE	%r0, LONGBYTES*0 + \savearea(%r2)
+	STORE	%r1, LONGBYTES*1 + \savearea(%r2)
+	mfcr	%r0
 	\uvstack
-	addi	%r1, %r1, UVSTACK_SIZE - FRAMELEN
-
-	STORE	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
+	stw	%r0, FRAME_CR(%r1)
 
 	/* fixme for 64-bit */
 	stmw	%r3, LONGBYTES*3 + FRAME_GPREGS(%r1)
 
-	LOAD	%r3, \savearea(%r2)
+	LOAD	%r0, LONGBYTES*0 + \savearea(%r2)
+	LOAD	%r3, LONGBYTES*1 + \savearea(%r2)
 	mfspr	%r4, \scratch
 	mflr	%r5
 	mfctr	%r6
-	mfcr	%r7
 	mfxer	%r8
 	mfspr	%r9, \srr0
 	mfspr	%r10, \srr1
@@ -91,11 +91,11 @@
 	mfspr	%r12, SPR_ESR
 	li	%r13, \exc
 
+	STORE	%r0, LONGBYTES*0 + FRAME_GPREGS(%r1)
 	STORE	%r3, LONGBYTES*1 + FRAME_GPREGS(%r1)
 	STORE	%r4, LONGBYTES*2 + FRAME_GPREGS(%r1)
 	STORE	%r5, FRAME_LR(%r1)
 	STORE	%r6, FRAME_CTR(%r1)
-	stw	%r7, FRAME_CR(%r1)
 	stw	%r8, FRAME_XER(%r1)
 	STORE	%r9, FRAME_SRR0(%r1)
 	STORE	%r10, FRAME_SRR1(%r1)
@@ -174,10 +174,19 @@
 	.endm
 
 	.macro	baseuvstack
+	mfspr	%r1, SPR_SRR1
+	andis.	%r1, %r1, MSR_GS@h
+	beq-	1f
+	
+	.subsection 1
+1:	LOAD	%r1, LONGBYTES*1 + HCPU_NORMSAVE(%r2)
+	stwu	%r1, -FRAMELEN(%r1)
+	b	2f
+	.subsection 0
+
 	LOAD	%r1, HCPU_GCPU(%r2)
-#if GCPU_UVSTACK != 0
-	addi	%r1, %r1, GCPU_UVSTACK
-#endif
+	addi	%r1, %r1, GCPU_UVSTACK + UVSTACK_SIZE - FRAMELEN
+2:
 	.endm
 
 	.macro	baseexception, exc, name, handler
@@ -186,7 +195,7 @@
 	.endm
 
 	.macro	crituvstack
-	addi	%r1, %r2, HCPU_CRITSTACK
+	addi	%r1, %r2, HCPU_CRITSTACK + UVSTACK_SIZE - FRAMELEN
 	.endm
 
 	.macro	critexception, exc, name, handler
@@ -195,7 +204,7 @@
 	.endm
 
 	.macro	mcheckuvstack
-	addi	%r1, %r2, HCPU_MCHECKSTACK
+	addi	%r1, %r2, HCPU_MCHECKSTACK + UVSTACK_SIZE - FRAMELEN
 	.endm
 
 	.macro	machinecheck, exc, name, handler
@@ -204,7 +213,7 @@
 	.endm
 
 	.macro	debuguvstack
-	addi	%r1, %r2, HCPU_DEBUGSTACK
+	addi	%r1, %r2, HCPU_DEBUGSTACK + UVSTACK_SIZE - FRAMELEN
 	.endm
 
 	.macro	debugexception, exc, name, handler
