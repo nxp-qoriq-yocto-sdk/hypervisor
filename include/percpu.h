@@ -46,6 +46,8 @@ typedef struct {
 	tlbmap_t tlb1_free;
 	tlbmap_t tlb1_used[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
+	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
+	uint64_t mcar;
 	int pending;
 } gcpu_t;
 

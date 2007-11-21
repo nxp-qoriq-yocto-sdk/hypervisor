@@ -80,6 +80,9 @@
 #define MSR_DS                  (1 << (63 - MSRBIT_DS))
 #define MSR_PMM                 (1 << (63 - MSRBIT_PMM))
 
+#define MSR_HVPRIV              (MSR_GS | MSR_UCLE | MSR_DE | \
+                                 MSR_WE | MSR_PMM)
+
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
 
@@ -100,8 +103,17 @@
 
 #define	SPR_CSRR0		0x03a	/* ..8 58 Critical SRR0 */
 #define	SPR_CSRR1		0x03b	/* ..8 59 Critical SRR1 */
-#define	SPR_MCSRR0		0x23a	/* ..8 570 Machine check SRR0 */
-#define	SPR_MCSRR1		0x23b	/* ..8 571 Machine check SRR1 */
+
+#define SPR_MCARU               569     /* Macihne check Address Upper */
+#define SPR_MCSRR0              570     /* Machine check SRR0 */
+#define SPR_MCSRR1              571     /* Machine check SRR1 */
+#define SPR_MCSR                572     /* Machine check Status */
+#define   MCSR_MCP                0x80000000 /* Input to core */
+#define   MCSR_NMI                0x00100000 /* Non-Maskable Interrupt */
+#define   MCSR_MAV                0x00080000 /* Address Valid */
+#define   MCSR_MEA                0x00040000 /* MCAR is virtual */
+#define SPR_MCAR                573     /* Machine check Address */
+
 #define	SPR_DSRR0		0x23e	/* ..8 570 Machine check SRR0 */
 #define	SPR_DSRR1		0x23f	/* ..8 571 Machine check SRR1 */
 

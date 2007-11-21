@@ -226,7 +226,7 @@
 interrupt_vector_base:
 	critexception 0 int_critical_input unknown_exception
 	machinecheck 1 int_machine_check unknown_exception
-	baseexception 2 int_data_storage unknown_exception
+	baseexception 2 int_data_storage data_storage
 	baseexception 3 int_instr_storage unknown_exception
 	baseexception 4 int_external_input unknown_exception
 	baseexception 5 int_alignment reflect_trap

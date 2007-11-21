@@ -115,7 +115,7 @@ void reflect_trap(trapframe_t *regs)
 	mtspr(SPR_GSRR1, regs->srr1);
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
-	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS;
+	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE;
 }
 
 void guest_doorbell(trapframe_t *regs)
@@ -136,6 +136,30 @@ void guest_doorbell(trapframe_t *regs)
 		gcpu->pending &= ~GCPU_PEND_DECR;
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
-		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS);
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
 	}
+}
+
+void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	gcpu->mcsr = mcsr;
+	gcpu->mcar = mcar;
+
+	gcpu->mcsrr0 = regs->srr0;
+	gcpu->mcsrr1 = regs->srr1;
+
+	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_MCHK];
+	regs->srr1 &= MSR_GS | MSR_UCLE;
+}
+
+void data_storage(trapframe_t *regs)
+{
+	// If it's from the guest, then it was a virtualization
+	// fault.  Currently, we only use that for bad mappings.
+	if (regs->srr1 & MSR_GS)
+		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA, mfspr(SPR_DEAR));
+	else
+		reflect_trap(regs);
 }

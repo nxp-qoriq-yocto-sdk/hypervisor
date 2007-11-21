@@ -169,7 +169,7 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		// to spend on VF mappings.
 
 		if (unlikely(!(attr & PTE_VALID))) {
-			printf("invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
+//			printf("invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
 			epn = (epn | rpn) + 1;
 			grpn = (grpn | rpn) + 1;
 			continue;

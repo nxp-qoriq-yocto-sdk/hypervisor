@@ -241,10 +241,12 @@ no_dup:
 			// If there's no valid mapping, request a virtualization
 			// fault, so a machine check can be reflected upon use.
 			if (unlikely(!(attr & PTE_VALID))) {
+#if 0
 				printf("tlbwe@0x%x: Invalid gphys %llx for va %lx\n",
 				       regs->srr0,
 				       ((uint64_t)grpn) << PAGE_SHIFT,
 				       mas2 & MAS2_EPN);
+#endif
 				mas8 |= MAS8_VF;
 			} else {
 				mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
@@ -273,6 +275,7 @@ static int get_spr(uint32_t insn)
 
 static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 {
+	gcpu_t *gcpu = hcpu->gcpu;
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	uint32_t ret;
@@ -284,15 +287,15 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case SPR_IVPR:
-		ret = hcpu->gcpu->ivpr;
+		ret = gcpu->ivpr;
 		break;
 
 	case SPR_IVOR0...SPR_IVOR15:
-		ret = hcpu->gcpu->ivor[spr - SPR_IVOR0];
+		ret = gcpu->ivor[spr - SPR_IVOR0];
 		break;
 
 	case SPR_IVOR32...SPR_IVOR37:
-		ret = hcpu->gcpu->ivor[spr - SPR_IVOR32 + 32];
+		ret = gcpu->ivor[spr - SPR_IVOR32 + 32];
 		break;
 
 	case SPR_TSR:
@@ -307,6 +310,34 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		ret = mfspr(SPR_DEC);
 		break;
 
+	case SPR_CSRR0:
+		ret = gcpu->csrr0;
+		break;
+
+	case SPR_CSRR1:
+		ret = gcpu->csrr1;
+		break;
+
+	case SPR_MCSRR0:
+		ret = gcpu->mcsrr0;
+		break;
+
+	case SPR_MCSRR1:
+		ret = gcpu->mcsrr1;
+		break;
+
+	case SPR_MCSR:
+		ret = gcpu->mcsr;
+		break;
+
+	case SPR_MCAR:
+		ret = gcpu->mcar;
+		break;
+
+	case SPR_MCARU:
+		ret = gcpu->mcar >> 32;
+		break;
+
 	default:
 		printf("mfspr@0x%x: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
@@ -319,6 +350,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 
 static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 {
+	gcpu_t *gcpu = hcpu->gcpu;
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
@@ -359,11 +391,11 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	case SPR_IVOR9...SPR_IVOR12:
 	case SPR_IVOR15:
 	low_ivor:
-		hcpu->gcpu->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
+		gcpu->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
 		break;
 
 	case SPR_IVOR32...SPR_IVOR37:
-		hcpu->gcpu->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
+		gcpu->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
 		break;
 
 	case SPR_TSR:
@@ -378,6 +410,26 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		mtspr(SPR_DEC, val);
 		break;
 
+	case SPR_CSRR0:
+		gcpu->csrr0 = val;
+		break;
+
+	case SPR_CSRR1:
+		gcpu->csrr1 = val;
+		break;
+
+	case SPR_MCSRR0:
+		gcpu->mcsrr0 = val;
+		break;
+
+	case SPR_MCSRR1:
+		gcpu->mcsrr1 = val;
+		break;
+
+	case SPR_MCSR:
+		gcpu->mcsr &= ~val;
+		break;
+
 	default:
 		printf("mtspr@0x%x: unknown reg %d, val 0x%x\n",
 		       regs->srr0, spr, val);
@@ -387,50 +439,85 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_rfci(trapframe_t *regs, uint32_t insn)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	regs->srr0 = gcpu->csrr0;
+	regs->srr1 = (regs->srr1 & MSR_HVPRIV) | (gcpu->csrr1 & ~MSR_HVPRIV);
+
+	return 0;
+}
+
+static int emu_rfmci(trapframe_t *regs, uint32_t insn)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	regs->srr0 = gcpu->mcsrr0;
+	regs->srr1 = (regs->srr1 & MSR_HVPRIV) | (gcpu->mcsrr1 & ~MSR_HVPRIV);
+
+	return 0;
+}
+
 void hvpriv(trapframe_t *regs)
 {
-	uint32_t insn, op;
+	uint32_t insn, major, minor;
 	int fault = 1;
 
 	guestmem_set_insn(regs);
 //	printf("hvpriv trap from 0x%lx, srr1 0x%lx, eplc 0x%lx\n", regs->srr0,
 //	       regs->srr1, mfspr(SPR_EPLC));
 	insn = guestmem_in32((uint32_t *)regs->srr0);
+	major = (insn >> 26) & 0x3f;
+	minor = (insn >> 1) & 0x3ff;
 	
-	if (((insn >> 26) & 0x3f) != 0x1f)
-		goto bad;
+	switch (major) {
+	case 0x13:
+		switch (minor) {
+		case 0x033:
+			fault = emu_rfci(regs, insn);
+			break;
+
+		case 0x026:
+			fault = emu_rfmci(regs, insn);
+			break;
+		}
+		
+		break;
+
+	case 0x1f:
+		switch (minor) {
+		case 0x312:
+			fault = emu_tlbivax(regs, insn);
+			break;
 	
-	op = (insn >> 1) & 0x3ff;
+		case 0x3b2:
+			fault = emu_tlbre(regs, insn);
+			break;
 
-	switch (op) {
-	case 0x312:
-		fault = emu_tlbivax(regs, insn);
-		break;
-	
-	case 0x3b2:
-		fault = emu_tlbre(regs, insn);
-		break;
+		case 0x392:
+			fault = emu_tlbsx(regs, insn);
+			break;
 
-	case 0x392:
-		fault = emu_tlbsx(regs, insn);
-		break;
+		case 0x236:
+			fault = emu_tlbsync(regs, insn);
+			break;
 
-	case 0x236:
-		fault = emu_tlbsync(regs, insn);
-		break;
+		case 0x3d2:
+			fault = emu_tlbwe(regs, insn);
+			break;
 
-	case 0x3d2:
-		fault = emu_tlbwe(regs, insn);
-		break;
+		case 0x153:
+			fault = emu_mfspr(regs, insn);
+			break;
 
-	case 0x153:
-		fault = emu_mfspr(regs, insn);
+		case 0x1d3:
+			fault = emu_mtspr(regs, insn);
+			break;
+		}
+		
 		break;
-
-	case 0x1d3:
-		fault = emu_mtspr(regs, insn);
-		break;
-	}
+	} 
 
 	if (likely(!fault)) {
 		regs->srr0 += 4;
