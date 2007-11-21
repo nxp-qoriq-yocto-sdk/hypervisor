@@ -42,8 +42,8 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn, unsigned long *attr)
 	}
 
 	if (size == 0) {
-		pte.page &= ~1;
-		tbl = (pte_t *)(pte.page << PAGE_SHIFT);
+		pte.page &= ~(PAGE_SIZE * 2 - 1);
+		tbl = (pte_t *)pte.page;
 		pte = tbl[epn & (PGDIR_SIZE - 1)];
 
 //		printf("page %lx attr %lx\n", pte.page, pte.attr);
