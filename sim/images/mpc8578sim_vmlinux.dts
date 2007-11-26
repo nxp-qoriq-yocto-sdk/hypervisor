@@ -11,6 +11,17 @@
 		linux,initrd-end = <013ca000>;
 	};
 
+	aliases {
+		ethernet0 = "/soc@fe000000/ethernet@31c000";
+		ethernet1 = "/soc@fe000000/ethernet@31d000";
+		ethernet2 = "/soc@fe000000/ethernet@31e000";
+		ethernet3 = "/soc@fe000000/ethernet@31f000";
+		serial0 = "/soc@fe000000/serial@11c500";
+		serial1 = "/soc@fe000000/serial@11c600";
+		serial2 = "/soc@fe000000/serial@11d500";
+		serial3 = "/soc@fe000000/serial@11d600";
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -44,25 +55,116 @@
 		memory-controller@8000 {
 			compatible = "fsl,mpc8578-memory-controller";
 			reg = <8000 1000>;
-			interrupt-parent = <&PIC>;
+			interrupt-parent = <1>;
 			interrupts = <12 2>;
 		};
 
 		memory-controller@9000 {
 			compatible = "fsl,mpc8578-memory-controller";
 			reg = <9000 1000>;
-			interrupt-parent = <&PIC>;
+			interrupt-parent = <1>;
 			interrupts = <12 2>;
 		};
-
 
 		i2c@118000 {
 			device_type = "i2c";
 			compatible = "fsl-i2c";
 			reg = <118000 100>;
 			interrupts = <1e 2>;
-			interrupt-parent = <&PIC>;
+			interrupt-parent = <1>;
 			dfsrr;
+		};
+
+		mdio@31c520 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "mdio";
+			compatible = "gianfar";
+			reg = <31c520 20>;
+
+			ethernet-phy@0 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <0>;
+				linux,phandle = <2>;
+			};
+
+			ethernet-phy@1 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <1>;
+				linux,phandle = <3>;
+			};
+
+			ethernet-phy@2 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <2>;
+				linux,phandle = <4>;
+			};
+
+			ethernet-phy@3 {
+				interrupt-parent = <1>;
+				interrupts = <a 1>;
+				reg = <3>;
+				linux,phandle = <5>;
+			};
+		};
+
+		ethernet@31c000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <31c000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <1d 2 1e 2 22 2>;
+			interrupt-parent = <1>;
+			phy-handle = <2>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@31d000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <31d000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <23 2 24 2 28 2>;
+			interrupt-parent = <1>;
+			phy-handle = <3>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@31e000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <31e000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <1f 2 20 2 21 2>;
+			interrupt-parent = <1>;
+			phy-handle = <4>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		ethernet@31f000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <31f000 1000>;
+			local-mac-address = [00 00 00 00 00 00];
+			interrupts = <25 2 26 2 27 2>;
+			interrupt-parent = <1>;
+			phy-handle = <5>;
+			phy-connection-type = "rgmii-id";
 		};
 
 		serial@11c600 {
@@ -71,7 +173,25 @@
 			reg = <11c600 100>;
 			clock-frequency = <0>;
 			interrupts = <1c 2>;
-			interrupt-parent = <&PIC>;
+			interrupt-parent = <1>;
+		};
+
+		serial@11d500 {
+			device_type = "serial";
+			compatible = "ns16550";
+			reg = <11d500 100>;
+			clock-frequency = <0>;
+			interrupts = <1d 2>;
+			interrupt-parent = <1>;
+		};
+
+		serial@11d600 {
+			device_type = "serial";
+			compatible = "ns16550";
+			reg = <11d600 100>;
+			clock-frequency = <0>;
+			interrupts = <1d 2>;
+			interrupt-parent = <1>;
 		};
 
 		global-utilities@e0000 {
@@ -80,7 +200,7 @@
 			fsl,has-rstcr;
 		};
 
-		PIC: pic@40000 {
+		pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
 			#address-cells = <0>;
@@ -89,6 +209,7 @@
 			compatible = "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
+			linux,phandle = <1>;
 		};
 	};
 };
