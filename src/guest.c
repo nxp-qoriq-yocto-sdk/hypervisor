@@ -21,7 +21,7 @@ static const unsigned long guest_io_pages[] = {
 	0xfe11d, TLB_TSIZE_4K, // DUART
 	0xfe040, TLB_TSIZE_256K, // MPIC
 	0xfe118, TLB_TSIZE_4K, // I2C
-	0xfe31c, TLB_TSIZE_256K, // ethernet
+	0xfe31c, TLB_TSIZE_16K, // ethernet
 };
 
 void start_guest(void)
