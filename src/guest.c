@@ -9,6 +9,7 @@
 #include <uv.h>
 #include <percpu.h>
 #include <paging.h>
+#include <timers.h>
 #include "tlb.h"
 
 void branch_to_guest(register_t r3, register_t r4, register_t r5,
@@ -30,6 +31,8 @@ void start_guest(void)
 #define GUEST_RPN             (0x20000000 >> PAGE_SHIFT)
 #define GUEST_EPN             (0x00000000 >> PAGE_SHIFT)
 #define GUEST_SIZE            TLB_TSIZE_256M
+
+	guest_timer_init(hcpu->gcpu);
 
 	hcpu->gcpu->guest = &guest;
 	guest.mem_start = 0;

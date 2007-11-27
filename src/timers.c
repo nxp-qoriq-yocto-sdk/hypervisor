@@ -36,6 +36,10 @@
 #include <spr.h>
 #include <doorbell.h>
 
+/* gcpu->timer_flags */
+#define TF_ENABLED        1
+#define TF_ENABLED_SHIFT  0
+
 void decrementer(trapframe_t *regs)
 {
 	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
@@ -44,7 +48,66 @@ void decrementer(trapframe_t *regs)
 	}
 
 	// The guest has interrupts disabled, so defer it.
-	printf("Deferring guest decrementer...\n");
 	hcpu->gcpu->pending |= GCPU_PEND_DECR;
+	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
+
 	send_local_guest_doorbell();
+}
+
+void run_deferred_decrementer(void)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	gcpu->pending &= ~GCPU_PEND_DECR;
+
+	if (gcpu->timer_flags & TF_ENABLED) {
+		uint32_t val = mfspr(SPR_TCR) & ~TCR_DIE;
+		val |= (gcpu->timer_flags << (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
+	   	    TCR_DIE;
+
+		mtspr(SPR_TCR, val);
+	}
+}
+
+void guest_timer_init(gcpu_t *gcpu)
+{
+	gcpu->timer_flags |= TF_ENABLED;
+}
+
+void set_tcr(uint32_t val)
+{
+	gcpu_t *gcpu = hcpu->gcpu;
+
+	gcpu->timer_flags &= ~TF_ENABLED;
+	gcpu->timer_flags |= (val >> (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
+	                     TF_ENABLED;
+
+	if (gcpu->pending & GCPU_PEND_DECR)
+		val &= ~TCR_DIE;
+
+	mtspr(SPR_TCR, val);
+}
+
+void set_tsr(uint32_t val)
+{
+	if (val & TCR_DIS)
+		hcpu->gcpu->pending &= ~GCPU_PEND_DECR;
+
+	mtspr(SPR_TSR, val);
+}
+
+uint32_t get_tcr(void)
+{
+	uint32_t val = mfspr(SPR_TCR);
+
+	val &= ~TCR_DIE;
+	val |= (hcpu->gcpu->timer_flags << (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
+	       TCR_DIE;
+
+	return val;
+}
+
+uint32_t get_tsr(void)
+{
+	return mfspr(SPR_TSR);
 }

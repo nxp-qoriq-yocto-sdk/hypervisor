@@ -140,7 +140,10 @@
 #define	  TLBCFG_NENTRY_MASK	0x00000fff /* Number of entries in TLB */
 
 #define SPR_TSR                 336     /*  Timer Status Register */
+#define   TCR_DIS                 0x08000000 /* Decrementer Int Pending */
 #define SPR_TCR                 340     /*  Timer Control Register */
+#define   TCR_DIE                 0x04000000 /* Decrementer Int Enable */
+#define   TCR_DIE_SHIFT           26
 
 #define	SPR_IVPR		0x03f	/* Interrupt Vector Prefix Register */
 #define	SPR_IVOR0		0x190	/* Critical input */

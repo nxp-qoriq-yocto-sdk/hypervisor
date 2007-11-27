@@ -5,6 +5,7 @@
 #include "console.h"
 #include <percpu.h>
 #include <spr.h>
+#include <timers.h>
 
 struct powerpc_exception {
 	int vector;
@@ -132,8 +133,7 @@ void guest_doorbell(trapframe_t *regs)
 
 	// Then, check for a decrementer.
 	if (gcpu->pending & GCPU_PEND_DECR) {
-		printf("Running deferred guest decrementer...\n");
-		gcpu->pending &= ~GCPU_PEND_DECR;
+		run_deferred_decrementer();
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);

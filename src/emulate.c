@@ -32,6 +32,7 @@
 #include <percpu.h>
 #include <trap_booke.h>
 #include <paging.h>
+#include <timers.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -299,11 +300,11 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case SPR_TSR:
-		ret = mfspr(SPR_TSR);
+		ret = get_tsr();
 		break;
 
 	case SPR_TCR:
-		ret = mfspr(SPR_TCR);
+		ret = get_tcr();
 		break;
 
 	case SPR_DEC:
@@ -399,11 +400,11 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case SPR_TSR:
-		mtspr(SPR_TSR, val);
+		set_tsr(val);
 		break;
 
 	case SPR_TCR:
-		mtspr(SPR_TCR, val);
+		set_tcr(val);
 		break;
 
 	case SPR_DEC:
