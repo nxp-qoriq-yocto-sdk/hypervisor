@@ -18,7 +18,7 @@ void uart_init(void)
 void uart_putc(uint8_t c) 
 {
 
-    unsigned long addr = 0xf0000000 + 0x11c100 + REG_DATA;
+    unsigned long addr = 0xf0000000 + 0x11c600 + REG_DATA;
 
     out8(addr,c);
     
