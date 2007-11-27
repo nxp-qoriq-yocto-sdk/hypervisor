@@ -34,9 +34,9 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=../tools/genassym.sh
 
 OBJS = head.o exceptions.o interrupts.o trap.o init.o gs-tester.o tlb.o \
-	uart.o console.o sprintf.o string.o emulate.o
+	uart.o console.o sprintf.o string.o
 
-SRCS_C = ../src/genassym.c ../src/interrupts.c trap.c ../src/init.c ../src/tbl.c ../src/uart.c ../src/console.c \
+SRCS_C = ../src/genassym.c ../src/interrupts.c trap.c ../src/init.c tbl.c ../src/uart.c ../src/console.c \
           gs-tester.c ../src/sprintf.c ../src/string.c ../src/emulate.c
 SRCS_S = ../src/head.S exceptions.S
 
