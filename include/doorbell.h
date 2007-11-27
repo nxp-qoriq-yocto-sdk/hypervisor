@@ -5,10 +5,10 @@
 #include <spr.h>
 
 #define MSG_DBELL      0x00000000
-#define MSG_DBELL_CRIT 0x10000000
-#define MSG_GBELL      0x20000000
-#define MSG_GBELL_CRIT 0x30000000
-#define MSG_GBELL_MCHK 0x40000000
+#define MSG_DBELL_CRIT 0x08000000
+#define MSG_GBELL      0x10000000
+#define MSG_GBELL_CRIT 0x18000000
+#define MSG_GBELL_MCHK 0x20000000
 
 static inline void send_local_guest_doorbell(void)
 {
