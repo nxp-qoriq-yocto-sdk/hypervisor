@@ -191,7 +191,7 @@ _start:
 	bl	clear_bss
 	bl	ivor_setup
 	bl	init
-	bl	start_guest
+	bl	main
 
         mr      21,21   /* this is a magic inst that cause the Simics sim to stop */
 
