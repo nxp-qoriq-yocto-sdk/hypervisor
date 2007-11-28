@@ -57,8 +57,11 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
-	// FIXME: add lock so only one can be executing at a time
+	static uint32_t tlbsync_lock;
+
+	spin_lock(&tlbsync_lock);
 	asm volatile("tlbsync" : : : "memory");
+	spin_unlock(&tlbsync_lock);
 	return 0;
 }
 

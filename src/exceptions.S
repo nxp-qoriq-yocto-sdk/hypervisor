@@ -149,7 +149,8 @@
 	mtspr	SPR_EPLC, %r3
 	mtspr	SPR_EPSC, %r4
 
-2:
+2:	stwcx.	%r0, 0, %r1
+
 	LOAD	%r5, FRAME_LR(%r1)
 	LOAD	%r6, FRAME_CTR(%r1)
 	lwz	%r7, FRAME_CR(%r1)
