@@ -113,17 +113,6 @@ instantiate-components
 # (MAS0[ESEL] mask is wrong thus we can only modify 16 TLB entries
 cpu0->tlb1cfg = 0x1019c010
 
-# put uarts in their correct place
-ccsr_space.del-map device = uart0
-ccsr_space.add-map device = uart0 base = 0x11C500 length = 0x100 function = 0
-ccsr_space.del-map device = uart1
-ccsr_space.add-map device = uart1 base = 0x11C600 length = 0x100 function = 0
-
-ccsr_space.del-map device = uart2
-ccsr_space.add-map device = uart2 base = 0x11D500 length = 0x100 function = 0
-ccsr_space.del-map device = uart3
-ccsr_space.add-map device = uart3 base = 0x11D600 length = 0x100 function = 0
-
 @def reset(dummy, cpu, hard_reset):
 	cpu.tlb1cfg = 0x1019c010
 
