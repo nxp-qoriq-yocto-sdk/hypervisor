@@ -1,5 +1,8 @@
 
 #include "uv.h"
+#include "percpu.h"
+
+hcpu_t hcpu0;
 
 extern void tlb1_init(void);
 
@@ -12,7 +15,7 @@ void init(unsigned long devtree_ptr)
 
     core_init();
 
-    printh("Simple Guest 0.1\n");
+    printf("Simple Guest 0.1\n");
 
 }
 

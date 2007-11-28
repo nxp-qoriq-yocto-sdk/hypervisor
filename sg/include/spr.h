@@ -37,17 +37,57 @@
 
 
 #if !defined(_ASM)
+
+#include "uvtypes.h"
+
 #define mtspr(reg, val)                                                 \
-        __asm __volatile("mtspr %0,%1" : : "K"(reg), "r"(val))
+        __asm __volatile("mtspr %0,%1" : : "K"(reg), "r"(val) : "memory")
 #define mfspr(reg)                                                      \
         ( { register_t val;                                             \
-          __asm __volatile("mfspr %0,%1" : "=r"(val) : "K"(reg));       \
+          __asm __volatile("mfspr %0,%1" : "=r"(val) : "K"(reg) : "memory");\
           val; } )
 #endif
 
+#define MSRBIT_GS               35 /* Guest State */
+#define MSRBIT_UCLE             37 /* User-mode Cache Lock Enable */
+#define MSRBIT_SPE              38 /* SPE Available */
+#define MSRBIT_WE               45 /* Wait Enable */
+#define MSRBIT_CE               46 /* Critical Enable */
+#define MSRBIT_EE               48 /* External Enable */
+#define MSRBIT_PR               49 /* User Mode */
+#define MSRBIT_FP               50 /* Floating Point Available */
+#define MSRBIT_ME               51 /* Machine Check Available */
+#define MSRBIT_FE0              52 /* Floating Point Exception 0 */
+#define MSRBIT_DE               54 /* Debug Mode Enable */
+#define MSRBIT_FE1              55 /* Floating Point Exception 1 */
+#define MSRBIT_IS               58 /* Instruction Address Space */
+#define MSRBIT_DS               59 /* Data Address Space */
+#define MSRBIT_PMM              61 /* Performance Monitor Mask */
+
+#define MSR_GS                  (1 << (63 - MSRBIT_GS))
+#define MSR_UCLE                (1 << (63 - MSRBIT_UCLE))
+#define MSR_SPE                 (1 << (63 - MSRBIT_SPE))
+#define MSR_WE                  (1 << (63 - MSRBIT_WE))
+#define MSR_CE                  (1 << (63 - MSRBIT_CE))
+#define MSR_EE                  (1 << (63 - MSRBIT_EE))
+#define MSR_PR                  (1 << (63 - MSRBIT_PR))
+#define MSR_FP                  (1 << (63 - MSRBIT_FP))
+#define MSR_ME                  (1 << (63 - MSRBIT_ME))
+#define MSR_FE0                 (1 << (63 - MSRBIT_FE0))
+#define MSR_DE                  (1 << (63 - MSRBIT_DE))
+#define MSR_FE1                 (1 << (63 - MSRBIT_FE1))
+#define MSR_IS                  (1 << (63 - MSRBIT_IS))
+#define MSR_DS                  (1 << (63 - MSRBIT_DS))
+#define MSR_PMM                 (1 << (63 - MSRBIT_PMM))
+
+#define MSR_HVPRIV              (MSR_GS | MSR_UCLE | MSR_DE | \
+                                 MSR_WE | MSR_PMM)
 
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
+
+#define SPR_DEC                 22      /* Decrementer */
+
 #define	SPR_SRR0		0x01a	/* 26 Save/Restore Register 0 */
 #define	SPR_SRR1		0x01b	/* 27 Save/Restore Register 1 */
 
@@ -63,8 +103,30 @@
 
 #define	SPR_CSRR0		0x03a	/* ..8 58 Critical SRR0 */
 #define	SPR_CSRR1		0x03b	/* ..8 59 Critical SRR1 */
-#define	SPR_MCSRR0		0x23a	/* ..8 570 Machine check SRR0 */
-#define	SPR_MCSRR1		0x23b	/* ..8 571 Machine check SRR1 */
+
+#define SPR_MCARU               569     /* Macihne check Address Upper */
+#define SPR_MCSRR0              570     /* Machine check SRR0 */
+#define SPR_MCSRR1              571     /* Machine check SRR1 */
+#define SPR_MCSR                572     /* Machine check Status */
+#define   MCSR_MCP                0x80000000 /* Input to core */
+#define   MCSR_NMI                0x00100000 /* Non-Maskable Interrupt */
+#define   MCSR_MAV                0x00080000 /* Address Valid */
+#define   MCSR_MEA                0x00040000 /* MCAR is virtual */
+#define SPR_MCAR                573     /* Machine check Address */
+
+#define	SPR_DSRR0		0x23e	/* ..8 570 Machine check SRR0 */
+#define	SPR_DSRR1		0x23f	/* ..8 571 Machine check SRR1 */
+
+#define SPR_GSRR0               699
+#define SPR_GSRR1               700
+
+#define SPR_EHCSR               703
+#define   EHCSR_EXTGS           0x80000000
+#define   EHCSR_DTLBGS          0x40000000
+#define   EHCSR_ITLBGS          0x20000000
+#define   EHCSR_DSIGS           0x10000000
+#define   EHCSR_ISIGS           0x08000000
+#define   EHCSR_DUVD            0x04000000
 
 #define	SPR_SVR			0x3ff	/* ..8 1023 System Version Register */
 #define	SPR_PID0		0x030	/* ..8 Process ID Register 0 */
@@ -76,6 +138,12 @@
 #define	  TLBCFG_ASSOC_MASK	0xff000000 /* Associativity of TLB */
 #define	  TLBCFG_ASSOC_SHIFT	24
 #define	  TLBCFG_NENTRY_MASK	0x00000fff /* Number of entries in TLB */
+
+#define SPR_TSR                 336     /*  Timer Status Register */
+#define   TCR_DIS                 0x08000000 /* Decrementer Int Pending */
+#define SPR_TCR                 340     /*  Timer Control Register */
+#define   TCR_DIE                 0x04000000 /* Decrementer Int Enable */
+#define   TCR_DIE_SHIFT           26
 
 #define	SPR_IVPR		0x03f	/* Interrupt Vector Prefix Register */
 #define	SPR_IVOR0		0x190	/* Critical input */
@@ -105,6 +173,17 @@
 #define	SPR_IVOR40		0x218   /* hypercall */
 #define	SPR_IVOR41		0x219   /* hypervisor priv */
 
+#define SPR_GIVPR               0x390   /* guest ivor base */
+#define	SPR_GIVOR2		0x391   /* guest DSI */
+#define	SPR_GIVOR3		0x392   /* guest ISI */
+#define	SPR_GIVOR4		0x393   /* guest ext input */
+#define	SPR_GIVOR8		0x396   /* guest sys call */
+#define	SPR_GIVOR13		0x397   /* guest data tlb error */
+#define	SPR_GIVOR14		0x398   /* guest inst tlb error */
+
+#define IVPR_MASK               0xffff0000
+#define IVOR_MASK               0x0000fff0
+
 #define	SPR_MAS0		0x270	/* ..8 MMU Assist Register 0 Book-E/e500 */
 #define	SPR_MAS1		0x271	/* ..8 MMU Assist Register 1 Book-E/e500 */
 #define	SPR_MAS2		0x272	/* ..8 MMU Assist Register 2 Book-E/e500 */
@@ -113,6 +192,7 @@
 #define	SPR_MAS5		0x275	/* ..8 MMU Assist Register 5 Book-E */
 #define	SPR_MAS6		0x276	/* ..8 MMU Assist Register 6 Book-E/e500 */
 #define	SPR_MAS7		0x3B0	/* ..8 MMU Assist Register 7 Book-E/e500 */
+#define	SPR_MAS8		0x277	/* ..8 MMU Assist Register 7 Book-E/e500 */
 
 #define	SPR_L1CSR0		0x3F2	/* ..8 L1 Cache Control and Status Register 0 */
 #define	  L1CSR0_DCPE		0x00010000	/* Data Cache Parity Enable */
@@ -139,6 +219,24 @@
 #define	SPR_LR			0x008	/* Link Register */
 #define	SPR_CTR			0x009	/* Count Register */
 
+#define SPR_PIR                 286     /* Processor ID reg */
+
+#define SPR_LPID                638     /* Logical Partition ID */
+
+#define SPR_EPLC                947     /* External PID Load Context */
+#define SPR_EPSC                948     /* External PID Store Context */
+#define   EPC_EPR               0x80000000 /* 1 = user, 0 = kernel */
+#define   EPCBIT_EPR            32
+#define   EPC_EAS               0x40000000 /* Address Space */
+#define   EPCBIT_EAS            33
+#define   EPC_EGS               0x20000000 /* 1 = guest, 0 = hypervisor */
+#define   EPCBIT_EGS            34
+#define   EPC_ELPID             0x00ff0000
+#define   EPC_ELPID_SHIFT       16
+#define   EPC_EPID              0x00003fff
+#define   EPC_EPID_SHIFT        0
+
+#define	SPR_DEAR		0x3d5	/* Data Error Address Register */
 
 #if 0
 /*
@@ -371,8 +469,6 @@
 #define	SPR_RPA			0x3d6	/* .68 Required Physical Address Register */
 #define	SPR_PTELO		0x3d6	/* .6. Required Physical Address Register */
 
-#define	SPR_TSR			0x150	/*  Timer Status Register */
-#define	SPR_TCR			0x154	/*  Timer Control Register */
 
 #define	  TSR_ENW		  0x80000000 /* Enable Next Watchdog */
 #define	  TSR_WIS		  0x40000000 /* Watchdog Interrupt Status */
@@ -599,13 +695,6 @@
 #define	SPR_IVOR39		0x217   /* guest processor doorbell critical */
 #define	SPR_IVOR40		0x218   /* hypercall */
 #define	SPR_IVOR41		0x219   /* hypervisor priv */
-
-#define	SPR_GIVOR2		0x391   /* guest DSI */
-#define	SPR_GIVOR3		0x392   /* guest ISI */
-#define	SPR_GIVOR4		0x393   /* guest ext input */
-#define	SPR_GIVOR8		0x396   /* guest sys call */
-#define	SPR_GIVOR13		0x397   /* guest data tlb error */
-#define	SPR_GIVOR14		0x398   /* guest inst tlb error */
 
 #define	SPR_MAS0		0x270	/* ..8 MMU Assist Register 0 Book-E/e500 */
 #define	SPR_MAS1		0x271	/* ..8 MMU Assist Register 1 Book-E/e500 */
