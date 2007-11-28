@@ -17,7 +17,6 @@ SECTIONS
 		*(.text)
 	}
 
-	. = ALIGN(4096);
 	.rodata : {
 		*(.rodata)
 		*(.rodata.*)
@@ -27,8 +26,14 @@ SECTIONS
 	.data : {
 		*(.data)
 		*(.sdata)
+		
+		. = ALIGN(8);
+		extable_begin = .;
+		*(.extable)
+		extable_end = .;
 	}
 
+	. = ALIGN(8);
 	bss_start = .;
 	.bss : {
 		*(.sbss)

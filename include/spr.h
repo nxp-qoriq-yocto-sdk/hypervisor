@@ -100,9 +100,12 @@
 #define	  ESR_ILK		  0x00100000 /* Data storage, I cache locking */
 #define	  ESR_BO		  0x00020000 /* Data/instruction storage, byte ordering */
 #define	  ESR_SPE		  0x00000080 /* SPE exception bit */
+#define   ESR_EPID                0x00000040 /* External PID Access */
 
 #define	SPR_CSRR0		0x03a	/* ..8 58 Critical SRR0 */
 #define	SPR_CSRR1		0x03b	/* ..8 59 Critical SRR1 */
+
+#define	SPR_DEAR                61      /* Data Error Address Register */
 
 #define SPR_MCARU               569     /* Macihne check Address Upper */
 #define SPR_MCSRR0              570     /* Machine check SRR0 */
@@ -236,7 +239,6 @@
 #define   EPC_EPID              0x00003fff
 #define   EPC_EPID_SHIFT        0
 
-#define	SPR_DEAR		0x3d5	/* Data Error Address Register */
 
 #if 0
 /*

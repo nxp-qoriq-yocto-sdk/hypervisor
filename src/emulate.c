@@ -467,11 +467,24 @@ void hvpriv(trapframe_t *regs)
 {
 	uint32_t insn, major, minor;
 	int fault = 1;
+	int ret;
 
 	guestmem_set_insn(regs);
 //	printf("hvpriv trap from 0x%lx, srr1 0x%lx, eplc 0x%lx\n", regs->srr0,
 //	       regs->srr1, mfspr(SPR_EPLC));
-	insn = guestmem_in32((uint32_t *)regs->srr0);
+
+	ret = guestmem_in32((uint32_t *)regs->srr0, &insn);
+	if (ret != GUESTMEM_OK) {
+		printf("guestmem in returned %d\n", ret);
+		if (ret == GUESTMEM_TLBMISS)
+			regs->exc = EXC_ITLB;
+		else
+			regs->exc = EXC_ISI;
+
+		reflect_trap(regs);
+		return;
+	}
+
 	major = (insn >> 26) & 0x3f;
 	minor = (insn >> 1) & 0x3ff;
 	

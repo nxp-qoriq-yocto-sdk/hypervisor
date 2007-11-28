@@ -51,9 +51,20 @@ static inline void guestmem_set_insn(trapframe_t *regs)
 	             "memory");
 }
 
-static inline uint32_t guestmem_in32(uint32_t *ptr)
+#define GUESTMEM_OK 0
+#define GUESTMEM_TLBMISS 1
+#define GUESTMEM_TLBERR 2
+
+static inline int guestmem_in32(uint32_t *ptr, uint32_t *val)
 {
-	uint32_t ret;
-	asm("lwepx %0, 0, %1" : "=r" (ret) : "r" (ptr));
-	return ret;
+	register int stat asm("r3") = 0;
+
+	asm("1: lwepx %0, 0, %2;"
+	    "2:"
+	    ".section .extable,\"a\";"
+	    ".long 1b;"
+	    ".long 2b;"
+	    ".previous;" : "=r" (*val), "+r" (stat) : "r" (ptr));
+
+	return stat;
 }

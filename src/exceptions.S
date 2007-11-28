@@ -237,7 +237,7 @@ interrupt_vector_base:
 	baseexception 10 int_decrementer decrementer
 	baseexception 11 int_fixed_interval_timer unknown_exception
 	critexception 12 int_watchdog unknown_exception
-	baseexception 13 int_data_tlb_error unknown_exception
+	baseexception 13 int_data_tlb_error dtlb_miss
 	baseexception 14 int_inst_tlb_error unknown_exception
 	debugexception 15 int_debug unknown_exception
 	baseexception 35 int_perf_mon unknown_exception
