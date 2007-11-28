@@ -29,7 +29,7 @@ _start:
 	nop
 
 /*
- * Use tblsx to locate the TLB1 entry that maps kernel code
+ * Use tlbsx to locate the TLB1 entry that maps kernel code
  */
 	bl	1f			/* Current address */
 1:	mflr	%r15
@@ -115,12 +115,12 @@ _start:
 	bl	tlb1_inval_entry
 
 /*
- * Setup final mapping in TLB1[2] and switch to it
+ * Setup final mapping in TLB1[15] and switch to it
  */
 	/* Final kernel mapping, map in 16 MB of RAM */
 	lis	%r16, MAS0_TLBSEL1@h	/* Select TLB1 */
-	li	%r17, 2			/* Entry 1 */
-	rlwimi	%r16, %r17, 16, 12, 15
+	li	%r17, 15		/* Entry 63 */
+	rlwimi	%r16, %r17, 16, 10, 15
 	mtspr	SPR_MAS0, %r16
 	isync
 
@@ -176,27 +176,22 @@ _start:
  *        need to programmatically compute this
  *        from some base
  */
-	lis	%r1, uv_stack_top@ha
-	addi	%r1, %r1, uv_stack_top@l
-	addi	%r1, %r1, -4
+	lis	%r1, (uv_stack_top - 16)@ha
+	addi	%r1, %r1, (uv_stack_top - 16)@l
 
 /* 
- * set SPRG0 to point to the pcpu struct
+ * set SPRG0 to point to the vcpu struct
  * (for the exception handlers)
  * -TODO: this will need to be per-core eventually
  */
-	lis	%r21, pcpu@ha
-	addi	%r21, %r21, pcpu@l
-	mtsprg0	%r21
+	lis	%r2, hcpu0@ha
+	addi	%r2, %r2, hcpu0@l
+	mtsprg0	%r2
 
-
+	bl	clear_bss
 	bl	ivor_setup
-
 	bl	init
-
 	bl	start_guest
-
-/*	.long   0 */
 
         mr      21,21   /* this is a magic inst that cause the Simics sim to stop */
 
@@ -239,6 +234,8 @@ ivor_setup:
 	mtspr	SPR_IVOR5, %r21
 	li	%r21, int_program@l
 	mtspr	SPR_IVOR6, %r21
+	li	%r21, int_fpunavail@l
+	mtspr	SPR_IVOR7, %r21
 	li	%r21, int_syscall@l
 	mtspr	SPR_IVOR8, %r21
 	li	%r21, int_decrementer@l
@@ -270,40 +267,43 @@ ivor_setup:
 
 	blr
 
+clear_bss:
+	lis	%r3, (bss_start - 4)@h
+	lis	%r4, (bss_end - 4)@h
+	ori	%r3, %r3, (bss_start - 4)@l
+	ori	%r4, %r4, (bss_end - 4)@l
 
-	.data
-	.align 12 /* page align */
-pcpu:
-	.space PCPU_SIZE
+	sub	%r5, %r4, %r3
+	srawi	%r5, %r5, 2
+	mtctr	%r5
 
-	/* For now allocate 4 pages for the 4 exception stacks
-	 * normal, critical, machine check, debug.
-	 * Eventually, these stacks need to be in a per hypervisor
-         * data area.
-         */
+	li	%r6, 0
+1:	stwu	%r6, 4(%r3)
+	bdnz	1b
 
-GLOBAL(uvload)
-        .long
+	blr
+
+/*
+ * r3 = target address of guest
+ * -this needs to change to support the full ePAPR interface
+ * 
+ */
+.globl branch_to_guest
+branch_to_guest:
+	mfmsr	%r0
+	oris	%r0, %r0, 0x1000	/* Switch to GS 1. */
+
+	mtspr	SPR_SRR0, %r8
+	mtspr	SPR_SRR1, %r0
+	
+	rfi				/* Switch context */
 
 	.section .bss
-	.align 12  /* page align */
+	.align 4
+	/* Initial boot stack */
 uv_stack_bottom:
 	.space 4096
+uv_stack_top:
 
-GLOBAL(uv_stack_top)
-except_stack_bottom:
-	.space 4096
-
-GLOBAL(except_stack_top)
-crit_except_stack_bottom:
-	.space 4096
-
-GLOBAL(crit_except_stack_top)
-machchk_except_stack_bottom:
-	.space 4096
-
-GLOBAL(machchk_except_stack_top)
-dbg_except_stack_bottom:
-	.space 4096
-
-GLOBAL(dbg_except_stack_top)
+uvload:
+        .long

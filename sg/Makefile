@@ -9,8 +9,7 @@
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 
 CC=$(CROSS_COMPILE)gcc
-#CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude
+CC_OPTS=-m32 -Wa,-me500 -Iinclude -g -std=gnu99
 CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \
@@ -26,16 +25,20 @@ CC_OPTS_C= -Wall \
   -funit-at-a-time \
   -mno-string \
   -fomit-frame-pointer \
-  -Wdeclaration-after-statement
+  -Wno-unused \
+  -Werror
+#CC_OPTS=-m32 -nostdinc -Wa,-me500
 CC_OPTS_ASM=-D_ASM
 LD=$(CROSS_COMPILE)ld
-LD_OPTS=-m elf32ppc -Bstatic
+LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
 OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o src/init.o src/guest.o src/tlb.o \
-	src/uart.o
+	src/uart.o src/sprintf.o src/console.o src/string.o
 
-SRCS_C = src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tbl.c src/uart.c
+SRCS_C = src/genassym.c src/interrupts.c src/trap.c src/init.c src/guest.c src/tbl.c src/uart.c src/sprintf.c src/console.c \
+	src/string.c
+
 SRCS_S = src/head.S src/exceptions.S
 
 all: sg.uImage sg.map
@@ -56,7 +59,7 @@ sg.bin: sg
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 sg: $(OBJS)
-	$(LD) $(LD_OPTS) -T sg.lds -o $@ $(OBJS)
+	$(CC) $(LD_OPTS) -T sg.lds -o $@ $(OBJS) -lgcc
 #	$(LD) $(LD_OPTS) -o $@ $(OBJS)
 
 # compile and gen dependecy file
