@@ -86,8 +86,9 @@ static const char *trapname(int vector)
 
 void trap(trapframe_t *regs)
 {
-	printf("unknown exception: %s\n", trapname(regs->exc));
+	printf("simple guest : unknown exception: %s\n", trapname(regs->exc));
 	dump_regs(regs); 
 	
 	stopsim();
+
 }

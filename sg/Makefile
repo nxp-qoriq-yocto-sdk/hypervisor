@@ -34,10 +34,10 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 
 OBJS = src/head.o src/exceptions.o src/interrupts.o src/trap.o src/init.o src/tlb.o \
-	src/uart.o src/sprintf.o src/console.o src/string.o src/main.o src/hcall.o
+	src/uart.o src/sprintf.o src/console.o src/string.o src/main.o src/hcall.o src/hcall_wrapper.o
 
 SRCS_C = src/genassym.c src/interrupts.c src/trap.c src/init.c src/tbl.c src/uart.c src/sprintf.c src/console.c \
-	src/string.c src/main.c
+	src/string.c src/main.c src/hcall_wrapper.c
 
 SRCS_S = src/head.S src/exceptions.S src/hcall.S
 

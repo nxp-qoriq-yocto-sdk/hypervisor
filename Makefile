@@ -35,8 +35,8 @@ GENASSYM=tools/genassym.sh
 
 SRCS_C := src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
        src/console.c src/string.c src/sprintf.c src/emulate.c src/timers.c \
-       src/paging.c src/alloc.c
-SRCS_S := src/head.S src/exceptions.S
+       src/paging.c src/alloc.c src/hcalls.c
+SRCS_S := src/head.S src/exceptions.S 
 
 OBJS := $(SRCS_S:.S=.o) $(SRCS_C:.c=.o)
 
