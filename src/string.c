@@ -178,3 +178,30 @@ char *strchr(const char *s, int c)
 
 	return NULL;
 }
+
+void *memchr(const void *s, int c, size_t len)
+{
+	const char *cp = s;
+
+	while (*cp && *cp != c && len-- != 0)
+		cp++;
+
+	if (*cp == c) 
+		return (void *)cp;
+
+	return NULL;
+}
+
+void *memrchr(const void *s, int c, size_t len)
+{
+	const char *cp = s;
+	len--;
+
+	while (cp[len] && cp[len] != c && (ssize_t)len >= 0)
+		len--;
+
+	if (cp[len] == c) 
+		return (void *)&cp[len];
+
+	return NULL;
+}

@@ -7,7 +7,9 @@
 void *memcpy(void *dest, const void *src, size_t len);
 void *memmove(void *dest, const void *src, size_t len);
 int memcmp(const void *b1, const void *b2, size_t len);
-void *memset(void *block, int count, size_t len);
+void *memset(void *block, int c, size_t len);
+void *memchr(const void *s, int c, size_t len);
+void *memrchr(const void *s, int c, size_t len);
 size_t strnlen(const char *s, size_t n);
 size_t strlen(const char *s);
 char *strcpy(char *dest, const char *src);
