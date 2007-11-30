@@ -3,25 +3,16 @@
 #include "pio.h"
 #include "uart.h"
 
-/*
- * Note: this is a hack for now
- *
- */
-
-
 void uart_init(void)
 {
-
 }
 
 #define UART0_OFFSET 0x11c500
 
-
 void uart_putc(uint8_t c) 
 {
+	unsigned long addr = 0xf0000000 + UART0_OFFSET + REG_DATA;
 
-    unsigned long addr = 0xf0000000 + UART0_OFFSET + REG_DATA;
-
-    out8(addr,c);
-    
+	while (!(in8(addr + 5) & 0x20));
+	out8(addr, c);
 }
