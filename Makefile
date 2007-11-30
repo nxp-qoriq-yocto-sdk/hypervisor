@@ -73,7 +73,8 @@ bin/src/%.o : src/%.c
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
+	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -include include/libfdt_env.h \
+	-c -o $@ $<
 
 # assemble and gen dependecy file
 bin/src/%.o : src/%.S bin/src/assym.s
@@ -96,4 +97,4 @@ bin/uv.map: bin/uv
 	nm -n bin/uv > $@	
  
 clean:
-	rm -f bin
+	rm -rf bin
