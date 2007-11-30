@@ -7,8 +7,7 @@ typedef void (*hcallfp_t)(trapframe_t *regs);
 static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall\n");
-
-	return;
+	regs->gpregs[3] = -1;
 }
 
 static void fh_partition_get_status(trapframe_t *regs)
@@ -27,18 +26,12 @@ static void fh_partition_get_status(trapframe_t *regs)
 
 	/* success */
 	regs->gpregs[3] = 0;  
-
-	return;
 }
 
 static void fh_whoami(trapframe_t *regs)
 {
-
 	regs->gpregs[4] = 0x99;  /* FIXME */
-
 	regs->gpregs[3] = 0;  /* success */
-
-	return;
 }
 
 static hcallfp_t hcall_table[] = {
@@ -68,15 +61,20 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 0x17 */
 	&unimplemented,		/* 0x18 */
 	&unimplemented,		/* 0x19 */
-	&unimplemented,		/* 0x1A */
-	&unimplemented,		/* 0x1B */
-	&unimplemented,		/* 0x13 */
-	&unimplemented,		/* 0x13 */
+	&unimplemented,		/* 0x1a */
+	&unimplemented,		/* 0x1b */
+	&unimplemented,		/* 0x1c */
+	&unimplemented,		/* 0x1d */
 };
 
 void hcall(trapframe_t *regs)
 {
-	int token = regs->gpregs[11];   /* hcall token is in r11 */
+	unsigned int token = regs->gpregs[11];   /* hcall token is in r11 */
+
+	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
+		regs->gpregs[3] = -1; // status
+		return;
+	}
 
 	hcall_table[token](regs);
 }
