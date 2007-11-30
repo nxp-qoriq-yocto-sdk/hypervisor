@@ -12,7 +12,9 @@ if not defined kernel_addr      {$kernel_addr   = 0x10000000}
 if not defined kernel_symbols	{$kernel_symbols = ""}
 if not defined uboot_symbols	{$uboot_symbols = ""}
 if not defined use_uart0	{$use_uart0 = 1}
-if not defined use_uart1	{$use_uart1 = 1}
+if not defined use_uart1	{$use_uart1 = 0}
+if not defined use_uart2	{$use_uart2 = 1}
+if not defined use_uart3	{$use_uart3 = 0}
 if not defined do_boot		{$do_boot = "yes"}
 if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
@@ -87,6 +89,26 @@ if $use_uart1 == 1 {
 	if defined terminal_fg_color   {$con2->fg_color   = $terminal_fg_color}
 	if defined terminal_win32_font {$con2->win32_font = $terminal_win32_font}
 	if defined terminal_x11_font   {$con2->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart2 == 1 {
+	$con3 = (create-std-text-console)
+	$system.connect uart2 $con3
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con3->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con3->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con3->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con3->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart3 == 1 {
+	$con4 = (create-std-text-console)
+	$system.connect uart3 $con4
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con4->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con4->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con4->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con4->x11_font   = $terminal_x11_font}
 }
 
 # Create ethernet PHYs and connect them to the MACs

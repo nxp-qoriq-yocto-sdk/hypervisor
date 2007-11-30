@@ -7,7 +7,7 @@ void uart_init(void)
 {
 }
 
-#define UART0_OFFSET 0x11c600
+#define UART0_OFFSET 0x11d500
 
 void uart_putc(uint8_t c) 
 {

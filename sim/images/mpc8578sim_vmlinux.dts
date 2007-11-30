@@ -16,7 +16,7 @@
 	#size-cells = <1>;
 
 	chosen {
-		linux,stdout-path = "/soc@fe000000/serial@11c600";
+		linux,stdout-path = "/soc@fe000000/serial@11d500";
 		bootargs = "console=ttyS0,115200 simicsfs=0xeff00000";
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
@@ -177,15 +177,6 @@
 			interrupt-parent = <&mpic>;
 			phy-handle = <&phy3>;
 			phy-connection-type = "rgmii-id";
-		};
-
-		serial@11c600 {
-			device_type = "serial";
-			compatible = "ns16550";
-			reg = <11c600 100>;
-			clock-frequency = <0>;
-			interrupts = <1c 2>;
-			interrupt-parent = <&mpic>;
 		};
 
 		serial@11d500 {
