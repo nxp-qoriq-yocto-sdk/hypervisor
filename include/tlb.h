@@ -154,6 +154,8 @@
 
 #define TLBIVAX_RESERVED        0xfe3
 
+#define BASE_TLB_ENTRY 63
+
 #if !defined(_ASM)
 
 #include <uv.h>

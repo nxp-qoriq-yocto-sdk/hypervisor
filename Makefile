@@ -8,6 +8,7 @@
 
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 LIBFDT_DIR := ../dtc/libfdt
+LIBOS_DIR := ../libos/lib
 
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
@@ -39,14 +40,19 @@ all: bin/uv.uImage bin/uv.map
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
+include $(LIBOS_DIR)/Makefile.libos
 
-SRCS_C := src/interrupts.c src/trap.c src/init.c src/guest.c src/tlb.c src/uart.c \
-       src/console.c src/string.c src/sprintf.c src/emulate.c src/timers.c \
+SRCS_C := src/interrupts.c src/trap.c src/init.c src/start.c src/tlb.c \
+       src/emulate.c src/timers.c \
        src/paging.c src/alloc.c src/hcalls.c
-SRCS_S := src/head.S src/exceptions.S 
+SRCS_S := src/exceptions.S 
 
 OBJS := $(SRCS_S:.S=.o) $(SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
 OBJS := $(OBJS:%=bin/%)
+LIBOS_OBJS := $(LIBOS_STARTUP_OBJS:%=$(LIBOS_DIR)/%) \
+	$(LIBOS_CONSOLE_OBJS:%=$(LIBOS_DIR)/%) \
+	$(LIBOS_LIB_OBJS:%=$(LIBOS_DIR)/%)
+OBJS := $(LIBOS_OBJS) $(OBJS)
 
 bin/uv.uImage: bin/uv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
@@ -63,6 +69,7 @@ bin/uv.bin: bin/uv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 bin/uv: $(OBJS)
+	echo foo $(LIBOS_CONSOLE_OBJS) bar
 	$(CC) $(LD_OPTS) -Wl,-Tuv.lds -o $@ $(OBJS) -lgcc
 #	$(LD) $(LD_OPTS) -o $@ $(OBJS)
 

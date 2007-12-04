@@ -24,7 +24,7 @@ static const unsigned long guest_io_pages[] = {
 	0xfe31c, TLB_TSIZE_16K, // ethernet
 };
 
-void start_guest(void)
+void start(void)
 {
 
 #define GUEST_RPN             (0x20000000 >> PAGE_SHIFT)
