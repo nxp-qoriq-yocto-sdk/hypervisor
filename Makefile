@@ -12,7 +12,7 @@ LIBOS_DIR := ../libos/lib
 
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -g -std=gnu99
+CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_DIR) -g -std=gnu99
 CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \

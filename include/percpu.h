@@ -7,7 +7,6 @@
 
 #ifndef _ASM
 #include <stdint.h>
-#include "uvtypes.h"
 #include "tlb.h"
 #include <uv.h>
 #endif
