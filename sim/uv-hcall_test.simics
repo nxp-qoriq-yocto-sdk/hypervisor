@@ -1,0 +1,12 @@
+#
+# Script to run 8578/u-boot/ultravisor/simple-guest on simulator
+#
+
+# simple guest
+$guest_image  = "%script%/tests/bin/hcall_test.bin"
+$guest_addr   = 0x20000000
+
+# indicate that simics magic instructions are wanted
+$want_magic_inst = 1
+
+run-command-file "%script%/uvsim.include"

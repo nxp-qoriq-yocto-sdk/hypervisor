@@ -36,21 +36,38 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/hello.bin
+all: bin/hello.bin bin/hcall_test.bin
 
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
-SRCS_C := hello.c init.c
+####################
+# Hello
 
-OBJS := $(SRCS_S:.S=.o) $(SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
-OBJS := $(LIBOS_ALL_OBJS:%=$(LIBOS_DIR)/%) $(OBJS:%=bin/%) 
+HELLO_SRCS_C := hello.c init.c
+HELLO_OBJS :=  $(HELLO_SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
+HELLO_OBJS := $(LIBOS_ALL_OBJS:%=$(LIBOS_DIR)/%) $(HELLO_OBJS:%=bin/%) 
 
 bin/hello.bin: bin/hello
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/hello: $(OBJS)
-	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(OBJS) -lgcc
+bin/hello: $(HELLO_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HELLO_OBJS) -lgcc
+
+####################
+# hcall_test
+
+HCALL_SRCS_C := hcall_test.c init.c
+HCALL_OBJS := $(HCALL_SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
+HCALL_OBJS := $(LIBOS_ALL_OBJS:%=$(LIBOS_DIR)/%) $(HCALL_OBJS:%=bin/%) 
+
+bin/hcall_test.bin: bin/hcall_test
+	$(CROSS_COMPILE)objcopy -O binary $< $@
+
+bin/hcall_test: $(HCALL_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HCALL_OBJS) -lgcc
+
+####################
 
 # compile and gen dependecy file
 bin/%.o : %.c
