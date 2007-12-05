@@ -1,7 +1,0 @@
-*.s
-*.o
-*.P
-sg
-sg.bin
-sg.map
-sg.uImage
