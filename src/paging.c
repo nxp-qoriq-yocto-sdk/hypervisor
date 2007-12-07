@@ -26,7 +26,7 @@
  */
 
 #include <paging.h>
-#include <tlb.h>
+#include <libos/fsl-booke-tlb.h>
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn, unsigned long *attr)
 {

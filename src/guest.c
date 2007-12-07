@@ -10,7 +10,7 @@
 #include <percpu.h>
 #include <paging.h>
 #include <timers.h>
-#include "tlb.h"
+#include <libos/fsl-booke-tlb.h>
 
 void branch_to_guest(register_t r3, register_t r4, register_t r5,
                      register_t r6, register_t r7, uint32_t vaddr);
@@ -24,16 +24,16 @@ static const unsigned long guest_io_pages[] = {
 	0xfe31c, TLB_TSIZE_16K, // ethernet
 };
 
-void start(void)
+void start_guest(void)
 {
 
 #define GUEST_RPN             (0x20000000 >> PAGE_SHIFT)
 #define GUEST_EPN             (0x00000000 >> PAGE_SHIFT)
 #define GUEST_SIZE            TLB_TSIZE_256M
 
-	guest_timer_init(hcpu->gcpu);
+	guest_timer_init(get_gcpu());
 
-	hcpu->gcpu->guest = &guest;
+	get_gcpu()->guest = &guest;
 	guest.mem_start = 0;
 	guest.mem_end = tsize_to_pages(GUEST_SIZE) << PAGE_SHIFT;
 	guest.mem_real = GUEST_RPN << PAGE_SHIFT;
@@ -58,7 +58,11 @@ void start(void)
 	               GUEST_EPN, GUEST_EPN,
 	               TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	branch_to_guest(0x00f00000, 0, 0, 0, 0, GUEST_EPN << PAGE_SHIFT);
+	asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
+	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
+	             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
+	             "r" (GUEST_EPN << PAGE_SHIFT) :
+	             "r3", "r4", "r5", "r6", "r7", "r8");
 
    /* this never returns */
 

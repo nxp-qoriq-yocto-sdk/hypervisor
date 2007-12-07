@@ -1,22 +1,26 @@
-#include "uv.h"
-#include "console.h"
-#include "percpu.h"
-#include <spr.h>
+#include <uv.h>
+#include <libos/console.h>
+#include <percpu.h>
+#include <libos/spr.h>
+#include <libos/trapframe.h>
 
 static gcpu_t noguest = {
 	// FIXME 64-bit
 	.tlb1_free = { ~0UL, ~0UL },
 };
 
-hcpu_t hcpu0 = {
-	.gcpu = &noguest,
+extern uint8_t init_stack_top;
+
+cpu_t cpu0 = {
+	.kstack = &init_stack_top - FRAMELEN,
+	.client.gcpu = &noguest,
 };
 
 extern void tlb1_init(void);
-
 static void core_init(void);
+void start_guest(void);
 
-void init(unsigned long devtree_ptr)
+void start(unsigned long devtree_ptr)
 {
 	core_init();
 	console_init();
@@ -27,6 +31,8 @@ void init(unsigned long devtree_ptr)
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
+
+	start_guest();
 
 #if 0
 	if (first instance) {

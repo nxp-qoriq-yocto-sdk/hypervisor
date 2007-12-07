@@ -1,5 +1,5 @@
 
-#include "frame.h"
+#include <libos/trapframe.h>
 
 extern void trap(trapframe_t *);
 

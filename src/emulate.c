@@ -26,11 +26,11 @@
  */
 
 #include <uv.h>
-#include <frame.h>
-#include <console.h>
+#include <libos/trapframe.h>
+#include <libos/console.h>
 #include <guestmemio.h>
 #include <percpu.h>
-#include <trap_booke.h>
+#include <libos/trap_booke.h>
 #include <paging.h>
 #include <timers.h>
 
@@ -67,6 +67,8 @@ static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 
 static void fixup_tlb_sx_re(void)
 {
+	gcpu_t *gcpu = get_gcpu();
+
 	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
 		return;
 
@@ -80,7 +82,7 @@ static void fixup_tlb_sx_re(void)
 //	       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
 
 	unsigned long attr;
-	unsigned long rpn = vptbl_xlate(hcpu->gcpu->guest->gphys_rev,
+	unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
 	                                grpn, &attr);
 
 	assert(attr & PTE_VALID);
@@ -92,7 +94,6 @@ static void fixup_tlb_sx_re(void)
 	uint32_t mas0 = mfspr(SPR_MAS0);
 
 	if (MAS0_GET_TLBSEL(mas0) == 1) {
-		gcpu_t *gcpu = hcpu->gcpu;
 		unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
 		mas0 &= ~MAS0_ESEL_MASK;
 		mas0 |= MAS0_ESEL(guest_tlb1_to_gtlb1(entry));
@@ -117,7 +118,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	uint32_t mas0 = mfspr(SPR_MAS0);
 	unsigned int entry, tlb;
 	
@@ -149,7 +150,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
-	guest_t *guest = hcpu->gcpu->guest;
+	guest_t *guest = get_gcpu()->guest;
 	unsigned long mas0 = mfspr(SPR_MAS0);
 	unsigned long mas1 = mfspr(SPR_MAS1);
 	unsigned long mas2 = mfspr(SPR_MAS2);
@@ -279,7 +280,7 @@ static int get_spr(uint32_t insn)
 
 static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	uint32_t ret;
@@ -354,7 +355,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 
 static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
@@ -363,7 +364,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	case SPR_IVPR:
 		val &= IVPR_MASK;
 		mtspr(SPR_GIVPR, val);
-		hcpu->gcpu->ivpr = val;
+		gcpu->ivpr = val;
 		break;
 	
 	case SPR_IVOR2:
@@ -445,7 +446,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 
 static int emu_rfci(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 
 	regs->srr0 = gcpu->csrr0;
 	regs->srr1 = (regs->srr1 & MSR_HVPRIV) | (gcpu->csrr1 & ~MSR_HVPRIV);
@@ -455,7 +456,7 @@ static int emu_rfci(trapframe_t *regs, uint32_t insn)
 
 static int emu_rfmci(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 
 	regs->srr0 = gcpu->mcsrr0;
 	regs->srr1 = (regs->srr1 & MSR_HVPRIV) | (gcpu->mcsrr1 & ~MSR_HVPRIV);
@@ -543,6 +544,6 @@ void hvpriv(trapframe_t *regs)
 
 bad:
 	printf("unhandled hvpriv trap from 0x%x, insn 0x%08x\n", regs->srr0, insn);
-	regs->exc = EXC_PGM;
+	regs->exc = EXC_PROGRAM;
 	reflect_trap(regs);
 }

@@ -1,6 +1,6 @@
 
-#include "uv.h"
-#include "frame.h"
+#include <uv.h>
+#include <libos/trapframe.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 

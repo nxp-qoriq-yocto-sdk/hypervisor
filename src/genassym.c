@@ -34,19 +34,19 @@
  */
 
 #include <stddef.h>
-#include "assym.h"
-#include "percpu.h"
-#include "frame.h"
+#include <assym.h>
+#include <percpu.h>
+#include <libos/trapframe.h>
 
-ASSYM(HCPU_SIZE, sizeof(hcpu_t));
-ASSYM(HCPU_GCPU, offsetof(hcpu_t, gcpu));
-ASSYM(HCPU_NORMSAVE, offsetof(hcpu_t, normsave));
-ASSYM(HCPU_CRITSAVE, offsetof(hcpu_t, critsave));
-ASSYM(HCPU_MACHKSAVE, offsetof(hcpu_t, machksave));
-ASSYM(HCPU_DBGSAVE, offsetof(hcpu_t, dbgsave));
-ASSYM(HCPU_DEBUGSTACK, offsetof(hcpu_t, debugstack));
-ASSYM(HCPU_CRITSTACK, offsetof(hcpu_t, critstack));
-ASSYM(HCPU_MCHECKSTACK, offsetof(hcpu_t, mcheckstack));
+ASSYM(HCPU_SIZE, sizeof(cpu_t));
+ASSYM(HCPU_GCPU, offsetof(cpu_t, gcpu));
+ASSYM(HCPU_NORMSAVE, offsetof(cpu_t, normsave));
+ASSYM(HCPU_CRITSAVE, offsetof(cpu_t, critsave));
+ASSYM(HCPU_MACHKSAVE, offsetof(cpu_t, machksave));
+ASSYM(HCPU_DBGSAVE, offsetof(cpu_t, dbgsave));
+ASSYM(HCPU_DEBUGSTACK, offsetof(cpu_t, debugstack));
+ASSYM(HCPU_CRITSTACK, offsetof(cpu_t, critstack));
+ASSYM(HCPU_MCHECKSTACK, offsetof(cpu_t, mcheckstack));
 
 ASSYM(GCPU_UVSTACK, offsetof(gcpu_t, uvstack));
 

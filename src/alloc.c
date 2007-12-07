@@ -28,7 +28,7 @@
 
 #include <uv.h>
 #include <string.h>
-#include <bitops.h>
+#include <libos/bitops.h>
 
 extern int _end;
 static unsigned long heap = (unsigned long)&_end;

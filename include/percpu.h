@@ -7,22 +7,18 @@
 
 #ifndef _ASM
 #include <stdint.h>
-#include "tlb.h"
+#include <libos/fsl-booke-tlb.h>
+#include <libos/percpu.h>
 #include <uv.h>
 #endif
 
-#define CPUSAVE_LEN 2
-#define TLB1_SIZE  64 // Physical TLB size
 #define TLB1_RSVD  62 // First TLB1 entry reserved for the hypervisor.
                       // Entries below this but above TLB1_GSIZE are
                       // used to break up guest TLB1 entries due to
                       // alignment, size, or permission holes.
 #define TLB1_GSIZE 16 // As seen by the guest
-#define UVSTACK_SIZE 2048
 
 #ifndef _ASM
-typedef uint8_t uvstack_t[UVSTACK_SIZE] __attribute__((aligned(16)));
-
 struct pte_t;
 
 typedef struct {
@@ -37,8 +33,8 @@ typedef struct {
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
-typedef struct {
-	uvstack_t uvstack;
+typedef struct gcpu_t {
+	kstack_t uvstack;
 	guest_t *guest;
 	register_t ivpr;
 	register_t ivor[38];
@@ -51,18 +47,7 @@ typedef struct {
 	int pending;
 } gcpu_t;
 
-typedef struct {
-	gcpu_t *gcpu;
-	register_t normsave[CPUSAVE_LEN];
-	register_t critsave[CPUSAVE_LEN];
-	register_t machksave[CPUSAVE_LEN];
-	register_t dbgsave[CPUSAVE_LEN];
-	tlb_entry_t tlb1[TLB1_SIZE];
-	int coreid;
-	uvstack_t debugstack, critstack, mcheckstack;
-} hcpu_t;
+#define get_gcpu() (cpu->client.gcpu)
 
-register hcpu_t *hcpu asm("r2");
 #endif
-
 #endif

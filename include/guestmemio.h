@@ -26,8 +26,8 @@
  */
 
 #include <stdint.h>
-#include <spr.h>
-#include <frame.h>
+#include <libos/spr.h>
+#include <libos/trapframe.h>
 
 static inline void guestmem_set_data(trapframe_t *regs)
 {

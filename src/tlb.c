@@ -29,39 +29,15 @@
  * a few other pmap modules from the FreeBSD tree.
  */
 
-#include "tlb.h"
-#include "spr.h"
-#include "percpu.h"
+#include <libos/fsl-booke-tlb.h>
+#include <libos/spr.h>
+#include <percpu.h>
 #include <paging.h>
-#include <bitops.h>
-
-static void tlb1_write_entry(unsigned int idx);
-
-/*
- *    after tlb1_init:
- *        TLB1[0] = CCSR
- *        TLB1[1] = hv image 16M
- *
- *
- */
-
-/* hardcoded hack for now */
-#define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0xf0000000
-#define CCSRBAR_SIZE            TLB_TSIZE_16M
-
-static int print_ok;
-
-void tlb1_init(void)
-{
-	tlb1_set_entry(62, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, UV_TID, 0, TLB_MAS8_HV);
-	print_ok = 1;
-}
+#include <libos/bitops.h>
 
 static int alloc_tlb1(unsigned int entry)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	unsigned long val;
 	int idx = 0;
 	int i = 0;
@@ -93,7 +69,7 @@ static int alloc_tlb1(unsigned int entry)
 
 static void free_tlb1(unsigned int entry)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	unsigned long val;
 	int i = 0;
 	int idx = 0;
@@ -105,7 +81,7 @@ static void free_tlb1(unsigned int entry)
 			
 //			printf("clearing tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
 
-			hcpu->tlb1[idx + bit].mas1 = 0;
+			cpu->tlb1[idx + bit].mas1 = 0;
 			tlb1_write_entry(idx + bit);
 
 			gcpu->tlb1_used[entry][i] &= ~(1UL << bit);
@@ -119,7 +95,7 @@ static void free_tlb1(unsigned int entry)
 
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	int i = idx / LONG_BITS;
 	int bit = idx % LONG_BITS;
 	unsigned int entry;
@@ -135,7 +111,7 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
                     unsigned long epn, unsigned long grpn,
                     uint32_t mas2flags, uint32_t mas3flags)
 {
-	gcpu_t *gcpu = hcpu->gcpu;
+	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	unsigned int size = (mas1 >> MAS1_TSIZE_SHIFT) & 15;
 	unsigned long size_pages = tsize_to_pages(size);
@@ -203,85 +179,4 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
-}
-
-/*
- * Setup entry in a sw tlb1 table, write entry to TLB1 hardware.
- * This routine is used for low level operations on the TLB1,
- * for creating temporaray as well as permanent mappings (tlb_set_entry).
- *
- * We assume kernel mappings only, thus all entries created have supervisor
- * permission bits set nad user permission bits cleared.
- *
- * Provided mapping size must be a power of 4.
- * Mapping flags must be a combination of MAS2_[WIMG].
- * Entry TID is set to _tid which must not exceed 8 bit value.
- * Entry TS is set to either 0 or MAS1_TS based on provided _ts.
- */
-void tlb1_set_entry(unsigned int idx, unsigned long va, physaddr_t pa,
-                    uint32_t tsize, uint32_t mas2flags, uint32_t mas3flags,
-                    unsigned int _tid, unsigned int _ts,
-                    uint32_t mas8)
-{
-	uint32_t ts, tid;
-
-#if 0
-	if (print_ok)
-		printf("__tlb1_set_entry: s (idx = %d va = 0x%08lx pa = 0x%08llx "
-		       "tsize = 0x%08x mas2flags = 0x%08x mas3flags = 0x%08x "
-		       "_tid = %d _ts = %d mas8 = 0x%08x\n",
-		       idx, va, pa, tsize, mas2flags, mas3flags, _tid, _ts, mas8);
-#endif
-
-	tid = (_tid <<  MAS1_TID_SHIFT) & MAS1_TID_MASK;
-	ts = (_ts) ? MAS1_TS : 0;
-	hcpu->tlb1[idx].mas1 = MAS1_VALID | MAS1_IPROT | ts | tid;
-	hcpu->tlb1[idx].mas1 |= ((tsize << MAS1_TSIZE_SHIFT) & MAS1_TSIZE_MASK);
-
-	hcpu->tlb1[idx].mas2 = (va & MAS2_EPN) | mas2flags;
-
-	/* Set supervisor rwx permission bits */
-	hcpu->tlb1[idx].mas3 = (pa & MAS3_RPN) | mas3flags;
-	 MAS3_SR | MAS3_SW | MAS3_SX;
-
-	hcpu->tlb1[idx].mas7 = pa >> 32;
-	hcpu->tlb1[idx].mas8 = mas8;
-
-#if 0
-	if (print_ok)
-		printf("__tlb1_set_entry: mas1 = %08x mas2 = %08x mas3 = 0x%08x mas7 = 0x%08x\n",
-		       hcpu->tlb1[idx].mas1, hcpu->tlb1[idx].mas2, hcpu->tlb1[idx].mas3,
-	   	    hcpu->tlb1[idx].mas7);
-#endif
-
-	tlb1_write_entry(idx);
-	//debugf("__tlb1_set_entry: e\n");
-}
-
-
-static void
-tlb1_write_entry(unsigned int idx)
-{
-	uint32_t mas0, mas7;
-
-	//debugf("tlb1_write_entry: s\n");
-
-	/* Select entry */
-	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(idx);
-	//debugf("tlb1_write_entry: mas0 = 0x%08x\n", mas0);
-
-	mtspr(SPR_MAS0, mas0);
-	asm volatile("isync");
-	mtspr(SPR_MAS1, hcpu->tlb1[idx].mas1);
-	asm volatile("isync");
-	mtspr(SPR_MAS2, hcpu->tlb1[idx].mas2);
-	asm volatile("isync");
-	mtspr(SPR_MAS3, hcpu->tlb1[idx].mas3);
-	asm volatile("isync");
-	mtspr(SPR_MAS7, hcpu->tlb1[idx].mas7);
-	asm volatile("isync");
-	mtspr(SPR_MAS8, hcpu->tlb1[idx].mas8);
-	asm volatile("isync; tlbwe; isync; msync");
-
-	//debugf("tlb1_write_entry: e\n");;
 }
