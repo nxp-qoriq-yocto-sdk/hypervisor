@@ -16,7 +16,7 @@ cpu_t cpu0 = {
 	.client.gcpu = &noguest,
 };
 
-extern void tlb1_init(void);
+static void tlb1_init(void);
 static void core_init(void);
 void start_guest(void);
 
@@ -55,4 +55,16 @@ static void core_init(void)
 {
 	/* set up a TLB entry for CCSR space */
 	tlb1_init();
+}
+
+/* hardcoded hack for now */
+#define CCSRBAR_PA              0xfe000000
+#define CCSRBAR_VA              0x01000000
+#define CCSRBAR_SIZE            TLB_TSIZE_16M
+
+static void tlb1_init(void)
+{
+
+        tlb1_set_entry(62, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
+                       TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 }
