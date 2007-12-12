@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <endian.h>
+#include <libos/endian.h>
 
 #define fdt32_to_cpu cpu_from_be32
 #define cpu_to_fdt32 cpu_to_be32

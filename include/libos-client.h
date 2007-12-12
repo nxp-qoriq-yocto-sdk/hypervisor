@@ -1,6 +1,7 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
+#define BASE_TLB_ENTRY 63
 #define PHYSBASE 0
 #define HYPERVISOR
 
