@@ -1,18 +1,31 @@
 
-#include "os.h"
-#include "pcpu.h"
-#include "tlb.h"
+#include <libos/libos.h>
+#include <libos/percpu.h>
+#include <libos/fsl-booke-tlb.h>
+#include <libos/trapframe.h>
 
-hcpu_t hcpu0;
+extern uint8_t init_stack_top;
+
+cpu_t cpu0 = {
+        .kstack = &init_stack_top - FRAMELEN,
+        .client = 0,
+};
 
 static void tlb1_init(void);
-
 static void  core_init(void);
+
+/* hardcoded hack for now */
+#define CCSRBAR_PA              0xfe000000
+#define CCSRBAR_VA              0x01000000
+#define CCSRBAR_SIZE            TLB_TSIZE_16M
+#define UART_OFFSET 0x11d500
 
 void init(unsigned long devtree_ptr)
 {
 
-    core_init();
+	core_init();
+
+	console_init(CCSRBAR_VA + UART_OFFSET);
 
 }
 
@@ -27,40 +40,19 @@ static void core_init(void)
 
 /*
  *    after tlb1_init:
- *        TLB1[0] = CCSR
- *        TLB1[1] = hv image 16M
- *
- *
+ *        TLB1[0]  = CCSR
+ *        TLB1[15] = OS image 16M
  */
 
-/* hardcoded hack for now */
-#define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0xf0000000
-#define CCSRBAR_SIZE            0x01000000
+
+
+extern int print_ok;  /* set to indicate printf can work now */
 
 static void tlb1_init(void)
 {
+	tlb1_set_entry(0, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
+		TLB_MAS3_KERN, 0, 0, 0);
 
-        uint32_t mas1, mas2, mas3, mas7;
-        uint32_t tsize,tid,ts;
-
-        /* Convert size to TSIZE */
-        tsize = size2tsize(CCSRBAR_SIZE);
-        tid = (UV_TID <<  MAS1_TID_SHIFT) & MAS1_TID_MASK;
-        ts = 0;
-        mas1 = MAS1_VALID | MAS1_IPROT | ts | tid;
-        mas1 |= ((tsize << MAS1_TSIZE_SHIFT) & MAS1_TSIZE_MASK);
-
-        mas2 = (CCSRBAR_VA & MAS2_EPN) | _TLB_ENTRY_IO;
-
-        /* Set supervisor rwx permission bits */
-        mas3 = (CCSRBAR_PA & MAS3_RPN) | MAS3_SR | MAS3_SW | MAS3_SX;
-
-        mas7 = 0;
-
-        tlb1_write_entry(0, mas1, mas2, mas3, mas7);
-
-//        __asm __volatile("mr 0,0");
-
+	print_ok = 1;
 }
 

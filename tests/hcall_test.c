@@ -1,12 +1,16 @@
 
-#include "os.h"
-#include "hcalls.h"
+#include <libos/libos.h>
+#include <libos/hcalls.h>
+
+extern void init(void);
 
 void start(void)
 {
 	int32_t rc;
 	uint32_t i;
 	uint32_t lpar_stat, num_cpus, mem_size;
+
+	init();
 
 	printf("Main...Start\n");
 

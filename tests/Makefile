@@ -9,10 +9,14 @@
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 LIBFDT_DIR := ../../dtc/libfdt
 LIBOS_DIR := ../../libos/lib
+LIBOS_INC := ../../libos/include
+LIBOS_BIN := bin/libos
+LIBOS_CLIENT_H := libos-client.h
 
 CC=$(CROSS_COMPILE)gcc
-#CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_DIR) -g -std=gnu99
+CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
+        -std=gnu99  -include $(LIBOS_CLIENT_H)
+
 CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \
@@ -33,20 +37,25 @@ CC_OPTS_C= -Wall \
 CC_OPTS_ASM=-D_ASM -Ibin
 LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
-GENASSYM=tools/genassym.sh
+GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/hello.bin bin/hcall_test.bin
+all: bin/hello.bin bin/hello bin/hello.map bin/hcall_test.bin bin/hcall_test bin/hcall_test.map
 
+LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
+
+LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
+              $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL)
 
 ####################
 # Hello
 
-HELLO_SRCS_C := hello.c init.c
-HELLO_OBJS :=  $(HELLO_SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
-HELLO_OBJS := $(LIBOS_ALL_OBJS:%=$(LIBOS_DIR)/%) $(HELLO_OBJS:%=bin/%) 
+HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) hello.c init.c 
+HELLO_OBJS := $(basename $(HELLO_SRCS))
+HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
 
 bin/hello.bin: bin/hello
 	$(CROSS_COMPILE)objcopy -O binary $< $@
@@ -54,18 +63,30 @@ bin/hello.bin: bin/hello
 bin/hello: $(HELLO_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HELLO_OBJS) -lgcc
 
+bin/hello.map: bin/hello
+	nm -n bin/hello > $@	
+
+-include $(HELLO_OBJS:.o=.d)
+
 ####################
 # hcall_test
 
-HCALL_SRCS_C := hcall_test.c init.c
-HCALL_OBJS := $(HCALL_SRCS_C:.c=.o) $(LIBFDT_OBJS:%=libfdt/%)
-HCALL_OBJS := $(LIBOS_ALL_OBJS:%=$(LIBOS_DIR)/%) $(HCALL_OBJS:%=bin/%) 
+HCALL_SRCS := $(LIBOS_SRCS:%=libos/%) hcall_test.c init.c 
+HCALL_OBJS := $(basename $(HCALL_SRCS))
+HCALL_OBJS := $(HCALL_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+HCALL_OBJS := $(HCALL_OBJS:%=bin/%)
 
 bin/hcall_test.bin: bin/hcall_test
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 bin/hcall_test: $(HCALL_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HCALL_OBJS) -lgcc
+
+bin/hcall_test.map: bin/hcall_test
+	nm -n bin/hello > $@	
+
+-include $(HCALL_OBJS:.o=.d)
+
 
 ####################
 
@@ -76,27 +97,14 @@ bin/%.o : %.c
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
-
-# assemble and gen dependecy file
-bin/%.o : %.S bin/assym.s
-	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) $(CC_OPTS_ASM) -c -o $@ $<
-
-bin/genassym.o: genassym.c
-	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) -c -o $@ $<
-
-bin/assym.s: bin/genassym.o
-	@$(MKDIR) `dirname $@`
-	$(GENASSYM) -o $@ $<
+	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) \
+	-include libfdt_env.h -c -o $@ $<
 
 # include the dependecy files
 -include bin/genassym.d
--include $(OBJS:.o=.d)
 
-bin/hello.map: bin/hello
-	nm -n bin/hello > $@	
+bin/example.map: bin/example
+	nm -n bin/example > $@	
  
 clean:
 	rm -rf bin
