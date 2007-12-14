@@ -6,10 +6,19 @@
  *
  */
 
-#include "tlb.h"
-#include "console.h"
-#include "trap_booke.h"
-#include "spr.h"
+#include <libos/libos.h>
+#include <libos/percpu.h>
+#include <libos/fsl-booke-tlb.h>
+#include <libos/trapframe.h>
+#include <libos/trap_booke.h>
+#include <libos/spr.h>
+
+extern uint8_t init_stack_top;
+
+cpu_t cpu0 = {
+        .kstack = &init_stack_top - FRAMELEN,
+        .client = 0,
+};
 
 void branch_to_guest(register_t r3, register_t r4, register_t r5,
                      register_t r6, register_t r7, uint32_t vaddr);
@@ -17,96 +26,160 @@ void branch_to_guest(register_t r3, register_t r4, register_t r5,
 void guest_main(void);
 void test_privileged_instructions(void);
 void test_givors_rw(void);
+void init(unsigned long devtree_ptr);
+static void core_init(void);
+static void tlb1_init(void);
+void guest_main(void);
 
 unsigned int srr0;
 unsigned int srr1;
 
-void start_guest(void)
-{
-   unsigned int tmp;
+/* hardcoded hack for now */
+#define CCSRBAR_PA              0xfe000000
+#define CCSRBAR_VA              0x01000000
+#define CCSRBAR_SIZE            TLB_TSIZE_16M
+#define UART_OFFSET 0x11c500
 
 #define GUEST_PA              0x10000000
 #define GUEST_VA              0x00000000
-#define GUEST_SIZE            0x01000000
+#define GUEST_SIZE            TLB_TSIZE_16M
 #define GUEST_TID             0x0
 #define GUEST_GS              0x1
+
+void start(unsigned long devtree_ptr)
+{
+	init(devtree_ptr);
+
+	printf("gs-tester...\n");
+	printf("MSR[GS=0]\n");
+
+	tlb1_set_entry(1, GUEST_VA, GUEST_PA, GUEST_SIZE, TLB_MAS2_MEM,
+		TLB_MAS3_KERN, 0, 0, TLB_MAS8_GUEST);
+
+	tlb1_set_entry(2, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_MEM,
+		TLB_MAS3_KERN, 0, 0, TLB_MAS8_GUEST);
+
+	/* do some initialization of registers for the tests */
+	/* GIVOR init */
+	mtspr(SPR_GIVOR2,0x20);
+	mtspr(SPR_GIVOR3,0x30);
+	mtspr(SPR_GIVOR4,0x40);
+	mtspr(SPR_GIVOR8,0x80);
+	mtspr(SPR_GIVOR13,0x130);
+	mtspr(SPR_GIVOR14,0x140);
+
+	printf("Switching to guest state...\n");
+
+        asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
+                     "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
+                     "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
+                     "r" (&guest_main) :
+                     "r3", "r4", "r5", "r6", "r7", "r8");
+
+	/* this never returns */
     
-    /* set up a tlb mapping for the guest */
-    __tlb1_set_entry(0, GUEST_VA, GUEST_PA, GUEST_SIZE, _TLB_ENTRY_MEM, UV_TID, 0, GUEST_GS);
-
-/* hardcoded hack for now */
-#define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0xf0000000
-#define CCSRBAR_SIZE            0x01000000
-
-    __tlb1_set_entry(1, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, _TLB_ENTRY_IO, UV_TID, 0, GUEST_GS);
-
-   printf("gs-tester...\n");
-   printf("MSR[GS=1]\n");
-
-   /*
-    * do some initialization of registers for the test
-    */
-
-  
-   /* GIVOR init */
-   mtspr(SPR_GIVOR2,0x20);
-   mtspr(SPR_GIVOR3,0x30);
-   mtspr(SPR_GIVOR4,0x40);
-   mtspr(SPR_GIVOR8,0x80);
-   mtspr(SPR_GIVOR13,0x130);
-   mtspr(SPR_GIVOR14,0x140);
+}
 
 
-   /* 
-    * start the guest 
-    */
+void init(unsigned long devtree_ptr)
+{
 
-   printf("Switching to guest state...\n");
-   branch_to_guest(0,0,0,0,0,(uint32_t)&guest_main);
+	core_init();
+
+	console_init(CCSRBAR_VA + UART_OFFSET);
 
 }
+
+
+static void core_init(void)
+{
+
+    /* set up a TLB entry for CCSR space */
+    tlb1_init();
+
+}
+
+/*
+ *    after tlb1_init:
+ *        TLB1[0]  = CCSR
+ *        TLB1[15] = OS image 16M
+ */
+
+
+
+extern int print_ok;  /* set to indicate printf can work now */
+
+static void tlb1_init(void)
+{
+	tlb1_set_entry(0, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
+		TLB_MAS3_KERN, 0, 0, 0);
+
+	print_ok = 1;
+}
+
+kstack_t guest_kstack;
+cpu_t guest_cpu = {
+        .kstack = guest_kstack,
+        .client = 0,
+};
 
 volatile int exception_type;
 
 void guest_main(void)
 {
-   unsigned int tmp;
-   unsigned int tmp2;
+	unsigned long stack_top = (unsigned long)guest_kstack + KSTACK_SIZE - FRAMELEN;
 
-   printf("MSR[GS=0]\n");
-   printf("Starting tests...\n\n");
+	/* set gsprg0 and r1 for guest context */
 
+	asm volatile( 	"mtspr 592,%0;"
+			"mr %%r1, %1;" : :
+			 "r" (&guest_cpu), "r" (stack_top));
 
-   test_privileged_instructions();
+	printf("MSR[GS=0]\n");
+	printf("Starting tests...\n\n");
 
-   test_givors_rw();
+	test_givors_rw();
 
+	test_privileged_instructions();
 
-   /*
-    * SRR0/GSRR0 read
-    */
-   printf("Testing SRR0/GSRR0 read/write...");
-   exception_type = -1; /* reinit the exception type */
-   tmp = mfspr(SPR_GSRR0);
-   tmp2 = mfspr(SPR_SRR0);
-   if (tmp != tmp2) {
-       printf("FAILED...GSRR0 != SRR0\n");
-   } else {
-       mtspr(SPR_SRR0,0x1234);
-       tmp = mfspr(SPR_GSRR0);
-       if (tmp != 0x1234) {
-           printf("FAILED...write failed\n");
-       } else if (exception_type != -1) {
-           printf("FAILED...got exception\n");
-       } else {
-           printf("PASSED\n");
-       }
-   }
+	printf("\ntests done.\n");
 
+	/* end of simulation */
+	__asm__ volatile("mr 21, 21");
+}
 
-   /* end of simulation */
-    __asm__ volatile("mr 22, 22");
+#define GIVOR_TST(str,num,expected) do { \
+	unsigned int tmp; \
+	printf("Testing %s read...",str); \
+	exception_type = -1; \
+	tmp = mfspr(num); \
+	if (tmp == expected && exception_type == -1) { \
+	    printf("\tgot 0x%x...PASSED\n",tmp); \
+	} else { \
+	    printf("FAILED...value=%04x, exception_type=%d\n",tmp,exception_type); \
+	} \
+	printf("Testing %s write...",str); \
+	exception_type = -1; \
+	mtspr(num,tmp); \
+	if (exception_type == EXC_EHPRIV) { \
+		printf("\tgot ehpriv...PASSED\n"); \
+	} else { \
+		printf("FAILED got %d\n",exception_type); \
+	} \
+    } while (0)
+
+void test_givors_rw(void)
+{
+
+	printf("\nGIVOR tests...\n");
+
+	GIVOR_TST("givor2",SPR_GIVOR2,0x20);
+	GIVOR_TST("givor3",SPR_GIVOR3,0x30);
+	GIVOR_TST("givor4",SPR_GIVOR4,0x40);
+	GIVOR_TST("givor8",SPR_GIVOR8,0x80);
+	GIVOR_TST("givor13",SPR_GIVOR13,0x130);
+	GIVOR_TST("givor14",SPR_GIVOR14,0x140);
+
 
 }
 
@@ -182,6 +255,8 @@ void guest_main(void)
 void test_privileged_instructions(void)
 {
 	unsigned int tmp;
+	printf("\nprivileged instruction tests...\n");
+
    /*
     * tlb management instructions
     */
@@ -197,7 +272,7 @@ void test_privileged_instructions(void)
    /*
     * tlbsx 
     */
-   test_tlbxx_one_operand(sx,SPR_MAS6,(mfspr(SPR_PID0) << MAS6_SPID0_SHIFT),0);
+   test_tlbxx_one_operand(sx,SPR_MAS6,(mfspr(SPR_PID) << MAS6_SPID_SHIFT),0);
 
    /*
     * msgsnd & msgclr 
@@ -214,35 +289,4 @@ void test_privileged_instructions(void)
    test_rfxx_interrupt(di,D,1);
 }
 
-#define GIVOR_TST(str,num,expected) do { \
-	unsigned int tmp; \
-	printf("Testing %s read...",str); \
-	exception_type = -1; \
-	tmp = mfspr(num); \
-	if (tmp == expected && exception_type == -1) { \
-	    printf("got 0x%x...PASSED\n",tmp); \
-	} else { \
-	    printf("FAILED...value=%04x, exception_type=%d\n",tmp,exception_type); \
-	} \
-	printf("Testing %s write...",str); \
-	exception_type = -1; \
-	mtspr(num,tmp); \
-	if (exception_type == EXC_EHPRIV) { \
-		printf("got ehpriv...PASSED\n"); \
-	} else { \
-		printf("FAILED got %d\n",exception_type); \
-	} \
-    } while (0)
 
-
-void test_givors_rw(void)
-{
-
-    GIVOR_TST("givor2",SPR_GIVOR2,0x20);
-    GIVOR_TST("givor3",SPR_GIVOR3,0x30);
-    GIVOR_TST("givor4",SPR_GIVOR4,0x40);
-    GIVOR_TST("givor8",SPR_GIVOR8,0x80);
-    GIVOR_TST("givor13",SPR_GIVOR13,0x130);
-    GIVOR_TST("givor14",SPR_GIVOR14,0x140);
-
-}
