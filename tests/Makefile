@@ -40,7 +40,10 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/hello.bin bin/hello bin/hello.map bin/hcall_test.bin bin/hcall_test bin/hcall_test.map
+HELLO_TARGETS := bin/hello.bin bin/hello bin/hello.map
+HCALL_TARGETS := bin/hcall_test.bin bin/hcall_test bin/hcall_test.map
+
+all: $(HELLO_TARGETS) $(HCALL_TARGETS)
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -83,7 +86,7 @@ bin/hcall_test: $(HCALL_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HCALL_OBJS) -lgcc
 
 bin/hcall_test.map: bin/hcall_test
-	nm -n bin/hello > $@	
+	nm -n bin/hcall_test > $@	
 
 -include $(HCALL_OBJS:.o=.d)
 
