@@ -12,12 +12,17 @@
 #include <libos/trapframe.h>
 #include <libos/trap_booke.h>
 #include <libos/spr.h>
+#include <libos/uart.h>
 
 extern uint8_t init_stack_top;
 
 cpu_t cpu0 = {
         .kstack = &init_stack_top - FRAMELEN,
         .client = 0,
+};
+
+struct console_calls console = {
+	.putc = uart_putc
 };
 
 void branch_to_guest(register_t r3, register_t r4, register_t r5,
@@ -86,7 +91,9 @@ void init(unsigned long devtree_ptr)
 
 	core_init();
 
-	console_init(CCSRBAR_VA + UART_OFFSET);
+	uart_init(CCSRBAR_VA + UART_OFFSET);
+
+	console_init();
 
 }
 

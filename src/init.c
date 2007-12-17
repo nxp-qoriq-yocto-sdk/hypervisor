@@ -3,6 +3,7 @@
 #include <percpu.h>
 #include <libos/spr.h>
 #include <libos/trapframe.h>
+#include <libos/uart.h>
 
 static gcpu_t noguest = {
 	// FIXME 64-bit
@@ -14,6 +15,10 @@ extern uint8_t init_stack_top;
 cpu_t cpu0 = {
 	.kstack = &init_stack_top - FRAMELEN,
 	.client.gcpu = &noguest,
+};
+
+struct console_calls console = {
+	.putc = uart_putc
 };
 
 static void tlb1_init(void);
@@ -29,7 +34,10 @@ void start_guest(void);
 void start(unsigned long devtree_ptr)
 {
 	core_init();
-	console_init(CCSRBAR_VA + UART_OFFSET);
+
+	uart_init(CCSRBAR_VA + UART_OFFSET);
+
+	console_init();
 
 	printf("=======================================\n");
 	printf("Freescale Ultravisor 0.1\n");
