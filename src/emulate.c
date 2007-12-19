@@ -44,10 +44,10 @@ static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t va = get_ea_indexed(regs, insn);
+	unsigned long va = get_ea_indexed(regs, insn);
 	
 	if (va & TLBIVAX_RESERVED) {
-		printf("tlbivax@0x%08x: reserved bits in EA: 0x%08x\n", regs->srr0, va);
+		printf("tlbivax@0x%08lx: reserved bits in EA: 0x%08lx\n", regs->srr0, va);
 		return 1;
 	}
 
@@ -78,7 +78,7 @@ static void fixup_tlb_sx_re(void)
 	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
 	                     (mas3 >> MAS3_RPN_SHIFT);
 
-//	printf("sx_re: mas0 %x mas1 %x mas3 %lx mas7 %lx grpn %lx\n",
+//	printf("sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
 //	       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
 
 	unsigned long attr;
@@ -123,7 +123,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	unsigned int entry, tlb;
 	
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
-		printf("tlbre@0x%08x: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
+		printf("tlbre@0x%08lx: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
 		return 1;
 	}
 
@@ -136,7 +136,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 	entry = MAS0_GET_TLB1ESEL(mas0);
 	if (entry >= TLB1_GSIZE) {
-		printf("tlbre@0x%08x: attempt to read TLB1 entry %d (max %d)\n",
+		printf("tlbre@0x%08lx: attempt to read TLB1 entry %d (max %d)\n",
 		       regs->srr0, entry, TLB1_GSIZE);
 		return 1;
 	}
@@ -160,27 +160,27 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	                     (mas3 >> MAS3_RPN_SHIFT);
 
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
-		printf("tlbwe@0x%x: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
+		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas1 & MAS1_RESERVED) {
-		printf("tlbwe@0x%x: reserved bits in MAS1: 0x%lx\n", regs->srr0, mas0);
+		printf("tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas2 & MAS2_RESERVED) {
-		printf("tlbwe@0x%x: reserved bits in MAS2: 0x%lx\n", regs->srr0, mas0);
+		printf("tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas3 & MAS3_RESERVED) {
-		printf("tlbwe@0x%x: reserved bits in MAS3: 0x%lx\n", regs->srr0, mas0);
+		printf("tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
 	if (mas7 & MAS7_RESERVED) {
-		printf("tlbwe@0x%x: reserved bits in MAS7: 0x%lx\n", regs->srr0, mas0);
+		printf("tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n", regs->srr0, mas0);
 		return 1;
 	}
 
@@ -209,7 +209,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		    guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(mas0)))
 			goto no_dup;
 
-		printf("tlbwe@0x%x: duplicate entry for vaddr 0x%lx\n",
+		printf("tlbwe@0x%lx: duplicate entry for vaddr 0x%lx\n",
 		       regs->srr0, mas2 & MAS2_EPN);
 
 		return 1;
@@ -221,7 +221,7 @@ no_dup:
 		int entry = MAS0_GET_TLB1ESEL(mas0);
 
 		if (entry >= TLB1_GSIZE) {
-			printf("tlbwe@0x%x: attempt to write TLB1 entry %d (max %d)\n",
+			printf("tlbwe@0x%lx: attempt to write TLB1 entry %d (max %d)\n",
 			       regs->srr0, entry, TLB1_GSIZE);
 			return 1;
 		}
@@ -242,12 +242,11 @@ no_dup:
 			unsigned long attr;
 			unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr);
 
-
 			// If there's no valid mapping, request a virtualization
 			// fault, so a machine check can be reflected upon use.
 			if (unlikely(!(attr & PTE_VALID))) {
 #if 0
-				printf("tlbwe@0x%x: Invalid gphys %llx for va %lx\n",
+				printf("tlbwe@0x%lx: Invalid gphys %llx for va %lx\n",
 				       regs->srr0,
 				       ((uint64_t)grpn) << PAGE_SHIFT,
 				       mas2 & MAS2_EPN);
@@ -344,7 +343,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	default:
-		printf("mfspr@0x%x: unknown reg %d\n", regs->srr0, spr);
+		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
 //		return 1;
 	}
@@ -436,7 +435,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		break;
 
 	default:
-		printf("mtspr@0x%x: unknown reg %d, val 0x%x\n",
+		printf("mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
 		       regs->srr0, spr, val);
 //		return 1;
 	}
@@ -543,7 +542,7 @@ void hvpriv(trapframe_t *regs)
 	}
 
 bad:
-	printf("unhandled hvpriv trap from 0x%x, insn 0x%08x\n", regs->srr0, insn);
+	printf("unhandled hvpriv trap from 0x%lx, insn 0x%08x\n", regs->srr0, insn);
 	regs->exc = EXC_PROGRAM;
 	reflect_trap(regs);
 }
