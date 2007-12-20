@@ -4,6 +4,7 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
+#include <mpic.h>
 
 static gcpu_t noguest = {
 	// FIXME 64-bit
@@ -21,8 +22,12 @@ struct console_calls console = {
 	.putc = uart_putc
 };
 
+int global_init_done = 0;
+
 static void tlb1_init(void);
 static void core_init(void);
+static void release_secondary_cores(unsigned long devtree_ptr);
+static void partition_init(unsigned long devtree_ptr);
 void start_guest(void);
 
 /* hardcoded hack for now */
@@ -35,40 +40,58 @@ void start(unsigned long devtree_ptr)
 {
 	core_init();
 
-	uart_init(CCSRBAR_VA + UART_OFFSET);
+	if (!global_init_done) {
 
-	console_init();
+		printf("=======================================\n");
+		printf("Freescale Ultravisor 0.1\n");
 
-	printf("=======================================\n");
-	printf("Freescale Ultravisor 0.1\n");
+		uart_init(CCSRBAR_VA + UART_OFFSET);
 
-	mtspr(SPR_EHCSR,
-	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
-	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
+		console_init();
+
+		mpic_init(devtree_ptr);
+
+		// pamu init
+
+		global_init_done = 1;
+
+		release_secondary_cores(devtree_ptr);
+	}
+
+	partition_init(devtree_ptr);
 
 	start_guest();
 
-#if 0
-	if (first instance) {
-		platform_hw_init();
-		uv_global_init();
-	}
+}
 
-	uv_instance_init();
+static void release_secondary_cores(unsigned long devtree_ptr)
+{
+	// go thru cpu nodes in device tree
+	// for each cpu
+	//    get cpu release method
+	//    if not spin, error
+	//    get release address
+	//    write address of secondary entry point (head.S)
+}
 
-	guest_init();
-
-	run_guest();
-
-	/* run_guest() never returns */
-
-#endif
+static void partition_init(unsigned long devtree_ptr)
+{
+	// -init/alloc partition data structure
+	// -identify partition node in device tree for
+	//  this partition, do partition init
+	//    -configure all interrupts-- irq#,cpu#
+	//    -add entries to PAMU table
+	// -create guest device tree
 }
 
 static void core_init(void)
 {
 	/* set up a TLB entry for CCSR space */
 	tlb1_init();
+
+	mtspr(SPR_EHCSR,
+	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
+	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
 }
 
 extern int print_ok;  /* set to indicate printf can work now */
