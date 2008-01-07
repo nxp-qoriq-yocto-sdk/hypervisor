@@ -124,8 +124,12 @@ foreach $phy_idx in (range 4) {
 #create-and-connect-ddr-memory $system $memory_megs "AA"
 
 # all memory on a single slot controller, not sure if on one CS? (kkg)
-create-and-connect-ddr-memory $system $memory_megs "A"
+#create-and-connect-ddr-memory $system $memory_megs "A"
 
+(create-and-connect-ddr-memory $system $memory_megs "ABCD"
+                               ranks_per_module = 2
+                              max_module_size = 2048
+                              ddr_type = DDR2)
 
 instantiate-components
 
