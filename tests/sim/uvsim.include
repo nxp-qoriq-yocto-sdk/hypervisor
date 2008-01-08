@@ -133,19 +133,6 @@ foreach $phy_idx in (range 4) {
 
 instantiate-components
 
-# WORKAROUNDS_START =========================================================
-# workaround POR values 3.2.2 (build-id: 1536)
-
-# (MAS0[ESEL] mask is wrong thus we can only modify 16 TLB entries
-cpu0->tlb1cfg = 0x1019c010
-
-@def reset(dummy, cpu, hard_reset):
-	cpu.tlb1cfg = 0x1019c010
-
-@SIM_hap_add_callback("PPC_Processor_Reset", reset, None)
-
-# WORKAROUNDS_END =========================================================
-
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
 run-command-file "%simics%/targets/common/add-eth-link.include"
