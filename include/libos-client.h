@@ -2,7 +2,7 @@
 #define LIBOS_CLIENT_H
 
 #define BASE_TLB_ENTRY 63
-#define PHYSBASE 0
+#define PHYSBASE 0x40000000
 #define HYPERVISOR
 
 #ifndef _ASM

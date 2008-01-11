@@ -28,38 +28,70 @@
 #include <paging.h>
 #include <libos/fsl-booke-tlb.h>
 
-unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn, unsigned long *attr)
+// epn is already shifted by levels that the caller deals with.
+static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
+                             int insert)
 {
-	pte_t pte = tbl[epn >> PGDIR_SHIFT];
+	while (--*levels >= 0) {
+		int idx = (epn >> (PGDIR_SHIFT * *levels)) & (PGDIR_SIZE - 1);
+		pte_t *ptep = &tbl[idx];
+#if 0
+		printf("pte %lx attr %lx epn %lx level %d\n", ptep->page, ptep->attr,
+		       epn, *levels);
+#endif
+		if (!(ptep->attr & PTE_VALID)) {
+			if (!insert)
+				return NULL;
+
+			if (*levels == 0)
+				return ptep;
+
+			tbl = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
+			assert(tbl);
+
+			ptep->page = (unsigned long)tbl;
+			ptep->attr = PTE_VALID;
+		}
+
+		if (ptep->attr & PTE_SIZE)
+			return ptep;
+
+		tbl = (pte_t *)ptep->page;
+	}
+
+	BUG();
+}
+
+unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
+                          unsigned long *attr, int level)
+{
+	pte_t *ptep = vptbl_get_ptep(tbl, &level, epn, 0);
+
+	if (unlikely(!ptep)) {
+		*attr = 0;
+//		printf("2 vtable xlate %p 0x%lx %i\n", tbl, epn << PAGE_SHIFT, level);
+		return (1UL << (PGDIR_SHIFT * level)) - 1;
+	}
+
+	pte_t pte = *ptep;
 	unsigned int size = pte.attr >> PTE_SIZE_SHIFT;
 	unsigned long size_pages;
 
 //	printf("vtable xlate %p 0x%lx 0x%lx\n", tbl, epn << PAGE_SHIFT, pte.attr);
 
-	if (unlikely(!(pte.attr & PTE_VALID))) {
-		*attr = 0;
-		return 0x3ff;
-	}
+	size = pte.attr >> PTE_SIZE_SHIFT;
 
-	if (size == 0) {
-		pte.page &= ~(PAGE_SIZE * 2 - 1);
-		tbl = (pte_t *)pte.page;
-		pte = tbl[epn & (PGDIR_SIZE - 1)];
-
-//		printf("page %lx attr %lx\n", pte.page, pte.attr);
-
-		if (unlikely(!(pte.attr & PTE_VALID))) {
-			*attr = 0;
-			return 0; 
-		}
-		
-		size = pte.attr >> PTE_SIZE_SHIFT;
-		assert(size != 0 && size < TLB_TSIZE_4M);
+	if (level == 0) {
+		assert(size < TLB_TSIZE_4M);
 	} else {
+		assert(level == 1);
 		assert(size >= TLB_TSIZE_4M);
 	}
 
 	*attr = pte.attr;
+
+	if (unlikely(!(pte.attr & PTE_VALID)))
+		return (1UL << (PGDIR_SHIFT * level)) - 1;
 	
 	size_pages = tsize_to_pages(size);
 	return (pte.page & ~(size_pages - 1)) | (epn & (size_pages - 1));
@@ -69,7 +101,7 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn, unsigned long *attr)
 // at initialization, when processing the device tree.
 
 void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
-               unsigned long npages, unsigned long attr)
+               unsigned long npages, unsigned long attr, int levels)
 {
 	unsigned long end = epn + npages;
 
@@ -78,7 +110,6 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 		                        natural_alignment(rpn));
 		unsigned long size_pages = tsize_to_pages(size);
 		unsigned long sub_end = epn + size_pages;
-		int l2idx = epn >> PGDIR_SHIFT;
 
 		assert(size_pages <= end - epn);
 		attr = (attr & ~PTE_SIZE) | (size << PTE_SIZE_SHIFT);
@@ -91,35 +122,36 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 #endif
 
 		assert(size > 0);
+		int largepage = size >= TLB_TSIZE_4M;
+		int incr = largepage ? PGDIR_SIZE - 1 : 0;
+		
+		while (epn < sub_end) {
+			int level = levels - largepage;
+			pte_t *ptep = vptbl_get_ptep(tbl, &level,
+			                             epn >> (PGDIR_SHIFT * largepage),
+			                             1);
 
-		if (size >= TLB_TSIZE_4M) {
-			while (epn < sub_end) {
-				tbl[l2idx].page = rpn;
-				tbl[l2idx].attr = attr;
-	
-				epn = (epn | (PGDIR_SIZE - 1)) + 1;
-				rpn = (rpn | (PGDIR_SIZE - 1)) + 1;
-				l2idx++;
-				continue;
-			}
-		} else while (epn < sub_end) {
-			pte_t *subtbl = (pte_t *)tbl[l2idx].page;
-			int idx = epn & (PGDIR_SIZE - 1);
-
-			if (!subtbl) {
-				subtbl = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
-				assert(subtbl);
-				
-				tbl[l2idx].page = (unsigned long)subtbl;
-				tbl[l2idx].attr = PTE_VALID;
+			if (largepage && ptep->page && !(ptep->attr & PTE_SIZE)) {
+				printf("vptbl_map: Tried to overwrite a small page with "
+				       "a large page at %llx\n",
+				       ((uint64_t )epn) << PAGE_SHIFT);
+				return;
 			}
 
-			subtbl[idx].page = rpn;
-			subtbl[idx].attr = attr;
+			if (!largepage && level != 0) {
+				printf("vptbl_map: Tried to overwrite a large page with "
+				       "a small page at %llx\n",
+				       ((uint64_t )epn) << PAGE_SHIFT);
+				return;
+			}
 
-			epn++;
-			rpn++;
-			idx++;
+			ptep->page = rpn;
+			ptep->attr = attr;
+			
+//			printf("epn %lx: setting rpn %lx attr %lx\n", epn, rpn, attr);
+
+			epn = (epn | incr) + 1;
+			rpn = (rpn | incr) + 1;
 		}
 	}
 }

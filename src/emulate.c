@@ -83,7 +83,7 @@ static void fixup_tlb_sx_re(void)
 
 	unsigned long attr;
 	unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
-	                                grpn, &attr);
+	                                grpn, &attr, PTE_PHYS_LEVELS);
 
 	assert(attr & PTE_VALID);
 
@@ -240,7 +240,8 @@ no_dup:
 
 		if (likely(mas1 & MAS1_VALID)) {
 			unsigned long attr;
-			unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr);
+			unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
+			                                &attr, PTE_PHYS_LEVELS);
 
 			// If there's no valid mapping, request a virtualization
 			// fault, so a machine check can be reflected upon use.

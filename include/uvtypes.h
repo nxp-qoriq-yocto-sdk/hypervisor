@@ -1,7 +1,6 @@
+#ifndef UVTYPES_H
+#define UVTYPES_H
 
-#ifndef _ASM_H
-#define	_ASM_H
+typedef unsigned long register_t;
 
-typedef int register_t;
-
-#endif /* !_ASM_H */
+#endif

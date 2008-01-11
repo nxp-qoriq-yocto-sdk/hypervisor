@@ -26,6 +26,8 @@ typedef struct {
 	uint64_t mem_real;           // real physical start addr
 	struct pte_t *gphys;         // guest phys to real phys mapping
 	struct pte_t *gphys_rev;     // real phys to guest phys mapping
+	char *name;
+	void *devtree;
 	uint32_t lpid;
 } guest_t;
 

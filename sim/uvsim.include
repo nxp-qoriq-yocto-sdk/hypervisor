@@ -7,10 +7,12 @@ digit-grouping 16 8
 output-radix 16
 
 if not defined uboot		{$uboot  = "u-boot.8578"}
-if not defined kernel_image	{$kernel_image  = "%script%/bin/uv.bin"}
-if not defined kernel_addr      {$kernel_addr   = 0x10000000}
+if not defined kernel_image	{$kernel_image  = "%script%/bin/uv.uImage"}
+if not defined kernel_addr      {$kernel_addr   = 0x40000}
 if not defined kernel_symbols	{$kernel_symbols = ""}
 if not defined uboot_symbols	{$uboot_symbols = ""}
+if not defined dtb_image	{$dtb_image  = "%script%/bin/mpc8578sim-hv.dtb"}
+if not defined dtb_addr      	{$dtb_addr   = 0x20000}
 if not defined use_uart0	{$use_uart0 = 1}
 if not defined use_uart1	{$use_uart1 = 0}
 if not defined use_uart2	{$use_uart2 = 1}
@@ -20,8 +22,7 @@ if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
 if not defined guest_image	{$guest_image = ""}
 if not defined initrd_image	{$initrd_image = ""}
-if not defined dev_tree_blob	{$dev_tree_blob = ""}
-if not defined boot_command  {$boot_command  = "bootm 0x1000000 0x1300000 0xf00000"}
+if not defined boot_command  {$boot_command  = "bootm 0x40000 - 0x20000"}
 if not defined mac_address   {$mac_address   = "00:01:af:07:9b:8a"}
 if not defined mac_address1  {$mac_address1  = "00:01:af:07:9b:8b"}
 if not defined mac_address2  {$mac_address2  = "00:01:af:07:9b:8c"}
@@ -192,8 +193,8 @@ if $do_boot == "yes" {
         local $ip_address1  = $ip_address1
         local $ip_address2  = $ip_address2
         local $ip_address3  = $ip_address3
-        local $dev_tree_blob= $dev_tree_blob
-        local $dev_tree_addr= $dev_tree_addr
+        local $dtb_addr     = $dtb_addr
+        local $dtb_image    = $dtb_image
 
         $con.wait-for-string "autoboot:"
         $con.input "\n"
@@ -235,9 +236,9 @@ if $do_boot == "yes" {
         if ($initrd_image != "") {
             $phys_mem.load-file $initrd_image $initrd_addr
         }
-        if ($dev_tree_blob != "") {
+        if ($dtb_image != "") {
             # Must load to address covered by initial TLB entry
-            $phys_mem.load-file $dev_tree_blob $dev_tree_addr
+            $phys_mem.load-file $dtb_image $dtb_addr
         }
 	$con.input "# images has been forced into memory\n"
 
@@ -247,10 +248,6 @@ if $do_boot == "yes" {
 
         # Note: user must override boot_command if dev_tree_blob is set
 	$con.wait-then-write "=> " "setenv bootcmd " + $boot_command + "\n"
-	if ($boot_uimage == "true") {
-		$con.wait-then-write "=> " "boot\n"
-	} else {
-		$con.wait-then-write "=> " "go 0x10000000\n"
-	}
+	$con.wait-then-write "=> " "boot\n"
     }
 }

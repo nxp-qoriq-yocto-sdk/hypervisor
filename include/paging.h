@@ -3,6 +3,9 @@
 
 #include <uv.h>
 
+#define PHYS_BITS 36
+#define VIRT_BITS 32
+
 #define PAGE_SIZE 4096
 #define PAGE_SHIFT 12
 
@@ -12,9 +15,12 @@
 #define L2PAGE_SIZE (PAGE_SIZE * PGDIR_SIZE)
 #define L2PAGE_SHIFT (PAGE_SHIFT + PGDIR_SHIFT)
 
+#define PTE_VIRT_LEVELS ((VIRT_BITS - PAGE_SHIFT + PGDIR_SHIFT - 1) / PGDIR_SHIFT)
+#define PTE_PHYS_LEVELS ((PHYS_BITS - PAGE_SHIFT + PGDIR_SHIFT - 1) / PGDIR_SHIFT)
+
 /* PTEs are two words.  The upper word is the physical page number.
  * The lower word contains attributes.  Page tables consist of
- * 1024 ptes on an 8K-aligned page pair.
+ * 1024 ptes on an 8K-aligned page pair.  
  *
  * Note that SR must be set if SX is set -- or emulation will not work.
  */
@@ -64,14 +70,16 @@ typedef struct pte_t {
 // directory entry, 0x3ff if there is not).
 //
 // vptbl deals expects virtual page numbers in page directory entries.
+// levels should be PTE_VIRT_LEVELS for virtual->phys mappings, and
+// PTE_PHYS_LEVELS for guest phys->phys and reverse mappings.
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
-                          unsigned long *attr);
+                          unsigned long *attr, int levels);
 
 // attr->PTE_SIZE should be 0; vptbl_map will use the largest
 // page sizes it can.
 void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
-               unsigned long npages, unsigned long attr);
+               unsigned long npages, unsigned long attr, int levels);
 
 
 void guest_set_tlb1(unsigned int entry, uint32_t mas1,

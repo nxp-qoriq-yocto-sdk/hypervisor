@@ -1,10 +1,14 @@
-#include <uv.h>
 #include <libos/console.h>
-#include <percpu.h>
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
 #include <mpic.h>
+
+#include <uv.h>
+#include <percpu.h>
+
+#include <libfdt.h>
+#include <limits.h>
 
 static gcpu_t noguest = {
 	// FIXME 64-bit
@@ -26,8 +30,8 @@ int global_init_done = 0;
 
 static void tlb1_init(void);
 static void core_init(void);
-static void release_secondary_cores(unsigned long devtree_ptr);
-static void partition_init(unsigned long devtree_ptr);
+static void release_secondary_cores(void);
+static void partition_init(void);
 void start_guest(void);
 
 /* hardcoded hack for now */
@@ -36,18 +40,29 @@ void start_guest(void);
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET		0x11c500
 
+void *fdt;
+
 void start(unsigned long devtree_ptr)
 {
 	core_init();
 
 	if (!global_init_done) {
+		fdt = (void *)(devtree_ptr + PHYSBASE);
 
-		printf("=======================================\n");
-		printf("Freescale Ultravisor 0.1\n");
+		unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+		heap = (heap + 15) & ~15;
+
+		// FIXME: heap length
+		alloc_init(heap, ULONG_MAX);
 
 		uart_init(CCSRBAR_VA + UART_OFFSET);
 
+		printf("=======================================\n");
+		printf("Freescale Ultravisor 0.1\n");
+		printf("heap %lx\n", heap);
+
 		console_init();
+
 
 		mpic_init(devtree_ptr);
 
@@ -55,16 +70,13 @@ void start(unsigned long devtree_ptr)
 
 		global_init_done = 1;
 
-		release_secondary_cores(devtree_ptr);
+		release_secondary_cores();
 	}
 
-	partition_init(devtree_ptr);
-
-	start_guest();
-
+	partition_init();
 }
 
-static void release_secondary_cores(unsigned long devtree_ptr)
+static void release_secondary_cores(void)
 {
 	// go thru cpu nodes in device tree
 	// for each cpu
@@ -74,7 +86,7 @@ static void release_secondary_cores(unsigned long devtree_ptr)
 	//    write address of secondary entry point (head.S)
 }
 
-static void partition_init(unsigned long devtree_ptr)
+static void partition_init(void)
 {
 	// -init/alloc partition data structure
 	// -identify partition node in device tree for
@@ -82,6 +94,8 @@ static void partition_init(unsigned long devtree_ptr)
 	//    -configure all interrupts-- irq#,cpu#
 	//    -add entries to PAMU table
 	// -create guest device tree
+
+	start_guest();
 }
 
 static void core_init(void)
@@ -98,9 +112,6 @@ extern int print_ok;  /* set to indicate printf can work now */
 
 static void tlb1_init(void)
 {
-
 	tlb1_set_entry(62, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
 		TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-
-	print_ok = 1;
 }

@@ -31,9 +31,10 @@
 
 #include <libos/fsl-booke-tlb.h>
 #include <libos/spr.h>
+#include <libos/bitops.h>
+
 #include <percpu.h>
 #include <paging.h>
-#include <libos/bitops.h>
 
 static int alloc_tlb1(unsigned int entry)
 {
@@ -117,9 +118,10 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 	unsigned long size_pages = tsize_to_pages(size);
 	unsigned long end = epn + size_pages;
 
-//	printf("gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %x\n",
-//	       entry, epn, end, grpn, mas1);
-
+#if 0
+	printf("gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %x\n",
+	       entry, epn, end, grpn, mas1);
+#endif 
 	free_tlb1(entry);
 
 	gcpu->gtlb1[entry].mas1 = mas1;
@@ -131,7 +133,7 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		int size = max_page_size(epn, end - epn);
 
 		unsigned long attr, rpn; 
-		rpn = vptbl_xlate(guest->gphys, grpn, &attr);
+		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
 
 		// If there's no valid mapping, try again at the next page. Note
 		// that this searching can cause latency.  If you need to do

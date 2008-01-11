@@ -37,9 +37,23 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		PowerPC,8578@0 {
+		cpu@0 {
 			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
 			reg = <0>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#83333333>;
+			bus-frequency = <d#666666666>;
+			clock-frequency = <d#666666666>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <1>;
 			d-cache-line-size = <20>;
 			i-cache-line-size = <20>;
 			d-cache-size = <8000>;

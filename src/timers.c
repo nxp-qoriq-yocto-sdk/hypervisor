@@ -57,7 +57,6 @@ void decrementer(trapframe_t *regs)
 void run_deferred_decrementer(void)
 {
 	gcpu_t *gcpu = get_gcpu();
-
 	gcpu->pending &= ~GCPU_PEND_DECR;
 
 	if (gcpu->timer_flags & TF_ENABLED) {
