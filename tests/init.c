@@ -21,7 +21,7 @@ static void  core_init(void);
 
 /* hardcoded hack for now */
 #define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0x01000000
+#define CCSRBAR_VA              0xfe000000
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET 0x11d500
 
