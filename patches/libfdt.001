@@ -1,0 +1,358 @@
+From 1038cfb291ef97239e6daa5accfd26284ff5c236 Mon Sep 17 00:00:00 2001
+From: scottwood@freescale.com <scottwood@freescale.com>
+Date: Mon, 14 Jan 2008 10:20:16 -0600
+Subject: [PATCH] libfdt: Add ft_get_next_node(), ft_get_next_prop(), and
+
+ft_getprop_offset().
+
+ft_get_next_node() enumerates children of a given node.
+ft_get_next_prop() enumerates propreties of a given node.
+
+ft_getprop_offset() is like ft_getprop(), but takes a property offset rather
+than a node offset and property name; it is primarily intended for use
+with ft_get_next_prop().
+
+Signed-off-by: Scott Wood <scottwood@freescale.com>
+---
+ libfdt/fdt_ro.c       |  134 +++++++++++++++++++++++++++++++++++++++++++++++++
+ libfdt/fdt_strerror.c |    1 +
+ libfdt/libfdt.h       |  123 ++++++++++++++++++++++++++++++++++++++++++---
+ 3 files changed, 251 insertions(+), 7 deletions(-)
+
+diff --git a/libfdt/fdt_ro.c b/libfdt/fdt_ro.c
+index 12a37d5..27c943a 100644
+--- a/libfdt/fdt_ro.c
++++ b/libfdt/fdt_ro.c
+@@ -293,6 +293,51 @@ const void *fdt_getprop(const void *fdt, int nodeoffset,
+ 	return prop->data;
+ }
+ 
++const void *fdt_getprop_offset(const void *fdt, int propoffset,
++                               const char **name, int *lenp)
++{
++	uint32_t tag;
++	const struct fdt_property *prop;
++	int namestroff;
++	int err, len;
++
++	err = fdt_check_header(fdt);
++	if (err)
++		goto fail;
++
++	tag = fdt_next_tag(fdt,propoffset, NULL);
++	if (tag != FDT_PROP) {
++		err = -FDT_ERR_BADOFFSET;
++		goto fail;
++	}
++
++	err = -FDT_ERR_BADSTRUCTURE;
++	prop = fdt_offset_ptr(fdt, propoffset, sizeof(*prop));
++	if (!prop)
++		goto fail;
++
++	if (name) {
++		namestroff = fdt32_to_cpu(prop->nameoff);
++		*name = fdt_string(fdt, namestroff);
++	}
++
++	len = fdt32_to_cpu(prop->len);
++	if (lenp)
++		*lenp = len;
++
++	prop = fdt_offset_ptr(fdt, propoffset, sizeof(*prop) + len);
++	if (!prop)
++		goto fail;
++
++	return prop->data;
++
++fail:
++	if (lenp)
++		*lenp = err;
++
++	return NULL;
++}
++
+ uint32_t fdt_get_phandle(const void *fdt, int nodeoffset)
+ {
+ 	const uint32_t *php;
+@@ -581,3 +626,92 @@ int fdt_node_offset_by_compatible(const void *fdt, int startoffset,
+ 
+ 	return -FDT_ERR_NOTFOUND;
+ }
++
++int fdt_get_next_node(const void *fdt, int startoffset,
++                      int *depth, int recursive)
++{
++	uint32_t tag;
++	int offset, nextoffset;
++
++	CHECK_HEADER(fdt);
++
++	if (startoffset >= 0) {
++		tag = fdt_next_tag(fdt, startoffset, &nextoffset);
++		if (tag != FDT_BEGIN_NODE)
++			return -FDT_ERR_BADOFFSET;
++	} else {
++		nextoffset = 0;
++	}
++
++	do {
++		offset = nextoffset;
++		tag = fdt_next_tag(fdt, offset, &nextoffset);
++
++		switch (tag) {
++		case FDT_BEGIN_NODE:
++			if ((*depth)++ == 0 || recursive) {
++				return offset;
++			}
++
++			break;
++
++		case FDT_END_NODE:
++			if (--*depth < 0)
++				return -FDT_ERR_NOTFOUND;
++
++			break;
++
++		case FDT_PROP:
++		case FDT_END:
++		case FDT_NOP:
++			break;
++
++		default:
++			return -FDT_ERR_BADSTRUCTURE;
++		}
++	} while (tag != FDT_END);
++
++	if (depth != 0)
++		return -FDT_ERR_BADSTRUCTURE;
++
++	return -FDT_ERR_NOTFOUND;
++}
++
++int fdt_get_next_prop(const void *fdt, int startoffset)
++{
++	uint32_t tag;
++	int offset, nextoffset;
++
++	CHECK_HEADER(fdt);
++
++	if (startoffset >= 0) {
++		tag = fdt_next_tag(fdt, startoffset, &nextoffset);
++		if (tag != FDT_BEGIN_NODE && tag != FDT_PROP)
++			return -FDT_ERR_BADOFFSET;
++	} else {
++		nextoffset = 0;
++	}
++
++	do {
++		offset = nextoffset;
++		tag = fdt_next_tag(fdt, offset, &nextoffset);
++
++		switch (tag) {
++		case FDT_BEGIN_NODE:
++		case FDT_END_NODE:
++			return -FDT_ERR_NOTFOUND;
++
++		case FDT_PROP:
++			return offset;
++
++		case FDT_END:
++		case FDT_NOP:
++			break;
++
++		default:
++			return -FDT_ERR_BADSTRUCTURE;
++		}
++	} while (tag != FDT_END);
++
++	return -FDT_ERR_BADSTRUCTURE;
++}
+diff --git a/libfdt/fdt_strerror.c b/libfdt/fdt_strerror.c
+index f9d32ef..4e87550 100644
+--- a/libfdt/fdt_strerror.c
++++ b/libfdt/fdt_strerror.c
+@@ -70,6 +70,7 @@ static struct errtabent errtable[] = {
+ 	ERRTABENT(FDT_ERR_BADOFFSET),
+ 	ERRTABENT(FDT_ERR_BADPATH),
+ 	ERRTABENT(FDT_ERR_BADSTATE),
++	ERRTABENT(FDT_ERR_BADDEPTH),
+ 
+ 	ERRTABENT(FDT_ERR_TRUNCATED),
+ 	ERRTABENT(FDT_ERR_BADMAGIC),
+diff --git a/libfdt/libfdt.h b/libfdt/libfdt.h
+index d053689..6c5d4a9 100644
+--- a/libfdt/libfdt.h
++++ b/libfdt/libfdt.h
+@@ -85,25 +85,28 @@
+ 	/* FDT_ERR_BADSTATE: Function was passed an incomplete device
+ 	 * tree created by the sequential-write functions, which is
+ 	 * not sufficiently complete for the requested operation. */
++#define FDT_ERR_BADDEPTH	8
++	/* FDT_ERR_BADDEPTH: Function was passed a negative
++	 * (or otherwise invalid) depth. */
+ 
+ /* Error codes: codes for bad device tree blobs */
+-#define FDT_ERR_TRUNCATED	8
++#define FDT_ERR_TRUNCATED	9
+ 	/* FDT_ERR_TRUNCATED: Structure block of the given device tree
+ 	 * ends without an FDT_END tag. */
+-#define FDT_ERR_BADMAGIC	9
++#define FDT_ERR_BADMAGIC	10
+ 	/* FDT_ERR_BADMAGIC: Given "device tree" appears not to be a
+ 	 * device tree at all - it is missing the flattened device
+ 	 * tree magic number. */
+-#define FDT_ERR_BADVERSION	10
++#define FDT_ERR_BADVERSION	11
+ 	/* FDT_ERR_BADVERSION: Given device tree has a version which
+ 	 * can't be handled by the requested operation.  For
+ 	 * read-write functions, this may mean that fdt_open_into() is
+ 	 * required to convert the tree to the expected version. */
+-#define FDT_ERR_BADSTRUCTURE	11
++#define FDT_ERR_BADSTRUCTURE	12
+ 	/* FDT_ERR_BADSTRUCTURE: Given device tree has a corrupt
+ 	 * structure block or other serious error (e.g. misnested
+ 	 * nodes, or subnodes preceding properties). */
+-#define FDT_ERR_BADLAYOUT	12
++#define FDT_ERR_BADLAYOUT	13
+ 	/* FDT_ERR_BADLAYOUT: For read-write functions, the given
+ 	 * device tree has it's sub-blocks in an order that the
+ 	 * function can't handle (memory reserve map, then structure,
+@@ -111,12 +114,12 @@
+ 	 * into a form suitable for the read-write operations. */
+ 
+ /* "Can't happen" error indicating a bug in libfdt */
+-#define FDT_ERR_INTERNAL	13
++#define FDT_ERR_INTERNAL	14
+ 	/* FDT_ERR_INTERNAL: libfdt has failed an internal assertion.
+ 	 * Should never be returned, if it is, it indicates a bug in
+ 	 * libfdt itself. */
+ 
+-#define FDT_ERR_MAX		13
++#define FDT_ERR_MAX		14
+ 
+ /**********************************************************************/
+ /* Low-level functions (you probably don't need these)                */
+@@ -409,6 +412,41 @@ static inline void *fdt_getprop_w(void *fdt, int nodeoffset,
+ }
+ 
+ /**
++ * fdt_getprop_offset - retrieve the value of a given property by offset
++ * @fdt: pointer to the device tree blob
++ * @propoffset: offset of the property to read
++ * @name: pointer to a character pointer (will be overwritten) or NULL
++ * @lenp: pointer to an integer variable (will be overwritten) or NULL
++ *
++ * fdt_getprop() retrieves a pointer to the value of the property
++ * named 'name' of the node at offset nodeoffset (this will be a
++ * pointer to within the device blob itself, not a copy of the value).
++ * If lenp is non-NULL, the length of the property value also
++ * returned, in the integer pointed to by lenp.
++ *
++ * returns:
++ *	pointer to the property's value
++ *		if lenp is non-NULL, *lenp contains the length of the property
++ *		value (>=0)
++ *	NULL, on error
++ *		if lenp is non-NULL, *lenp contains an error code (<0):
++ *		-FDT_ERR_NOTFOUND, node does not have named property
++ *		-FDT_ERR_BADOFFSET, nodeoffset did not point to FDT_BEGIN_NODE tag
++ *		-FDT_ERR_BADMAGIC,
++ *		-FDT_ERR_BADVERSION,
++ *		-FDT_ERR_BADSTATE,
++ *		-FDT_ERR_BADSTRUCTURE,
++ *		-FDT_ERR_TRUNCATED, standard meanings
++ */
++const void *fdt_getprop_offset(const void *fdt, int propoffset,
++                               const char **name, int *lenp);
++static inline void *fdt_getprop_offset_w(void *fdt, int propoffset,
++                                      const char **name, int *lenp)
++{
++	return (void *)fdt_getprop_offset(fdt, propoffset, name, lenp);
++}
++
++/**
+  * fdt_get_phandle - retreive the phandle of a given node
+  * @fdt: pointer to the device tree blob
+  * @nodeoffset: structure block offset of the node
+@@ -651,6 +689,77 @@ int fdt_node_check_compatible(const void *fdt, int nodeoffset,
+ int fdt_node_offset_by_compatible(const void *fdt, int startoffset,
+ 				  const char *compatible);
+ 
++/**
++ * fdt_get_next_node - enumerate children of a node
++ * @fdt: pointer to the device tree blob
++ * @startoffset: only find nodes after this offset
++ * @depth: depth of the node, should be zero upon first call
++ * @recursive: only find immediate children if zero
++ *
++ * fdt_get_next_node() returns the offset of the first node after
++ * startoffset, until depth returns to zero.
++ *
++ * To iterate through all children, the following idiom can be used:
++ *	depth = 0;
++ *	offset = parent node offset;
++ *	while (1) {
++ *		offset = fdt_get_next_node(fdt, offset, &depth, recursive);
++ *		if (offset < 0)
++ *		break;
++ *
++ *		// other code here
++ *	}
++ *
++ * To find all the children of the root node, set the initial
++ * offset to zero.  To find all nodes *including* the root
++ * node, set the initial offset and depth to -1.
++ *
++ * returns:
++ *	structure block offset of the located node (>= 0, >startoffset),
++ *		 on success
++ *	-FDT_ERR_NOTFOUND, no more child nodes exist after startoffset
++ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
++ *	-FDT_ERR_BADMAGIC,
++ *	-FDT_ERR_BADVERSION,
++ *	-FDT_ERR_BADSTATE,
++ *	-FDT_ERR_BADSTRUCTURE,
++ *	-FDT_ERR_BADDEPTH, standard meanings
++ */
++int fdt_get_next_node(const void *fdt, int startoffset,
++                      int *depth, int recursive);
++
++/**
++ * fdt_get_next_prop - enumerate properties of a node
++ * @fdt: pointer to the device tree blob
++ * @startoffset: only find nodes after this offset
++ *
++ * fdt_get_next_prop() returns the offset of the first property after
++ * startoffset.
++ *
++ * To iterate through all properties, the following idiom can be used:
++ *	offset = node offset;
++ *	while (1) {
++ *		offset = fdt_get_next_prop(fdt, offset);
++ *		if (offset < 0)
++ *		break;
++ *
++ *		// other code here
++ *	}
++ *
++ * returns:
++ *	structure block offset of the located property (>= 0, >startoffset),
++ *		 on success
++ *	-FDT_ERR_NOTFOUND, no more properties exist in the current node
++ *		after startoffset
++ *	-FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
++ *		or a PROP tag
++ *	-FDT_ERR_BADMAGIC,
++ *	-FDT_ERR_BADVERSION,
++ *	-FDT_ERR_BADSTATE,
++ *	-FDT_ERR_BADSTRUCTURE, standard meanings
++ */
++int fdt_get_next_prop(const void *fdt, int startoffset);
++
+ /**********************************************************************/
+ /* Write-in-place functions                                           */
+ /**********************************************************************/
+-- 
+1.5.3
+

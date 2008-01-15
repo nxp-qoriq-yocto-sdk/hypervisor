@@ -96,7 +96,7 @@ clean:
 
 .PHONY: test-linux
 test-linux: bin/uv.uImage
-	dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
+	../dtc/dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
 	dtc -p 1024 -O dtb dts/mpc8578sim-hv.dts -o bin/mpc8578sim-hv.dtb
-	simics sim/uv-linux.simics
+	~/work/simics/simics sim/uv-linux.simics
 
