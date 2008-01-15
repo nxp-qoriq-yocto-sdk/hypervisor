@@ -12,18 +12,12 @@
 #include <uv.h>
 #endif
 
-#define TLB1_RSVD  62 // First TLB1 entry reserved for the hypervisor.
-                      // Entries below this but above TLB1_GSIZE are
-                      // used to break up guest TLB1 entries due to
-                      // alignment, size, or permission holes.
 #define TLB1_GSIZE 16 // As seen by the guest
 
 #ifndef _ASM
 struct pte_t;
 
 typedef struct {
-	uint64_t mem_start, mem_end; // guest physical address range
-	uint64_t mem_real;           // real physical start addr
 	struct pte_t *gphys;         // guest phys to real phys mapping
 	struct pte_t *gphys_rev;     // real phys to guest phys mapping
 	char *name;

@@ -2,10 +2,11 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
-#include <mpic.h>
 
 #include <uv.h>
 #include <percpu.h>
+#include <paging.h>
+#include <mpic.h>
 
 #include <libfdt.h>
 #include <limits.h>
@@ -26,64 +27,215 @@ struct console_calls console = {
 	.putc = uart_putc
 };
 
-int global_init_done = 0;
-
-static void tlb1_init(void);
 static void core_init(void);
 static void release_secondary_cores(void);
 static void partition_init(void);
 void start_guest(void);
 
-/* hardcoded hack for now */
-#define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0x01000000
-#define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET		0x11c500
 
 void *fdt;
+static physaddr_t mem_end;
+
+// FIXME: memory holes
+static void find_end_of_mem(void)
+{
+	int memnode = fdt_subnode_offset(fdt, 0, "memory");
+	if (memnode < 0) {
+		printf("error %d (%s) opening /memory\n", memnode,
+		       fdt_strerror(memnode));
+
+		return;
+	}
+
+	int len;
+	const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
+	if (!memreg) {
+		printf("error %d (%s) reading /memory/reg\n", memnode,
+		       fdt_strerror(memnode));
+
+		return;
+	}
+
+	uint32_t naddr, nsize;
+	int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
+	if (ret < 0) {
+		printf("error %d (%s) getting address format for /memory\n",
+		       ret, fdt_strerror(ret));
+
+		return;
+	}
+
+	if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
+		printf("bad address format %u/%u for /memory\n", naddr, nsize);
+		return;
+	}
+
+	const uint32_t *reg = memreg;
+	while (reg + naddr + nsize <= memreg + len / 4) {
+		physaddr_t addr = *reg++;
+		if (naddr == 2) {
+			addr <<= 32;
+			addr |= *reg++;
+		}
+
+		physaddr_t size = *reg++;
+		if (nsize == 2) {
+			size <<= 32;
+			size |= *reg++;
+		}
+
+		addr += size - 1;
+		if (addr > mem_end)
+			mem_end = addr;
+	}
+}
 
 void start(unsigned long devtree_ptr)
 {
+	fdt = (void *)(devtree_ptr + PHYSBASE);
+	find_end_of_mem();
 	core_init();
 
-	if (!global_init_done) {
-		fdt = (void *)(devtree_ptr + PHYSBASE);
+	unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+	heap = (heap + 15) & ~15;
 
-		unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
-		heap = (heap + 15) & ~15;
+	alloc_init(heap, mem_end + PHYSBASE);
 
-		// FIXME: heap length
-		alloc_init(heap, ULONG_MAX);
+	uart_init(CCSRBAR_VA + UART_OFFSET);
 
-		uart_init(CCSRBAR_VA + UART_OFFSET);
+	printf("mem_end %llx\n", mem_end);
 
-		printf("=======================================\n");
-		printf("Freescale Ultravisor 0.1\n");
-		printf("heap %lx\n", heap);
+	printf("=======================================\n");
+	printf("Freescale Ultravisor 0.1\n");
 
-		console_init();
+	console_init();
 
+	mpic_init(devtree_ptr);
 
-		mpic_init(devtree_ptr);
+	// pamu init
 
-		// pamu init
+	release_secondary_cores();
+	partition_init();
+}
 
-		global_init_done = 1;
-
-		release_secondary_cores();
-	}
-
+static void secondary_init(void)
+{
+	core_init();
 	partition_init();
 }
 
 static void release_secondary_cores(void)
 {
-	// go thru cpu nodes in device tree
-	// for each cpu
-	//    get cpu release method
-	//    if not spin, error
-	//    get release address
-	//    write address of secondary entry point (head.S)
+	int node = fdt_subnode_offset(fdt, 0, "cpus");
+	int depth = 0;
+
+	if (node < 0) {
+		printf("Missing /cpus node\n");
+		goto fail;
+	}
+
+	while ((node = fdt_get_next_node(fdt, node, &depth, 0)) >= 0) {
+		int len;
+		const char *status = fdt_getprop(fdt, node, "status", &len);
+		if (!status) {
+			if (len == -FDT_ERR_NOTFOUND)
+				continue;
+
+			node = len;
+			goto fail;
+		}
+
+		if (len != strlen("disabled") + 1 || strcmp(status, "disabled"))
+			continue;
+
+		const char *enable = fdt_getprop(fdt, node, "enable-method", &len);
+		if (!status) {
+			printf("Missing enable-method on disabled cpu node\n");
+			node = len;
+			goto fail;
+		}
+
+		if (len != strlen("spin-table") + 1 || strcmp(enable, "spin-table")) {
+			printf("Unknown enable-method \"%s\"; not enabling\n", enable);
+			continue;
+		}
+
+		const uint32_t *reg = fdt_getprop(fdt, node, "reg", &len);
+		if (!reg) {
+			printf("Missing reg property in cpu node\n");
+			node = len;
+			goto fail;
+		}
+
+		if (len != 4) {
+			printf("Bad length %d for cpu reg property; core not released\n",
+			       len);
+			return;
+		}
+
+		const uint32_t *table = fdt_getprop(fdt, node, "cpu-release-addr", &len);
+		if (!table) {
+			printf("Missing cpu-release-addr property in cpu node\n");
+			node = len;
+			goto fail;
+		}
+
+
+		printf("starting cpu %u\n", *reg);
+
+		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
+		if (!cpu)
+			goto nomem;
+
+		cpu->kstack = alloc(KSTACK_SIZE, 16);
+		if (!cpu->kstack)
+			goto nomem;
+
+		cpu->kstack += KSTACK_SIZE - FRAMELEN;
+
+		cpu->client.gcpu = alloc(sizeof(gcpu_t), __alignof__(gcpu_t));
+		if (!cpu->client.gcpu)
+			goto nomem;
+
+		// FIXME 64-bit
+		cpu->client.gcpu->tlb1_free[0] = ~0UL;
+		cpu->client.gcpu->tlb1_free[1] = ~0UL;
+
+		if (start_secondary_spin_table((void *)(*table + PHYSBASE),
+		                               *reg, cpu, secondary_init, NULL))
+			printf("couldn't spin up CPU%u\n", *reg);
+
+next_core:
+		;
+	}
+
+	if (node != -FDT_ERR_NOTFOUND) {
+		printf("error getting child\n");
+		goto fail;
+	}
+
+	return;
+
+fail:
+	printf("error %d (%s) reading CPU nodes, "
+	       "secondary cores may not be released.\n",
+	       node, fdt_strerror(node));
+
+	return;
+ 
+nomem:
+	printf("out of memory reading CPU nodes, "
+	       "secondary cores may not be released.\n");
+
+	return;
+
+fail_one:
+	printf("error %d (%s) reading CPU node, "
+	       "this core may not be released.\n",
+	       node, fdt_strerror(node));
+
+	goto next_core;
 }
 
 static void partition_init(void)
@@ -106,12 +258,4 @@ static void core_init(void)
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
-}
-
-extern int print_ok;  /* set to indicate printf can work now */
-
-static void tlb1_init(void)
-{
-	tlb1_set_entry(62, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
-		TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 }

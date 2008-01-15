@@ -227,15 +227,19 @@ if $do_boot == "yes" {
 
         # Boot the linux kernel
         $con.wait-for-string "=> "
+
         if ($kernel_image != "") {
             $phys_mem.load-file $kernel_image $kernel_addr
         }
-        if ($guest_image != "") {
-            $phys_mem.load-file $guest_image $guest_addr
+
+	foreach $i in (range (list-length $guest_image)) {
+            $phys_mem.load-file $guest_image[$i] $guest_addr[$i]
         }
-        if ($initrd_image != "") {
-            $phys_mem.load-file $initrd_image $initrd_addr
+
+	foreach $i in (range (list-length $initrd_image)) {
+            $phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
         }
+
         if ($dtb_image != "") {
             # Must load to address covered by initial TLB entry
             $phys_mem.load-file $dtb_image $dtb_addr

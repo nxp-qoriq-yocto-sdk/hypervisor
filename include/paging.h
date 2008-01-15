@@ -87,4 +87,10 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
                     uint32_t mas2flags, uint32_t mas3flags);
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
 
+#define CCSRBAR_PA              0xfe000000
+#define CCSRBAR_VA              0x01000000
+#define CCSRBAR_SIZE            TLB_TSIZE_16M
+
+void tlb1_init(void);
+
 #endif

@@ -36,6 +36,7 @@
 #include <libfdt.h>
 
 guest_t guest;
+static unsigned long last_lpid;
 
 static const unsigned long guest_io_pages[] = {
 	0xfe11d, TLB_TSIZE_4K, // DUART
@@ -63,8 +64,8 @@ static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 #define MAX_ADDR_CELLS 4
 #define MAX_SIZE_CELLS 2
 
-static int get_addr_format(const void *tree, int node,
-                           uint32_t *naddr, uint32_t *nsize)
+int get_addr_format(const void *tree, int node,
+                    uint32_t *naddr, uint32_t *nsize)
 {
 	*naddr = 2;
 	*nsize = 1;
@@ -504,7 +505,15 @@ void start_guest(void)
 
 		if (pir == cpus[0]) {
 			guest_t *guest = alloc(sizeof(guest_t), 16);
+			if (!guest)
+				goto nomem;
+			
 			guest->name = alloc(MAX_PATH, 1);
+			if (!guest->name)
+				goto nomem;
+
+			guest->lpid = atomic_add(&last_lpid, 1);
+			mtspr(SPR_LPID, guest->lpid);
 			
 			ret = fdt_get_path(fdt, off, guest->name, sizeof(buf));
 			if (ret < 0) {
@@ -543,4 +552,9 @@ void start_guest(void)
 			// enter as secondary cpu
 		}
 	}
+
+	return;
+
+nomem:
+	printf("out of memory in start_guest\n");
 } 

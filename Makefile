@@ -48,7 +48,7 @@ include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-              $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE)
+              $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_MP)
 SRCS := $(LIBOS_SRCS:%=libos/%) src/interrupts.c src/trap.c \
        src/init.c src/guest.c src/tlb.c src/emulate.c src/timers.c \
        src/paging.c src/hcalls.c src/mpic.c
@@ -97,6 +97,7 @@ clean:
 .PHONY: test-linux
 test-linux: bin/uv.uImage
 	dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
+	dtc -O dtb dts/mpc8578sim-part2.dts -o dts/mpc8578sim-part2.dtb
 	dtc -p 1024 -O dtb dts/mpc8578sim-hv.dts -o bin/mpc8578sim-hv.dtb
 	simics sim/uv-linux.simics
 

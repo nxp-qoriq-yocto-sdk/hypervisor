@@ -36,6 +36,11 @@
 #include <percpu.h>
 #include <paging.h>
 
+// First TLB1 entry reserved for the hypervisor. Entries below this but
+// above TLB1_GSIZE are used to break up guest TLB1 entries due to
+// alignment, size, or permission holes.
+static int tlb1_reserved = BASE_TLB_ENTRY;
+
 static int alloc_tlb1(unsigned int entry)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -47,7 +52,7 @@ static int alloc_tlb1(unsigned int entry)
 		while (gcpu->tlb1_free[i]) {
 			int bit = count_lsb_zeroes(gcpu->tlb1_free[i]);
 
-			if (idx + bit >= TLB1_RSVD)
+			if (idx + bit >= tlb1_reserved)
 				return -1;
 			
 			gcpu->tlb1_free[i] &= ~(1UL << bit);
@@ -78,7 +83,7 @@ static void free_tlb1(unsigned int entry)
 	do {
 		while (gcpu->tlb1_used[entry][i]) {
 			int bit = count_lsb_zeroes(gcpu->tlb1_used[entry][i]);
-			assert(idx + bit < TLB1_RSVD);
+			assert(idx + bit < tlb1_reserved);
 			
 //			printf("clearing tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
 
@@ -181,4 +186,26 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
+}
+
+void tlb1_init(void)
+{
+	int tlb = BASE_TLB_ENTRY;
+	
+	tlb1_set_entry(--tlb, CCSRBAR_VA, CCSRBAR_PA,
+	               CCSRBAR_SIZE, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+	physaddr_t addr = 256 * 1024 * 1024; 
+	while (addr < 4096ULL * 1024 * 1024 - PHYSBASE) {
+		int tsize = natural_alignment(addr >> PAGE_SHIFT);
+		tlb1_set_entry(--tlb, PHYSBASE + addr,
+		               addr, tsize, TLB_MAS2_MEM,
+		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+		addr += tsize_to_pages(tsize) << PAGE_SHIFT;
+	}
+
+	if (mfspr(SPR_PIR))
+		tlb1_reserved = tlb;
 }

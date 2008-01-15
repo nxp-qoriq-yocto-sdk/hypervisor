@@ -51,6 +51,10 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
+	unsigned long lpid = mfspr(SPR_LPID);
+	va |= (lpid << 5) & 0xfe0;
+	va |= (lpid >> 6) & 0x002;
+
 	asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
 	return 0;
 }
@@ -205,12 +209,20 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			goto no_dup;
 
 		if (MAS0_GET_TLBSEL(mas0) == 1 && MAS0_GET_TLBSEL(sx_mas0) == 1 &&
-		    MAS0_GET_TLB1ESEL(sx_mas0) ==
-		    guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(mas0)))
+		    MAS0_GET_TLB1ESEL(mas0) ==
+		    guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(sx_mas0)))
 			goto no_dup;
 
 		printf("tlbwe@0x%lx: duplicate entry for vaddr 0x%lx\n",
 		       regs->srr0, mas2 & MAS2_EPN);
+
+		printf("mas0 %lx mas1 %lx mas2 %lx mas3 %lx mas7 %lx\n",
+		       mas0, mas1, mas2, mas3, mas7);
+		printf("dup0 %lx dup1 %lx dup2 %lx dup3 %lx dup7 %lx dup8 %lx\n",
+		       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mfspr(SPR_MAS2),
+		       mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
+
+		printf("guest_tlb1_to_gtlb1 %d\n", guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(mas0)));
 
 		return 1;
 	}
