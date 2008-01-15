@@ -7,7 +7,8 @@
 #
 
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
-LIBFDT_DIR := ../../dtc/libfdt
+DTC_DIR := ../../dtc
+LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../libos/lib
 LIBOS_INC := ../../libos/include
 LIBOS_BIN := bin/libos
@@ -40,10 +41,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-HELLO_TARGETS := bin/hello.bin bin/hello bin/hello.map
-HCALL_TARGETS := bin/hcall_test.bin bin/hcall_test bin/hcall_test.map
-
-all: $(HELLO_TARGETS) $(HCALL_TARGETS)
+all: hello_all hcall_test_all
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -59,6 +57,8 @@ HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) hello.c init.c
 HELLO_OBJS := $(basename $(HELLO_SRCS))
 HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
+
+hello_all: bin/hello.bin bin/hello.map bin/mpc8578sim-hv-test.dtb
 
 bin/hello.bin: bin/hello
 	$(CROSS_COMPILE)objcopy -O binary $< $@
@@ -79,6 +79,8 @@ HCALL_OBJS := $(basename $(HCALL_SRCS))
 HCALL_OBJS := $(HCALL_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 HCALL_OBJS := $(HCALL_OBJS:%=bin/%)
 
+hcall_test_all: bin/hcall_test.bin bin/hcall_test.map bin/mpc8578sim-hv-test.dtb
+
 bin/hcall_test.bin: bin/hcall_test
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
@@ -87,6 +89,7 @@ bin/hcall_test: $(HCALL_OBJS)
 
 bin/hcall_test.map: bin/hcall_test
 	nm -n bin/hcall_test > $@	
+
 
 -include $(HCALL_OBJS:.o=.d)
 
@@ -103,6 +106,14 @@ bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) \
 	-include libfdt_env.h -c -o $@ $<
 
+bin/mpc8578sim-hv-test.dtb: dts/mpc8578sim-hv-test.dts dts/mpc8578sim-test-part1.dtb
+
+bin/%.dtb : dts/%.dts
+	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
+
+dts/%.dtb : dts/%.dts
+	$(DTC_DIR)/dtc -O dtb $< -o $@
+
 # include the dependecy files
 -include bin/genassym.d
 
@@ -111,3 +122,4 @@ bin/example.map: bin/example
  
 clean:
 	rm -rf bin
+	rm -f dts/*.dtb
