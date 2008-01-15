@@ -4,7 +4,7 @@
 
 # simple guest
 $guest_image  = "%script%/tests/bin/hcall_test.bin"
-$guest_addr   = 0x20000000
+$guest_addr   = 0x01000000
 
 # indicate that simics magic instructions are wanted
 $want_magic_inst = 1

@@ -6,8 +6,10 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
+SIMICS=simics
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
-LIBFDT_DIR := ../dtc/libfdt
+DTC_DIR := ../dtc
+LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../libos/lib
 LIBOS_INC := ../libos/include
 LIBOS_BIN := bin/libos
@@ -41,7 +43,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/uv.uImage bin/uv.map
+all: bin/uv.uImage bin/uv.map linux_dtbs
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -84,20 +86,29 @@ bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) \
 	-include include/libfdt_env.h -c -o $@ $<
 
+bin/%.dtb : dts/%.dts
+	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
+
+dts/%.dtb : dts/%.dts
+	$(DTC_DIR)/dtc -O dtb $< -o $@
+
 # include the dependecy files
 -include bin/src/genassym.d
 -include $(OBJS:.o=.d)
 
 bin/uv.map: bin/uv
 	nm -n bin/uv > $@	
- 
+
 clean:
 	rm -rf bin
+	rm -f dts/*.dtb
+
+linux_dtbs: bin/mpc8578sim-hv.dtb
+bin/mpc8578sim-hv.dtb: dts/mpc8578sim-part1.dtb
 
 .PHONY: test-linux
 test-linux: bin/uv.uImage
-	dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
-	dtc -O dtb dts/mpc8578sim-part2.dts -o dts/mpc8578sim-part2.dtb
-	dtc -p 1024 -O dtb dts/mpc8578sim-hv.dts -o bin/mpc8578sim-hv.dtb
-	simics sim/uv-linux.simics
-
+	$(DTC_DIR)/dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
+	$(DTC_DIR)/dtc -O dtb dts/mpc8578sim-part2.dts -o dts/mpc8578sim-part2.dtb
+	$(DTC_DIR)/dtc -p 1024 -O dtb dts/mpc8578sim-hv.dts -o bin/mpc8578sim-hv.dtb
+	$(SIMICS) sim/uv-linux.simics
