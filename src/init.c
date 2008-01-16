@@ -2,11 +2,11 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
+#include <libos/mpic.h>
 
 #include <uv.h>
 #include <percpu.h>
 #include <paging.h>
-#include <mpic.h>
 
 #include <libfdt.h>
 #include <limits.h>
