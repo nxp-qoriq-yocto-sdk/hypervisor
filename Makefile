@@ -43,7 +43,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/uv.uImage bin/uv.map linux_dtbs
+all: bin/uv.uImage bin/uv.map
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -61,11 +61,6 @@ OBJS := $(OBJS:%=bin/%)
 
 bin/uv.uImage: bin/uv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
-
-#	mkimage -A ppc -O linux -T standalone -C gzip -a 00000000 -e 00000000 -d $< $@
-#	mkimage -A ppc -O linux -T kernel -C gzip -a 00000000 -e 00000000 -d $< $@
-#	mkimage -A ppc -O linux -C none -T standalone -a 00000000 -e 00000000 -d $< $@
-
 
 bin/uv.bin.gz: bin/uv.bin
 	gzip -f $<
@@ -103,12 +98,12 @@ clean:
 	rm -rf bin
 	rm -f dts/*.dtb
 
-linux_dtbs: bin/mpc8578sim-hv.dtb
-bin/mpc8578sim-hv.dtb: dts/mpc8578sim-part1.dtb
+.PHONY: test-linux test-linux test-linux-2p
 
-.PHONY: test-linux
-test-linux: bin/uv.uImage
-	$(DTC_DIR)/dtc -O dtb dts/mpc8578sim-part1.dts -o dts/mpc8578sim-part1.dtb
-	$(DTC_DIR)/dtc -O dtb dts/mpc8578sim-part2.dts -o dts/mpc8578sim-part2.dtb
-	$(DTC_DIR)/dtc -p 1024 -O dtb dts/mpc8578sim-hv.dts -o bin/mpc8578sim-hv.dtb
-	$(SIMICS) sim/uv-linux.simics
+bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb
+test-linux-1p: bin/uv.uImage bin/mpc8578sim-hv-1p.dtb
+	$(SIMICS) sim/uv-linux-1p.simics
+
+bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-part2.dtb
+test-linux-2p: bin/uv.uImage bin/mpc8578sim-hv-2p.dtb
+	$(SIMICS) sim/uv-linux-2p.simics
