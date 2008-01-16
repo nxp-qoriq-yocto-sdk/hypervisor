@@ -92,11 +92,6 @@ static void find_end_of_mem(void)
 	}
 }
 
-void func_tmp(uint32_t arg)
-{
-	printf("func temp\n");
-}
-
 void start(unsigned long devtree_ptr)
 {
 	fdt = (void *)(devtree_ptr + PHYSBASE);
