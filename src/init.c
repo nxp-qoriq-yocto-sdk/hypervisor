@@ -7,6 +7,7 @@
 #include <uv.h>
 #include <percpu.h>
 #include <paging.h>
+#include <interrupts.h>
 
 #include <libfdt.h>
 #include <limits.h>
@@ -91,6 +92,11 @@ static void find_end_of_mem(void)
 	}
 }
 
+void func_tmp(uint32_t arg)
+{
+	printf("func temp\n");
+}
+
 void start(unsigned long devtree_ptr)
 {
 	fdt = (void *)(devtree_ptr + PHYSBASE);
@@ -112,6 +118,9 @@ void start(unsigned long devtree_ptr)
 	console_init();
 
 	mpic_init(devtree_ptr);
+
+        /* enable critical interrupts */
+        mtmsr(mfmsr()|MSR_CE);
 
 	// pamu init
 
