@@ -3,8 +3,8 @@
 #
 
 # simple guest
-$guest_image  = "%script%/tests/bin/hello.bin"
-$guest_addr   = 0x01000000
+$guest_image[0]  = "%script%/tests/bin/hello.bin"
+$guest_addr[0]   = 0x01000000
 
 $dtb_image  = "%script%/tests/bin/mpc8578sim-hv-test.dtb"
 

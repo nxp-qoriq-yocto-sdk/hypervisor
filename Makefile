@@ -100,6 +100,9 @@ clean:
 
 .PHONY: test-linux test-linux test-linux-2p
 
+test-hello: bin/uv.uImage
+	$(SIMICS) sim/uv-hello.simics
+
 bin/mpc8578sim-hv-1p.dtb: dts/mpc8578sim-part1.dtb
 test-linux-1p: bin/uv.uImage bin/mpc8578sim-hv-1p.dtb
 	$(SIMICS) sim/uv-linux-1p.simics

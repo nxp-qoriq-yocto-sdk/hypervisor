@@ -236,9 +236,11 @@ if $do_boot == "yes" {
             $phys_mem.load-file $guest_image[$i] $guest_addr[$i]
         }
 
-	foreach $i in (range (list-length $initrd_image)) {
-            $phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
-        }
+        if ($initrd_image != "") {
+	    foreach $i in (range (list-length $initrd_image)) {
+                $phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
+            }
+	}
 
         if ($dtb_image != "") {
             # Must load to address covered by initial TLB entry
