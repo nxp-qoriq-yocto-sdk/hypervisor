@@ -49,14 +49,6 @@ if $want_magic_inst == 1 {
 @SIM_hap_add_callback("Core_Magic_Instruction", hap_callback, None)
 }
 
-@def clear_gs(obj, param):
-	obj.msr &= ~0x10000000
-
-@def exception_handler(*params):
-	SIM_run_unrestricted(conf.cpu0, clear_gs, None)
-
-@SIM_hap_add_callback_index("Core_Exception", exception_handler, None, 7)
-
 ###
 
 if not defined freq_mhz      {$freq_mhz      = 1333.3}
