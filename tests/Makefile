@@ -15,7 +15,7 @@ LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := libos-client.h
 
 CC=$(CROSS_COMPILE)gcc
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
+CC_OPTS=-m32 -Wa,-me500 -I. -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
         -std=gnu99  -include $(LIBOS_CLIENT_H)
 
 CC_OPTS_C= -Wall \
@@ -41,14 +41,16 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: hello_all hcall_test_all
+all: hello_all hcall_test_all vmpic_all
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-              $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL)
+	$(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
+	$(LIBOS_MPIC)
+		
 
 ####################
 # Hello
@@ -70,6 +72,27 @@ bin/hello.map: bin/hello
 	nm -n bin/hello > $@	
 
 -include $(HELLO_OBJS:.o=.d)
+
+####################
+# vmpic_test
+
+VMPIC_SRCS := $(LIBOS_SRCS:%=libos/%) vmpic_test.c init.c 
+VMPIC_OBJS := $(basename $(VMPIC_SRCS))
+VMPIC_OBJS := $(VMPIC_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+VMPIC_OBJS := $(VMPIC_OBJS:%=bin/%)
+
+vmpic_all: bin/vmpic_test.bin bin/vmpic_test.map bin/mpc8578sim-hv-test.dtb
+
+bin/vmpic_test.bin: bin/vmpic_test
+	$(CROSS_COMPILE)objcopy -O binary $< $@
+
+bin/vmpic_test: $(VMPIC_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(VMPIC_OBJS) -lgcc
+
+bin/vmpic_test.map: bin/vmpic_test
+	nm -n $< > $@	
+
+-include $(VMPIC_OBJS:.o=.d)
 
 ####################
 # hcall_test

@@ -1,0 +1,14 @@
+#
+# Script to run 8578/u-boot/ultravisor/simple-guest on simulator
+#
+
+# simple guest
+$guest_image[0]  = "%script%/tests/bin/vmpic_test.bin"
+$guest_addr[0]   = 0x01000000
+
+$dtb_image  = "%script%/tests/bin/mpc8578sim-hv-test.dtb"
+
+# indicate that simics magic instructions are wanted
+$want_magic_inst = 1
+
+run-command-file "%script%/uvsim.include"
