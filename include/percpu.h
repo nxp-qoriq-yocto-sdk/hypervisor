@@ -23,6 +23,7 @@ typedef struct {
 	char *name;
 	void *devtree;
 	uint32_t lpid;
+	int partition_node;
 } guest_t;
 
 #define GCPU_PEND_DECR	0x00000001 // Decrementer event pending

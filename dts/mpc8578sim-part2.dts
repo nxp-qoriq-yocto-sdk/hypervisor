@@ -24,7 +24,7 @@
 			clock-frequency = <d#66666666>;
 			status = "okay";
 		};
-
+/*
 		cpu@1 {
 			device_type = "cpu";
 			compatible = "fsl,e500mc", "fsl,e500";
@@ -39,11 +39,11 @@
 			status = "disabled";
 			enable-method = "fsl,hv-start-secondary";
 		};
+*/
 	};
 	
 	memory {
 		reg = <0 0 04000000>;
-		fsl,hv-ranges = <0 0 0 21000000 04000000>;
 		device_type = "memory";
 	};
 	
@@ -60,7 +60,7 @@
 			             "fsl,ns16550", "ns16550";
 			reg = <11c600 100>;
 			clock-frequency = <0>;
-			interrupts = <1c 2>;
+//			interrupts = <1c 2>;
 			interrupt-parent = <&mpic>;
 		};
 

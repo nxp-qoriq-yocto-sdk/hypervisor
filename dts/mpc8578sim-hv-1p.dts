@@ -182,7 +182,8 @@
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,dtb = /incbin/("mpc8578sim-part1.dtb");
+			fsl,hv-ranges = <0 0 0 1000000 17000000
+			                 0 17000000 0 20000000 1000000>;
 		};
-
 	};
 };

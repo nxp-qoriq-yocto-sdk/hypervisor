@@ -182,6 +182,12 @@
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,dtb = /incbin/("mpc8578sim-part1.dtb");
+			fsl,hv-ranges = <0 0 0 1000000 17000000
+			                 0 17000000 0 20000000 1000000
+			                 0 fe040000 0 fe040000 20000
+			                 0 fe060000 0 fe060000 1000
+			                 0 fe061000 0 fe062000 1000
+			                 0 fe062000 ffffffff ffffffff 1e000>;
 		};
 
 		part2 {
@@ -189,6 +195,12 @@
 			fsl,cpus = <5 2 1 1 3 1>;
 			fsl,entry = <0>;
 			fsl,dtb = /incbin/("mpc8578sim-part2.dtb");
+			fsl,hv-ranges = <0 0 0 21000000 04000000
+			                 0 fe040000 0 fe040000 20000
+			                 0 fe060000 0 fe065000 2000
+			                 0 fe062000 0 fe061000 1000
+			                 0 fe063000 0 fe063000 1000
+			                 0 fe064000 ffffffff ffffffff 1c000>;
 		};
 	};
 };
