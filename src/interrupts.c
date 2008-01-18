@@ -51,6 +51,8 @@ void critical_interrupt(trapframe_t *frameptr)
 	struct crit_int_h *ptr;
 	int_handler_t h;
 
+printf ("crit\n");
+
 	for (ptr = hlist_head; ptr != NULL; ptr = ptr->next) {
 		if (ptr->handler != NULL) {
 			ptr->handler(ptr->arg);

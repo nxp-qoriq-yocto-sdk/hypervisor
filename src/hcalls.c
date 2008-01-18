@@ -1,6 +1,7 @@
 
 #include <uv.h>
 #include <libos/trapframe.h>
+#include <percpu.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
@@ -34,6 +35,48 @@ static void fh_whoami(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
+/*
+ * r3: handle
+ * r4 : count
+ * r5,r6,r7,r8 : bytes
+ *
+ */
+int byte_chan_send(int byte_chan_handle, char const* buf, int length);
+
+static void fh_byte_channel_send(trapframe_t *regs)
+{
+        guest_t *guest = get_gcpu()->guest;
+	int i;
+	int valid = 0;
+
+#ifdef DEBUG
+	printf("byte-channel send\n");
+	printf("arg0 %08lx\n",regs->gpregs[3]);
+	printf("arg1 %08lx\n",regs->gpregs[4]);
+	printf("arg2 %08lx\n",regs->gpregs[5]);
+	printf("arg2 %08lx\n",regs->gpregs[6]);
+	printf("arg2 %08lx\n",regs->gpregs[7]);
+	printf("arg2 %08lx\n",regs->gpregs[8]);
+#endif
+
+	for (i=0; i < guest->bc_cnt; i++) {
+		if (regs->gpregs[3] == guest->bc[i]) {
+			valid = 1;
+			break;
+		}
+	}
+
+	if (!valid) {
+		regs->gpregs[3] = -2;  /* bad handle */
+		return;
+	}
+
+	/* put chars into bytechannel queue here */
+	byte_chan_send(regs->gpregs[3],(const char *)&regs->gpregs[5],regs->gpregs[4]);
+
+	regs->gpregs[3] = 0;  /* success */
+}
+
 static hcallfp_t hcall_table[] = {
 	&fh_whoami,		/* 0x00 */
 	&unimplemented,		/* 0x01 */
@@ -51,7 +94,7 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 0x0d */
 	&unimplemented,		/* 0x0e */
 	&unimplemented,		/* 0x0f */
-	&unimplemented,		/* 0x10 */
+	&fh_byte_channel_send,	/* 0x10 */
 	&unimplemented,		/* 0x11 */
 	&unimplemented,		/* 0x12 */
 	&unimplemented,		/* 0x13 */

@@ -32,6 +32,7 @@
 #include <uv.h>
 #include <paging.h>
 #include <timers.h>
+#include <byte_chan.h>
 
 #include <libfdt.h>
 
@@ -521,8 +522,10 @@ void start_guest(void)
 				       ret, fdt_strerror(ret), off);
 				continue;
 			}
-			
+
 			build_guest_devtree(guest, off, cpus, len);
+
+			byte_chan_partition_init(guest);
 
 			unsigned long attr;
 			unsigned long rpn = vptbl_xlate(guest->gphys,

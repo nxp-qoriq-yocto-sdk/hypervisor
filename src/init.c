@@ -3,11 +3,13 @@
 #include <libos/trapframe.h>
 #include <libos/uart.h>
 #include <libos/mpic.h>
-
+#include <libos/8578.h>   // FIXME-- remove when UART is moved
+ 
 #include <uv.h>
 #include <percpu.h>
 #include <paging.h>
 #include <interrupts.h>
+#include <byte_chan.h>
 
 #include <libfdt.h>
 #include <limits.h>
@@ -110,9 +112,15 @@ void start(unsigned long devtree_ptr)
 	printf("=======================================\n");
 	printf("Freescale Ultravisor 0.1\n");
 
-	console_init();
+	mpic_init((unsigned long)fdt);
 
-	mpic_init(devtree_ptr);
+// FIXME-- need mpic_irq_setup func
+	mpic_irq_set_inttype(DUART2_IRQ,TYPE_CRIT);
+	mpic_irq_set_priority(DUART2_IRQ,15);
+	mpic_irq_unmask(DUART2_IRQ);
+
+	/* byte channel initialization */
+	byte_chan_global_init();
 
         /* enable critical interrupts */
         mtmsr(mfmsr()|MSR_CE);
@@ -263,3 +271,4 @@ static void core_init(void)
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
 }
+
