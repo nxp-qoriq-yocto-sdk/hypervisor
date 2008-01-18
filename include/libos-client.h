@@ -5,6 +5,8 @@
 #define PHYSBASE 0x40000000
 #define HYPERVISOR
 
+#define CCSRBAR_VA	0x01000000
+
 #ifndef _ASM
 typedef struct {
 	struct gcpu_t *gcpu;
