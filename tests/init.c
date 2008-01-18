@@ -4,6 +4,8 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
+#include <libos/io.h>
+#include <libos-client.h>
 
 extern uint8_t init_stack_top;
 
@@ -21,7 +23,6 @@ static void  core_init(void);
 
 /* hardcoded hack for now */
 #define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_VA              0xfe000000
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET 0x11d500
 
@@ -63,3 +64,18 @@ static void tlb1_init(void)
 	print_ok = 1;
 }
 
+void dec_handler(trapframe_t *frameptr)
+{
+}
+
+int extint_cnt = 0;;
+void ext_int_handler(trapframe_t *frameptr)
+{
+	uint8_t c;
+
+	extint_cnt++;
+
+	printf("ext int\n");
+
+	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
+}
