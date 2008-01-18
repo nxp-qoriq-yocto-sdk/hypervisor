@@ -17,6 +17,7 @@
 #include <string.h>
 #include <libos/libos.h>
 #include <interrupts.h>
+#include <libos/io.h>
 
 // FIXME -- get clock from device tree
 #define get_system_glock() 266
@@ -24,8 +25,8 @@
 /** byte_chans array and a next free pointer */
 static void duart_isr(unsigned long lld_handler);
 
-#define WRITE_UART(p, reg, val) *(p->offset+reg) = val
-#define READ_UART(p, reg) *(p->offset+reg)
+#define WRITE_UART(p, reg, val) out8((uint8_t *)(p->offset+reg),val)
+#define READ_UART(p, reg) in8((uint8_t *)(p->offset+reg))
 
 int tx_counter;
 int rx_counter;
