@@ -14,7 +14,8 @@ static inline void send_local_guest_doorbell(void)
 {
 	unsigned long msg = MSG_GBELL |
 	                    (get_gcpu()->guest->lpid << 14) |
-	                    mfspr(SPR_PIR);
+	                    mfspr(SPR_GPIR);
+
 	asm volatile("msgsnd %0" : : "r" (msg));
 }
 
