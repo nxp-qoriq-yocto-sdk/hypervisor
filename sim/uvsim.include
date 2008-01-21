@@ -18,6 +18,7 @@ if not defined use_uart1	{$use_uart1 = 0}
 if not defined use_uart2	{$use_uart2 = 1}
 if not defined use_uart3	{$use_uart3 = 0}
 if not defined do_boot		{$do_boot = "yes"}
+if not defined create_network  {$create_network = "yes"}
 if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
 if not defined guest_image	{$guest_image = ""}
@@ -124,7 +125,29 @@ foreach $phy_idx in (range 4) {
                               max_module_size = 2048
                               ddr_type = DDR2)
 
+# Pulls in the create-pci commands
+load-module pci-components
+
+# Create and connect a SIL controller with a single IDE disk to the first
+# PCIe interface
+#$sil = (create-pci-sil680a)
+#$disk = (create-std-ide-disk size = (80 * 1024 * 1024 * 1024))
+#$sil.connect ide0-slot0 $disk
+#$system.connect pcie0-slot0 $sil
+
 instantiate-components
+
+# work arounds
+
+ccsr_space.del-map guts:device_configuration
+ccsr_space.del-map guts:clock_generation
+ccsr_space.del-map guts:clock_control
+ccsr_space.del-map guts:run_control
+ccsr_space.del-map pmc
+ccsr_space.del-map debug
+
+ccsr_space.add-map base = 0xe0000 device =guts:device_configuration length = 0x1000
+ccsr_space.add-map base = 0xe2000 device = guts:run_control length = 0x1000
 
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
