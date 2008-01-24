@@ -139,15 +139,6 @@ instantiate-components
 
 # work arounds
 
-ccsr_space.del-map guts:device_configuration
-ccsr_space.del-map guts:clock_generation
-ccsr_space.del-map guts:clock_control
-ccsr_space.del-map guts:run_control
-ccsr_space.del-map pmc
-ccsr_space.del-map debug
-
-ccsr_space.add-map base = 0xe0000 device =guts:device_configuration length = 0x1000
-ccsr_space.add-map base = 0xe2000 device = guts:run_control length = 0x1000
 
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
