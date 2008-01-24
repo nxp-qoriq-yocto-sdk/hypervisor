@@ -193,8 +193,15 @@ static void release_secondary_cores(void)
 			goto fail;
 		}
 
+		printf("starting cpu %u, table %x\n", *reg, *table);
 
-		printf("starting cpu %u\n", *reg);
+		tlb1_set_entry(BASE_TLB_ENTRY + 1, CCSRBAR_VA - PAGE_SIZE,
+		               (*table) & ~(PAGE_SIZE - 1),
+		               PAGE_SIZE, TLB_MAS2_IO,
+		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+		uintptr_t table_va = *table & (PAGE_SIZE - 1);
+		table_va |= CCSRBAR_VA - PAGE_SIZE;
 
 		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
 		if (!cpu)
@@ -214,8 +221,8 @@ static void release_secondary_cores(void)
 		cpu->client.gcpu->tlb1_free[0] = ~0UL;
 		cpu->client.gcpu->tlb1_free[1] = ~0UL;
 
-		if (start_secondary_spin_table((void *)(*table + PHYSBASE),
-		                               *reg, cpu, secondary_init, NULL))
+		if (start_secondary_spin_table((void *)table_va, *reg, cpu,
+		                               secondary_init, NULL))
 			printf("couldn't spin up CPU%u\n", *reg);
 
 next_core:
