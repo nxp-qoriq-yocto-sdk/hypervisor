@@ -62,17 +62,6 @@ void duart_start_tx(void* lld_handler)
 		return;
 	uart->tx_active = 1;
 	
-	while(READ_UART(uart, LSR) & LSR_THRE) {
-		if(byte_chan_receive(uart->byte_chan, (char *)&data, 1) == 1) {
-			tx_counter++;
-			WRITE_UART(uart, THR, data);
-		} else {
-			uart->tx_active = 0;
-			WRITE_UART(uart, IER, IER_ERDAI);
-			break;
-		}
-				
-	}
 	//TODO ENABLE ISR
 	WRITE_UART(uart, IER, IER_ERDAI | IER_ETHREI);
 	
