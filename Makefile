@@ -110,3 +110,6 @@ test-linux-1p: bin/uv.uImage bin/mpc8578sim-hv-1p.dtb
 bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-part2.dtb
 test-linux-2p: bin/uv.uImage bin/mpc8578sim-hv-2p.dtb
 	$(SIMICS) sim/uv-linux-2p.simics
+
+docs:
+	doxygen doc/Doxyfile
