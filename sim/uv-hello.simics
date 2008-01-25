@@ -11,4 +11,8 @@ $dtb_image  = "%script%/tests/bin/mpc8578sim-hv-test.dtb"
 # indicate that simics magic instructions are wanted
 $want_magic_inst = 1
 
+# uncomment to attach uart2 to network port
+#$use_uart2 = 0
+#$use_uart2_net = 1
+
 run-command-file "%script%/uvsim.include"

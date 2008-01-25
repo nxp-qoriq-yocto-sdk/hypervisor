@@ -95,6 +95,16 @@ if $use_uart2 == 1 {
 	if defined terminal_x11_font   {$con3->x11_font   = $terminal_x11_font}
 }
 
+if $use_uart2_tty == 1 {
+	$con3_tty = (create-std-host-serial-console)
+	$system.connect uart2 $con3_tty
+}
+
+if $use_uart2_net == 1 {
+	$con3_tty = (create-std-server-console "foo" 9999)
+	$system.connect uart2 $con3_tty
+}
+
 if $use_uart3 == 1 {
 	$con4 = (create-std-text-console)
 	$system.connect uart3 $con4
