@@ -2,6 +2,8 @@
 # Script to run 8578/u-boot/ultravisor/simple-guest on simulator
 #
 
+$use_uart1 = 1
+
 # simple guest
 $guest_image[0]  = "%script%/tests/bin/hello.bin"
 $guest_addr[0]   = 0x01000000

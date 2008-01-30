@@ -1,4 +1,4 @@
-#include <uv.h>
+#include <hv.h>
 #include <libos/trapframe.h>
 #include <libos/trap_booke.h>
 #include <libos/console.h>
@@ -16,6 +16,7 @@ void reflect_trap(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
+		crashing = 1;
 		printf("unexpected trap in hypervisor\n");
 		dump_regs(regs);
 		stopsim();

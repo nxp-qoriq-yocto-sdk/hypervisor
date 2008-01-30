@@ -1,5 +1,5 @@
 /**************************************************************************//*
-    @file   byte_chan.h
+    @file
 
     @brief  This file contain the implementation of general byte_chan interface
     The byte_chan interface usually implements 
@@ -13,15 +13,16 @@
     $Id: $
  **************************************************************************/
 
-#include  "libos/libos.h"
-#include  "queue.h"
-#include  "byte_chan.h"
-#include  "bcmux.h"
-#include  "uverrors.h"
-#include  <string.h>
+#include <libos/libos.h>
+#include <libos/queue.h>
+#include <libos/ns16550.h>
+#include <byte_chan.h>
+#include <bcmux.h>
+#include <errors.h>
+#include <string.h>
 
 
-#define printf(X...)
+//#define printf(X...)
 /*==================================================================================================
                                        LOCAL VARIABLES
 ==================================================================================================*/
@@ -273,7 +274,7 @@ void mux_send_data(void* mux_p)
 
 *//***************************************************************************/
 
-int mux_complex_init(int byte_chan, mux_complex_t** mux_p)
+int mux_complex_init(byte_chan_handle_t *byte_chan, mux_complex_t **mux_p)
 {
 	int                    byte_channel_handle;
 	mux_complex_t*         mux;
@@ -323,9 +324,8 @@ int mux_complex_init(int byte_chan, mux_complex_t** mux_p)
 
 *//***************************************************************************/
 
-int mux_complex_add(mux_complex_t* mux_complex, 
-					int  byte_chan,
-					char multiplexing_id)
+int mux_complex_add(mux_complex_t *mux_complex, byte_chan_handle_t *bc,
+                    char multiplexing_id)
 {
 
 	connected_bc_t* bc;
@@ -348,11 +348,13 @@ int mux_complex_add(mux_complex_t* mux_complex,
 		bc_chain->next = bc;
 	}
 	
-	byte_chan_reg_params.end_point_handler        = mux_complex;
-	byte_chan_reg_params.byte_chan_rx_data_avail  = mux_send_data;
-	byte_chan_reg_params.byte_chan_tx_space_avail = mux_get_data;
+	bc->tx->producer = mux_complex;
+	bc->rx->consumer = mux_complex;
+
 	
-	byte_chan_register(byte_chan, &byte_chan_reg_params);	
+
+	byte_chan_reg_params.byte_chan_rx_data_avail = mux_send_data;
+	byte_chan_reg_params.byte_chan_tx_space_avail = mux_get_data;
 	
 	mux_complex->current_tx_bc = bc;
 	mux_complex->num_of_channels++;
@@ -362,70 +364,53 @@ int mux_complex_add(mux_complex_t* mux_complex,
 #define TEST
 #ifdef TEST
 
-uart_param_t test_uart_params = 
-{
-	8, 1, 'n', 115200, 0, CCSRBAR_VA+0x11d500,0
-};
-
-
 void test_byte_chan_mux(void)
 {
-        byte_chan_param_t byte_chan_param;
-        char str[10];
-        int byte_chan;
-        int num;
-	int byte_chan0;
-	int byte_chan1;
-	struct mux_complex_s* vuart_complex;	
-	int byte_chan_to_lld;
+	uint8_t str[10];
+	int num;
+	byte_chan_t *byte_chan0;
+	byte_chan_t *byte_chan1;
+	byte_chan_t *byte_chan_to_lld;
+	mux_complex_t *vuart_complex;	
 
+	byte_chan0 = byte_chan_alloc();
+	byte_chan1 = byte_chan_alloc();
+	byte_chan_to_lld = byte_chan_alloc();
 
-	byte_chan_param.queue_size_0_1 = 0x100;
-	byte_chan_param.queue_size_1_0 = 0x100;
+	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
+	if (!cd) {
+		printf("test_byte_chan_mux: failed to alloc uart\n");
+		return;
+	}
 
+	if (byte_chan_attach_chardev(&byte_chan_to_lld->handles[0], cd)) {
+		printf("test_byte_chan_mux: Couldn't attach to uart\n");
+		return;
+	}
 
-	byte_chan0 = byte_chan_alloc(&byte_chan_param);
+	mux_complex_init(&byte_chan_to_lld->handles[1], &vuart_complex);
 	
-	byte_chan1 = byte_chan_alloc(&byte_chan_param);
-			
-	byte_chan_to_lld = byte_chan_alloc(&byte_chan_param);
+	mux_complex_add(vuart_complex, &byte_chan0->handles[1], 48);
+	mux_complex_add(vuart_complex, &byte_chan1->handles[1], 49);
 
-	duart_init(byte_chan_to_lld + 1, &test_uart_params);
-	
-	mux_complex_init(byte_chan_to_lld, &vuart_complex);
-	
-	mux_complex_add(vuart_complex, byte_chan0 + 1, 48);
-	mux_complex_add(vuart_complex, byte_chan1 + 1, 49);
+	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"ABCDEF\n\r", 8);
+	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"UUUU", 4);
+	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"GGGG", 4);
+	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"DDDD", 4);
 
-	byte_chan_send(byte_chan0, "ABCDEF\n\r", 8);
-	byte_chan_send(byte_chan1, "UUUU", 4);
-	byte_chan_send(byte_chan0, "GGGG", 4);
-	byte_chan_send(byte_chan1, "DDDD", 4);
+	while(1) {
+		num = byte_chan_receive(&byte_chan0->handles[0], str, 1);
+		if (num == 1) {
+			// printf("Chan 0 = %c", str[0]);
+			byte_chan_send(&byte_chan1->handles[0], str, 1);
+		}
 
-        while(1)
-        {
-                num = byte_chan_receive(byte_chan0, str, 1);
-                if(num == 1)
-                {
-                       // printf("Chan 0 = %c", str[0]);
-			byte_chan_send(byte_chan1, str, 1);
-	
-                }
-
-               num = byte_chan_receive(byte_chan1, str, 1);
-                if(num == 1)
-                {
-//                        printf("Chan 1 = %c", str[0]);
-			byte_chan_send(byte_chan0, str, 1);
-
-                }
-
-
-        }
-	
-
-	
-
+		num = byte_chan_receive(&byte_chan1->handles[0], str, 1);
+		if (num == 1) {
+			// printf("Chan 1 = %c", str[0]);
+			byte_chan_send(&byte_chan0->handles[0], str, 1);
+		}
+	}
 }
 
 #endif

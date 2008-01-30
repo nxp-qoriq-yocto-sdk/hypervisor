@@ -9,13 +9,21 @@
 #include <stdint.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
-#include <uv.h>
+#include <hv.h>
 #endif
 
 #define TLB1_GSIZE 16 // As seen by the guest
 
 #ifndef _ASM
 struct pte_t;
+
+#define MAX_HANDLES 32
+
+// An extremely crude form of RTTI/multiple interfaces...
+// Add pointers here for other handle types as they are needed.
+typedef struct {
+	struct byte_chan_handle_t *bc;
+} handle_t;
 
 typedef struct {
 	struct pte_t *gphys;         // guest phys to real phys mapping
@@ -24,8 +32,7 @@ typedef struct {
 	void *devtree;
 	uint32_t lpid;
 	int partition_node;
-	uint32_t *bc;                // array of byte channel handles
-	uint32_t bc_cnt;             // # of channels
+	handle_t *handles[MAX_HANDLES];
 } guest_t;
 
 #define GCPU_PEND_DECR	0x00000001 // Decrementer event pending
@@ -47,6 +54,8 @@ typedef struct gcpu_t {
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
+
+int alloc_guest_handle(guest_t *guest, handle_t *handle);
 
 #endif
 #endif

@@ -29,7 +29,7 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/spr.h>
 
-#include <uv.h>
+#include <hv.h>
 #include <paging.h>
 #include <timers.h>
 #include <byte_chan.h>
@@ -38,13 +38,6 @@
 
 guest_t guest;
 static unsigned long last_lpid;
-
-static const unsigned long guest_io_pages[] = {
-	0xfe11d, TLB_TSIZE_4K, // DUART
-	0xfe040, TLB_TSIZE_256K, // MPIC
-	0xfe118, TLB_TSIZE_4K, // I2C
-	0xfe31c, TLB_TSIZE_16K, // ethernet
-};
 
 static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 {

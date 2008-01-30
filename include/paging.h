@@ -1,7 +1,7 @@
 #ifndef PAGING_H
 #define PAGING_H
 
-#include <uv.h>
+#include <hv.h>
 
 #define PHYS_BITS 36
 #define VIRT_BITS 32

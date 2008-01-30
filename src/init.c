@@ -4,8 +4,9 @@
 #include <libos/uart.h>
 #include <libos/mpic.h>
 #include <libos/8578.h>   // FIXME-- remove when UART is moved
+#include <libos/ns16550.h>
  
-#include <uv.h>
+#include <hv.h>
 #include <percpu.h>
 #include <paging.h>
 #include <interrupts.h>
@@ -24,10 +25,6 @@ extern uint8_t init_stack_top;
 cpu_t cpu0 = {
 	.kstack = &init_stack_top - FRAMELEN,
 	.client.gcpu = &noguest,
-};
-
-struct console_calls console = {
-	.putc = uart_putc
 };
 
 static void core_init(void);
@@ -105,7 +102,9 @@ void start(unsigned long devtree_ptr)
 
 	alloc_init(heap, mem_end + PHYSBASE);
 
-	uart_init(CCSRBAR_VA + UART_OFFSET);
+	chardev_t *console = ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET,
+	                                  0, 0, 16);
+	console_init(console);
 
 	printf("mem_end %llx\n", mem_end);
 
@@ -115,15 +114,14 @@ void start(unsigned long devtree_ptr)
 	mpic_init((unsigned long)fdt);
 
 // FIXME-- need mpic_irq_setup func
-	mpic_irq_set_inttype(DUART2_IRQ,TYPE_CRIT);
-	mpic_irq_set_priority(DUART2_IRQ,15);
-	mpic_irq_unmask(DUART2_IRQ);
+	mpic_irq_set_inttype(0x24, TYPE_CRIT);
+	mpic_irq_set_priority(0x24, 15);
+	mpic_irq_unmask(0x24);
 
 	/* byte channel initialization */
 	byte_chan_global_init();
 
-        /* enable critical interrupts */
-        mtmsr(mfmsr()|MSR_CE);
+	enable_critint();
 
 	// pamu init
 

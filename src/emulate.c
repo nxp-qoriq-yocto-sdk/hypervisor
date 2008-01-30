@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uv.h>
+#include <hv.h>
 #include <libos/trapframe.h>
 #include <libos/console.h>
 #include <guestmemio.h>

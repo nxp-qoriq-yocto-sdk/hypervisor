@@ -28,14 +28,14 @@
 #ifndef MUX_COMPLEX_H_
 #define MUX_COMPLEX_H_
 
-
+#include <byte_chan.h>
 
 typedef struct mux_complex_s
 {
-	int  byte_chan;
-	struct connected_bc_s* current_tx_bc;
-	struct connected_bc_s* current_rx_bc;
-	struct connected_bc_s* first_bc;	
+	byte_chan_handle_t *byte_chan;
+	struct connected_bc_s *current_tx_bc;
+	struct connected_bc_s *current_rx_bc;
+	struct connected_bc_s *first_bc;	
 	int current_tx;
 	int current_rx;
 	int rx_flag_state;
@@ -45,7 +45,7 @@ typedef struct mux_complex_s
 	int rx_problem;
 //	int curr_rx_length;
 	int num_of_channels;
-}mux_complex_t;
+} mux_complex_t;
 
 typedef struct connected_bc_s
 {

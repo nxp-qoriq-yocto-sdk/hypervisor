@@ -4,6 +4,7 @@
 #define BASE_TLB_ENTRY 62
 #define PHYSBASE 0x40000000
 #define HYPERVISOR
+#define INTERRUPTS
 
 #define CCSRBAR_VA	0x01000000
 
@@ -11,6 +12,8 @@
 typedef struct {
 	struct gcpu_t *gcpu;
 } client_cpu_t;
+
+#include <interrupts.h>
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt

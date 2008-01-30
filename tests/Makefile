@@ -49,7 +49,7 @@ include $(LIBOS_DIR)/Makefile.libos
 
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
 	$(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
-	$(LIBOS_MPIC)
+	$(LIBOS_MPIC) $(LIBOS_QUEUE)
 		
 
 ####################

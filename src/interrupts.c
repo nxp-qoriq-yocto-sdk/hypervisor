@@ -8,16 +8,16 @@ extern void trap(trapframe_t *);
 
 struct crit_int_h {
 	int_handler_t handler;
-	uint32_t arg;
-	uint32_t irq;
+	void *arg;
 	struct crit_int_h *next;
+	int irq;
 };
 
 struct crit_int_h *hlist_head = NULL;
 struct crit_int_h *hlist_tail = NULL;
 static uint32_t link_handler_lock;
 
-int32_t register_critical_handler(uint16_t irq, int_handler_t funcptr, uint32_t arg)
+int register_irq_handler(int irq, int_handler_t funcptr, void *arg)
 {
 	struct crit_int_h *ptr;
 	struct crit_int_h *tmp;
@@ -29,7 +29,7 @@ int32_t register_critical_handler(uint16_t irq, int_handler_t funcptr, uint32_t 
 	ptr->arg = arg;
 	ptr->next = NULL;
 
-        spin_lock(&link_handler_lock);
+	register_t saved = spin_lock_critsave(&link_handler_lock);
 
 	/* link it in */
 	if (hlist_head == NULL) {
@@ -40,8 +40,7 @@ int32_t register_critical_handler(uint16_t irq, int_handler_t funcptr, uint32_t 
 		hlist_tail = ptr;
 	}
 
-        spin_unlock(&link_handler_lock);
-
+	spin_unlock_critsave(&link_handler_lock, saved);
 	return 0;
 	
 }
@@ -51,7 +50,9 @@ void critical_interrupt(trapframe_t *frameptr)
 	struct crit_int_h *ptr;
 	int_handler_t h;
 
-printf ("crit\n");
+	printf("crit\n");
+
+	spin_lock(&link_handler_lock);
 
 	for (ptr = hlist_head; ptr != NULL; ptr = ptr->next) {
 		if (ptr->handler != NULL) {
@@ -59,6 +60,7 @@ printf ("crit\n");
 		}
 	}
 
+	spin_unlock(&link_handler_lock);
 }
 
 void powerpc_mchk_interrupt(trapframe_t *frameptr)
@@ -68,4 +70,3 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
         dump_frame(framep);
 #endif
 }
-

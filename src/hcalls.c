@@ -1,9 +1,35 @@
-
-#include <uv.h>
 #include <libos/trapframe.h>
+#include <libos/bitops.h>
+
+#include <hv.h>
 #include <percpu.h>
+#include <byte_chan.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
+
+// This could have latency implications if compare_and_swap
+// fails often enough -- but it's unlikely.
+int alloc_guest_handle(guest_t *guest, handle_t *handle)
+{
+	int again;
+
+	do {
+		again = 0;
+	
+		for (int i = 0; i < MAX_HANDLES; i++) {
+			if (guest->handles[i])
+				continue;
+		
+			if (compare_and_swap((unsigned long *)&guest->handles[i],
+			                     0, (unsigned long)handle))
+				return i;
+
+			again = 1;
+		}
+	} while (again);
+
+	return -1;
+}
 
 static void unimplemented(trapframe_t *regs)
 {
@@ -41,13 +67,14 @@ static void fh_whoami(trapframe_t *regs)
  * r5,r6,r7,r8 : bytes
  *
  */
-int byte_chan_send(int byte_chan_handle, char const* buf, int length);
-
 static void fh_byte_channel_send(trapframe_t *regs)
 {
-        guest_t *guest = get_gcpu()->guest;
+	guest_t *guest = get_gcpu()->guest;
 	int i;
 	int valid = 0;
+	int handle = regs->gpregs[3];
+	size_t len = regs->gpregs[4];
+	const uint8_t *buf = (const uint8_t *)&regs->gpregs[5];
 
 #ifdef DEBUG
 	printf("byte-channel send\n");
@@ -59,22 +86,32 @@ static void fh_byte_channel_send(trapframe_t *regs)
 	printf("arg2 %08lx\n",regs->gpregs[8]);
 #endif
 
-	for (i=0; i < guest->bc_cnt; i++) {
-		if (regs->gpregs[3] == guest->bc[i]) {
-			valid = 1;
-			break;
-		}
-	}
-
-	if (!valid) {
-		regs->gpregs[3] = -2;  /* bad handle */
+	if (len > 16) {
+		regs->gpregs[3] = -2;  // invalid arg
 		return;
 	}
 
-	/* put chars into bytechannel queue here */
-	byte_chan_send(regs->gpregs[3],(const char *)&regs->gpregs[5],regs->gpregs[4]);
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
 
-	regs->gpregs[3] = 0;  /* success */
+	byte_chan_handle_t *bc = guest->handles[handle]->bc;
+	if (!bc) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	register_t saved = spin_lock_critsave(&bc->tx_lock);
+
+	if (len > queue_get_space(bc->tx))
+		regs->gpregs[3] = -3;  // insufficient room
+	else
+		/* put chars into bytechannel queue here */
+		regs->gpregs[3] = byte_chan_send(bc, buf, len);
+
+	spin_unlock_critsave(&bc->tx_lock, saved);
 }
 
 static hcallfp_t hcall_table[] = {

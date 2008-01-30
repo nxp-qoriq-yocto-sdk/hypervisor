@@ -5,6 +5,7 @@
 #include <libos/trapframe.h>
 #include <libos/uart.h>
 #include <libos/io.h>
+#include <libos/ns16550.h>
 #include <libos-client.h>
 
 extern uint8_t init_stack_top;
@@ -12,10 +13,6 @@ extern uint8_t init_stack_top;
 cpu_t cpu0 = {
         .kstack = &init_stack_top - FRAMELEN,
         .client = 0,
-};
-
-struct console_calls console = {
-	.putc = uart_putc
 };
 
 static void tlb1_init(void);
@@ -28,13 +25,8 @@ static void  core_init(void);
 
 void init(unsigned long devtree_ptr)
 {
-
 	core_init();
-
-	uart_init(CCSRBAR_VA + UART_OFFSET);
-
-	console_init();
-
+	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET, 0, 0, 16));
 }
 
 
