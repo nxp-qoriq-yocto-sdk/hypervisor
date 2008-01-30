@@ -15,9 +15,12 @@
 #include <libfdt.h>
 #include <limits.h>
 
+extern cpu_t cpu0;
+
 static gcpu_t noguest = {
 	// FIXME 64-bit
 	.tlb1_free = { ~0UL, ~0UL },
+	.cpu = &cpu0,   /* link back to cpu */
 };
 
 extern uint8_t init_stack_top;
@@ -215,6 +218,8 @@ static void release_secondary_cores(void)
 		if (!cpu->client.gcpu)
 			goto nomem;
 
+		cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
+
 		// FIXME 64-bit
 		cpu->client.gcpu->tlb1_free[0] = ~0UL;
 		cpu->client.gcpu->tlb1_free[1] = ~0UL;
@@ -271,6 +276,9 @@ static void core_init(void)
 {
 	/* set up a TLB entry for CCSR space */
 	tlb1_init();
+
+	/* PIR was set by firmware-- record in cpu_t struct */
+	cpu->coreid = mfspr(SPR_PIR);
 
 	/* dec init sequence 
 	 *  -disable DEC interrupts

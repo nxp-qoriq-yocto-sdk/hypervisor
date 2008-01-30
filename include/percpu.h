@@ -51,6 +51,7 @@ typedef struct gcpu_t {
 	uint64_t mcar;
 	uint32_t timer_flags;
 	int pending;
+	cpu_t *cpu;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
