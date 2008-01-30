@@ -7,6 +7,7 @@
 #include <libos/io.h>
 #include <libos/ns16550.h>
 #include <libos-client.h>
+#include <libfdt.h>
 
 extern uint8_t init_stack_top;
 
@@ -23,10 +24,22 @@ static void  core_init(void);
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET 0x11d500
 
+void *fdt;
+
 void init(unsigned long devtree_ptr)
 {
 	core_init();
+
+	/* alloc the heap */
+        fdt = (void *)(devtree_ptr + PHYSBASE);
+
+        unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+        heap = (heap + 15) & ~15;
+
+        alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
+
 	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET, 0, 0, 16));
+
 }
 
 
