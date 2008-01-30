@@ -272,6 +272,16 @@ static void core_init(void)
 	/* set up a TLB entry for CCSR space */
 	tlb1_init();
 
+	/* dec init sequence 
+	 *  -disable DEC interrupts
+	 *  -disable DEC auto reload
+	 *  -set DEC to zero 
+	 *  -clear any pending DEC interrupts */
+	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
+	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_ARE);
+	mtspr(SPR_DEC, 0x0);
+	mtspr(SPR_TSR, TSR_DIS );
+
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);

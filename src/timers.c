@@ -89,7 +89,7 @@ void set_tcr(uint32_t val)
 
 void set_tsr(uint32_t val)
 {
-	if (val & TCR_DIS)
+	if (val & TSR_DIS)
 		get_gcpu()->pending &= ~GCPU_PEND_DECR;
 
 	mtspr(SPR_TSR, val);
