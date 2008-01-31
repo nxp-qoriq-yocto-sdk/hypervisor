@@ -115,36 +115,36 @@ static void fh_byte_channel_send(trapframe_t *regs)
 }
 
 static hcallfp_t hcall_table[] = {
-	&fh_whoami,		/* 0x00 */
-	&unimplemented,		/* 0x01 */
-	&unimplemented,		/* 0x02 */
-	&unimplemented,		/* 0x03 */
-	&unimplemented,		/* 0x04 */
-	&unimplemented,		/* 0x05 */
-	&unimplemented,		/* 0x06 */
-	&fh_partition_get_status,	/* 0x07 */
-	&unimplemented,		/* 0x08 */
-	&unimplemented,		/* 0x09 */
-	&unimplemented,		/* 0x0a */
-	&unimplemented,		/* 0x0b */
-	&unimplemented,		/* 0x0c */
-	&unimplemented,		/* 0x0d */
-	&unimplemented,		/* 0x0e */
-	&unimplemented,		/* 0x0f */
-	&fh_byte_channel_send,	/* 0x10 */
-	&unimplemented,		/* 0x11 */
-	&unimplemented,		/* 0x12 */
-	&unimplemented,		/* 0x13 */
-	&unimplemented,		/* 0x14 */
-	&unimplemented,		/* 0x15 */
-	&unimplemented,		/* 0x16 */
-	&unimplemented,		/* 0x17 */
-	&unimplemented,		/* 0x18 */
-	&unimplemented,		/* 0x19 */
-	&unimplemented,		/* 0x1a */
-	&unimplemented,		/* 0x1b */
-	&unimplemented,		/* 0x1c */
-	&unimplemented,		/* 0x1d */
+	&unimplemented,		/* 0 */
+	&fh_whoami,		/* 1 */
+	&unimplemented,		/* 2 */
+	&unimplemented,		/* 3 */
+	&unimplemented,		/* 4 */
+	&unimplemented,		/* 5 */
+	&fh_partition_get_status,/* 6 */
+	&unimplemented,		/* 7 */
+	&unimplemented,		/* 8 */
+	&unimplemented,		/* 9 */
+	&unimplemented,		/* 10 */
+	&unimplemented,		/* 11 */
+	&unimplemented,		/* 12 */
+	&unimplemented,		/* 13 */
+	&unimplemented,		/* 14 */
+	&unimplemented,		/* 15 */
+	&unimplemented,		/* 16 */
+	&unimplemented,		/* 17 */
+	&fh_byte_channel_send,	/* 18 */
+	&unimplemented,		/* 19 */
+	&unimplemented,		/* 20 */
+	&unimplemented,		/* 21 */
+	&unimplemented,		/* 22 */
+	&unimplemented,		/* 23 */
+	&unimplemented,		/* 24 */
+	&unimplemented,		/* 25 */
+	&unimplemented,		/* 26 */
+	&unimplemented,		/* 27 */
+	&unimplemented,		/* 28 */
+	&unimplemented,		/* 29 */
 };
 
 void hcall(trapframe_t *regs)
