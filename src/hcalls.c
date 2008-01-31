@@ -112,6 +112,40 @@ static void fh_byte_channel_send(trapframe_t *regs)
 		regs->gpregs[3] = byte_chan_send(bc, buf, len);
 
 	spin_unlock_critsave(&bc->tx_lock, saved);
+
+	regs->gpregs[3] = 0;  /* success */
+	return;
+}
+
+static void fh_byte_channel_poll(trapframe_t *regs)
+{
+	register_t saved;
+	guest_t *guest = get_gcpu()->guest;
+
+	int handle = regs->gpregs[3];
+
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	byte_chan_handle_t *bc = guest->handles[handle]->bc;
+	if (!bc) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	saved = spin_lock_critsave(&bc->rx_lock);
+	regs->gpregs[4] = queue_get_avail(bc->rx);
+	spin_unlock_critsave(&bc->rx_lock, saved);
+
+	saved = spin_lock_critsave(&bc->tx_lock);
+	regs->gpregs[5] = queue_get_space(bc->tx);
+	spin_unlock_critsave(&bc->tx_lock, saved);
+
+	regs->gpregs[3] = 0;  /* success */
+	return;
 }
 
 static hcallfp_t hcall_table[] = {
@@ -135,7 +169,7 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 17 */
 	&fh_byte_channel_send,	/* 18 */
 	&unimplemented,		/* 19 */
-	&unimplemented,		/* 20 */
+	&fh_byte_channel_poll,	/* 20 */
 	&unimplemented,		/* 21 */
 	&unimplemented,		/* 22 */
 	&unimplemented,		/* 23 */
