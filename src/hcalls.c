@@ -1,5 +1,6 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/libos.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -117,6 +118,42 @@ static void fh_byte_channel_send(trapframe_t *regs)
 	return;
 }
 
+static void fh_byte_channel_receive(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	int avail;
+	int handle = regs->gpregs[3];
+	size_t max_receive = regs->gpregs[4];
+	uint8_t *outbuf = (uint8_t *)&regs->gpregs[5];
+	register_t saved;
+
+	if (max_receive > 16) {
+		regs->gpregs[3] = -2;  // invalid arg
+		return;
+	}
+
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	byte_chan_handle_t *bc = guest->handles[handle]->bc;
+	if (!bc) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	saved = spin_lock_critsave(&bc->rx_lock);
+	regs->gpregs[4] = byte_chan_receive(bc, outbuf, max_receive);
+	spin_unlock_critsave(&bc->rx_lock, saved);
+
+
+	regs->gpregs[3] = 0;  /* success */
+	return;
+}
+
+
 static void fh_byte_channel_poll(trapframe_t *regs)
 {
 	register_t saved;
@@ -168,7 +205,7 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 16 */
 	&unimplemented,		/* 17 */
 	&fh_byte_channel_send,	/* 18 */
-	&unimplemented,		/* 19 */
+	&fh_byte_channel_receive,/* 19 */
 	&fh_byte_channel_poll,	/* 20 */
 	&unimplemented,		/* 21 */
 	&unimplemented,		/* 22 */
