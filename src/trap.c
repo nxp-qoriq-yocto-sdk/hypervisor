@@ -39,6 +39,9 @@ void guest_doorbell(trapframe_t *regs)
 	assert(gsrr1 & MSR_GS);
 	assert(gsrr1 & MSR_EE);
 
+	regs->srr0 = mfspr(SPR_GSRR0);
+	regs->srr1 = gsrr1;
+
 	// First, check external interrupts. (TODO).
 	if (0) {
 	}
@@ -49,7 +52,11 @@ void guest_doorbell(trapframe_t *regs)
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		return;
 	}
+
+	if (gcpu->pending & GCPU_PEND_TCR_DIE)
+		enable_tcr_die();
 }
 
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)

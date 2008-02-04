@@ -60,12 +60,18 @@ void run_deferred_decrementer(void)
 	gcpu->pending &= ~GCPU_PEND_DECR;
 
 	if (gcpu->timer_flags & TF_ENABLED) {
-		uint32_t val = mfspr(SPR_TCR) & ~TCR_DIE;
-		val |= (gcpu->timer_flags << (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
-	   	    TCR_DIE;
-
-		mtspr(SPR_TCR, val);
+		gcpu->pending |= GCPU_PEND_TCR_DIE;
+		send_local_guest_doorbell();
 	}
+}
+
+void enable_tcr_die(void)
+{
+	gcpu_t *gcpu = get_gcpu();
+	gcpu->pending &= ~GCPU_PEND_TCR_DIE;
+
+	if (gcpu->timer_flags & TF_ENABLED)
+		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
 }
 
 void guest_timer_init(gcpu_t *gcpu)
@@ -89,8 +95,13 @@ void set_tcr(uint32_t val)
 
 void set_tsr(uint32_t val)
 {
-	if (val & TSR_DIS)
-		get_gcpu()->pending &= ~GCPU_PEND_DECR;
+	if (val & TSR_DIS) {
+		gcpu_t *gcpu = get_gcpu();
+		gcpu->pending &= ~GCPU_PEND_DECR;
+		
+		if (gcpu->timer_flags & TF_ENABLED)
+			mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
+	}
 
 	mtspr(SPR_TSR, val);
 }

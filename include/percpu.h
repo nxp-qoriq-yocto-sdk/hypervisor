@@ -35,7 +35,8 @@ typedef struct {
 	handle_t *handles[MAX_HANDLES];
 } guest_t;
 
-#define GCPU_PEND_DECR	0x00000001 // Decrementer event pending
+#define GCPU_PEND_DECR     0x00000001 // Decrementer event pending
+#define GCPU_PEND_TCR_DIE  0x00000002 // Set TCR[DIE] after pending decr.
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
