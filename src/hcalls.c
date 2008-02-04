@@ -71,8 +71,6 @@ static void fh_whoami(trapframe_t *regs)
 static void fh_byte_channel_send(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int i;
-	int valid = 0;
 	int handle = regs->gpregs[3];
 	size_t len = regs->gpregs[4];
 	const uint8_t *buf = (const uint8_t *)&regs->gpregs[5];
@@ -108,20 +106,19 @@ static void fh_byte_channel_send(trapframe_t *regs)
 
 	if (len > queue_get_space(bc->tx))
 		regs->gpregs[3] = -3;  // insufficient room
-	else
+	else {
 		/* put chars into bytechannel queue here */
-		regs->gpregs[3] = byte_chan_send(bc, buf, len);
+		int ret = byte_chan_send(bc, buf, len);
+		assert(ret == len);
+		regs->gpregs[3] = 0;  /* success */
+	}
 
 	spin_unlock_critsave(&bc->tx_lock, saved);
-
-	regs->gpregs[3] = 0;  /* success */
-	return;
 }
 
 static void fh_byte_channel_receive(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int avail;
 	int handle = regs->gpregs[3];
 	size_t max_receive = regs->gpregs[4];
 	uint8_t *outbuf = (uint8_t *)&regs->gpregs[5];
@@ -148,11 +145,8 @@ static void fh_byte_channel_receive(trapframe_t *regs)
 	regs->gpregs[4] = byte_chan_receive(bc, outbuf, max_receive);
 	spin_unlock_critsave(&bc->rx_lock, saved);
 
-
 	regs->gpregs[3] = 0;  /* success */
-	return;
 }
-
 
 static void fh_byte_channel_poll(trapframe_t *regs)
 {
