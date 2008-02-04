@@ -241,7 +241,6 @@ no_dup:
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
 	} else {
-		unsigned long rpn;
 		unsigned long mas8 = guest->lpid | MAS8_GTS;
 	
 		mtspr(SPR_MAS0, mas0);
@@ -554,7 +553,6 @@ void hvpriv(trapframe_t *regs)
 		return;
 	}
 
-bad:
 	printf("unhandled hvpriv trap from 0x%lx, insn 0x%08x\n", regs->srr0, insn);
 	regs->exc = EXC_PROGRAM;
 	reflect_trap(regs);

@@ -35,7 +35,6 @@ CC_OPTS_C= -Wall \
   -funit-at-a-time \
   -mno-string \
   -fomit-frame-pointer \
-  -Wno-unused \
   -Werror
 CC_OPTS_ASM=-D_ASM -Ibin/src
 LD=$(CROSS_COMPILE)ld

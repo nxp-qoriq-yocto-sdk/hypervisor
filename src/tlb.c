@@ -44,7 +44,6 @@ static int tlb1_reserved = BASE_TLB_ENTRY;
 static int alloc_tlb1(unsigned int entry)
 {
 	gcpu_t *gcpu = get_gcpu();
-	unsigned long val;
 	int idx = 0;
 	int i = 0;
 
@@ -76,7 +75,6 @@ static int alloc_tlb1(unsigned int entry)
 static void free_tlb1(unsigned int entry)
 {
 	gcpu_t *gcpu = get_gcpu();
-	unsigned long val;
 	int i = 0;
 	int idx = 0;
 

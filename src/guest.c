@@ -241,11 +241,9 @@ static int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                          physaddr_t *size)
 {
 	int parent;
-	uint64_t ret_addr;
 	uint32_t naddr, nsize, prev_naddr, prev_nsize;
 	const uint32_t *ranges;
-	int len, offset;
-	int ret;
+	int len, ret;
 
 	parent = fdt_parent_offset(tree, node);
 	if (parent < 0)
@@ -303,6 +301,7 @@ static int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 	return 0;
 }
 
+__attribute__((unused))
 static int xlate_reg(const void *tree, int node, const uint32_t *reg,
                      physaddr_t *addr, physaddr_t *size)
 {
@@ -310,6 +309,8 @@ static int xlate_reg(const void *tree, int node, const uint32_t *reg,
 	uint32_t rootnaddr;
 
 	int ret = xlate_reg_raw(tree, node, reg, addrbuf, &rootnaddr, size);
+	if (ret < 0)
+		return ret;
 
 	if (rootnaddr < 0 || rootnaddr > 2)
 		return BADTREE;
@@ -333,10 +334,8 @@ static void map_guest_range(guest_t *guest, physaddr_t gaddr,
 //	printf("cpu%ld mapping guest %lx to real %lx, %lx pages\n",
 //	       mfspr(SPR_PIR), grpn, rpn, pages);
 
-	vptbl_map(guest->gphys, gaddr >> PAGE_SHIFT, addr >> PAGE_SHIFT,
-	          pages, PTE_ALL, PTE_PHYS_LEVELS);
-	vptbl_map(guest->gphys_rev, addr >> PAGE_SHIFT, gaddr >> PAGE_SHIFT,
-	          size >> PAGE_SHIFT, PTE_ALL, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys, grpn, rpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 }
 
 static int map_guest_reg_one(guest_t *guest, int node, const uint32_t *reg)

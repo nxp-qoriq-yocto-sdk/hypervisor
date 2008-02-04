@@ -156,7 +156,7 @@ static void release_secondary_cores(void)
 				continue;
 
 			node = len;
-			goto fail;
+			goto fail_one;
 		}
 
 		if (len != strlen("disabled") + 1 || strcmp(status, "disabled"))
@@ -166,7 +166,7 @@ static void release_secondary_cores(void)
 		if (!status) {
 			printf("Missing enable-method on disabled cpu node\n");
 			node = len;
-			goto fail;
+			goto fail_one;
 		}
 
 		if (len != strlen("spin-table") + 1 || strcmp(enable, "spin-table")) {
@@ -178,7 +178,7 @@ static void release_secondary_cores(void)
 		if (!reg) {
 			printf("Missing reg property in cpu node\n");
 			node = len;
-			goto fail;
+			goto fail_one;
 		}
 
 		if (len != 4) {
@@ -191,7 +191,7 @@ static void release_secondary_cores(void)
 		if (!table) {
 			printf("Missing cpu-release-addr property in cpu node\n");
 			node = len;
-			goto fail;
+			goto fail_one;
 		}
 
 		printf("starting cpu %u, table %x\n", *reg, *table);

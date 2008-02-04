@@ -20,7 +20,6 @@ static uint32_t link_handler_lock;
 int register_irq_handler(int irq, int_handler_t funcptr, void *arg)
 {
 	struct crit_int_h *ptr;
-	struct crit_int_h *tmp;
 
 	ptr = alloc(sizeof(struct crit_int_h),4);
 	// FIXME-- check if alloc is out of space 
@@ -48,7 +47,6 @@ int register_irq_handler(int irq, int_handler_t funcptr, void *arg)
 void critical_interrupt(trapframe_t *frameptr)
 {
 	struct crit_int_h *ptr;
-	int_handler_t h;
 
 	printf("crit\n");
 
