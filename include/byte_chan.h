@@ -34,6 +34,7 @@ ssize_t byte_chan_send(byte_chan_handle_t *bc,
 ssize_t byte_chan_receive(byte_chan_handle_t *bc,
                           uint8_t *buf, size_t length);
 
+int byte_chan_claim(byte_chan_handle_t *handle);
 int byte_chan_attach_chardev(byte_chan_handle_t *bc, chardev_t *cd);
 int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest);
 

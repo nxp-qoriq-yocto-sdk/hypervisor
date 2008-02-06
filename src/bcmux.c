@@ -36,7 +36,7 @@
 #include <errors.h>
 #include <string.h>
 
-#define debug(X...) printf(X)
+#define debug(X...)
 
 #define TX_THRESHOLD_QUEUE   8
 
@@ -278,6 +278,9 @@ int mux_complex_init(byte_chan_handle_t *bc, mux_complex_t **mux_p)
 int mux_complex_add(mux_complex_t *mux, byte_chan_handle_t *bc,
                     char multiplexing_id)
 {
+	if (byte_chan_claim(bc))
+		return -1;
+
 	connected_bc_t *cbc;
 	cbc = alloc(sizeof(connected_bc_t), __alignof__(connected_bc_t));
 	if (!cbc)

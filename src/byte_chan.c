@@ -62,7 +62,7 @@ byte_chan_t *byte_chan_alloc(void)
 
 static uint32_t bchan_lock;
 
-static int byte_chan_claim(byte_chan_handle_t *handle)
+int byte_chan_claim(byte_chan_handle_t *handle)
 {
 	register_t saved = spin_lock_critsave(&bchan_lock);
 	int ret = -1;
