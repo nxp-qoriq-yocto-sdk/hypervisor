@@ -34,7 +34,7 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 
 static void unimplemented(trapframe_t *regs)
 {
-	printf("unimplemented hcall\n");
+	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
 	regs->gpregs[3] = -1;
 }
 
