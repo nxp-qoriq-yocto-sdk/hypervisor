@@ -48,8 +48,6 @@ void critical_interrupt(trapframe_t *frameptr)
 {
 	struct crit_int_h *ptr;
 
-	printf("crit\n");
-
 	spin_lock(&link_handler_lock);
 
 	for (ptr = hlist_head; ptr != NULL; ptr = ptr->next) {
