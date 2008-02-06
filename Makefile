@@ -53,7 +53,7 @@ LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
               $(LIBOS_MPIC) $(LIBOS_QUEUE)
 SRCS := $(LIBOS_SRCS:%=libos/%) src/interrupts.c src/trap.c \
 	src/init.c src/guest.c src/tlb.c src/emulate.c src/timers.c \
-	src/paging.c src/hcalls.c src/byte_chan.c #src/bcmux.c
+	src/paging.c src/hcalls.c src/byte_chan.c src/bcmux.c
 
 OBJS := $(basename $(SRCS))
 OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)

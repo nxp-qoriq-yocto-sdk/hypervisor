@@ -1,17 +1,32 @@
-/**************************************************************************//*
-    @file
-
-    @brief  This file contain the implementation of general byte_chan interface
-    The byte_chan interface usually implements 
-	
+/** @file
+ *
+ * Byte channel multiplexing
+ */
     
-    The byte_chan generic interface is a user accessible layer that is responcible primarily
-    for data bufferization. The idea is to separate a LLD (Low Level Driver) and
-    a higher level, more OS dependent layer.
-    
+/*
+ * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
-    $Id: $
- **************************************************************************/
 
 #include <libos/libos.h>
 #include <libos/queue.h>
@@ -21,47 +36,15 @@
 #include <errors.h>
 #include <string.h>
 
-
-//#define printf(X...)
-/*==================================================================================================
-                                       LOCAL VARIABLES
-==================================================================================================*/
-
-/** byte_chans array and a next free pointer */
-
+#define debug(X...) printf(X)
 
 #define TX_THRESHOLD_QUEUE   8
 
+#define TX_SEND_ESCAPE 0x12
+#define TX_SEND_DATA 0x13
+#define RX_BUFF_SIZE 16
 
-#define TX_SEND_ESCAPE      0x12
-#define TX_SEND_DATA        0x13
-#define RX_BUFF_SIZE 		20
-
-/*==================================================================================================
-                                       LOCAL FUNCTIONS
-==================================================================================================*/
-
-/**************************************************************************//**
-
-	@Function      channel_find
-	
-    @brief This function finds a channel according to id
-
-    This function reads data from multiplexed channel and writes it
-    to connected channels using mux protocol
-    
-    @pre    N/A
-    @post   N/A
-
-    @param [in]     mux_p   IN multiplexer handler
-
-    @return void
-    
-    @note It can be called from any partition.
-    
-*//***************************************************************************/
-
-static connected_bc_t* channel_find(mux_complex_t* mux, char id)
+static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 {
 	connected_bc_t* bc = mux->first_bc;
 	
@@ -77,301 +60,267 @@ static connected_bc_t* channel_find(mux_complex_t* mux, char id)
 	return NULL;
 }
 
-
-
-
-/**************************************************************************//**
-
-	@Function      mux_get_data
-	
-    @brief This function sends data to the connected channels
-
-    This function reads data from multiplexed channel and writes it
-    to connected channels using mux protocol
-    
-    @pre    N/A
-    @post   N/A
-
-    @param [in]     mux_p   IN multiplexer handler
-
-    @return void
-    
-    @note It can be called from any partition.
-    
-*//***************************************************************************/
-int mux_rx;
-int mux_err;
-int mux_err_1;
-static void mux_get_data(void* mux_p)
+/** Demultiplex incoming data
+ *
+ * This function reads data from multiplexed channel and writes it
+ * to the appropriate connected channel(s).
+ */
+static void mux_get_data(queue_t *q)
 {
-	mux_complex_t* mux = mux_p;
-	char str[RX_BUFF_SIZE];
-	int i;
-	int length;
-	connected_bc_t* bc;
+	mux_complex_t *mux = q->consumer;
+	queue_t *notify = NULL;
+	int ch;
 	
-	//osHwiSwiftDisable();
+	if (spin_lock_held(&mux->byte_chan->rx_lock)) {
+		debug("mux_get_data: bcmux recursion detected\n");
+		return;
+	}
+	
+	register_t saved = spin_lock_critsave(&mux->byte_chan->rx_lock);
 	
 	/* Add a string to byte channel */
-	while((length = byte_chan_receive(mux->byte_chan, str, RX_BUFF_SIZE)) > 0)
-		for(i = 0; i < length; i++)
-		{
-			mux_rx++;
-			if(mux->rx_flag_state == 1)
-			{
-				mux->rx_flag_state = 0;
-				/* If not B it means that it is an escape */
-				if(str[i] != 'B')
-				{
-					bc = channel_find(mux, str[i]);					
-					/* Can not find this one */
-					/* for now skip it       */
-					if(bc == NULL)
-						mux->rx_problem++;
-					else
-					{
-						mux->current_rx_bc = bc;
-						mux->tx_flag_state = TX_SEND_ESCAPE;
-					}
-						
-					continue;
+	while ((ch = queue_readchar(mux->byte_chan->rx)) >= 0) {
+		mux->rx_count++;
 
+		if (mux->rx_flag_state == 1) {
+			mux->rx_flag_state = 0;
+			/* If not B it means that it is an escape */
+			if (ch != 'B') {
+				if (notify) {
+					queue_notify_consumer(notify);
+					notify = NULL;
 				}
-			} else if(str[i] == 'B')
-			{
-				mux->rx_flag_state++;
+				
+				mux->current_rx_bc = channel_find(mux, ch);
+				debug("mux_get_data: switched to channel '%c' (%p)\n",
+				       ch, mux->current_rx_bc);
+
 				continue;
 			}
-			if(mux->current_rx_bc)
-			{
-				int ret;
-				ret = byte_chan_send(mux->current_rx_bc->byte_chan, &str[i], 1);
-				if(ret < 0)
-					mux_err_1++;
-			}
-		    	
-
-		}
-	//osHwiSwiftEnable();
-};
-
-
-static char str_escape[] = "BXBX";
-static char str_char[] = "BB";
-
-/**************************************************************************//**
-
-	@Function      mux_send_data
-
-    @brief This function sends data to a multiplexed channel 
-
-    The function checks all its channels for input and sends the data 
-    to a multiplexed channel. This function sends the data from the same
-    channel. If specific channel does not have a data it will send the data
-    from the next channel.
-
-    @pre    N/A
-    @post   N/A
-
-    @param [in]     mux_p   IN multiplexer handler
-
-    @return void
-
-    @note It can be called from any partition.
-
-*//***************************************************************************/
-int err_counter;
-void mux_send_data(void* mux_p)
-{
-	mux_complex_t*  mux = mux_p;
-	int counter = 0;
-	connected_bc_t* bc;
-	
-	bc = mux->current_tx_bc;
-	int num;
-	char c;
-	//TODO protect with spinlock
-	//osHwiSwiftDisable();
-	printf("mux_send_data\n");
-	while(byte_chan_get_space(mux->byte_chan) > TX_THRESHOLD_QUEUE)
-	{
-		num = byte_chan_receive(bc->byte_chan, &c, 1);
-		if(num)
-			printf("Num is %d Char is %c\n", num, c);
-		else
-		{
-			printf("No data\n");
-			if(bc == mux->current_tx_bc)
-				mux->tx_flag_state = TX_SEND_DATA;
-			else	
-				mux->current_tx_bc = bc;
-		}
-		if(num == 0)
-		{
-			mux->tx_flag_state = TX_SEND_ESCAPE;
-			//Here switch to next vuart
-			printf("Falg is ESCAPE\n");
-			bc = bc->next;
-			if(bc == NULL)
-				bc = mux->first_bc;
-			counter++;
-			if(counter >= mux->num_of_channels)
-				break;	
+		} else if (ch == 'B') {
+			mux->rx_flag_state = 1;
 			continue;
-			
 		}
 
-		/* If we are here it means that num is 1                */
-		/* at this point we may need to create an flag symbol */
+		if (mux->current_rx_bc) {
+			queue_t *txq = mux->current_rx_bc->byte_chan->tx;
+			int ret = queue_writechar(txq, ch);
 
-		/* SEND_ESCAPE here we need to send an flag character */
-		printf("tx_flag = %x\n", mux->tx_flag_state);
-		if(mux->tx_flag_state == TX_SEND_ESCAPE)
-		{
-			/* TODO workarround */
-//			str_escape[3] = bc->num;
-			printf("sending escape %p\n", bc);
-			str_escape[1] = bc->num;
-			byte_chan_send(mux->byte_chan, str_escape, 2);
-			mux->tx_flag_state = TX_SEND_DATA;
+			// If there's no room in outbound queue, discard the data
+			// rather than stop processing input that could be
+			// for another channel.
+			if (ret < 0)
+				mux->rx_discarded++;
+			else
+				notify = txq;
 		}
-
-		if(c == 'B')
-		{
-			byte_chan_send(mux->byte_chan, str_char, 2);
-			continue;			
-		}
-
-		if(byte_chan_send(mux->byte_chan, &c, 1) < 0)
-			err_counter++;
-		printf("Sending %c\n",c);
-
 	}
-	//osHwiSwiftEnable();
+
+	spin_unlock_critsave(&mux->byte_chan->rx_lock, saved);
+
+	if (notify)
+		queue_notify_consumer(notify);
 };
 
-/*==================================================================================================
-                                       GLOBAL FUNCTIONS
-==================================================================================================*/
-
-/**************************************************************************//**
-
-	@Function      mux_complex_init
-
-    @brief This function initializes a mux complex and returns its poinnter
-
-    The function allocates a memory for multiplexer and initializes its
-    members.
-
-    @pre    N/A
-    @post   N/A
-
-    @param [in]     byte_chan   IN byte channel handler of multiplexed channel
-
-    @return void
-
-    @note It can be called from any partition.
-
-*//***************************************************************************/
-
-int mux_complex_init(byte_chan_handle_t *byte_chan, mux_complex_t **mux_p)
+static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 {
-	int                    byte_channel_handle;
-	mux_complex_t*         mux;
-	byte_chan_reg_params_t byte_chan_reg_params;
-	
-	mux = alloc(sizeof(mux_complex_t), sizeof(int));
-	if(mux == NULL)
-	{
-		return MEM_NOT_ENOUGH;	
-	}
+	if (mux->current_tx_bc == cbc)
+		return 0;
+	if (queue_get_space(mux->byte_chan->tx) < 2)
+		return -1;
 
-	mux->byte_chan     = byte_chan;
-	mux->first_bc      = NULL;
+	debug("mux_tx_switch: switched to channel '%c' (%p)\n",
+	       cbc->num, cbc);
+
+	assert(queue_writechar(mux->byte_chan->tx, 'B') == 0);
+	assert(queue_writechar(mux->byte_chan->tx, cbc->num) == 0);
+	mux->current_tx_bc = cbc;
+	return 2;
+}
+
+static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
+{
+	int ret, c, sent;
+
+	if (queue_empty(cbc->byte_chan->rx))
+		return 0;
+
+	sent = mux_tx_switch(mux, cbc);
+	if (sent < 0)
+		return -1;
+
+	while (queue_get_space(mux->byte_chan->tx) >= 2) {
+		c = queue_readchar(cbc->byte_chan->rx);
+		if (c < 0)
+			break;
+
+		debug("mux send '%c'\n", c);
+
+		if (c == 'B') {
+			ret = queue_write(mux->byte_chan->tx, (const uint8_t *)"BB", 2);
+			assert(ret == 2);
+			sent += 2;
+		} else {
+			ret = queue_writechar(mux->byte_chan->tx, c);
+			assert(ret >= 0);
+			sent++;
+		}
+	}
+	
+	return sent;
+};
+
+static void mux_send_data_pull(queue_t *q)
+{
+	mux_complex_t *mux = q->producer;
+	int ret, total = 0;
+
+	if (spin_lock_held(&mux->byte_chan->tx_lock)) {
+		debug("mux_send_data_pull: bcmux recursion detected\n");
+		return;
+	}
+	
+	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
+
+	connected_bc_t *first_cbc = mux->current_tx_bc;
+	if (!first_cbc)
+		first_cbc = mux->first_bc;
+	
+	connected_bc_t *cbc = first_cbc;
+
+	do {
+		ret = __mux_send_data(mux, cbc);
+		if (ret < 0) // no more room
+			break;
+
+		if (ret > 0)
+			queue_notify_producer(cbc->byte_chan->rx);
+
+		cbc = cbc->next;
+		if (!cbc)
+			cbc = mux->first_bc;
+
+		// Limit total work per invocation to limit latency.
+		total += ret;
+	} while (cbc != first_cbc && total < 64);
+
+	// If we stopped due to a lack of data, remove the pull callback.
+	if (ret >= 0 && total < 64)
+		q->space_avail = NULL;
+	
+	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+}
+
+static void mux_send_data_push(queue_t *q)
+{
+	connected_bc_t *cbc = q->consumer;
+	mux_complex_t *mux = cbc->mux_complex;
+
+	if (spin_lock_held(&cbc->byte_chan->tx_lock)) {
+		debug("mux_send_data_push: bcmux recursion detected\n");
+		return;
+	}
+	
+	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
+
+	int ret = __mux_send_data(mux, cbc);
+	if (ret > 0)
+		queue_notify_consumer(mux->byte_chan->tx);
+	else if (ret < 0)
+		// If we ran out of space, arm the pull callback.
+		mux->byte_chan->tx->space_avail = mux_send_data_pull;
+	else
+		debug("mux_send_data_push: no data\n");
+	
+	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+}
+
+/** Create a byte channel multiplexer.
+ *
+ * @param[in] bc byte channel handle of multiplexed stream
+ * @param[out] mux_p newly created multiplexer
+ */
+int mux_complex_init(byte_chan_handle_t *bc, mux_complex_t **mux_p)
+{
+	mux_complex_t *mux = alloc(sizeof(mux_complex_t),
+	                           __alignof__(mux_complex_t));
+	if (!mux)
+		return MEM_NOT_ENOUGH;	
+
+	mux->byte_chan = bc;
+	mux->first_bc = NULL;
 	mux->rx_flag_state = 0;
 	mux->current_tx_bc = NULL;
 	mux->current_rx_bc = NULL;
 	mux->tx_flag_state = TX_SEND_ESCAPE;
 	mux->rx_flag_state = 0;
-	mux->tx_flag_num   = 0;
+	mux->tx_flag_num = 0;
 	mux->num_of_channels = 0;
 
 	/* Here we register a mux as an end point for byte channel */
-	byte_chan_reg_params.end_point_handler        = mux;
-	byte_chan_reg_params.byte_chan_rx_data_avail  = mux_get_data;
-	byte_chan_reg_params.byte_chan_tx_space_avail = mux_send_data;
+	bc->tx->producer = mux;
+	bc->rx->consumer = mux;
 
-	byte_chan_register(byte_chan, &byte_chan_reg_params);	
-
+	bc->tx->space_avail = NULL;
+	bc->rx->data_avail = mux_get_data;
+ 
 	*mux_p = mux;
-	return 1;
+	return 0;
 }
 
-/**************************************************************************//**
-
-	@Function      mux_complex_add
-
-    @brief Adding a new byte channel to multiplexer
-
-    @pre    N/A
-    @post   N/A
-
-    @param [in]     byte_chan   IN byte channel handler of multiplexed channel
-
-    @return void
-
-    @note It can be called from any partition.
-
-*//***************************************************************************/
-
-int mux_complex_add(mux_complex_t *mux_complex, byte_chan_handle_t *bc,
+/** Register a byte channel with a multiplexer
+ *
+ * @param[in] mux multiplexer to register with
+ * @param[in] bc byte channel handle to register (must not be
+ * attached to anything else, or data may be corrupted).
+ * @param[in] multiplexing_id channel descriptor
+ */
+int mux_complex_add(mux_complex_t *mux, byte_chan_handle_t *bc,
                     char multiplexing_id)
 {
-
-	connected_bc_t* bc;
-	bc = alloc(sizeof(connected_bc_t), sizeof(int));
-	byte_chan_reg_params_t byte_chan_reg_params;
+	connected_bc_t *cbc;
+	cbc = alloc(sizeof(connected_bc_t), __alignof__(connected_bc_t));
+	if (!cbc)
+		return MEM_NOT_ENOUGH;
 	
-	bc->num         = multiplexing_id;
-	bc->byte_chan   = byte_chan;
-	bc->mux_complex = mux_complex;
-//	bc->next        = NULL;
-	
-	if(mux_complex->first_bc == NULL)
-		mux_complex->first_bc = bc;
-	else
-	{
-		connected_bc_t* bc_chain = mux_complex->first_bc;
+	cbc->num = multiplexing_id;
+	cbc->byte_chan = bc;
+	cbc->mux_complex = mux;
 
-		while(bc_chain->next != NULL)
+	bc->tx->producer = cbc;
+	bc->rx->consumer = cbc;
+	
+	bc->tx->space_avail = NULL;
+	bc->rx->data_avail = mux_send_data_push;
+
+	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
+	
+	if (mux->first_bc == NULL) {
+		mux->first_bc = cbc;
+	} else {
+		connected_bc_t *bc_chain = mux->first_bc;
+
+		while (bc_chain->next != NULL)
 			bc_chain = bc_chain->next;
-		bc_chain->next = bc;
+		bc_chain->next = cbc;
 	}
 	
-	bc->tx->producer = mux_complex;
-	bc->rx->consumer = mux_complex;
+	mux->num_of_channels++;
 
-	
-
-	byte_chan_reg_params.byte_chan_rx_data_avail = mux_send_data;
-	byte_chan_reg_params.byte_chan_tx_space_avail = mux_get_data;
-	
-	mux_complex->current_tx_bc = bc;
-	mux_complex->num_of_channels++;
-	return 1;
+	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+	return 0;
 }
 
 #define TEST
 #ifdef TEST
 
+mux_complex_t *vuart_complex;	
+
 void test_byte_chan_mux(void)
 {
-	uint8_t str[10];
-	int num;
 	byte_chan_t *byte_chan0;
 	byte_chan_t *byte_chan1;
 	byte_chan_t *byte_chan_to_lld;
-	mux_complex_t *vuart_complex;	
 
 	byte_chan0 = byte_chan_alloc();
 	byte_chan1 = byte_chan_alloc();
@@ -379,38 +328,44 @@ void test_byte_chan_mux(void)
 
 	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
 	if (!cd) {
-		printf("test_byte_chan_mux: failed to alloc uart\n");
+		debug("test_byte_chan_mux: failed to alloc uart\n");
 		return;
 	}
 
 	if (byte_chan_attach_chardev(&byte_chan_to_lld->handles[0], cd)) {
-		printf("test_byte_chan_mux: Couldn't attach to uart\n");
+		debug("test_byte_chan_mux: Couldn't attach to uart\n");
 		return;
 	}
 
 	mux_complex_init(&byte_chan_to_lld->handles[1], &vuart_complex);
-	
-	mux_complex_add(vuart_complex, &byte_chan0->handles[1], 48);
-	mux_complex_add(vuart_complex, &byte_chan1->handles[1], 49);
+
+#if 1
+	mux_complex_add(vuart_complex, &byte_chan0->handles[0], '0');
+	mux_complex_add(vuart_complex, &byte_chan0->handles[1], '1');
+#else	
+	mux_complex_add(vuart_complex, &byte_chan0->handles[1], '0');
+	mux_complex_add(vuart_complex, &byte_chan1->handles[1], '1');
 
 	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"ABCDEF\n\r", 8);
 	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"UUUU", 4);
 	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"GGGG", 4);
 	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"DDDD", 4);
 
-	while(1) {
-		num = byte_chan_receive(&byte_chan0->handles[0], str, 1);
+	while (1) {
+		uint8_t str[10];
+		int num = byte_chan_receive(&byte_chan0->handles[0], str, 1);
 		if (num == 1) {
-			// printf("Chan 0 = %c", str[0]);
+			// debug("Chan 0 = %c", str[0]);
 			byte_chan_send(&byte_chan1->handles[0], str, 1);
 		}
 
 		num = byte_chan_receive(&byte_chan1->handles[0], str, 1);
 		if (num == 1) {
-			// printf("Chan 1 = %c", str[0]);
+			// debug("Chan 1 = %c", str[0]);
 			byte_chan_send(&byte_chan0->handles[0], str, 1);
 		}
 	}
+#endif
 }
 
 #endif

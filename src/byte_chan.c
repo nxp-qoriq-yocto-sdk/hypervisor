@@ -31,6 +31,7 @@
 #include <libos/bitops.h>
 #include <libos/ns16550.h>
 #include <byte_chan.h>
+#include <bcmux.h>
 #include <errors.h>
 #include <stdint.h>
 #include <string.h>
@@ -132,6 +133,11 @@ void byte_chan_global_init(void)
 	/* alloc a channel */
 	test_bc = byte_chan_alloc();
 
+#if 1
+	/* Connect it to a bc mux */
+	extern mux_complex_t *vuart_complex;
+	mux_complex_add(vuart_complex, &test_bc->handles[0], '2');
+#else
 	/* connect it to a uart */  /* FIXME - dev tree, IRQ number, baudclock */
 	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
 	if (!cd) {
@@ -143,6 +149,7 @@ void byte_chan_global_init(void)
 		printf("byte_chan_global_init: Couldn't attach to uart\n");
 		return;
 	}
+#endif
 }
 
 void byte_chan_partition_init(guest_t *guest)

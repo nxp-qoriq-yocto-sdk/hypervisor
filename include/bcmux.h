@@ -14,9 +14,9 @@
  **************************************************************************/
 
 
-#include  "queue.h"
-#include  "byte_chan.h"
-#include  "uverrors.h"
+#include  <libos/queue.h>
+#include  <byte_chan.h>
+#include  <errors.h>
 
 
 /*==================================================================================================
@@ -30,51 +30,32 @@
 
 #include <byte_chan.h>
 
-typedef struct mux_complex_s
-{
+typedef struct mux_complex_s {
 	byte_chan_handle_t *byte_chan;
 	struct connected_bc_s *current_tx_bc;
 	struct connected_bc_s *current_rx_bc;
-	struct connected_bc_s *first_bc;	
+	struct connected_bc_s *first_bc;
 	int current_tx;
 	int current_rx;
 	int rx_flag_state;
-//	queue_t*        output_queue;
 	int tx_flag_state;
 	int tx_flag_num;
-	int rx_problem;
-//	int curr_rx_length;
+	int rx_discarded;
 	int num_of_channels;
+	int rx_count;
 } mux_complex_t;
 
-typedef struct connected_bc_s
-{
-	char                   num;
-	int                    byte_chan;
-	mux_complex_t*         mux_complex; 
-	struct connected_bc_s* next;
-	
-}connected_bc_t;
+typedef struct connected_bc_s {
+	byte_chan_handle_t *byte_chan;
+	mux_complex_t *mux_complex; 
+	struct connected_bc_s *next;
+	char num;
+} connected_bc_t;
 
+int mux_complex_init(byte_chan_handle_t *byte_chan, mux_complex_t **mux);
 
-int mux_complex_init(int byte_chan, mux_complex_t** mux);
-
-int vuart_init(void**      lld_handler,
-			   int        lld_num, 
-			   void*      byte_chan, 
-			   void*      lld_param,
-			   data_rx_t  data_rx,
-			   data_get_t data_get);
-
-int mux_complex_add(mux_complex_t* mux_complex, 
-					int  byte_chan,
-					char multiplexing_id);
-
+int mux_complex_add(mux_complex_t *mux_complex, 
+                    byte_chan_handle_t *byte_chan,
+                    char multiplexing_id);
 
 #endif
-
-
-/*================================================================================================*/
-
-
-

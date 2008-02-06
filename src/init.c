@@ -121,6 +121,9 @@ void start(unsigned long devtree_ptr)
 	mpic_irq_set_priority(0x24, 15);
 	mpic_irq_unmask(0x24);
 
+	void test_byte_chan_mux(void);
+	test_byte_chan_mux();
+
 	/* byte channel initialization */
 	byte_chan_global_init();
 
