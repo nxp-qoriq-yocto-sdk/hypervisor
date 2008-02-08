@@ -27,6 +27,7 @@ typedef struct {
 } handle_t;
 
 typedef struct {
+	vpic_t vpic;
 	struct pte_t *gphys;         // guest phys to real phys mapping
 	struct pte_t *gphys_rev;     // real phys to guest phys mapping
 	char *name;

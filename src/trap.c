@@ -6,6 +6,7 @@
 #include <libos/spr.h>
 #include <timers.h>
 #include <guestmemio.h>
+#include <vpic.h>
 
 // Do not use this when entering via guest doorbell, since that saves
 // state in gsrr rather than srr, despite being directed to the
@@ -42,12 +43,15 @@ void guest_doorbell(trapframe_t *regs)
 	regs->srr0 = mfspr(SPR_GSRR0);
 	regs->srr1 = gsrr1;
 
-	// First, check external interrupts. (TODO).
-	if (0) {
+	/* check for pending virtual interrupts */
+	if (vpic_process_pending_ints(gcpu->guest)) {
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_EXT_INT];
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		return;
 	}
 
 	// Then, check for a decrementer.
-	if (gcpu->pending & GCPU_PEND_DECR) {
+	if (gcpu->gdbell_pending & GCPU_PEND_DECR) {
 		run_deferred_decrementer();
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
@@ -55,7 +59,7 @@ void guest_doorbell(trapframe_t *regs)
 		return;
 	}
 
-	if (gcpu->pending & GCPU_PEND_TCR_DIE)
+	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
 		enable_tcr_die();
 }
 
