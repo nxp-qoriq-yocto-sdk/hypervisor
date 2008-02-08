@@ -48,7 +48,7 @@ void decrementer(trapframe_t *regs)
 	}
 
 	// The guest has interrupts disabled, so defer it.
-	get_gcpu()->pending |= GCPU_PEND_DECR;
+	get_gcpu()->gdbell_pending |= GCPU_PEND_DECR;
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 
 	send_local_guest_doorbell();
@@ -57,10 +57,10 @@ void decrementer(trapframe_t *regs)
 void run_deferred_decrementer(void)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gcpu->pending &= ~GCPU_PEND_DECR;
+	gcpu->gdbell_pending &= ~GCPU_PEND_DECR;
 
 	if (gcpu->timer_flags & TF_ENABLED) {
-		gcpu->pending |= GCPU_PEND_TCR_DIE;
+		gcpu->gdbell_pending |= GCPU_PEND_TCR_DIE;
 		send_local_guest_doorbell();
 	}
 }
@@ -68,7 +68,7 @@ void run_deferred_decrementer(void)
 void enable_tcr_die(void)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gcpu->pending &= ~GCPU_PEND_TCR_DIE;
+	gcpu->gdbell_pending &= ~GCPU_PEND_TCR_DIE;
 
 	if (gcpu->timer_flags & TF_ENABLED)
 		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
@@ -87,7 +87,7 @@ void set_tcr(uint32_t val)
 	gcpu->timer_flags |= (val >> (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
 	                     TF_ENABLED;
 
-	if (gcpu->pending & GCPU_PEND_DECR)
+	if (gcpu->gdbell_pending & GCPU_PEND_DECR)
 		val &= ~TCR_DIE;
 
 	mtspr(SPR_TCR, val);
@@ -97,7 +97,7 @@ void set_tsr(uint32_t val)
 {
 	if (val & TSR_DIS) {
 		gcpu_t *gcpu = get_gcpu();
-		gcpu->pending &= ~GCPU_PEND_DECR;
+		gcpu->gdbell_pending &= ~GCPU_PEND_DECR;
 		
 		if (gcpu->timer_flags & TF_ENABLED)
 			mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);

@@ -10,6 +10,7 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
 #include <hv.h>
+#include <vpic_def.h>
 #endif
 
 #define TLB1_GSIZE 16 // As seen by the guest
@@ -53,7 +54,8 @@ typedef struct gcpu_t {
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
 	uint64_t mcar;
 	uint32_t timer_flags;
-	int pending;
+	unsigned long gdbell_pending;
+	unsigned long cdbell_pending;
 	int gcpu_num;
 } gcpu_t;
 

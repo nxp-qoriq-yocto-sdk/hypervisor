@@ -51,7 +51,7 @@ include $(LIBOS_DIR)/Makefile.libos
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
               $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_MP) \
               $(LIBOS_MPIC) $(LIBOS_QUEUE)
-SRCS := $(LIBOS_SRCS:%=libos/%) src/interrupts.c src/trap.c \
+SRCS := $(LIBOS_SRCS:%=libos/%) src/interrupts.c src/trap.c src/events.c \
 	src/init.c src/guest.c src/tlb.c src/emulate.c src/timers.c \
 	src/paging.c src/hcalls.c src/byte_chan.c src/bcmux.c
 
