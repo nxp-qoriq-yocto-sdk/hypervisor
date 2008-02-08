@@ -42,7 +42,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/uv.uImage bin/uv.map
+all: bin/uv.uImage bin/uv.map dtbs tests
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -103,13 +103,20 @@ clean:
 test-hello: bin/uv.uImage
 	$(SIMICS) sim/uv-hello.simics
 
-bin/mpc8578sim-hv-1p.dtb: dts/mpc8578sim-part1.dtb
+dtbs: bin/mpc8578sim-hv-1p.dtb bin/mpc8578sim-hv-2p.dtb
+
+bin/mpc8578sim-hv-1p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-hv-1p.dts
+bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-part2.dtb dts/mpc8578sim-hv-2p.dts
+
 test-linux-1p: bin/uv.uImage bin/mpc8578sim-hv-1p.dtb
 	$(SIMICS) sim/uv-linux-1p.simics
 
-bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-part2.dtb
 test-linux-2p: bin/uv.uImage bin/mpc8578sim-hv-2p.dtb
 	$(SIMICS) sim/uv-linux-2p.simics
+
+.PHONY: tests
+tests:
+	make -C $@
 
 docs:
 	doxygen doc/Doxyfile
