@@ -35,6 +35,7 @@
 #include <errors.h>
 #include <stdint.h>
 #include <string.h>
+#include <vpic.h>
 
 // Must be a power of two.
 #define QUEUE_SIZE 256
@@ -98,7 +99,7 @@ err:
 	return -1;
 }
 
-int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest)
+int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest, int rxirq, int txirq)
 {
 	if (byte_chan_claim(bc))
 		return -1;
@@ -111,6 +112,27 @@ int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest)
 		return -1;
 	}
 
+	if (rxirq != -1) {
+		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
+		if (!vint)
+			return -1;
+	
+		vint->irq = rxirq;
+		vint->guest = guest;
+		bc->rx->consumer = vint;
+		bc->rx->data_avail = vpic_assert_vint_rxq;
+	}
+
+	if (txirq != -1) {
+		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
+		if (!vint)
+			return -1;
+	
+		vint->irq = txirq;
+		vint->guest = guest;
+		bc->tx->producer = vint;
+		bc->tx->space_avail = vpic_assert_vint_txq;
+	}
 	return handle;
 }
 
@@ -154,11 +176,14 @@ void byte_chan_global_init(void)
 
 void byte_chan_partition_init(guest_t *guest)
 {
+	int rxirq; // FIXME-- device tree
 	/* need to parse partition device tree here */
 	/* loop over virtual-devices node */
 	/* determine how many byte channels the partition has*/
 
-	int handle = byte_chan_attach_guest(&test_bc->handles[1], guest);
+	rxirq = vpic_alloc_irq(guest);  // FIXME: these handles go into dev tree
+
+	int handle = byte_chan_attach_guest(&test_bc->handles[1], guest, rxirq, -1);
 	printf("byte chan guest handle %d\n", handle);
 }
 
