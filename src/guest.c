@@ -50,6 +50,35 @@ static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 	return 0;
 }
 
+static int get_gcpu_num(const uint32_t *cpulist, int len, int cpu)
+{
+	int i;
+
+	int total = 0; 
+	for (i = 0; i < len / 4; i += 2) {
+		int base = cpulist[i];
+		int num = cpulist[i + 1];
+
+		if (cpu >= base && cpu < base + num)
+			return total + cpu - base;
+
+		total += num;
+	}
+
+	return -1;
+}
+
+static int count_cpus(const uint32_t *cpulist, int len)
+{
+	int i;
+	int total = 0;
+	for (i = 0; i < len / 4; i += 2) {
+		total += cpulist[i + 1];	
+	}
+
+	return total;
+}
+
 // Error values that will not conflict with FDT errors
 #define BADTREE -256
 #define NOMEM -257
@@ -580,6 +609,17 @@ void start_guest(void)
 			       fdt_totalsize(fdt));
 			
 			get_gcpu()->guest = guest;
+
+			/* count number of cpus for this partition and alloc data struct */
+			int cpucnt = count_cpus(cpus, len);
+			guest->gcpus = alloc(sizeof(long) * cpucnt, __alignof__(long));
+			if (!guest->gcpus)
+				goto nomem;
+
+			guest->gcpus[0] = get_gcpu();  /* this path is always cpu 0 */
+			get_gcpu()->gcpu_num = 0;
+			mtspr(SPR_GPIR,0);
+
 			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 			               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
@@ -593,6 +633,15 @@ void start_guest(void)
 
 		} else {
 			// enter as secondary cpu
+
+			// TODO: need to link from gcpu to guest
+
+			get_gcpu_num(cpus, len, pir);
+			// TODO: need to link guest.gcpus[] to gcpu
+			//    guest->gcpus[gcpu_num] = gcpu;
+			//    gcpu->gcpu_num = gcpu_num;
+			//    mtspr(SPR_GPIR,gcpu_num);
+
 		}
 	}
 

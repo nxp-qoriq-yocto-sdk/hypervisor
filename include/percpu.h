@@ -33,6 +33,7 @@ typedef struct {
 	uint32_t lpid;
 	int partition_node;
 	handle_t *handles[MAX_HANDLES];
+	struct gcpu_t **gcpus;
 } guest_t;
 
 #define GCPU_PEND_DECR     0x00000001 // Decrementer event pending
@@ -43,6 +44,7 @@ typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 typedef struct gcpu_t {
 	kstack_t uvstack;
 	guest_t *guest;
+	cpu_t *cpu;
 	register_t ivpr;
 	register_t ivor[38];
 	tlbmap_t tlb1_free;
@@ -52,7 +54,7 @@ typedef struct gcpu_t {
 	uint64_t mcar;
 	uint32_t timer_flags;
 	int pending;
-	cpu_t *cpu;
+	int gcpu_num;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
