@@ -5,10 +5,22 @@
 #include <libos/8578.h>
 #include <libos/io.h>
 #include <libos/spr.h>
+#include <libos/trapframe.h>
 
 extern void init(void);
 
-extern int extint_cnt;
+int extint_cnt = 0;;
+void ext_int_handler(trapframe_t *frameptr)
+{
+	uint8_t c;
+
+	extint_cnt++;
+
+	printf("ext int\n");
+
+	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
+}
+
 
 void start(void)
 {

@@ -1,8 +1,17 @@
 
 #include <libos/libos.h>
 #include <libos/hcalls.h>
+#include <libos/spr.h>
+#include <libos/trapframe.h>
+#include <libos/bitops.h>
 
 extern void init(void);
+
+void ext_int_handler(trapframe_t *frameptr)
+{
+	printf("ext int\n");
+
+}
 
 void start(void)
 {
@@ -12,10 +21,13 @@ void start(void)
 	uint32_t rxavail;
 	uint32_t txavail;
 	uint8_t buf[16];
+	uint32_t x;
 	int cnt;
 	int i;
 
 	init();
+
+	enable_extint();
 
 	printf("Hello World\n");
 
