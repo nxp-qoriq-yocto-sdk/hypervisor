@@ -152,7 +152,7 @@ static void release_secondary_cores(void)
 
 		tlb1_set_entry(BASE_TLB_ENTRY + 1, CCSRBAR_VA - PAGE_SIZE,
 		               (*table) & ~(PAGE_SIZE - 1),
-		               PAGE_SIZE, TLB_MAS2_IO,
+		               TLB_TSIZE_4K, TLB_MAS2_IO,
 		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 		uintptr_t table_va = *table & (PAGE_SIZE - 1);
