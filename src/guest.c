@@ -33,8 +33,7 @@
 #include <paging.h>
 #include <timers.h>
 #include <byte_chan.h>
-
-#include <libfdt.h>
+#include <devtree.h>
 
 guest_t guest;
 static unsigned long last_lpid;
@@ -53,8 +52,8 @@ static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 static int get_gcpu_num(const uint32_t *cpulist, int len, int cpu)
 {
 	int i;
-
 	int total = 0; 
+
 	for (i = 0; i < len / 4; i += 2) {
 		int base = cpulist[i];
 		int num = cpulist[i + 1];
@@ -72,283 +71,11 @@ static int count_cpus(const uint32_t *cpulist, int len)
 {
 	int i;
 	int total = 0;
-	for (i = 0; i < len / 4; i += 2) {
+
+	for (i = 0; i < len / 4; i += 2)
 		total += cpulist[i + 1];	
-	}
 
 	return total;
-}
-
-// Error values that will not conflict with FDT errors
-#define BADTREE -256
-#define NOMEM -257
-#define NOTRANS -258
-
-#define MAX_ADDR_CELLS 4
-#define MAX_SIZE_CELLS 2
-
-int get_addr_format(const void *tree, int node,
-                    uint32_t *naddr, uint32_t *nsize)
-{
-	*naddr = 2;
-	*nsize = 1;
-
-	int len;
-	const uint32_t *naddrp = fdt_getprop(tree, node, "#address-cells", &len);
-	if (!naddrp) {
-		if (len != -FDT_ERR_NOTFOUND)
-			return len;
-	} else if (len == 4 && *naddrp <= MAX_ADDR_CELLS) {
-		*naddr = *naddrp;
-	} else {
-		return BADTREE;
-	}
-
-	const uint32_t *nsizep = fdt_getprop(tree, node, "#size-cells", &len);
-	if (!nsizep) {
-		if (len != -FDT_ERR_NOTFOUND)
-			return len;
-	} else if (len == 4 && *nsizep <= MAX_SIZE_CELLS) {
-		*nsize = *nsizep;
-	} else {
-		return BADTREE;
-	}
-
-	return 0;
-}
-
-static void copy_val(uint32_t *dest, const uint32_t *src, int naddr)
-{
-	int pad = MAX_ADDR_CELLS - naddr;
-
-	memset(dest, 0, pad * 4);
-	memcpy(dest + pad, src, naddr * 4);
-}
-
-static void val_from_int(uint32_t *dest, physaddr_t src)
-{
-	dest[0] = 0;
-	dest[1] = 0;
-	dest[2] = src >> 32;
-	dest[3] = (uint32_t)src;
-}
-
-static int sub_reg(uint32_t *reg, uint32_t *sub)
-{
-	int i, borrow = 0;
-
-	for (i = MAX_ADDR_CELLS - 1; i >= 0; i--) {
-		int prev_borrow = borrow;
-		borrow = reg[i] < sub[i] + prev_borrow;
-		reg[i] -= sub[i] + prev_borrow;
-	}
-
-	return !borrow;
-}
-
-static int add_reg(uint32_t *reg, uint32_t *add, int naddr)
-{
-	int i, carry = 0;
-
-	for (i = MAX_ADDR_CELLS - 1; i >= MAX_ADDR_CELLS - naddr; i--) {
-		uint64_t tmp = (uint64_t)reg[i] + add[i] + carry;
-		carry = tmp >> 32;
-		reg[i] = (uint32_t)tmp;
-	}
-
-	return !carry;
-}
-
-/* FIXME: It is assumed that if the first byte of reg fits in a
- * range, then the whole reg block fits.
- */
-static int compare_reg(const uint32_t *reg, const uint32_t *range,
-                       const uint32_t *rangesize)
-{
-	int i;
-	uint32_t end;
-
-	for (i = 0; i < MAX_ADDR_CELLS; i++) {
-		if (reg[i] < range[i])
-			return 0;
-		if (reg[i] > range[i])
-			break;
-	}
-
-	for (i = 0; i < MAX_ADDR_CELLS; i++) {
-		end = range[i] + rangesize[i];
-
-		if (reg[i] < end)
-			return 1;
-		if (reg[i] > end)
-			return 0;
-	}
-
-	return 0;
-}
-
-/* reg must be MAX_ADDR_CELLS */
-static int find_range(const uint32_t *reg, const uint32_t *ranges,
-                      int nregaddr, int naddr, int nsize, int buflen)
-{
-	int nrange = nregaddr + naddr + nsize;
-	int i;
-
-	if (nrange <= 0)
-		return BADTREE;
-
-	for (i = 0; i < buflen; i += nrange) {
-		uint32_t range_addr[MAX_ADDR_CELLS];
-		uint32_t range_size[MAX_ADDR_CELLS];
-
-		if (i + nrange > buflen) {
-			return BADTREE;
-		}
-
-		copy_val(range_addr, ranges + i, naddr);
-		copy_val(range_size, ranges + i + nregaddr + naddr, nsize);
-
-		if (compare_reg(reg, range_addr, range_size))
-			return i;
-	}
-
-	return -FDT_ERR_NOTFOUND;
-}
-
-/* Currently only generic buses without special encodings are supported.
- * In particular, PCI is not supported.  Also, only the beginning of the
- * reg block is tracked; size is ignored except in ranges.
- */
-static int xlate_one(uint32_t *addr, const uint32_t *ranges,
-                     int rangelen, uint32_t naddr, uint32_t nsize,
-                     uint32_t prev_naddr, uint32_t prev_nsize,
-                     physaddr_t *rangesize)
-{
-	uint32_t tmpaddr[MAX_ADDR_CELLS], tmpaddr2[MAX_ADDR_CELLS];
-	int offset = find_range(addr, ranges, prev_naddr,
-	                        naddr, prev_nsize, rangelen / 4);
-
-	if (offset < 0)
-		return offset;
-
-	ranges += offset;
-
-	copy_val(tmpaddr, ranges, prev_naddr);
-
-	if (!sub_reg(addr, tmpaddr))
-		return BADTREE;
-
-	if (rangesize) {
-		copy_val(tmpaddr, ranges + prev_naddr + naddr, prev_nsize);
-	
-		if (!sub_reg(tmpaddr, addr))
-			return BADTREE;
-
-		*rangesize = ((uint64_t)tmpaddr[2]) << 32;
-		*rangesize |= tmpaddr[3];
-	}
-
-	copy_val(tmpaddr, ranges + prev_naddr, naddr);
-
-	if (!add_reg(addr, tmpaddr, naddr))
-		return BADTREE;
-
-	// Reject ranges that wrap around the address space.  Primarily
-	// intended to enable blacklist entries in fsl,hvranges.
-
-	copy_val(tmpaddr, ranges + prev_naddr, naddr);
-	copy_val(tmpaddr2, ranges + prev_naddr + naddr, nsize);
-	
-	if (!add_reg(tmpaddr, tmpaddr2, naddr))
-		return NOTRANS;
-
-	return 0;
-}
-
-static int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
-                         uint32_t *addrbuf, uint32_t *rootnaddr,
-                         physaddr_t *size)
-{
-	int parent;
-	uint32_t naddr, nsize, prev_naddr, prev_nsize;
-	const uint32_t *ranges;
-	int len, ret;
-
-	parent = fdt_parent_offset(tree, node);
-	if (parent < 0)
-		return parent;
-
-	ret = get_addr_format(tree, parent, &naddr, &nsize);
-	if (ret < 0)
-		return ret;
-
-	copy_val(addrbuf, reg, naddr);
-
-	if (size) {
-		*size = reg[naddr];
-		if (nsize == 2) {
-			*size <<= 32;
-			*size |= reg[naddr + 1];
-		}
-	}
-
-	for (;;) {
-		prev_naddr = naddr;
-		prev_nsize = nsize;
-		node = parent;
-
-		parent = fdt_parent_offset(tree, node);
-		if (parent == -FDT_ERR_NOTFOUND)
-			break;
-		if (parent < 0)
-			return parent;
-
-		ret = get_addr_format(tree, parent, &naddr, &nsize);
-		if (ret < 0)
-			return ret;
-
-		ranges = fdt_getprop(tree, node, "ranges", &len);
-		if (!ranges) {
-			if (len == -FDT_ERR_NOTFOUND)
-				return NOTRANS;
-		
-			return len;
-		}
-
-		if (len == 0)
-			continue;
-		if (len % 4)
-			return BADTREE;
-
-		ret = xlate_one(addrbuf, ranges, len, naddr, nsize,
-		                prev_naddr, prev_nsize, NULL);
-		if (ret < 0)
-			return ret;
-	}
-
-	*rootnaddr = naddr;
-	return 0;
-}
-
-__attribute__((unused))
-static int xlate_reg(const void *tree, int node, const uint32_t *reg,
-                     physaddr_t *addr, physaddr_t *size)
-{
-	uint32_t addrbuf[MAX_ADDR_CELLS];
-	uint32_t rootnaddr;
-
-	int ret = xlate_reg_raw(tree, node, reg, addrbuf, &rootnaddr, size);
-	if (ret < 0)
-		return ret;
-
-	if (rootnaddr < 0 || rootnaddr > 2)
-		return BADTREE;
-
-	if (addrbuf[0] || addrbuf[1])
-		return BADTREE;
-
-	*addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
-	return 0;
 }
 
 static void map_guest_range(guest_t *guest, physaddr_t gaddr,
@@ -367,14 +94,15 @@ static void map_guest_range(guest_t *guest, physaddr_t gaddr,
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 }
 
-static int map_guest_reg_one(guest_t *guest, int node, const uint32_t *reg)
+static int map_guest_reg_one(guest_t *guest, int node, int partition,
+                             const uint32_t *reg)
 {
 	physaddr_t gaddr, size;
 	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr = 0;
 	physaddr_t rangesize, addr, offset = 0;
 	int hvrlen;
 
-	const uint32_t *hvranges = fdt_getprop(fdt, guest->partition_node,
+	const uint32_t *hvranges = fdt_getprop(fdt, partition,
 	                                       "fsl,hv-ranges", &hvrlen);
 	if (!hvranges && hvrlen != -FDT_ERR_NOTFOUND)
 		return hvrlen;
@@ -422,7 +150,7 @@ static int map_guest_reg_one(guest_t *guest, int node, const uint32_t *reg)
 	return 0;
 }
 
-static int map_guest_reg(guest_t *guest, int node)
+static int map_guest_reg(guest_t *guest, int node, int partition)
 {
 	int len, ret;
 	uint32_t naddr, nsize;
@@ -461,7 +189,7 @@ static int map_guest_reg(guest_t *guest, int node)
 		if (i + naddr + nsize > len)
 			return BADTREE;
 
-		ret = map_guest_reg_one(guest, node, reg + i);
+		ret = map_guest_reg_one(guest, node, partition, reg + i);
 		if (ret < 0 && ret != NOTRANS)
 			return ret;
 	}
@@ -475,7 +203,7 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 	int depth = -1;
 
 	while ((node = fdt_get_next_node(guest->devtree, node, &depth, 1)) >= 0) {
-		int ret = map_guest_reg(guest, node);
+		int ret = map_guest_reg(guest, node, partition);
 		if (ret < 0)
 			return ret;
 	}
@@ -488,7 +216,7 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 
 #define MAX_PATH 256
 
-static int process_guest_devtree(guest_t *guest,
+static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
 {
@@ -496,7 +224,7 @@ static int process_guest_devtree(guest_t *guest,
 	int gfdt_size = fdt_totalsize(fdt);
 	const void *guest_origtree;
 
-	guest_origtree = fdt_getprop(fdt, guest->partition_node, "fsl,dtb", &len);
+	guest_origtree = fdt_getprop(fdt, partition, "fsl,dtb", &len);
 	if (!guest_origtree) {
 		printf("guest %s: no fsl,dtb property\n", guest->name);
 		ret = -FDT_ERR_NOTFOUND;
@@ -522,7 +250,7 @@ static int process_guest_devtree(guest_t *guest,
 		goto fail;
 	}
 
-	ret = map_guest_reg_all(guest, guest->partition_node);
+	ret = map_guest_reg_all(guest, partition);
 	if (ret == 0)
 		return 0;
 
@@ -579,7 +307,6 @@ void start_guest(void)
 			if (!guest->name)
 				goto nomem;
 
-			guest->partition_node = off;
 			guest->lpid = atomic_add(&last_lpid, 1);
 			mtspr(SPR_LPID, guest->lpid);
 			
@@ -590,7 +317,7 @@ void start_guest(void)
 				continue;
 			}
 			
-			ret = process_guest_devtree(guest, cpus, len);
+			ret = process_guest_devtree(guest, off, cpus, len);
 			if (ret < 0)
 				continue;
 

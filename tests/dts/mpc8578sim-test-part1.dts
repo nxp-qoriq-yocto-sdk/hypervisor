@@ -55,8 +55,8 @@
 			compatible = "fsl,mpc8578-i2c",
 			             "fsl,i2c", "fsl-i2c";
 			reg = <118000 100>;
-			interrupts = <1e 2>;
-			interrupt-parent = <&mpic>;
+//			interrupts = <1e 2>;
+//			interrupt-parent = <&mpic>;
 			dfsrr;
 		};
 
@@ -69,7 +69,7 @@
 			             "gianfar";
 			reg = <31c520 20>;
 			phy0: ethernet-phy@0 {
-				interrupt-parent = <&mpic>;
+//				interrupt-parent = <&mpic>;
 				interrupts = <a 1>;
 				reg = <0>;
 			};
@@ -85,8 +85,8 @@
 			             "gianfar";
 			reg = <31c000 1000>;
 			local-mac-address = [ 00 00 00 00 00 00 ];
-			interrupts = <1d 2 1e 2 22 2>;
-			interrupt-parent = <&mpic>;
+//			interrupts = <1d 2 1e 2 22 2>;
+//			interrupt-parent = <&mpic>;
 			phy-handle = <&phy0>;
 			phy-connection-type = "rgmii-id";
 		};
@@ -97,20 +97,8 @@
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
-			interrupts = <1d 2>;
-			interrupt-parent = <&mpic>;
-		};
-
-		mpic: pic@40000 {
-			clock-frequency = <0>;
-			interrupt-controller;
-			#address-cells = <0>;
-			#interrupt-cells = <2>;
-			reg = <40000 40000>;
-			compatible = "fsl,mpc8578-mpic", "fsl,mpic",
-			             "chrp,open-pic";
-			device_type = "open-pic";
-			big-endian;
+//			interrupts = <1d 2>;
+//			interrupt-parent = <&mpic>;
 		};
 	};
 
@@ -119,17 +107,14 @@
 		#size-cells = <0>;
 		compatible = "fsl,hv-handles";
 		
-		byte-channel@0 {
-			reg = <0>;
+		byte-channel0 {
 			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "uartmux";
+			fsl,endpoint = "byte-channel1";
 		};
 
-		gpio {
-			reg = <1>;
-			compatible = "fsl,hv-gpio";
-			fsl,real-dev = "gpio";
-			fsl,bitmask = <020033ff>;
+		byte-channel1 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = "byte-channel2";
 		};
 	};
 

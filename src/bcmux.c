@@ -31,9 +31,12 @@
 #include <libos/libos.h>
 #include <libos/queue.h>
 #include <libos/ns16550.h>
+
 #include <byte_chan.h>
 #include <bcmux.h>
 #include <errors.h>
+#include <devtree.h>
+
 #include <string.h>
 
 #define debug(X...)
@@ -240,32 +243,27 @@ static void mux_send_data_push(queue_t *q)
  * @param[in] bc byte channel handle of multiplexed stream
  * @param[out] mux_p newly created multiplexer
  */
-int mux_complex_init(byte_chan_handle_t *bc, mux_complex_t **mux_p)
+static mux_complex_t *mux_complex_init(byte_chan_t *bc)
 {
+	byte_chan_handle_t *handle = byte_chan_claim(bc);
+	if (!handle)
+		return NULL;
+
 	mux_complex_t *mux = alloc(sizeof(mux_complex_t),
 	                           __alignof__(mux_complex_t));
 	if (!mux)
-		return MEM_NOT_ENOUGH;	
+		return NULL;
 
-	mux->byte_chan = bc;
-	mux->first_bc = NULL;
-	mux->rx_flag_state = 0;
-	mux->current_tx_bc = NULL;
-	mux->current_rx_bc = NULL;
-	mux->tx_flag_state = TX_SEND_ESCAPE;
-	mux->rx_flag_state = 0;
-	mux->tx_flag_num = 0;
-	mux->num_of_channels = 0;
+	mux->byte_chan = handle;
 
 	/* Here we register a mux as an end point for byte channel */
-	bc->tx->producer = mux;
-	bc->rx->consumer = mux;
+	handle->tx->producer = mux;
+	handle->rx->consumer = mux;
 
-	bc->tx->space_avail = NULL;
-	bc->rx->data_avail = mux_get_data;
- 
-	*mux_p = mux;
-	return 0;
+	handle->tx->space_avail = NULL;
+	handle->rx->data_avail = mux_get_data;
+
+	return mux;
 }
 
 /** Register a byte channel with a multiplexer
@@ -275,10 +273,11 @@ int mux_complex_init(byte_chan_handle_t *bc, mux_complex_t **mux_p)
  * attached to anything else, or data may be corrupted).
  * @param[in] multiplexing_id channel descriptor
  */
-int mux_complex_add(mux_complex_t *mux, byte_chan_handle_t *bc,
+int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
                     char multiplexing_id)
 {
-	if (byte_chan_claim(bc))
+	byte_chan_handle_t *handle = byte_chan_claim(bc);
+	if (!handle)
 		return -1;
 
 	connected_bc_t *cbc;
@@ -287,14 +286,14 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_handle_t *bc,
 		return MEM_NOT_ENOUGH;
 	
 	cbc->num = multiplexing_id;
-	cbc->byte_chan = bc;
+	cbc->byte_chan = handle;
 	cbc->mux_complex = mux;
 
-	bc->tx->producer = cbc;
-	bc->rx->consumer = cbc;
+	handle->tx->producer = cbc;
+	handle->rx->consumer = cbc;
 	
-	bc->tx->space_avail = NULL;
-	bc->rx->data_avail = mux_send_data_push;
+	handle->tx->space_avail = NULL;
+	handle->rx->data_avail = mux_send_data_push;
 
 	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
 	
@@ -314,7 +313,69 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_handle_t *bc,
 	return 0;
 }
 
-#define TEST
+void create_muxes(void)
+{
+	int off = -1, ret;
+
+	while (1) {
+		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel-mux");
+		if (ret < 0)
+			break;
+
+		off = ret;
+
+		const uint32_t *physdev = fdt_getprop(fdt, off, "fsl,phys-dev", &ret);
+		if (!physdev) {
+			if (ret != -FDT_ERR_NOTFOUND)
+				break;
+			
+			printf("create_muxes: no fsl,phys-dev in mux node.\n");
+			continue;
+		}
+
+		ret = fdt_node_offset_by_phandle(fdt, *physdev);
+		if (ret < 0)
+			break;
+
+		byte_chan_t *bc = ptr_from_node(fdt, ret, "bc");
+		if (!bc) {
+			chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
+			if (!cd) {
+				printf("create_muxes: unrecognized fsl,phys-dev\n");
+				continue;
+			}
+
+			bc = byte_chan_alloc();
+			if (!bc) {	
+				printf("create_muxes: failed to create byte channel.\n");
+				return;
+			}
+
+			ret = byte_chan_attach_chardev(bc, cd);
+			if (ret < 0) {
+				printf("create_muxes: error %d attaching to chardev\n", ret);
+				continue;
+			}
+		}
+
+		mux_complex_t *mux = mux_complex_init(bc);
+		if (!mux) {	
+			printf("create_mux: error creating mux\n");
+			continue;
+		}
+		
+		ret = fdt_setprop(fdt, off, "fsl,hv-internal-mux-ptr", &mux, sizeof(mux));
+		if (ret < 0)
+			break;
+	}
+
+	if (ret == -FDT_ERR_NOTFOUND)
+		return;
+
+	printf("create_byte_channels: libfdt error %d (%s).\n",
+	       ret, fdt_strerror(ret));
+}
+
 #ifdef TEST
 
 mux_complex_t *vuart_complex;	
@@ -341,7 +402,6 @@ void test_byte_chan_mux(void)
 	}
 
 	mux_complex_init(&byte_chan_to_lld->handles[1], &vuart_complex);
-
 #if 1
 	mux_complex_add(vuart_complex, &byte_chan0->handles[0], '0');
 	mux_complex_add(vuart_complex, &byte_chan0->handles[1], '1');

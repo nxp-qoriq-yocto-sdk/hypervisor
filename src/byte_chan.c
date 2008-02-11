@@ -30,9 +30,12 @@
 #include <libos/libos.h>
 #include <libos/bitops.h>
 #include <libos/ns16550.h>
+
 #include <byte_chan.h>
 #include <bcmux.h>
 #include <errors.h>
+#include <devtree.h>
+
 #include <stdint.h>
 #include <string.h>
 #include <vpic.h>
@@ -63,31 +66,39 @@ byte_chan_t *byte_chan_alloc(void)
 
 static uint32_t bchan_lock;
 
-int byte_chan_claim(byte_chan_handle_t *handle)
+byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 {
+	byte_chan_handle_t *handle;
+	int i;
+
 	register_t saved = spin_lock_critsave(&bchan_lock);
-	int ret = -1;
 	
-	if (!handle->attached) {
-		ret = 0;
-		handle->attached = 1;
+	for (i = 0; i < 2; i++) {
+		handle = &bc->handles[i];
+
+		if (!handle->attached) {
+			handle->attached = 1;
+			break;
+		}
 	}
 
 	spin_unlock_critsave(&bchan_lock, saved);
-	return ret;
+
+	return i == 2 ? NULL : handle;
 }
 
-int byte_chan_attach_chardev(byte_chan_handle_t *bc, chardev_t *cd)
+int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 {
-	if (byte_chan_claim(bc))
+	byte_chan_handle_t *handle = byte_chan_claim(bc);
+	if (!bc)
 		return -1;
 
 	if (!cd->ops->set_tx_queue || !cd->ops->set_rx_queue)
 		goto err;
 
-	if (cd->ops->set_tx_queue(cd, bc->rx))
+	if (cd->ops->set_tx_queue(cd, handle->rx))
 		goto err;
-	if (cd->ops->set_rx_queue(cd, bc->tx)) {
+	if (cd->ops->set_rx_queue(cd, handle->tx)) {
 		cd->ops->set_tx_queue(cd, NULL);
 		goto err;
 	}
@@ -95,20 +106,22 @@ int byte_chan_attach_chardev(byte_chan_handle_t *bc, chardev_t *cd)
 	return 0;
 
 err:
-	bc->attached = 0;
+	handle->attached = 0;
 	return -1;
 }
 
-int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest, int rxirq, int txirq)
+int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
+                           int rxirq, int txirq)
 {
-	if (byte_chan_claim(bc))
+	byte_chan_handle_t *handle = byte_chan_claim(bc);
+	if (!handle)
 		return -1;
 
-	bc->user.bc = bc;
+	handle->user.bc = handle;
 	
-	int handle = alloc_guest_handle(guest, &bc->user);
-	if (handle < 0) {
-		bc->attached = 0;
+	int ghandle = alloc_guest_handle(guest, &handle->user);
+	if (ghandle < 0) {
+		handle->attached = 0;
 		return -1;
 	}
 
@@ -119,8 +132,8 @@ int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest, int rxirq, in
 	
 		vint->irq = rxirq;
 		vint->guest = guest;
-		bc->rx->consumer = vint;
-		bc->rx->data_avail = vpic_assert_vint_rxq;
+		handle->rx->consumer = vint;
+		handle->rx->data_avail = vpic_assert_vint_rxq;
 	}
 
 	if (txirq != -1) {
@@ -130,61 +143,185 @@ int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest, int rxirq, in
 	
 		vint->irq = txirq;
 		vint->guest = guest;
-		bc->tx->producer = vint;
-		bc->tx->space_avail = vpic_assert_vint_txq;
+		handle->tx->producer = vint;
+		handle->tx->space_avail = vpic_assert_vint_txq;
 	}
-	return handle;
+
+	return ghandle;
 }
 
-static byte_chan_t *test_bc;
-
-/*!
-    @fn byte_chan_global_init
-
-    @brief parses global device tree and sets up all byte-channels 
-
-*/
-void byte_chan_global_init(void)
+void create_byte_channels(void)
 {
-	/* need to parse device tree here */
-	/* loop over channels */
+	int off = -1, ret;
 
-	/* FIXME: right now this is hardcoded to
-           set up 1 uart channel only */
+	while (1) {
+		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel");
+		if (ret < 0)
+			break;
 
-	/* alloc a channel */
-	test_bc = byte_chan_alloc();
+		byte_chan_t *bc = byte_chan_alloc();
+		if (!bc) {	
+			printf("byte_chan_global_init: failed to create byte channel.\n");
+			return;
+		}
 
-#if 1
-	/* Connect it to a bc mux */
-	extern mux_complex_t *vuart_complex;
-	mux_complex_add(vuart_complex, &test_bc->handles[0], '2');
-#else
-	/* connect it to a uart */  /* FIXME - dev tree, IRQ number, baudclock */
-	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
-	if (!cd) {
-		printf("byte_chan_global_init: failed to alloc uart\n");
+		off = ret;
+		ret = fdt_setprop(fdt, off, "fsl,hv-internal-bc-ptr", &bc, sizeof(bc));
+		if (ret < 0)
+			break;
+	}
+
+	if (ret == -FDT_ERR_NOTFOUND)
+		return;
+
+	printf("create_byte_channels: libfdt error %d (%s).\n",
+	       ret, fdt_strerror(ret));
+}
+
+static void connect_byte_channel(byte_chan_t *bc, int endpoint,
+                                 int bcnode, int index)
+{
+	void *ptr = ptr_from_node(fdt, endpoint, "chardev");
+	if (ptr) {
+		int ret = byte_chan_attach_chardev(bc, ptr);
+		if (ret < 0)
+				printf("error %d attaching byte channel to chardev\n", ret);
+
 		return;
 	}
 
-	if (byte_chan_attach_chardev(&test_bc->handles[0], cd)) {
-		printf("byte_chan_global_init: Couldn't attach to uart\n");
+	ptr = ptr_from_node(fdt, endpoint, "mux");
+	if (ptr) {
+		int len;
+		const uint32_t *channel = fdt_getprop(fdt, bcnode,
+		                                      "fsl,mux-channel", &len);
+
+		if (!channel) {
+			printf("connect_byte_channel: fsl,mux-channel: libfdt error %d (%s).\n",
+			       len, fdt_strerror(len));
+			return;
+		}
+
+		if (len % 4 || (index + 1) * 4 > len) {
+			printf("connect_byte_channel: bad fsl,mux-channel\n");
+			return;
+		}
+	
+		int ret = mux_complex_add(ptr, bc, channel[index]);
+		if (ret < 0)
+				printf("error %d attaching byte channel to mux\n", ret);
+
 		return;
 	}
-#endif
+
+	printf("connect_byte_channel: unrecognized endpoint\n");
+}
+
+void connect_global_byte_channels(void)
+{
+	int off = -1, ret, len;
+	byte_chan_t *bc;
+	const uint32_t *endpoint;
+
+	while (1) {
+		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel");
+		if (ret == -FDT_ERR_NOTFOUND)
+			return;
+		if (ret < 0)
+			break;
+
+		off = ret;
+		bc = ptr_from_node(fdt, off, "bc");
+		if (!bc) {
+			printf("connect_global_byte_channel: no pointer\n");
+			continue;
+		}
+
+		endpoint = fdt_getprop(fdt, off, "fsl,endpoint", &ret);
+		if (!endpoint) {
+			if (ret == -FDT_ERR_NOTFOUND)
+				continue;
+			break;
+		}
+
+		len = ret;
+		if (len != 4 && len != 8) {
+			printf("connect_global_byte_channel: Invalid fsl,endpoint.\n");
+			continue;
+		}
+
+		ret = fdt_node_offset_by_phandle(fdt, endpoint[0]);
+		if (ret < 0) {
+			if (ret == -FDT_ERR_NOTFOUND) {
+				printf("connect_global_byte_channel: Invalid fsl,endpoint.\n");
+				continue;
+			}
+
+			break;
+		}
+				
+		connect_byte_channel(bc, ret, off, 0);
+
+		if (len == 8) {
+			ret = fdt_node_offset_by_phandle(fdt, endpoint[1]);
+			if (ret < 0)
+				break;
+				
+			connect_byte_channel(bc, ret, off, 1);
+		}
+	}
+
+	printf("connect_global_byte_channels: libfdt error %d (%s).\n",
+	       ret, fdt_strerror(ret));
 }
 
 void byte_chan_partition_init(guest_t *guest)
 {
-	int rxirq; // FIXME-- device tree
-	/* need to parse partition device tree here */
-	/* loop over virtual-devices node */
-	/* determine how many byte channels the partition has*/
+	int off = -1, ret;
+	const char *endpoint;
+	byte_chan_t *bc;
+	uint32_t irq[2];
 
-	rxirq = vpic_alloc_irq(guest);  // FIXME: these handles go into dev tree
+	while (1) {
+		ret = fdt_node_offset_by_compatible(guest->devtree, off,
+		                                    "fsl,hv-byte-channel");
+		if (ret == -FDT_ERR_NOTFOUND)
+			return;
+		if (ret < 0)
+			break;
 
-	int handle = byte_chan_attach_guest(&test_bc->handles[1], guest, rxirq, -1);
-	printf("byte chan guest handle %d\n", handle);
+		off = ret;
+
+		endpoint = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
+		if (!endpoint)
+			break;
+
+		ret = lookup_alias(fdt, endpoint);
+		if (ret < 0)
+			break;
+
+		bc = ptr_from_node(fdt, ret, "bc");
+		if (!bc) {
+			printf("byte_chan_partition_init: no pointer\n");
+			continue;
+		}
+
+		irq[0] = vpic_alloc_irq(guest);
+		irq[1] = vpic_alloc_irq(guest);
+
+		int32_t ghandle = byte_chan_attach_guest(bc, guest, irq[0], irq[1]);
+		if (ghandle < 0) {
+			printf("byte_chan_partition_init: cannot attach\n");
+			return;
+		}
+
+		ret = fdt_setprop(guest->devtree, off, "interrupts", irq, sizeof(irq));
+		if (ret < 0)
+			break;
+	}
+
+	printf("byte_chan_partition_init: libfdt error %d (%s).\n",
+	       ret, fdt_strerror(ret));
 }
 
 /** Send data through a byte channel

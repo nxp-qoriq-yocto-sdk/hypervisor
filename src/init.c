@@ -11,8 +11,9 @@
 #include <paging.h>
 #include <interrupts.h>
 #include <byte_chan.h>
+#include <bcmux.h>
+#include <devtree.h>
 
-#include <libfdt.h>
 #include <limits.h>
 
 extern cpu_t cpu0;
@@ -40,64 +41,10 @@ void start_guest(void);
 void *fdt;
 static physaddr_t mem_end;
 
-// FIXME: memory holes
-static void find_end_of_mem(void)
-{
-	int memnode = fdt_subnode_offset(fdt, 0, "memory");
-	if (memnode < 0) {
-		printf("error %d (%s) opening /memory\n", memnode,
-		       fdt_strerror(memnode));
-
-		return;
-	}
-
-	int len;
-	const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
-	if (!memreg) {
-		printf("error %d (%s) reading /memory/reg\n", memnode,
-		       fdt_strerror(memnode));
-
-		return;
-	}
-
-	uint32_t naddr, nsize;
-	int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
-	if (ret < 0) {
-		printf("error %d (%s) getting address format for /memory\n",
-		       ret, fdt_strerror(ret));
-
-		return;
-	}
-
-	if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
-		printf("bad address format %u/%u for /memory\n", naddr, nsize);
-		return;
-	}
-
-	const uint32_t *reg = memreg;
-	while (reg + naddr + nsize <= memreg + len / 4) {
-		physaddr_t addr = *reg++;
-		if (naddr == 2) {
-			addr <<= 32;
-			addr |= *reg++;
-		}
-
-		physaddr_t size = *reg++;
-		if (nsize == 2) {
-			size <<= 32;
-			size |= *reg++;
-		}
-
-		addr += size - 1;
-		if (addr > mem_end)
-			mem_end = addr;
-	}
-}
-
 void start(unsigned long devtree_ptr)
 {
 	fdt = (void *)(devtree_ptr + PHYSBASE);
-	find_end_of_mem();
+	mem_end = find_end_of_mem();
 	core_init();
 
 	unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
@@ -105,9 +52,14 @@ void start(unsigned long devtree_ptr)
 
 	alloc_init(heap, mem_end + PHYSBASE);
 
+#if 1
 	chardev_t *console = ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET,
 	                                  0, 0, 16);
 	console_init(console);
+#endif
+
+	create_ns16550();
+	open_stdout();
 
 	printf("mem_end %llx\n", mem_end);
 
@@ -121,11 +73,10 @@ void start(unsigned long devtree_ptr)
 	mpic_irq_set_priority(0x24, 15);
 	mpic_irq_unmask(0x24);
 
-	void test_byte_chan_mux(void);
-	test_byte_chan_mux();
-
 	/* byte channel initialization */
-	byte_chan_global_init();
+	create_byte_channels();
+	create_muxes();
+	connect_global_byte_channels();
 
 	enable_critint();
 
@@ -291,10 +242,9 @@ static void core_init(void)
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_ARE);
 	mtspr(SPR_DEC, 0x0);
-	mtspr(SPR_TSR, TSR_DIS );
+	mtspr(SPR_TSR, TSR_DIS);
 
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
 }
-

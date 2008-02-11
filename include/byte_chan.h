@@ -24,7 +24,8 @@ typedef struct {
 	byte_chan_handle_t handles[2];
 } byte_chan_t;
 
-void byte_chan_global_init(void);
+void create_byte_channels(void);
+void connect_global_byte_channels(void);
 void byte_chan_partition_init(guest_t *guest);
 
 byte_chan_t *byte_chan_alloc(void);
@@ -34,8 +35,9 @@ ssize_t byte_chan_send(byte_chan_handle_t *bc,
 ssize_t byte_chan_receive(byte_chan_handle_t *bc,
                           uint8_t *buf, size_t length);
 
-int byte_chan_claim(byte_chan_handle_t *handle);
-int byte_chan_attach_chardev(byte_chan_handle_t *bc, chardev_t *cd);
-int byte_chan_attach_guest(byte_chan_handle_t *bc, guest_t *guest, int rxirq, int txirq);
+byte_chan_handle_t *byte_chan_claim(byte_chan_t *handle);
+int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd);
+int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
+                           int rxirq, int txirq);
 
 #endif

@@ -52,10 +52,10 @@ typedef struct connected_bc_s {
 	char num;
 } connected_bc_t;
 
-int mux_complex_init(byte_chan_handle_t *byte_chan, mux_complex_t **mux);
-
 int mux_complex_add(mux_complex_t *mux_complex, 
-                    byte_chan_handle_t *byte_chan,
+                    byte_chan_t *byte_chan,
                     char multiplexing_id);
+
+void create_muxes(void);
 
 #endif

@@ -33,7 +33,6 @@ typedef struct {
 	char *name;
 	void *devtree;
 	uint32_t lpid;
-	int partition_node;
 	handle_t *handles[MAX_HANDLES];
 	struct gcpu_t **gcpus;
 } guest_t;

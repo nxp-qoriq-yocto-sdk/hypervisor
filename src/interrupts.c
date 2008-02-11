@@ -47,7 +47,7 @@ int register_irq_handler(int irq, int_handler_t funcptr, void *arg)
 void critical_interrupt(trapframe_t *frameptr)
 {
 	struct crit_int_h *ptr;
-
+	
 	spin_lock(&link_handler_lock);
 
 	for (ptr = hlist_head; ptr != NULL; ptr = ptr->next) {
