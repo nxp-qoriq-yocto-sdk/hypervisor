@@ -35,6 +35,7 @@ typedef struct {
 	uint32_t lpid;
 	handle_t *handles[MAX_HANDLES];
 	struct gcpu_t **gcpus;
+	struct boot_spin_table *spintbl;
 } guest_t;
 
 #define GCPU_PEND_DECR     0x00000001 // Decrementer event pending

@@ -213,6 +213,87 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 	return 0;
 }
 
+static int create_guest_spin_table(guest_t *guest)
+{
+	unsigned long rpn;
+	int num_cpus = 8; // get from stuart's patch
+	uint32_t spin_addr;
+	int ret;
+	
+	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
+	if (!guest->spintbl)
+		return NOMEM;
+
+	for (int i = 0; i < num_cpus; i++) {
+		guest->spintbl[i].addr = 1;
+		guest->spintbl[i].pir = i;
+		guest->spintbl[i].r3 = 0;
+		guest->spintbl[i].r4 = 0;
+		guest->spintbl[i].r7 = 0;
+	}
+
+	rpn = ((physaddr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
+
+	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
+
+	int off = 0;
+	while (1) {
+		ret = fdt_node_offset_by_prop_value(guest->devtree, off,
+		                                    "device_type", "cpu", 4);
+		if (ret == -FDT_ERR_NOTFOUND)
+			break;
+		if (ret < 0)
+			goto fail;
+
+		off = ret;
+		const uint32_t *reg = fdt_getprop(guest->devtree, off, "reg", &ret);
+		if (!reg)
+			goto fail;
+		if (ret != 4) {
+			printf("create_guest_spin_table(%s): bad cpu reg property\n",
+			       guest->name);
+			return BADTREE;
+		}
+
+		if (*reg >= num_cpus) {
+			printf("partition %s has no cpu %u\n", guest->name, *reg);
+			continue;
+		}
+
+		if (*reg == 0) {
+			ret = fdt_setprop_string(guest->devtree, off, "status", "okay");
+			if (ret < 0)
+				goto fail;
+			
+			continue;
+		}
+
+		ret = fdt_setprop_string(guest->devtree, off, "status", "disabled");
+		if (ret < 0)
+			goto fail;
+
+		ret = fdt_setprop_string(guest->devtree, off,
+		                         "enable-method", "spin-table");
+		if (ret < 0)
+			goto fail;
+
+		spin_addr = 0xfffff000 + *reg * sizeof(struct boot_spin_table);
+		ret = fdt_setprop(guest->devtree, off,
+		                  "cpu-release-addr", &spin_addr, 4);
+		if (ret < 0)
+			goto fail;
+	}
+
+	return 0;
+
+fail:
+	printf("create_guest_spin_table(%s): libfdt error %d (%s)\n",
+	       guest->name, ret, fdt_strerror(ret));
+
+	return ret;
+}
+
 #define MAX_PATH 256
 
 static int process_guest_devtree(guest_t *guest, int partition,
@@ -248,6 +329,10 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		ret = NOMEM;
 		goto fail;
 	}
+
+	ret = create_guest_spin_table(guest);
+	if (ret < 0)
+		goto fail;
 
 	ret = map_guest_reg_all(guest, partition);
 	if (ret == 0)
