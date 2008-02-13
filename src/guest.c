@@ -200,9 +200,8 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 static int map_guest_reg_all(guest_t *guest, int partition)
 {
 	int node = -1;
-	int depth = -1;
 
-	while ((node = fdt_get_next_node(guest->devtree, node, &depth, 1)) >= 0) {
+	while ((node = fdt_next_node(guest->devtree, node, NULL)) >= 0) {
 		int ret = map_guest_reg(guest, node, partition);
 		if (ret < 0)
 			return ret;

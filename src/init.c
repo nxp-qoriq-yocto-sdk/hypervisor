@@ -102,9 +102,18 @@ static void release_secondary_cores(void)
 		goto fail;
 	}
 
-	while ((node = fdt_get_next_node(fdt, node, &depth, 0)) >= 0) {
+	while ((node = fdt_next_node(fdt, node, &depth)) >= 0) {
 		int len;
-		const char *status = fdt_getprop(fdt, node, "status", &len);
+		const char *status;
+		
+		if (node < 0)
+			break;
+		if (depth > 1)
+			continue;
+		if (depth < 1)
+			return;
+		
+		status = fdt_getprop(fdt, node, "status", &len);
 		if (!status) {
 			if (len == -FDT_ERR_NOTFOUND)
 				continue;
@@ -185,13 +194,6 @@ static void release_secondary_cores(void)
 next_core:
 		;
 	}
-
-	if (node != -FDT_ERR_NOTFOUND) {
-		printf("error getting child\n");
-		goto fail;
-	}
-
-	return;
 
 fail:
 	printf("error %d (%s) reading CPU nodes, "
