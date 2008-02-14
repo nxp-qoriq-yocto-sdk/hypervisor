@@ -35,7 +35,9 @@
 #include <byte_chan.h>
 #include <devtree.h>
 
-guest_t guest;
+#define MAX_PARTITIONS 8
+
+guest_t guests[MAX_PARTITIONS];
 static unsigned long last_lpid;
 
 static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
@@ -217,22 +219,29 @@ static int create_guest_spin_table(guest_t *guest)
 {
 	unsigned long rpn;
 	int num_cpus = 8; // get from stuart's patch
+	struct boot_spin_table *spintbl;
 	uint32_t spin_addr;
-	int ret;
+	int ret, i;
 	
-	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
-	if (!guest->spintbl)
+	spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
+	if (!spintbl)
 		return NOMEM;
 
-	for (int i = 0; i < num_cpus; i++) {
-		guest->spintbl[i].addr = 1;
-		guest->spintbl[i].pir = i;
-		guest->spintbl[i].r3 = 0;
-		guest->spintbl[i].r4 = 0;
-		guest->spintbl[i].r7 = 0;
+	for (i = 0; i < num_cpus; i++) {
+		spintbl[i].addr = 1;
+		spintbl[i].pir = i;
+		spintbl[i].r3 = 0;
+		spintbl[i].r4 = 0;
+		spintbl[i].r7 = 0;
+		
 	}
 
-	rpn = ((physaddr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
+	/* FIXME: hardcoded cache line size */
+	for (i = 0; i < num_cpus * sizeof(struct boot_spin_table); i += 32)
+		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)spintbl + i ) :
+		             "memory");
+
+	rpn = ((physaddr_t)(unsigned long)spintbl - PHYSBASE) >> PAGE_SHIFT;
 
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
@@ -285,6 +294,9 @@ static int create_guest_spin_table(guest_t *guest)
 			goto fail;
 	}
 
+	printf("Setting spintbl on guest %p\n", guest);
+	smp_mbar();
+	guest->spintbl = spintbl;
 	return 0;
 
 fail:
@@ -345,11 +357,49 @@ fail:
 	return ret;
 }
 
+uint32_t start_guest_lock;
+
+static guest_t *node_to_partition(int partition)
+{
+	int i;
+	spin_lock(&start_guest_lock);
+	
+	for (i = 0; i < last_lpid; i++) {
+		assert(guests[i].lpid == i + 1);
+		if (guests[i].partition == partition)
+			break;
+	}
+	
+	if (i == last_lpid) {
+		if (last_lpid >= MAX_PARTITIONS) {
+			printf("too many partitions\n");
+		} else {
+			guests[i].partition = partition;
+			guests[i].lpid = ++last_lpid;
+		}
+	}
+	
+	spin_unlock(&start_guest_lock);
+	return &guests[i];
+}
+
+static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
+                                     int len)
+{
+	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
+	guest->gcpus[gpir] = get_gcpu();
+	get_gcpu()->gcpu_num = gpir;
+	mtspr(SPR_GPIR, gpir);
+	return gpir;
+}
+
 void start_guest(void)
 {
 	int off = -1, found = 0, ret;
 	int pir = mfspr(SPR_PIR);
 	char buf[MAX_PATH];
+	guest_t *guest;
+	unsigned long page;
 	
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
@@ -381,25 +431,27 @@ void start_guest(void)
 
 		printf("guest at %s on core %d\n", buf, pir);
 		found = 1;
+		
+		guest = node_to_partition(off);
+		mtspr(SPR_LPID, guest->lpid);
+	
+		get_gcpu()->guest = guest;
 
 		if (pir == cpus[0]) {
-			guest_t *guest = alloc(sizeof(guest_t), 16);
-			if (!guest)
-				goto nomem;
-			
-			guest->name = alloc(MAX_PATH, 1);
-			if (!guest->name)
+			int name_len;
+		
+			// Boot CPU
+			/* count number of cpus for this partition and alloc data struct */
+			int cpucnt = count_cpus(cpus, len);
+			guest->gcpus = alloc(sizeof(long) * cpucnt, __alignof__(long));
+			if (!guest->gcpus)
 				goto nomem;
 
-			guest->lpid = atomic_add(&last_lpid, 1);
-			mtspr(SPR_LPID, guest->lpid);
+			register_gcpu_with_guest(guest, cpus, len);
 			
-			ret = fdt_get_path(fdt, off, guest->name, sizeof(buf));
-			if (ret < 0) {
-				printf("start_guest: error %d (%s) getting path at offset %d\n",
-				       ret, fdt_strerror(ret), off);
-				continue;
-			}
+			name_len = strlen(buf) + 1;
+			guest->name = alloc(name_len, 1);
+			memcpy(guest->name, buf, name_len);
 			
 			ret = process_guest_devtree(guest, off, cpus, len);
 			if (ret < 0)
@@ -418,18 +470,6 @@ void start_guest(void)
 			
 			memcpy((void *)(PHYSBASE + (rpn << PAGE_SHIFT)), guest->devtree,
 			       fdt_totalsize(fdt));
-			
-			get_gcpu()->guest = guest;
-
-			/* count number of cpus for this partition and alloc data struct */
-			int cpucnt = count_cpus(cpus, len);
-			guest->gcpus = alloc(sizeof(long) * cpucnt, __alignof__(long));
-			if (!guest->gcpus)
-				goto nomem;
-
-			guest->gcpus[0] = get_gcpu();  /* this path is always cpu 0 */
-			get_gcpu()->gcpu_num = 0;
-			mtspr(SPR_GPIR,0);
 
 			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 			               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
@@ -441,18 +481,50 @@ void start_guest(void)
 			             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
 			             "r" (0 << PAGE_SHIFT) :
 	   		          "r3", "r4", "r5", "r6", "r7", "r8");
-
 		} else {
-			// enter as secondary cpu
+			register register_t r3 asm("r3");
+			register register_t r4 asm("r4");
+			register register_t r6 asm("r6");
+			register register_t r7 asm("r7");
+			int gpir;
 
-			// TODO: need to link from gcpu to guest
+			printf("cpu %d waiting for spintbl on guest %p...\n", pir, guest);
+		
+			// Wait for the boot cpu...
+			while (!guest->spintbl)
+				smp_mbar();
 
-			get_gcpu_num(cpus, len, pir);
-			// TODO: need to link guest.gcpus[] to gcpu
-			//    guest->gcpus[gcpu_num] = gcpu;
-			//    gcpu->gcpu_num = gcpu_num;
-			//    mtspr(SPR_GPIR,gcpu_num);
+			gpir = register_gcpu_with_guest(guest, cpus, len);
+			printf("cpu %d/%d spinning on table...\n", pir, gpir);
 
+			while (guest->spintbl[gpir].addr & 1) {
+				asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
+				asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
+				smp_mbar();
+			}
+
+			printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr);
+
+			if (guest->spintbl[gpir].pir != gpir)
+				printf("WARNING: cpu %d (guest cpu %d) changed spin-table "
+				       "PIR to %ld, ignoring\n",
+				       pir, gpir, guest->spintbl[gpir].pir);
+
+			/* Mask for 256M mapping */
+			page = (guest->spintbl[gpir].addr & ~0xfffffff) >> PAGE_SHIFT;
+
+			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
+			               page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+
+			r3 = guest->spintbl[gpir].r3;
+			r4 = guest->spintbl[gpir].r4;
+			r6 = 0;
+			r7 = guest->spintbl[gpir].r7;
+
+			asm volatile("mfmsr %%r5; oris %%r5, %%r5, 0x1000;"
+			             "mtsrr0 %0; mtsrr1 %%r5; li %%r5, 0; rfi" : :
+			             "r" (guest->spintbl[gpir].addr),
+			             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
 		}
 	}
 

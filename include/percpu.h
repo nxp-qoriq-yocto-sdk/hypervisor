@@ -32,10 +32,13 @@ typedef struct {
 	struct pte_t *gphys_rev;     // real phys to guest phys mapping
 	char *name;
 	void *devtree;
-	uint32_t lpid;
 	handle_t *handles[MAX_HANDLES];
 	struct gcpu_t **gcpus;
 	struct boot_spin_table *spintbl;
+	uint32_t lpid;
+
+	/** Offset to partition node in main device tree. */
+	int partition;
 } guest_t;
 
 #define GCPU_PEND_DECR     0x00000001 // Decrementer event pending
