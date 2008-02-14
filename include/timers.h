@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <percpu.h>
 
-void guest_timer_init(gcpu_t *gcpu);
 void run_deferred_decrementer(void);
 void enable_tcr_die(void);
 void set_tcr(uint32_t val);

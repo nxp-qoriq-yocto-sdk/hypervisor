@@ -74,11 +74,6 @@ void enable_tcr_die(void)
 		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
 }
 
-void guest_timer_init(gcpu_t *gcpu)
-{
-	gcpu->timer_flags |= TF_ENABLED;
-}
-
 void set_tcr(uint32_t val)
 {
 	gcpu_t *gcpu = get_gcpu();
