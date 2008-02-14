@@ -38,7 +38,7 @@ CC_OPTS_C= -Wall \
   -Werror
 CC_OPTS_ASM=-D_ASM -Ibin/src
 LD=$(CROSS_COMPILE)ld
-LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
+LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
@@ -93,7 +93,7 @@ dts/%.dtb : dts/%.dts
 -include $(OBJS:.o=.d)
 
 bin/uv.map: bin/uv
-	nm -n bin/uv > $@	
+	nm -n bin/uv > $@
 
 clean:
 	rm -rf bin

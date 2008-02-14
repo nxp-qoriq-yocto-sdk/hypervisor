@@ -36,7 +36,7 @@ CC_OPTS_C= -Wall \
   -Werror
 CC_OPTS_ASM=-D_ASM -Ibin
 LD=$(CROSS_COMPILE)ld
-LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
+LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
@@ -67,7 +67,7 @@ bin/gs-tester: $(GSTESTER_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Tgs-tester.lds -o $@ $(GSTESTER_OBJS) -lgcc
 
 bin/gs-tester.map: bin/gs-tester
-	nm -n bin/gs-tester > $@	
+	nm -n bin/gs-tester > $@
 
 -include $(GSTESTER_OBJS:.o=.d)
 
@@ -87,7 +87,7 @@ bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 -include bin/genassym.d
 
 bin/example.map: bin/example
-	nm -n bin/example > $@	
- 
+	nm -n bin/example > $@
+
 clean:
 	rm -rf bin
