@@ -37,7 +37,7 @@ CC_OPTS_C= -Wall \
   -Werror
 CC_OPTS_ASM=-D_ASM -Ibin
 LD=$(CROSS_COMPILE)ld
-LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib
+LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
@@ -50,12 +50,12 @@ include $(LIBOS_DIR)/Makefile.libos
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
 	$(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
 	$(LIBOS_MPIC) $(LIBOS_QUEUE)
-		
+
 
 ####################
 # Hello
 
-HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) hello.c init.c 
+HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) hello.c init.c
 HELLO_OBJS := $(basename $(HELLO_SRCS))
 HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
@@ -69,14 +69,14 @@ bin/hello: $(HELLO_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HELLO_OBJS) -lgcc
 
 bin/hello.map: bin/hello
-	nm -n bin/hello > $@	
+	nm -n bin/hello > $@
 
 -include $(HELLO_OBJS:.o=.d)
 
 ####################
 # vmpic_test
 
-VMPIC_SRCS := $(LIBOS_SRCS:%=libos/%) vmpic_test.c init.c 
+VMPIC_SRCS := $(LIBOS_SRCS:%=libos/%) vmpic_test.c init.c
 VMPIC_OBJS := $(basename $(VMPIC_SRCS))
 VMPIC_OBJS := $(VMPIC_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 VMPIC_OBJS := $(VMPIC_OBJS:%=bin/%)
@@ -90,14 +90,14 @@ bin/vmpic_test: $(VMPIC_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(VMPIC_OBJS) -lgcc
 
 bin/vmpic_test.map: bin/vmpic_test
-	nm -n $< > $@	
+	nm -n $< > $@
 
 -include $(VMPIC_OBJS:.o=.d)
 
 ####################
 # hcall_test
 
-HCALL_SRCS := $(LIBOS_SRCS:%=libos/%) hcall_test.c init.c 
+HCALL_SRCS := $(LIBOS_SRCS:%=libos/%) hcall_test.c init.c
 HCALL_OBJS := $(basename $(HCALL_SRCS))
 HCALL_OBJS := $(HCALL_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 HCALL_OBJS := $(HCALL_OBJS:%=bin/%)
@@ -111,7 +111,7 @@ bin/hcall_test: $(HCALL_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(HCALL_OBJS) -lgcc
 
 bin/hcall_test.map: bin/hcall_test
-	nm -n bin/hcall_test > $@	
+	nm -n bin/hcall_test > $@
 
 
 -include $(HCALL_OBJS:.o=.d)
@@ -141,8 +141,8 @@ dts/%.dtb : dts/%.dts
 -include bin/genassym.d
 
 bin/example.map: bin/example
-	nm -n bin/example > $@	
- 
+	nm -n bin/example > $@
+
 clean:
 	rm -rf bin
 	rm -f dts/*.dtb
