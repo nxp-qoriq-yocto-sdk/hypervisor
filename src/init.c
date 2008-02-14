@@ -82,6 +82,7 @@ void start(unsigned long devtree_ptr)
 
 	// pamu init
 
+	// Main device tree must be const after this point.
 	release_secondary_cores();
 	partition_init();
 }
@@ -249,4 +250,6 @@ static void core_init(void)
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
+
+	mtspr(SPR_HID0, HID0_DPM | HID0_TBEN);
 }
