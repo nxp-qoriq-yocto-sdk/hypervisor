@@ -41,7 +41,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: hello_all hcall_test_all vmpic_all
+all: hello_all hcall_test_all vmpic_all msgsnd_test_all
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -116,6 +116,26 @@ bin/hcall_test.map: bin/hcall_test
 
 -include $(HCALL_OBJS:.o=.d)
 
+####################
+# msgsnd_test
+
+MSGSND_SRCS := $(LIBOS_SRCS:%=libos/%) msgsnd_test.c init.c
+MSGSND_OBJS := $(basename $(MSGSND_SRCS))
+MSGSND_OBJS := $(MSGSND_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+MSGSND_OBJS := $(MSGSND_OBJS:%=bin/%)
+
+msgsnd_test_all: bin/msgsnd_test.bin bin/msgsnd_test.map bin/mpc8578sim-hv-test.dtb
+
+bin/msgsnd_test.bin: bin/msgsnd_test
+	$(CROSS_COMPILE)objcopy -O binary $< $@
+
+bin/msgsnd_test: $(MSGSND_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Ttests.lds -o $@ $(MSGSND_OBJS) -lgcc
+
+bin/msgsnd_test.map: bin/msgsnd_test
+	nm -n bin/msgsnd_test > $@
+
+-include $(MSGSND_OBJS:.o=.d)
 
 ####################
 

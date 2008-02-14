@@ -61,6 +61,46 @@ void guest_doorbell(trapframe_t *regs)
 
 	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
 		enable_tcr_die();
+
+	if (gcpu->gdbell_pending & GCPU_PEND_MSGSND) {
+		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSND);
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELL];
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		return;
+	}
+}
+
+/**
+ * Reflect a guest critical doorbell
+ *
+ * This function is called whenever the hypervisor receives a critical
+ * doorbell exception.  This happens when the hypervisor itself executes a
+ * msgsnd instruction where the message type is G_DBELL_CRIT.
+ *
+ * Note that there is no regs->csrr0 or regs->csrr1.  The exception handler
+ * prologue and epilogue (in exception.S) uses regs->srr0 and regs->srr1 to
+ * store the values of CSSR0 and CSSR1, respectively.
+ */
+void guest_critical_doorbell(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+
+	if (gcpu->gdbell_pending & GCPU_PEND_MSGSNDC) {
+		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSNDC);
+
+		/*
+		 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
+		 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
+		 * guest can't access CSRR0 or CSRR1 directly when the hypervisor is
+		 * running -- they need to be emulated.
+		 */
+		gcpu->csrr0 = regs->srr0;
+		gcpu->csrr1 = regs->srr1;
+
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELLC];
+		regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		return;
+	}
 }
 
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)

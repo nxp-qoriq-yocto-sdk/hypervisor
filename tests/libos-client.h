@@ -12,5 +12,7 @@ typedef int client_cpu_t;
 
 #define EXC_DECR_HANDLER dec_handler
 #define EXC_EXT_INT_HANDLER ext_int_handler
+#define EXC_DOORBELL_HANDLER ext_doorbell_handler
+#define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
 
 #endif

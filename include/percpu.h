@@ -33,6 +33,7 @@ typedef struct {
 	char *name;
 	void *devtree;
 	handle_t *handles[MAX_HANDLES];
+	unsigned int cpucnt;	     // The number of entries in gcpus[]
 	struct gcpu_t **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
@@ -43,6 +44,8 @@ typedef struct {
 
 #define GCPU_PEND_DECR     0x00000001 // Decrementer event pending
 #define GCPU_PEND_TCR_DIE  0x00000002 // Set TCR[DIE] after pending decr.
+#define GCPU_PEND_MSGSND   0x00000004 // Guest OS msgsnd
+#define GCPU_PEND_MSGSNDC  0x00000008 // Guest OS critical doorbell msgsnd
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 

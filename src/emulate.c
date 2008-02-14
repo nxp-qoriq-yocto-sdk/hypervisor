@@ -42,6 +42,69 @@ static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 	return regs->gpregs[rb] + (ra ? regs->gpregs[ra] : 0);
 }
 
+/**
+ * Emulate the msgsnd instruction
+ *
+ * This function is called when the guest OS tries to execute a msgsnd
+ * instruction.  This instruction must be emulated to ensure that one
+ * partition cannot send a message to another partition.
+ */
+static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
+{
+	unsigned int rb = (insn >> 11) & 31;
+	uint32_t msg = regs->gpregs[rb];
+	guest_t *guest = get_gcpu()->guest;
+	unsigned long lpid = guest->lpid;
+	unsigned int type = msg >> 27;
+
+	/*
+	 * Validate the message type, and convert it to the corresponding
+	 * hypervisor message type.  Supported types are: DBELL (0) and
+	 * DBELL_CRIT (1)
+	 */
+	if (type > 1) {
+		printf("msgsnd@0x%08lx: invalid message type %u\n", regs->srr0, type);
+		return 1;
+	}
+
+	/* Critical doorbells have their own bit flag */
+	unsigned long flag = type ? GCPU_PEND_MSGSNDC : GCPU_PEND_MSGSND;
+
+	/*
+	 * DBELL (0) becomes G_DBELL (2), and DBELL_CRIT (1) becomes
+	 * G_DBELL_CRIT (2).  The quickest way to make that change is to set bit
+	 * 1 of the type field (aka bit 35 of the register).
+	 */
+	msg |= 0x10000000;
+
+	/* Check for broadcast */
+	if (msg & 0x04000000) {
+		/* Tell each core that it needs to reflect a msgsnd doorbell
+		   exception. */
+		for (unsigned i = 0; i < guest->cpucnt; i++)
+			atomic_or(&guest->gcpus[i]->gdbell_pending, flag);
+
+	} else {
+		unsigned int pir = msg & 0x3fff;
+
+		if (pir >= guest->cpucnt) {
+			printf("msgsnd@0x%08lx: invalid pir %u\n", regs->srr0, pir);
+			return 1;
+		}
+
+		gcpu_t *gcpu = guest->gcpus[pir];
+		atomic_or(&gcpu->gdbell_pending, flag);
+	}
+
+	/* Clear the reserved bits and oerwrite the LPIDTAG field with
+	   the current lpid */
+	msg = (msg & 0xfc003fff) | (lpid << 14);
+
+	asm volatile("msgsnd %0" : : "r" (msg) : "memory");
+
+	return 0;
+}
+
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
@@ -516,6 +579,10 @@ void hvpriv(trapframe_t *regs)
 
 	case 0x1f:
 		switch (minor) {
+		case 0x0ce:
+			fault = emu_msgsnd(regs, insn);
+			break;
+
 		case 0x312:
 			fault = emu_tlbivax(regs, insn);
 			break;

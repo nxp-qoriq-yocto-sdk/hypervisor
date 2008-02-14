@@ -442,8 +442,8 @@ void start_guest(void)
 		
 			// Boot CPU
 			/* count number of cpus for this partition and alloc data struct */
-			int cpucnt = count_cpus(cpus, len);
-			guest->gcpus = alloc(sizeof(long) * cpucnt, __alignof__(long));
+			guest->cpucnt = count_cpus(cpus, len);
+			guest->gcpus = alloc(sizeof(long) * guest->cpucnt, __alignof__(long));
 			if (!guest->gcpus)
 				goto nomem;
 

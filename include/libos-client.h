@@ -25,6 +25,7 @@ typedef struct {
 #define EXC_DECR_HANDLER decrementer
 #define EXC_DTLB_HANDLER dtlb_miss
 #define EXC_GDOORBELL_HANDLER guest_doorbell
+#define EXC_GDOORBELLC_HANDLER guest_critical_doorbell
 #define EXC_HCALL_HANDLER hcall
 #define EXC_EHPRIV_HANDLER hvpriv
 #define EXC_DOORBELLC_HANDLER critical_doorbell_int

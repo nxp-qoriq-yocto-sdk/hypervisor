@@ -104,6 +104,9 @@ clean:
 test-hello: bin/uv.uImage
 	$(SIMICS) sim/uv-hello.simics
 
+test-msgsnd: bin/uv.uImage
+	$(SIMICS) sim/uv-msgsnd.simics
+
 dtbs: bin/mpc8578sim-hv-1p.dtb bin/mpc8578sim-hv-2p.dtb
 
 bin/mpc8578sim-hv-1p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-hv-1p.dts
