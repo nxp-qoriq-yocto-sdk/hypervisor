@@ -81,7 +81,7 @@ VMPIC_OBJS := $(basename $(VMPIC_SRCS))
 VMPIC_OBJS := $(VMPIC_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 VMPIC_OBJS := $(VMPIC_OBJS:%=bin/%)
 
-vmpic_all: bin/vmpic_test.bin bin/vmpic_test.map bin/mpc8578sim-hv-test.dtb
+vmpic_all: bin/vmpic_test.bin bin/vmpic_test.map bin/mpc8578sim-hv-test-mpic.dtb
 
 bin/vmpic_test.bin: bin/vmpic_test
 	$(CROSS_COMPILE)objcopy -O binary $< $@
@@ -150,6 +150,7 @@ bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	-include libfdt_env.h -c -o $@ $<
 
 bin/mpc8578sim-hv-test.dtb: dts/mpc8578sim-hv-test.dts dts/mpc8578sim-test-part1.dtb
+bin/mpc8578sim-hv-test-mpic.dtb: dts/mpc8578sim-hv-test-mpic.dts dts/mpc8578sim-test-part1-mpic.dtb
 
 bin/%.dtb : dts/%.dts
 	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
