@@ -105,6 +105,59 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+/**
+ * Emulate the msgclr instruction
+ *
+ * This function is called when the guest OS tries to execute a msgclr
+ * instruction.  This instruction must be emulated to ensure that one
+ * partition cannot send a message to another partition.
+ *
+ * Unlike emu_msgsnd, we don't re-issue the msgclr instruction.  Instead, we
+ * just clear the GCPU_PEND_MSGSND[C} bit.  The hypervisor trap handler will
+ * still get called, but it won't reflect the interrupt to the guest.
+ */
+static int emu_msgclr(trapframe_t *regs, uint32_t insn)
+{
+	unsigned int rb = (insn >> 11) & 31;
+	uint32_t msg = regs->gpregs[rb];
+	guest_t *guest = get_gcpu()->guest;
+	unsigned int type = msg >> 27;
+
+	/*
+	 * Validate the message type, and convert it to the corresponding
+	 * hypervisor message type.  Supported types are: DBELL (0) and
+	 * DBELL_CRIT (1)
+	 */
+	if (type > 1) {
+		printf("msgclr@0x%08lx: invalid message type %u\n", regs->srr0, type);
+		return 1;
+	}
+
+	/* Critical doorbells have their own bit flag */
+	unsigned long flag = type ? ~GCPU_PEND_MSGSNDC : ~GCPU_PEND_MSGSND;
+
+	/* Check for broadcast */
+	if (msg & 0x04000000) {
+		/* Tell each core that it needs to reflect a msgclr doorbell
+		   exception. */
+		for (unsigned i = 0; i < guest->cpucnt; i++)
+			atomic_and(&guest->gcpus[i]->gdbell_pending, flag);
+
+	} else {
+		unsigned int pir = msg & 0x3fff;
+
+		if (pir >= guest->cpucnt) {
+			printf("msgclr@0x%08lx: invalid pir %u\n", regs->srr0, pir);
+			return 1;
+		}
+
+		gcpu_t *gcpu = guest->gcpus[pir];
+		atomic_and(&gcpu->gdbell_pending, flag);
+	}
+
+	return 0;
+}
+
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
@@ -585,6 +638,10 @@ void hvpriv(trapframe_t *regs)
 		switch (minor) {
 		case 0x0ce:
 			fault = emu_msgsnd(regs, insn);
+			break;
+
+		case 0x0ee:
+			fault = emu_msgclr(regs, insn);
 			break;
 
 		case 0x312:

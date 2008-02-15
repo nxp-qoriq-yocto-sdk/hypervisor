@@ -19,7 +19,7 @@ void start(void)
 {
 	uint32_t status;
 	char *str;
-	uint32_t channel;
+	uint32_t channel = 0;
 	uint32_t rxavail;
 	uint32_t txavail;
 	uint8_t buf[16];
@@ -29,18 +29,43 @@ void start(void)
 
 	init();
 
-	enable_extint();
-	enable_critint();
-
 	printf("Hello World\n");
 
-	channel = 0;
+	// Normal doorbell
 
-        // Normal doorbell
+	enable_extint();
+	printf("Interrupts enabled\n");
+	printf("Sending message\n");
 	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
 
+	disable_extint();
+	printf("Interrupts disabled\n");
+	printf("Sending message\n");
+	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
+
+	enable_extint();
+	printf("Interrupts enabled\n");
+
+	disable_extint();
+	printf("Interrupts disabled\n");
+
+	printf("Sending message\n");
+	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
+
+	printf("Clearing message\n");
+	asm volatile ("msgclr %0" : : "r" (mfspr(SPR_PIR)));
+
+	enable_extint();
+	printf("Interrupts enabled\n");
+
 	// Critical doorbell
+
+	printf("Critical interrupts disabled\n");
+	printf("Sending critical message\n");
 	asm volatile ("msgsnd %0" : : "r" (0x08000000 | mfspr(SPR_PIR)));
+
+	printf("Critical interrupts enabled\n");
+	enable_critint();
 
 #define TEST
 #ifdef TEST
