@@ -567,12 +567,16 @@ void hvpriv(trapframe_t *regs)
 	case 0x13:
 		switch (minor) {
 		case 0x033:
-			fault = emu_rfci(regs, insn);
-			break;
+			if (unlikely(emu_rfci(regs, insn)))
+				goto fault;
+			
+			return;
 
 		case 0x026:
-			fault = emu_rfmci(regs, insn);
-			break;
+			if (unlikely(emu_rfmci(regs, insn)))
+				goto fault;
+
+			return;
 		}
 		
 		break;
@@ -620,6 +624,7 @@ void hvpriv(trapframe_t *regs)
 		return;
 	}
 
+fault:
 	printf("unhandled hvpriv trap from 0x%lx, insn 0x%08x\n", regs->srr0, insn);
 	regs->exc = EXC_PROGRAM;
 	reflect_trap(regs);
