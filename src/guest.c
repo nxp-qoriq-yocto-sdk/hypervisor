@@ -218,7 +218,7 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 static int create_guest_spin_table(guest_t *guest)
 {
 	unsigned long rpn;
-	int num_cpus = 8; // get from stuart's patch
+	unsigned int num_cpus = guest->cpucnt;
 	struct boot_spin_table *spintbl;
 	uint32_t spin_addr;
 	int ret, i;
@@ -248,6 +248,7 @@ static int create_guest_spin_table(guest_t *guest)
 
 	int off = 0;
 	while (1) {
+		uint32_t cpu;
 		ret = fdt_node_offset_by_prop_value(guest->devtree, off,
 		                                    "device_type", "cpu", 4);
 		if (ret == -FDT_ERR_NOTFOUND)
@@ -265,12 +266,13 @@ static int create_guest_spin_table(guest_t *guest)
 			return BADTREE;
 		}
 
-		if (*reg >= num_cpus) {
+		cpu = *reg;
+		if (cpu >= num_cpus) {
 			printf("partition %s has no cpu %u\n", guest->name, *reg);
 			continue;
 		}
 
-		if (*reg == 0) {
+		if (cpu == 0) {
 			ret = fdt_setprop_string(guest->devtree, off, "status", "okay");
 			if (ret < 0)
 				goto fail;
@@ -287,11 +289,13 @@ static int create_guest_spin_table(guest_t *guest)
 		if (ret < 0)
 			goto fail;
 
-		spin_addr = 0xfffff000 + *reg * sizeof(struct boot_spin_table);
+		spin_addr = 0xfffff000 + cpu * sizeof(struct boot_spin_table);
 		ret = fdt_setprop(guest->devtree, off,
 		                  "cpu-release-addr", &spin_addr, 4);
 		if (ret < 0)
 			goto fail;
+
+		printf("cpu-release-addr of CPU%u: %x\n", cpu, spin_addr);
 	}
 
 	printf("Setting spintbl on guest %p\n", guest);
