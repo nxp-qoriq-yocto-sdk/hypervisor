@@ -22,9 +22,8 @@
 			timebase-frequency = <d#8333333>;
 			bus-frequency = <d#66666666>;
 			clock-frequency = <d#66666666>;
-			status = "okay";
 		};
-/*
+
 		cpu@1 {
 			device_type = "cpu";
 			compatible = "fsl,e500mc", "fsl,e500";
@@ -36,10 +35,33 @@
 			timebase-frequency = <d#8333333>;
 			bus-frequency = <d#66666666>;
 			clock-frequency = <d#66666666>;
-			status = "disabled";
-			enable-method = "fsl,hv-start-secondary";
 		};
-*/
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <2>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <3>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
 	};
 	
 	memory {
@@ -97,7 +119,7 @@
 	};
 
 	chosen {
-		linux,stdout-path = "/ccsr/serial@11c600";
+		linux,stdout-path = "/ccsr@fe000000/serial@11c600";
 		bootargs = "console=ttyS0,115200";
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
