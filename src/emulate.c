@@ -81,9 +81,8 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	if (msg & 0x04000000) {
 		/* Tell each core that it needs to reflect a msgsnd doorbell
 		   exception. */
-		for (unsigned i = 0; i < guest->cpucnt; i++)
+		for (unsigned int i = 0; i < guest->cpucnt; i++)
 			atomic_or(&guest->gcpus[i]->gdbell_pending, flag);
-
 	} else {
 		unsigned int pir = msg & 0x3fff;
 
@@ -138,11 +137,8 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 
 	/* Check for broadcast */
 	if (msg & 0x04000000) {
-		/* Tell each core that it needs to reflect a msgclr doorbell
-		   exception. */
-		for (unsigned i = 0; i < guest->cpucnt; i++)
+		for (unsigned int i = 0; i < guest->cpucnt; i++)
 			atomic_and(&guest->gcpus[i]->gdbell_pending, flag);
-
 	} else {
 		unsigned int pir = msg & 0x3fff;
 
