@@ -19,8 +19,6 @@
 extern cpu_t cpu0;
 
 static gcpu_t noguest = {
-	// FIXME 64-bit
-	.tlb1_free = { ~0UL, ~0UL },
 	.cpu = &cpu0,   /* link back to cpu */
 };
 
@@ -183,10 +181,6 @@ static void release_secondary_cores(void)
 			goto nomem;
 
 		cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
-
-		// FIXME 64-bit
-		cpu->client.gcpu->tlb1_free[0] = ~0UL;
-		cpu->client.gcpu->tlb1_free[1] = ~0UL;
 
 		if (start_secondary_spin_table((void *)table_va, *reg, cpu,
 		                               secondary_init, NULL))

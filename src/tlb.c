@@ -48,17 +48,17 @@ static int alloc_tlb1(unsigned int entry)
 	int i = 0;
 
 	do {
-		while (gcpu->tlb1_free[i]) {
-			int bit = count_lsb_zeroes(gcpu->tlb1_free[i]);
+		while (~gcpu->tlb1_inuse[i]) {
+			int bit = count_lsb_zeroes(~gcpu->tlb1_inuse[i]);
 
 			if (idx + bit >= tlb1_reserved)
 				return -1;
 			
-			gcpu->tlb1_free[i] &= ~(1UL << bit);
-			gcpu->tlb1_used[entry][i] |= 1UL << bit;
+			gcpu->tlb1_inuse[i] |= 1UL << bit;
+			gcpu->tlb1_map[entry][i] |= 1UL << bit;
 
 #if 0
-			printf("tlb1_free[%d] now %lx\n", i, gcpu->tlb1_free[i]);
+			printf("tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
 			printf("using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
 #endif
 
@@ -79,8 +79,8 @@ static void free_tlb1(unsigned int entry)
 	int idx = 0;
 
 	do {
-		while (gcpu->tlb1_used[entry][i]) {
-			int bit = count_lsb_zeroes(gcpu->tlb1_used[entry][i]);
+		while (gcpu->tlb1_map[entry][i]) {
+			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
 			assert(idx + bit < tlb1_reserved);
 			
 //			printf("clearing tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
@@ -88,8 +88,8 @@ static void free_tlb1(unsigned int entry)
 			cpu->tlb1[idx + bit].mas1 = 0;
 			tlb1_write_entry(idx + bit);
 
-			gcpu->tlb1_used[entry][i] &= ~(1UL << bit);
-			gcpu->tlb1_free[i] |= 1UL << bit;
+			gcpu->tlb1_map[entry][i] &= ~(1UL << bit);
+			gcpu->tlb1_inuse[i] &= ~(1UL << bit);
 		}
 
 		i++;
@@ -105,7 +105,7 @@ unsigned int guest_tlb1_to_gtlb1(unsigned int idx)
 	unsigned int entry;
 
 	for (entry = 0; entry < TLB1_GSIZE; entry++)
-		if (gcpu->tlb1_used[entry][i] & (1UL << bit))
+		if (gcpu->tlb1_map[entry][i] & (1UL << bit))
 			return entry;
 
 	return TLB1_GSIZE;

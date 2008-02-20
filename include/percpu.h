@@ -55,8 +55,8 @@ typedef struct gcpu_t {
 	cpu_t *cpu;
 	register_t ivpr;
 	register_t ivor[38];
-	tlbmap_t tlb1_free;
-	tlbmap_t tlb1_used[TLB1_GSIZE];
+	tlbmap_t tlb1_inuse;
+	tlbmap_t tlb1_map[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
 	uint64_t mcar;
