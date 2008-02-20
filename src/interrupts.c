@@ -3,6 +3,7 @@
 #include <libos/libos.h>
 #include <libos/bitops.h>
 #include <interrupts.h>
+#include <errors.h>
 
 extern void trap(trapframe_t *);
 
@@ -22,7 +23,8 @@ int register_irq_handler(int irq, int_handler_t funcptr, void *arg)
 	struct crit_int_h *ptr;
 
 	ptr = alloc(sizeof(struct crit_int_h),4);
-	// FIXME-- check if alloc is out of space 
+	if (!ptr)
+		return ERR_NOMEM;
 
 	ptr->handler = funcptr;
 	ptr->arg = arg;

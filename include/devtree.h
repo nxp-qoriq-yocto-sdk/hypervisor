@@ -4,11 +4,6 @@
 #include <libos/libos.h>
 #include <libfdt.h>
 
-// Error values that will not conflict with FDT errors
-#define BADTREE -256
-#define NOMEM -257
-#define NOTRANS -258
-
 #define MAX_ADDR_CELLS 4
 #define MAX_SIZE_CELLS 2
 

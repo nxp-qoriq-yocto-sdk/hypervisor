@@ -278,12 +278,12 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 {
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!handle)
-		return -1;
+		return ERR_BUSY;
 
 	connected_bc_t *cbc;
 	cbc = alloc(sizeof(connected_bc_t), __alignof__(connected_bc_t));
 	if (!cbc)
-		return MEM_NOT_ENOUGH;
+		return ERR_NOMEM;
 	
 	cbc->num = multiplexing_id;
 	cbc->byte_chan = handle;

@@ -89,16 +89,20 @@ byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 
 int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 {
+	int ret;
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!bc)
-		return -1;
+		return ERR_BUSY;
 
 	if (!cd->ops->set_tx_queue || !cd->ops->set_rx_queue)
+		return ERR_INVALID;
+
+	ret = cd->ops->set_tx_queue(cd, handle->rx);
+	if (ret < 0)
 		goto err;
 
-	if (cd->ops->set_tx_queue(cd, handle->rx))
-		goto err;
-	if (cd->ops->set_rx_queue(cd, handle->tx)) {
+	ret = cd->ops->set_rx_queue(cd, handle->tx);
+	if (ret < 0) {
 		cd->ops->set_tx_queue(cd, NULL);
 		goto err;
 	}
@@ -107,7 +111,7 @@ int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 
 err:
 	handle->attached = 0;
-	return -1;
+	return ret;
 }
 
 int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
@@ -115,20 +119,20 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 {
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!handle)
-		return -1;
+		return ERR_BUSY;
 
 	handle->user.bc = handle;
 	
 	int ghandle = alloc_guest_handle(guest, &handle->user);
 	if (ghandle < 0) {
 		handle->attached = 0;
-		return -1;
+		return ERR_NOMEM;
 	}
 
 	if (rxirq != -1) {
 		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
 		if (!vint)
-			return -1;
+			return ERR_NOMEM;
 	
 		vint->irq = rxirq;
 		vint->guest = guest;
@@ -139,7 +143,7 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 	if (txirq != -1) {
 		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
 		if (!vint)
-			return -1;
+			return ERR_NOMEM;
 	
 		vint->irq = txirq;
 		vint->guest = guest;

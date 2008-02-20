@@ -34,6 +34,7 @@
 #include <timers.h>
 #include <byte_chan.h>
 #include <devtree.h>
+#include <errors.h>
 
 #define MAX_PARTITIONS 8
 
@@ -109,7 +110,7 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 	if (!hvranges && hvrlen != -FDT_ERR_NOTFOUND)
 		return hvrlen;
 	if (!hvranges || hvrlen % 4)
-		return BADTREE;
+		return ERR_BADTREE;
 
 	int ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
 	                        &rootnaddr, &size);
@@ -117,7 +118,7 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 		return ret;	
 
 	if (rootnaddr < 0 || rootnaddr > 2)
-		return BADTREE;
+		return ERR_BADTREE;
 
 	gaddr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
@@ -138,7 +139,7 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 			return ret;
 
 		if (addrbuf[0] || addrbuf[1])
-			return BADTREE;
+			return ERR_BADTREE;
 
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
@@ -166,7 +167,7 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 	}
 
 	if (len % 4)
-		return BADTREE;
+		return ERR_BADTREE;
 
 	len /= 4;
 
@@ -189,10 +190,10 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 
 	for (int i = 0; i < len; i += naddr + nsize) {
 		if (i + naddr + nsize > len)
-			return BADTREE;
+			return ERR_BADTREE;
 
 		ret = map_guest_reg_one(guest, node, partition, reg + i);
-		if (ret < 0 && ret != NOTRANS)
+		if (ret < 0 && ret != ERR_NOTRANS)
 			return ret;
 	}
 
@@ -225,7 +226,7 @@ static int create_guest_spin_table(guest_t *guest)
 	
 	spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
 	if (!spintbl)
-		return NOMEM;
+		return ERR_NOMEM;
 
 	for (i = 0; i < num_cpus; i++) {
 		spintbl[i].addr = 1;
@@ -263,7 +264,7 @@ static int create_guest_spin_table(guest_t *guest)
 		if (ret != 4) {
 			printf("create_guest_spin_table(%s): bad cpu reg property\n",
 			       guest->name);
-			return BADTREE;
+			return ERR_BADTREE;
 		}
 
 		cpu = *reg;
@@ -331,7 +332,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	
 	guest->devtree = alloc(gfdt_size, 16);
 	if (!guest->devtree) {
-		ret = NOMEM;
+		ret = ERR_NOMEM;
 		goto fail;
 	}
 
@@ -342,7 +343,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	if (!guest->gphys || !guest->gphys_rev) {
-		ret = NOMEM;
+		ret = ERR_NOMEM;
 		goto fail;
 	}
 
@@ -391,6 +392,8 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
                                      int len)
 {
 	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
+	assert(gpir >= 0);
+	
 	guest->gcpus[gpir] = get_gcpu();
 	get_gcpu()->gcpu_num = gpir;
 	mtspr(SPR_GPIR, gpir);
@@ -404,6 +407,7 @@ void start_guest(void)
 	char buf[MAX_PATH];
 	guest_t *guest;
 	unsigned long page;
+	int gpir;
 	
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
@@ -451,10 +455,14 @@ void start_guest(void)
 			if (!guest->gcpus)
 				goto nomem;
 
-			register_gcpu_with_guest(guest, cpus, len);
+			gpir = register_gcpu_with_guest(guest, cpus, len);
+			assert(gpir == 0);
 			
 			name_len = strlen(buf) + 1;
 			guest->name = alloc(name_len, 1);
+			if (!guest->name)
+				goto nomem;
+			
 			memcpy(guest->name, buf, name_len);
 			
 			ret = process_guest_devtree(guest, off, cpus, len);
@@ -490,7 +498,6 @@ void start_guest(void)
 			register register_t r4 asm("r4");
 			register register_t r6 asm("r6");
 			register register_t r7 asm("r7");
-			int gpir;
 
 			printf("cpu %d waiting for spintbl on guest %p...\n", pir, guest);
 		

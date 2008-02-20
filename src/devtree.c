@@ -27,6 +27,7 @@
 
 #include <devtree.h>
 #include <paging.h>
+#include <errors.h>
 
 #include <libos/ns16550.h>
 
@@ -44,7 +45,7 @@ int get_addr_format(const void *tree, int node,
 	} else if (len == 4 && *naddrp <= MAX_ADDR_CELLS) {
 		*naddr = *naddrp;
 	} else {
-		return BADTREE;
+		return ERR_BADTREE;
 	}
 
 	const uint32_t *nsizep = fdt_getprop(tree, node, "#size-cells", &len);
@@ -54,7 +55,7 @@ int get_addr_format(const void *tree, int node,
 	} else if (len == 4 && *nsizep <= MAX_SIZE_CELLS) {
 		*nsize = *nsizep;
 	} else {
-		return BADTREE;
+		return ERR_BADTREE;
 	}
 
 	return 0;
@@ -130,14 +131,14 @@ static int find_range(const uint32_t *reg, const uint32_t *ranges,
 	int i;
 
 	if (nrange <= 0)
-		return BADTREE;
+		return ERR_BADTREE;
 
 	for (i = 0; i < buflen; i += nrange) {
 		uint32_t range_addr[MAX_ADDR_CELLS];
 		uint32_t range_size[MAX_ADDR_CELLS];
 
 		if (i + nrange > buflen) {
-			return BADTREE;
+			return ERR_BADTREE;
 		}
 
 		copy_val(range_addr, ranges + i, naddr);
@@ -171,13 +172,13 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	copy_val(tmpaddr, ranges, prev_naddr);
 
 	if (!sub_reg(addr, tmpaddr))
-		return BADTREE;
+		return ERR_BADTREE;
 
 	if (rangesize) {
 		copy_val(tmpaddr, ranges + prev_naddr + naddr, prev_nsize);
 	
 		if (!sub_reg(tmpaddr, addr))
-			return BADTREE;
+			return ERR_BADTREE;
 
 		*rangesize = ((uint64_t)tmpaddr[2]) << 32;
 		*rangesize |= tmpaddr[3];
@@ -186,7 +187,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	copy_val(tmpaddr, ranges + prev_naddr, naddr);
 
 	if (!add_reg(addr, tmpaddr, naddr))
-		return BADTREE;
+		return ERR_BADTREE;
 
 	// Reject ranges that wrap around the address space.  Primarily
 	// intended to enable blacklist entries in fsl,hvranges.
@@ -195,7 +196,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	copy_val(tmpaddr2, ranges + prev_naddr + naddr, nsize);
 	
 	if (!add_reg(tmpaddr, tmpaddr2, naddr))
-		return NOTRANS;
+		return ERR_NOTRANS;
 
 	return 0;
 }
@@ -245,7 +246,7 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 		ranges = fdt_getprop(tree, node, "ranges", &len);
 		if (!ranges) {
 			if (len == -FDT_ERR_NOTFOUND)
-				return NOTRANS;
+				return ERR_NOTRANS;
 		
 			return len;
 		}
@@ -253,7 +254,7 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 		if (len == 0)
 			continue;
 		if (len % 4)
-			return BADTREE;
+			return ERR_BADTREE;
 
 		ret = xlate_one(addrbuf, ranges, len, naddr, nsize,
 		                prev_naddr, prev_nsize, NULL);
@@ -276,10 +277,10 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 		return ret;
 
 	if (rootnaddr < 0 || rootnaddr > 2)
-		return BADTREE;
+		return ERR_BADTREE;
 
 	if (addrbuf[0] || addrbuf[1])
-		return BADTREE;
+		return ERR_BADTREE;
 
 	*addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 	return 0;
@@ -303,10 +304,10 @@ int dt_get_reg(const void *tree, int node, int res,
 		return ret;
 
 	if (naddr == 0 || nsize == 0)
-		return NOTRANS;
+		return ERR_NOTRANS;
 
 	if (len < (naddr + nsize) * 4 * (res + 1))
-		return BADTREE;
+		return ERR_BADTREE;
 
 	return xlate_reg(tree, node, &reg[(naddr + nsize) * res], addr, size);
 }
