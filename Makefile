@@ -42,7 +42,7 @@ LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
-all: bin/uv.uImage bin/uv.map dtbs tests
+all: bin/uv.uImage bin/uv.map test
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -99,27 +99,25 @@ clean:
 	rm -rf bin
 	rm -f dts/*.dtb
 
-.PHONY: test-linux test-linux test-linux-2p
+.PHONY: test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
 
-test-hello: bin/uv.uImage
-	$(SIMICS) sim/uv-hello.simics
+test-hello:
+	$(SIMICS) test/hello-test/hv-hello.simics
 
-test-msgsnd: bin/uv.uImage
-	$(SIMICS) sim/uv-msgsnd.simics
+test-msgsnd:
+	$(SIMICS) test/msgsnd-test/hv-msgsnd.simics
 
-dtbs: bin/mpc8578sim-hv-1p.dtb bin/mpc8578sim-hv-2p.dtb
+test-vmpic:
+	$(SIMICS) test/vmpic-test/hv-vmpic.simics
 
-bin/mpc8578sim-hv-1p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-hv-1p.dts
-bin/mpc8578sim-hv-2p.dtb: dts/mpc8578sim-part1.dtb dts/mpc8578sim-part2.dtb dts/mpc8578sim-hv-2p.dts
+test-linux-1p:
+	$(SIMICS) test/linux/hv-linux-1p.simics
 
-test-linux-1p: bin/uv.uImage bin/mpc8578sim-hv-1p.dtb
-	$(SIMICS) sim/uv-linux-1p.simics
+test-linux-2p:
+	$(SIMICS) test/linux/hv-linux-2p.simics
 
-test-linux-2p: bin/uv.uImage bin/mpc8578sim-hv-2p.dtb
-	$(SIMICS) sim/uv-linux-2p.simics
-
-.PHONY: tests
-tests:
+.PHONY: test
+test:
 	make -C $@
 
 docs:

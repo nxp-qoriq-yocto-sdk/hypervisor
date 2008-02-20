@@ -1,0 +1,206 @@
+/ {
+	model = "fsl,MPC8578SIM";
+	compatible = "fsl,MPC8578SIM";
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	aliases {
+		console = &uart0;
+		serial0 = &uart0;
+		uartmux = &uartmux;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <0>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "okay";
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <1>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <2>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <3>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@4 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <4>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <5>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@6 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <6>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@7 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <7>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+	};
+
+	memory {
+		reg = <0 0 100000>;
+		device_type = "memory";
+	};
+
+	ccsr@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,mpc8578-ccsr", "simple-bus";
+		ranges = <0 0 fe000000 400000>;
+
+		uart0: serial@11c500 {
+			device_type = "serial";
+			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			reg = <11c500 100>;
+			clock-frequency = <0>;
+//			interrupts = <1c 2>;
+//			interrupt-parent = <&mpic>;
+		};
+
+		uart3: serial@11d600 {
+			device_type = "serial";
+			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			reg = <11d600 100>;
+			clock-frequency = <0>;
+//			interrupts = <1d 2>;
+//			interrupt-parent = <&mpic>;
+		};
+
+		global-utilities@e0000 {	//global utilities block
+			compatible = "fsl,mpc8572-guts";
+			reg = <e0000 1000>;
+			fsl,has-rstcr;
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "fsl,hv-byte-channel-mux";
+		fsl,real-dev = &uart3;
+		fsl,protocol = "tcp-over-ppp";
+	};
+
+	partitions {
+		part1 {
+			compatible = "fsl,hv-partition";
+			fsl,cpus = <0 1 2 1>;
+			fsl,entry = <0>;
+			fsl,privileged;
+			fsl,dtb = /incbin/("bin/linux-p1.dtb");
+			fsl,hv-ranges = <0 0 0 1000000 17000000
+			                 0 17000000 0 20000000 1000000
+			                 0 fe040000 0 fe040000 20000
+			                 0 fe060000 0 fe060000 1000
+			                 0 fe061000 0 fe062000 1000
+			                 0 fe062000 ffffffff ffffffff 1e000>;
+		};
+
+		part2 {
+			compatible = "fsl,hv-partition";
+			fsl,cpus = <5 2 1 1 3 1>;
+			fsl,entry = <0>;
+			fsl,dtb = /incbin/("bin/linux-p2.dtb");
+			fsl,hv-ranges = <0 0 0 21000000 04000000
+			                 0 fe040000 0 fe040000 20000
+			                 0 fe060000 0 fe065000 2000
+			                 0 fe062000 0 fe061000 1000
+			                 0 fe063000 0 fe063000 1000
+			                 0 fe064000 ffffffff ffffffff 1c000>;
+		};
+	};
+};

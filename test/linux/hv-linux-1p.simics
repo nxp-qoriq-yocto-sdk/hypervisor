@@ -1,0 +1,21 @@
+#
+# Script to run 8578/u-boot/ultravisor/linux on simulator
+#
+
+$use_uart1 = 1
+
+$guest_image[0]  = "vmlinux.bin"
+$guest_addr[0]   = 0x01000000
+$initrd_image[0]  = "busybox-1.1.3"
+$initrd_addr[0]   = 0x02300000
+
+$kernel_image  = "uv.uImage"
+
+$dtb_image  = "hv-linux-2p.dtb"
+
+add-directory "%script%/../common" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
+add-directory "%script%" -prepend
+
+run-command-file "hvsim.include"                                                                 
