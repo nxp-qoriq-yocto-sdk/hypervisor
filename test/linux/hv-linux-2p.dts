@@ -5,7 +5,7 @@
 	#size-cells = <1>;
 
 	aliases {
-		console = &uart0;
+		stdout = &uart0;
 		serial0 = &uart0;
 		uartmux = &uartmux;
 	};

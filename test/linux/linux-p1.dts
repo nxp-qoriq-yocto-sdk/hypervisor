@@ -139,4 +139,8 @@
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
 	};
+
+	aliases {
+		stdout = "/ccsr@fe000000/serial@11d500";
+	};
 };
