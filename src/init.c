@@ -38,9 +38,15 @@ void start_guest(void);
 
 void *fdt;
 static physaddr_t mem_end;
+unsigned long CCSRBAR_VA;
+void *temp_mapping;
 
 void start(unsigned long devtree_ptr)
 {
+	valloc_init(1024 * 1024, PHYSBASE);
+	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	temp_mapping = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+
 	fdt = (void *)(devtree_ptr + PHYSBASE);
 	mem_end = find_end_of_mem();
 	core_init();
@@ -49,12 +55,6 @@ void start(unsigned long devtree_ptr)
 	heap = (heap + 15) & ~15;
 
 	alloc_init(heap, mem_end + PHYSBASE);
-
-#if 1
-	chardev_t *console = ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET,
-	                                  0, 0, 16);
-	console_init(console);
-#endif
 
 	create_ns16550();
 	open_stdout();
@@ -158,13 +158,13 @@ static void release_secondary_cores(void)
 
 		printf("starting cpu %u, table %x\n", *reg, *table);
 
-		tlb1_set_entry(BASE_TLB_ENTRY + 1, CCSRBAR_VA - PAGE_SIZE,
+		tlb1_set_entry(BASE_TLB_ENTRY + 1, (unsigned long)temp_mapping,
 		               (*table) & ~(PAGE_SIZE - 1),
 		               TLB_TSIZE_4K, TLB_MAS2_IO,
 		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
-		uintptr_t table_va = *table & (PAGE_SIZE - 1);
-		table_va |= CCSRBAR_VA - PAGE_SIZE;
+		char *table_va = temp_mapping;
+		table_va += *table & (PAGE_SIZE - 1);
 
 		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
 		if (!cpu)

@@ -1,12 +1,10 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
-#define BASE_TLB_ENTRY 62
-#define PHYSBASE 0x40000000
-#define HYPERVISOR
-#define INTERRUPTS
-
-#define CCSRBAR_VA	0x01000000
+#define BASE_TLB_ENTRY 62 /**< TLB entry used for initial mapping */
+#define PHYSBASE 0x40000000 /**< Virtual base of physical address space */
+#define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
+#define INTERRUPTS /**< Indicates that we are interrupt-driven */
 
 #ifndef _ASM
 typedef struct {
@@ -14,6 +12,8 @@ typedef struct {
 } client_cpu_t;
 
 #include <interrupts.h>
+
+extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt
