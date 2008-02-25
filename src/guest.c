@@ -234,7 +234,6 @@ static int create_guest_spin_table(guest_t *guest)
 		spintbl[i].r3 = 0;
 		spintbl[i].r4 = 0;
 		spintbl[i].r7 = 0;
-		
 	}
 
 	/* FIXME: hardcoded cache line size */
