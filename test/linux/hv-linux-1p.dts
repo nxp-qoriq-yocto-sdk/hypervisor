@@ -184,6 +184,9 @@
 			fsl,dtb = /incbin/("bin/linux-p1.dtb");
 			fsl,hv-ranges = <0 0 0 1000000 17000000
 			                 0 17000000 0 20000000 1000000>;
+			fsl,hv-loaded-images;
+			fsl,image-src-addr = <0 efa00000>;
+			fsl,image-dest-offset = <0>;
 		};
 	};
 };

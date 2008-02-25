@@ -4,14 +4,14 @@
 
 $use_uart1 = 1
 
-$guest_image[0]  = "vmlinux.bin"
-$guest_addr[0]   = 0x01000000
+$guest_image[0]  = "vmlinux"
+$guest_addr[0]   = 0xefa00000
 $initrd_image[0]  = "busybox-1.1.3"
 $initrd_addr[0]   = 0x02300000
 
 $kernel_image  = "uv.uImage"
 
-$dtb_image  = "hv-linux-2p.dtb"
+$dtb_image  = "hv-linux-1p.dtb"
 
 add-directory "%script%/../common" -prepend
 add-directory "%script%/../../bin" -prepend

@@ -36,6 +36,7 @@
 #include <byte_chan.h>
 #include <devtree.h>
 #include <errors.h>
+#include <elf.h>
 
 #define MAX_PARTITIONS 8
 
@@ -313,6 +314,91 @@ fail:
 
 #define MAX_PATH 256
 
+/*
+ * Map flash into memory and return a hypervisor virtual address for the
+ * given physical address.
+ *
+ * @phys: physical address inside flash space
+ *
+ * The TLB entry created by this function is temporary.
+ */
+void *map_flash(physaddr_t phys)
+{
+	/* Make sure 'phys' points to flash */
+	if ((phys < 0xef000000) || (phys > 0xefffffff)) {
+		printf("%s: phys addr %llx is out of range\n", __FUNCTION__, phys);
+		return NULL;
+	}
+
+	/* We need to set up a temporary virtual mapping.  Use a VA right
+	   after the CCSR register space.  */
+
+	void *virt = (void *) (CCSRBAR_VA + 16 * 1024 * 1024);
+
+	/*
+	 * There is no permanent TLB entry for flash, so we create a temporary
+	 * one here. BASE_TLB_ENTRY + 1 is a slot reserved for temporary
+	 * mappings.
+	 */
+
+	// FIXME: we're hard-coding the phys address of flash here, it should
+	// read from the DTS instead.
+
+	tlb1_set_entry(BASE_TLB_ENTRY + 1, (unsigned long) virt,
+		       0xef000000, TLB_TSIZE_16M, TLB_MAS2_MEM,
+		       TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+	return virt + (phys - 0xef000000);
+}
+
+/*
+ * Return a hypervisor virtual address that corresponds to the given guest
+ * physical address.
+ */
+void *map_guest(guest_t *guest, physaddr_t phys)
+{
+	unsigned long attr;
+	unsigned long rpn;
+
+	/*
+	 * The first 4GB - PHYSBASE bytes of RAM are mapped into hypervisor
+	 * virtual address space, starting at virtual address PHYSBASE.  This
+	 * means that the physical memory of all guests is available starting at
+	 * address PHYSBASE.  All we need to do is obtain the corresponding
+	 * hypervisor virtual address that maps to guest_phys.
+	 */
+	rpn = vptbl_xlate(guest->gphys, phys >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
+
+	if (attr & PTE_VALID) {
+		unsigned long offset = (unsigned long) (phys & (PAGE_SIZE - 1));
+
+		return (void *) (PHYSBASE + (rpn << PAGE_SHIFT) + offset);
+	}
+
+	printf("%s: invalid PTE\n", __FUNCTION__);
+
+	return NULL;
+}
+
+/*
+ * Return a hypervisor virtual address that corresponds to the given guest
+ * physical address.
+ *
+ * We assume that the guest physical memory is physically contiguous.  This
+ * is because we do a straight memcpy from flash into the guest space, but
+ * we only provide a single physical address to map_guest().
+ */
+static int load_image_from_flash(guest_t *guest, physaddr_t elf_phys, unsigned long guest_offset)
+{
+	void *image = map_flash(elf_phys);
+	void *target = map_guest(guest, guest_offset);
+
+	if (!image || !target)
+		return -1;
+
+	return load_elf(image, 0, target);
+}
+
 static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
@@ -352,9 +438,39 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		goto fail;
 
 	ret = map_guest_reg_all(guest, partition);
-	if (ret == 0)
-		return 0;
+	if (ret < 0)
+		goto fail;
 
+	/*
+	 * If an ELF image exists, load it.  This must be called after
+	 * map_guest_reg_all(), because that function creates some of the TLB
+	 * mappings we need.
+	 */
+
+	if (fdt_getprop(fdt, partition, "fsl,hv-loaded-images", &len)) {
+		const uint64_t *image_addr;
+		const uint32_t *guest_offset;
+
+		image_addr = fdt_getprop(fdt, partition, "fsl,image-src-addr", &len);
+		if (!image_addr) {
+			printf("guest %s: no fsl,image-src-addr property\n", guest->name);
+			ret = -FDT_ERR_NOTFOUND;
+			goto fail;
+		}
+
+		guest_offset = fdt_getprop(fdt, partition, "fsl,image-dest-offset", &len);
+		if (!guest_offset) {
+			printf("guest %s: no fsl,image-dest-offset property\n", guest->name);
+			ret = -FDT_ERR_NOTFOUND;
+			goto fail;
+		}
+
+		ret = load_image_from_flash(guest, *image_addr, *guest_offset);
+		if (ret < 0)
+			goto fail;
+	}
+
+	return 0;
 fail:
 	printf("error %d (%s) building guest device tree for %s\n",
 	       ret, fdt_strerror(ret), guest->name);
