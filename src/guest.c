@@ -594,19 +594,7 @@ void start_guest(void)
 				printf("Couldn't copy device tree to guest, %d\n", ret);
 				continue;
 			}
-#if 0
-			unsigned long attr;
-			unsigned long rpn = vptbl_xlate(guest->gphys,
-			                                0x00f00, &attr, PTE_PHYS_LEVELS);
 
-			if (!(attr & PTE_VALID)) {
-				printf("No valid guest phys 0x00f00000\n");
-				continue;
-			}
-			
-			memcpy((void *)(PHYSBASE + (rpn << PAGE_SHIFT)), guest->devtree,
-			       fdt_totalsize(fdt));
-#endif
 			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 			               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
