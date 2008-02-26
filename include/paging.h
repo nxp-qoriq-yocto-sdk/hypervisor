@@ -3,6 +3,9 @@
 
 #include <hv.h>
 
+#define TEMPTLB1 62
+#define TEMPTLB2 63
+
 #define PHYS_BITS 36
 #define VIRT_BITS 32
 
@@ -94,5 +97,10 @@ void tlb1_init(void);
 
 /** Permanent 16MiB chunk of valloc space for temporary local mappings */
 extern void *temp_mapping;
+
+size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len);
+size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len);
+size_t copy_between_gphys(pte_t *dtbl, physaddr_t dest,
+                           pte_t *stbl, physaddr_t from, size_t len);
 
 #endif

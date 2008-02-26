@@ -158,7 +158,7 @@ static void release_secondary_cores(void)
 
 		printf("starting cpu %u, table %x\n", *reg, *table);
 
-		tlb1_set_entry(BASE_TLB_ENTRY + 1, (unsigned long)temp_mapping,
+		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping,
 		               (*table) & ~(PAGE_SIZE - 1),
 		               TLB_TSIZE_4K, TLB_MAS2_IO,
 		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);

@@ -1,6 +1,7 @@
+/** @file
+ * Guest management
+ */
 /*
- * Guest device tree processing
- *
  * Copyright (C) 2007-2008 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  * 
@@ -470,6 +471,14 @@ void start_guest(void)
 
 			byte_chan_partition_init(guest);
 
+			ret = copy_to_gphys(guest->gphys, 0x00f00000,
+			                    guest->devtree, fdt_totalsize(fdt));
+
+			if (ret != fdt_totalsize(fdt)) {
+				printf("Couldn't copy device tree to guest, %d\n", ret);
+				continue;
+			}
+#if 0
 			unsigned long attr;
 			unsigned long rpn = vptbl_xlate(guest->gphys,
 			                                0x00f00, &attr, PTE_PHYS_LEVELS);
@@ -481,7 +490,7 @@ void start_guest(void)
 			
 			memcpy((void *)(PHYSBASE + (rpn << PAGE_SHIFT)), guest->devtree,
 			       fdt_totalsize(fdt));
-
+#endif
 			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 			               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
@@ -543,3 +552,122 @@ void start_guest(void)
 nomem:
 	printf("out of memory in start_guest\n");
 } 
+
+void *map_gphys(int tlbentry, pte_t *tbl, physaddr_t addr,
+                void *vpage, size_t *len, int maxtsize, int write)
+{
+	size_t offset, bytesize;
+	unsigned long attr;
+	unsigned long rpn;
+	physaddr_t physaddr;
+	int tsize;
+
+	rpn = vptbl_xlate(tbl, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
+	if (!(attr & PTE_VALID) || (attr & PTE_VF))
+		return NULL;
+	if (write & !(attr & PTE_UW))
+		return NULL;
+
+	tsize = attr >> PTE_SIZE_SHIFT;
+	if (tsize > maxtsize)
+		tsize = maxtsize;
+
+	bytesize = (uintptr_t)tsize_to_pages(tsize) << PAGE_SHIFT;
+	offset = addr & (bytesize - 1);
+	physaddr = (physaddr_t)rpn << PAGE_SHIFT;
+
+	if (len)
+		*len = bytesize - offset;
+
+	tlb1_set_entry(tlbentry, (unsigned long)vpage, physaddr & ~(bytesize - 1),
+	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+	return vpage + offset;
+}
+
+/** Copy from a hypervisor virtual address to a guest physical address
+ *
+ * @param[in] tbl Guest physical page table
+ * @param[in] dest Guest physical address to copy to
+ * @param[in] src Hypervisor virtual address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len)
+{
+	size_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk;
+		void *vdest;
+		
+		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping,
+		                  &chunk, TLB_TSIZE_16M, 1);
+		if (!vdest)
+			break;
+
+		if (chunk > len)
+			chunk = len;
+
+		memcpy(vdest, src, chunk);
+
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	return ret;
+}
+
+/** Copy from a guest physical address to a hypervisor virtual address 
+ *
+ * @param[in] tbl Guest physical page table
+ * @param[in] dest Hypervisor virtual address to copy to
+ * @param[in] src Guest physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len)
+{
+	size_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk;
+		void *vsrc;
+		
+		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping,
+		                 &chunk, TLB_TSIZE_16M, 0);
+		if (!vsrc)
+			break;
+
+		if (chunk > len)
+			chunk = len;
+
+		memcpy(dest, vsrc, chunk);
+
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	return ret;
+}
+
+/** Copy from a guest physical address to another guest physical address
+ *
+ * @param[in] dtbl Guest physical page table of the destination
+ * @param[in] dest Guest physical address to copy to
+ * @param[in] stbl Guest physical page table of the source
+ * @param[in] src Guest physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_between_gphys(pte_t *dtbl, physaddr_t dest,
+                          pte_t *stbl, physaddr_t from, size_t len)
+{
+	size_t ret = 0;
+	// FIXME implement
+	return ret;
+}
