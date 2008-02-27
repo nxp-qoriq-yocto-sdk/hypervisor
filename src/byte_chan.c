@@ -319,6 +319,10 @@ void byte_chan_partition_init(guest_t *guest)
 			return;
 		}
 
+		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, 4);
+		if (ret < 0)
+			break;
+
 		ret = fdt_setprop(guest->devtree, off, "interrupts", irq, sizeof(irq));
 		if (ret < 0)
 			break;
