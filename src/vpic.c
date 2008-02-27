@@ -106,7 +106,7 @@ int vpic_process_pending_ints(guest_t *guest)
 		if (guest->vpic.active)
 			break;
 
-		if (!guest->vpic.ints[irq].msk) {
+		if (guest->vpic.ints[irq].enable) {
 			/* int now moves to active state */
 			guest->vpic.active |= 1 << irq;
 	
@@ -150,7 +150,7 @@ void vpic_assert_vint(guest_t *guest, int irq)
 	guest->vpic.pending |= 1 << irq;
 	spin_unlock_critsave(&guest->vpic.lock, save);
 
-	if (!guest->vpic.ints[irq].msk) {
+	if (guest->vpic.ints[irq].enable) {
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);
 	}
 }
@@ -160,7 +160,7 @@ void vpic_irq_mask(guest_t *guest, int irq)
 	register_t save;
 	save = spin_lock_critsave(&guest->vpic.lock);
 
-	guest->vpic.ints[irq].msk = 1;
+	guest->vpic.ints[irq].enable = 0;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
@@ -170,7 +170,7 @@ void vpic_irq_unmask(guest_t *guest, int irq)
 	register_t save;
 	save = spin_lock_critsave(&guest->vpic.lock);
 
-	guest->vpic.ints[irq].msk = 0;
+	guest->vpic.ints[irq].enable = 1;
 	if (guest->vpic.pending) {
 		uint8_t destcpu = vpic_irq_get_destcpu(guest,irq);
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);

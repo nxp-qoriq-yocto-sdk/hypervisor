@@ -30,7 +30,7 @@
 typedef struct {
 	struct {
 		uint32_t hw:1;
-		uint32_t msk:1;
+		uint32_t enable:1;
 		uint32_t reserved:10;
 		uint32_t priority:4;
 		uint32_t vector:16;
