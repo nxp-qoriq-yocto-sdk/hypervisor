@@ -585,7 +585,9 @@ void start_guest(void)
 			if (ret < 0)
 				continue;
 
+#ifdef CONFIG_BYTE_CHAN
 			byte_chan_partition_init(guest);
+#endif
 
 			ret = copy_to_gphys(guest->gphys, 0x00f00000,
 			                    guest->devtree, fdt_totalsize(fdt));

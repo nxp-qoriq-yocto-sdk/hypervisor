@@ -62,6 +62,7 @@ static void fh_whoami(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
+#ifdef CONFIG_BYTE_CHAN
 /*
  * r3: handle
  * r4 : count
@@ -178,6 +179,11 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 	return;
 }
+#else
+#define fh_byte_channel_send unimplemented
+#define fh_byte_channel_receive unimplemented
+#define fh_byte_channel_poll unimplemented
+#endif
 
 static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 0 */

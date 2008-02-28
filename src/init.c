@@ -74,9 +74,13 @@ void start(unsigned long devtree_ptr)
 	mpic_irq_unmask(0x24);
 
 	/* byte channel initialization */
+#ifdef CONFIG_BYTE_CHAN
 	create_byte_channels();
+#ifdef CONFIG_BCMUX
 	create_muxes();
+#endif
 	connect_global_byte_channels();
+#endif
 
 	enable_critint();
 

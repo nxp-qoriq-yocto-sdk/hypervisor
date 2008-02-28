@@ -10,3 +10,19 @@ config NS16550
 		UARTs).  This provides a libos character device that can
 		be used for byte channels, byte channel muxes, and the
 		hypervisor console.
+
+config BYTE_CHAN
+	bool "Byte-channel support"
+	help
+		Byte channels are a bidirectional pipe mechanism that
+		allows communication between guests, character devices,
+		multiplexers, and other components.
+
+config BCMUX
+	bool "Byte-channel multiplexer"
+	depends on BYTE_CHAN
+	help
+		Byte channel multiplexing creates virtual channels over
+		a single combined byte channel.  It is useful for, among
+		other things, sharing a single serial port for the
+		consoles of all guests.
