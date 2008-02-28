@@ -621,12 +621,12 @@ int main(int ac, char **av)
 		check_conf(&rootmenu);
 	} while (conf_cnt);
 	if (conf_write(NULL)) {
-		fprintf(stderr, _("\n*** conf_write  Error during writing of the kernel configuration.\n\n"));
+		fprintf(stderr, _("\n*** Error during writing of the kernel configuration.\n\n"));
 		return 1;
 	}
 skip_check:
 	if (input_mode == ask_silent && conf_write_autoconf()) {
-		fprintf(stderr, _("\n*** conf_write_autoconf Error during writing of the kernel configuration.\n\n"));
+		fprintf(stderr, _("\n*** Error during writing of the kernel configuration.\n\n"));
 		return 1;
 	}
 
