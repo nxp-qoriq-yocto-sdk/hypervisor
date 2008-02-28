@@ -11,8 +11,8 @@ all:
 include/config/auto.conf: .config include/config/auto.conf.cmd
 	@$(MAKE) -f $(srctree)/Makefile silentoldconfig
 
-.PHONY: silentoldconfig menuconfig xconfig gconfig oldconfig config
-silentoldconfig menuconfig xconfig gconfig oldconfig config:
+.PHONY: FORCE
+config %config: FORCE
 	$(MAKE) -f kconfig/Makefile obj=bin srctree=$(CURDIR) src=kconfig $@
 
 non-config := $(filter-out %config clean, $(MAKECMDGOALS))
