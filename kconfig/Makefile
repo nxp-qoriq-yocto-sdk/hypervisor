@@ -3,25 +3,36 @@
 # These targets are used from top-level makefile
 
 PHONY += oldconfig xconfig gconfig menuconfig config silentoldconfig update-po-config
+HOSTCC := cc
+HOSTCXX := c++
+HOSTCFLAGS := -O2 -DPROJECT=\"Topaz\" -DPROJECTADJ=\"Topaz\" -I"$(obj)"
+CONFIG_SHELL := sh
+MKDIR := mkdir -p
 
-Kconfig := arch/$(SRCARCH)/Kconfig
+Kconfig := $(srctree)/Kconfig
 
 xconfig: $(obj)/qconf
+	@$(MKDIR) $(srctree)/include/config
 	$< $(Kconfig)
 
 gconfig: $(obj)/gconf
+	@$(MKDIR) $(srctree)/include/config
 	$< $(Kconfig)
 
 menuconfig: $(obj)/mconf
+	@$(MKDIR) $(srctree)/include/config
 	$< $(Kconfig)
 
 config: $(obj)/conf
+	@$(MKDIR) $(srctree)/include/config
 	$< $(Kconfig)
 
 oldconfig: $(obj)/conf
+	@$(MKDIR) $(srctree)/include/config
 	$< -o $(Kconfig)
 
 silentoldconfig: $(obj)/conf
+	@$(MKDIR) $(srctree)/include/config
 	$< -s $(Kconfig)
 
 # Create new linux.pot file
@@ -93,9 +104,15 @@ check-lxdialog  := $(srctree)/$(src)/lxdialog/check-lxdialog.sh
 # we really need to do so. (Do not call gcc as part of make mrproper)
 HOST_EXTRACFLAGS = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ccflags)
 HOST_LOADLIBES   = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ldflags $(HOSTCC))
-
 HOST_EXTRACFLAGS += -DLOCALE
 
+$(obj)/%.o: $(src)/%.c
+	@$(MKDIR) $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $< -o $@
+
+$(obj)/%.o: $(src)/%.cc
+	@$(MKDIR) $(@D)
+	$(HOSTCXX) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $< -o $@
 
 # ===========================================================================
 # Shared Makefile for the various kconfig executables:
@@ -111,9 +128,17 @@ HOST_EXTRACFLAGS += -DLOCALE
 lxdialog := lxdialog/checklist.o lxdialog/util.o lxdialog/inputbox.o
 lxdialog += lxdialog/textbox.o lxdialog/yesno.o lxdialog/menubox.o
 
-conf-objs	:= conf.o  zconf.tab.o
+conf-objs	:= conf.o zconf.tab.o
+$(obj)/conf: $(conf-objs:%=$(obj)/%)
+	$(HOSTCC) $^ -o $@
+
 mconf-objs	:= mconf.o zconf.tab.o $(lxdialog)
+$(obj)/mconf: $(mconf-objs:%=$(obj)/%)
+	$(HOSTCC) $^ $(HOST_LOADLIBES) -o $@
+
 kxgettext-objs	:= kxgettext.o zconf.tab.o
+$(obj)/kxgettext: $(kxgettext-objs:%=$(obj)/%)
+	$(HOSTCC) $^ -o $@
 
 hostprogs-y := conf qconf gconf kxgettext
 
@@ -130,8 +155,7 @@ endif
 
 
 ifeq ($(qconf-target),1)
-qconf-cxxobjs	:= qconf.o
-qconf-objs	:= kconfig_load.o zconf.tab.o
+qconf-objs	:= qconf.o kconfig_load.o zconf.tab.o
 endif
 
 ifeq ($(gconf-target),1)
@@ -151,21 +175,30 @@ $(obj)/dochecklxdialog:
 
 always := dochecklxdialog
 
-# Add environment specific flags
-HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC) $(HOSTCFLAGS))
-
 # generated files seem to need this to find local include files
-HOSTCFLAGS_lex.zconf.o	:= -I$(src)
-HOSTCFLAGS_zconf.tab.o	:= -I$(src)
+$(obj)/lex.zconf.o: $(obj)/lex.zconf.c
+	@$(MKDIR) $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -c -I$(src) $(HOST_EXTRACFLAGS) $< -o $@
 
-HOSTLOADLIBES_qconf	= $(KC_QT_LIBS) -ldl
-HOSTCXXFLAGS_qconf.o	= $(KC_QT_CFLAGS) -D LKC_DIRECT_LINK
+$(obj)/zconf.tab.o: $(obj)/zconf.tab.c
+	$(HOSTCC) $(HOSTCFLAGS) -c -I$(src) $(HOST_EXTRACFLAGS) $< -o $@
 
-HOSTLOADLIBES_gconf	= `pkg-config --libs gtk+-2.0 gmodule-2.0 libglade-2.0`
-HOSTCFLAGS_gconf.o	= `pkg-config --cflags gtk+-2.0 gmodule-2.0 libglade-2.0` \
-                          -D LKC_DIRECT_LINK
 
-$(obj)/qconf.o: $(obj)/.tmp_qtcheck
+$(obj)/qconf.o: $(src)/qconf.cc
+	@$(MKDIR) $(@D)
+	$(HOSTCXX) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $(KC_QT_CFLAGS) -D LKC_DIRECT_LINK $< -o $@
+
+$(obj)/qconf: $(qconf-objs:%=$(obj)/%) $(obj)/.tmp_qtcheck
+	$(HOSTCXX) $(KC_QT_LIBS) -ldl $(qconf-objs:%=$(obj)/%) -o $@
+
+$(obj)/gconf.o: $(src)/gconf.c
+	@$(MKDIR) $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) -D LKC_DIRECT_LINK \
+	`pkg-config --cflags gtk+-2.0 gmodule-2.0 libglade-2.0` $< -o $@
+
+$(obj)/gconf: $(gconf-objs:%=$(obj)/%)
+	$(HOSTCC) `pkg-config --libs gtk+-2.0 gmodule-2.0 libglade-2.0` \
+	$^ -o $@
 
 ifeq ($(qconf-target),1)
 $(obj)/.tmp_qtcheck: $(src)/Makefile
@@ -173,6 +206,7 @@ $(obj)/.tmp_qtcheck: $(src)/Makefile
 
 # QT needs some extra effort...
 $(obj)/.tmp_qtcheck:
+	@$(MKDIR) $(@D)
 	@set -e; echo "  CHECK   qt"; dir=""; pkg=""; \
 	pkg-config --exists qt 2> /dev/null && pkg=qt; \
 	pkg-config --exists qt-mt 2> /dev/null && pkg=qt-mt; \
@@ -221,6 +255,7 @@ ifeq ($(gconf-target),1)
 
 # GTK needs some extra effort, too...
 $(obj)/.tmp_gtkcheck:
+	@$(MKDIR) $(@D)
 	@if `pkg-config --exists gtk+-2.0 gmodule-2.0 libglade-2.0`; then		\
 		if `pkg-config --atleast-version=2.0.0 gtk+-2.0`; then			\
 			touch $@;								\
@@ -249,9 +284,11 @@ $(obj)/qconf.o: $(obj)/qconf.moc $(obj)/lkc_defs.h
 $(obj)/gconf.o: $(obj)/lkc_defs.h
 
 $(obj)/%.moc: $(src)/%.h
+	@$(MKDIR) $(@D)
 	$(KC_QT_MOC) -i $< -o $@
 
 $(obj)/lkc_defs.h: $(src)/lkc_proto.h
+	@$(MKDIR) $(@D)
 	sed < $< > $@ 's/P(\([^,]*\),.*/#define \1 (\*\1_p)/'
 
 # Extract gconf menu items for I18N support
@@ -282,4 +319,7 @@ lex.%.c: %.l
 	gperf < $< > $@
 	cp $@ $@_shipped
 
+else
+$(obj)/%:: $(src)/%_shipped
+	cp -af $< $@
 endif

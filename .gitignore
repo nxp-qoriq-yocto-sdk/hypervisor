@@ -1,2 +1,5 @@
 bin
 *.dtb
+include/config
+.config
+.config.old

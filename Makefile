@@ -1,124 +1,28 @@
-#
-# Copyright © 2007 Freescale Semiconductor, Inc
-# Copyright © 1999 Paul D. Smith
-#
-#
-# The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
-#
+export PROJECTVERSION=0.0
+export srctree=$(CURDIR)
 
-SIMICS=simics
-CROSS_COMPILE=powerpc-e500mc-linux-gnu-
-DTC_DIR := ../dtc
-LIBFDT_DIR := $(DTC_DIR)/libfdt
-LIBOS_DIR := ../libos/lib
-LIBOS_INC := ../libos/include
-LIBOS_BIN := bin/libos
-LIBOS_CLIENT_H := include/libos-client.h
+.PHONY: all
+all:
 
-CC=$(CROSS_COMPILE)gcc
-#CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
-        -std=gnu99  -include $(LIBOS_CLIENT_H)
+.config include/config/auto.conf.cmd: ;
 
-CC_OPTS_C= -Wall \
-  -Wundef \
-  -Wstrict-prototypes \
-  -Wno-trigraphs \
-  -fno-strict-aliasing \
-  -fno-common \
-  -O2 \
-  -msoft-float \
-  -pipe \
-  -ffixed-r2 \
-  -mmultiple \
-  -mno-altivec \
-  -funit-at-a-time \
-  -mno-string \
-  -fomit-frame-pointer \
-  -Werror
-CC_OPTS_ASM=-D_ASM -Ibin/src
-LD=$(CROSS_COMPILE)ld
-LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
-GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
-MKDIR=mkdir -p
+-include include/config/auto.conf.cmd
 
-all: bin/uv.uImage bin/uv.map test
+include/config/auto.conf: .config include/config/auto.conf.cmd
+	@$(MAKE) -f $(srctree)/Makefile silentoldconfig
 
-LIBFDT_objdir := src
-include $(LIBFDT_DIR)/Makefile.libfdt
-include $(LIBOS_DIR)/Makefile.libos
+.PHONY: silentoldconfig menuconfig xconfig gconfig oldconfig config
+silentoldconfig menuconfig xconfig gconfig oldconfig config:
+	$(MAKE) -f kconfig/Makefile obj=bin srctree=$(CURDIR) src=kconfig $@
 
-LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-              $(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_MP) \
-              $(LIBOS_MPIC) $(LIBOS_QUEUE)
-SRCS := $(LIBOS_SRCS:%=libos/%) src/interrupts.c src/trap.c src/events.c src/vpic.c \
-	src/init.c src/guest.c src/tlb.c src/emulate.c src/timers.c \
-	src/paging.c src/hcalls.c src/byte_chan.c src/bcmux.c \
-	src/devtree.c src/elf.c
+non-config := $(filter-out %config clean, $(MAKECMDGOALS))
+ifeq ($(MAKECMDGOALS),)
+	non-config := all
+endif
 
-OBJS := $(basename $(SRCS))
-OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-OBJS := $(OBJS:%=bin/%)
-
-bin/uv.uImage: bin/uv.bin
-	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
-
-bin/uv.bin.gz: bin/uv.bin
-	gzip -f $<
-
-bin/uv.bin: bin/uv
-	$(CROSS_COMPILE)objcopy -O binary $< $@
-
-bin/uv: $(OBJS)
-	$(CC) $(LD_OPTS) -Wl,-Tuv.lds -o $@ $(OBJS) -lgcc
-
-# compile and gen dependecy file
-bin/src/%.o : src/%.c
-	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
-
-bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
-	@$(MKDIR) `dirname $@`
-	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) \
-	-include include/libfdt_env.h -c -o $@ $<
-
-bin/%.dtb : dts/%.dts
-	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
-
-dts/%.dtb : dts/%.dts
-	$(DTC_DIR)/dtc -O dtb $< -o $@
-
-# include the dependecy files
--include bin/src/genassym.d
--include $(OBJS:.o=.d)
-
-bin/uv.map: bin/uv
-	nm -n bin/uv > $@
+$(non-config): include/config/auto.conf
+	$(MAKE) -f Makefile.build $@
 
 clean:
 	rm -rf bin
 	rm -f dts/*.dtb
-
-.PHONY: test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
-
-test-hello:
-	$(SIMICS) test/hello-test/hv-hello.simics
-
-test-msgsnd:
-	$(SIMICS) test/msgsnd-test/hv-msgsnd.simics
-
-test-vmpic:
-	$(SIMICS) test/vmpic-test/hv-vmpic.simics
-
-test-linux-1p:
-	$(SIMICS) test/linux/hv-linux-1p.simics
-
-test-linux-2p:
-	$(SIMICS) test/linux/hv-linux-2p.simics
-
-.PHONY: test
-test:
-	make -C $@
-
-docs:
-	doxygen doc/Doxyfile

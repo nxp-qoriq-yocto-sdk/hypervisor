@@ -37,8 +37,10 @@ int file_write_dep(const char *name)
 	if (!name)
 		name = ".kconfig.d";
 	out = fopen("..config.tmp", "w");
-	if (!out)
+	if (!out) {
+		printf("..config.tmp\n");
 		return 1;
+	}
 	fprintf(out, "deps_config := \\\n");
 	for (file = file_list; file; file = file->next) {
 		if (file->next)
@@ -46,7 +48,7 @@ int file_write_dep(const char *name)
 		else
 			fprintf(out, "\t%s\n", file->name);
 	}
-	fprintf(out, "\ninclude/config/auto.conf: \\\n"
+	fprintf(out, "\ninclude/auto.conf: \\\n"
 		     "\t$(deps_config)\n\n");
 
 	expr_list_for_each_sym(sym_env_list, e, sym) {
@@ -61,7 +63,7 @@ int file_write_dep(const char *name)
 		if (!value)
 			value = "";
 		fprintf(out, "ifneq \"$(%s)\" \"%s\"\n", env_sym->name, value);
-		fprintf(out, "include/config/auto.conf: FORCE\n");
+		fprintf(out, "include/auto.conf: FORCE\n");
 		fprintf(out, "endif\n");
 	}
 

@@ -31,7 +31,7 @@ extern "C" {
 
 #define SRCTREE "srctree"
 
-#define PACKAGE "linux"
+#define PACKAGE "topaz"
 #define LOCALEDIR "/usr/share/locale"
 
 #define _(text) gettext(text)
