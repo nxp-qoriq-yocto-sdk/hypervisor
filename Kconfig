@@ -1,3 +1,12 @@
 config PROJECTVERSION
 	string
 	option env="PROJECTVERSION"
+
+config NS16550
+	bool "NS16550-compatible UART support"
+	help
+		Say "Y" to support serial ports compatible with the National
+		Semiconductor 16550 line of UART chips (including PC-style
+		UARTs).  This provides a libos character device that can
+		be used for byte channels, byte channel muxes, and the
+		hypervisor console.

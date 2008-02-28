@@ -332,6 +332,7 @@ void *ptr_from_node(const void *tree, int offset, const char *type)
 	return *ptr;
 }
 
+#ifdef CONFIG_NS16550
 void create_ns16550(void)
 {
 	int off = -1, ret;
@@ -360,6 +361,7 @@ void create_ns16550(void)
 			break;
 	}
 }
+#endif
 
 void open_stdout(void)
 {

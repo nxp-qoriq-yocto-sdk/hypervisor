@@ -376,7 +376,7 @@ void create_muxes(void)
 	       ret, fdt_strerror(ret));
 }
 
-#ifdef TEST
+#if defined(TEST) && defined(CONFIG_NS16550)
 
 mux_complex_t *vuart_complex;	
 
