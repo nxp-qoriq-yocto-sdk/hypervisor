@@ -24,5 +24,5 @@ $(non-config): include/config/auto.conf
 	$(MAKE) -f Makefile.build $@
 
 clean:
-	rm -rf bin
+	rm -rf bin include/config
 	rm -f dts/*.dtb
