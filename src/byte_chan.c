@@ -194,6 +194,7 @@ static void connect_byte_channel(byte_chan_t *bc, int endpoint,
 		return;
 	}
 
+#ifdef CONFIG_BCMUX
 	ptr = ptr_from_node(fdt, endpoint, "mux");
 	if (ptr) {
 		int len;
@@ -217,6 +218,7 @@ static void connect_byte_channel(byte_chan_t *bc, int endpoint,
 
 		return;
 	}
+#endif
 
 	printf("connect_byte_channel: unrecognized endpoint\n");
 }

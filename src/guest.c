@@ -586,7 +586,9 @@ void start_guest(void)
 			if (ret < 0)
 				continue;
 
+#ifdef CONFIG_BYTE_CHAN
 			byte_chan_partition_init(guest);
+#endif
 
 			vmpic_partition_init(guest);
 

@@ -44,7 +44,7 @@ MKDIR=mkdir -p
 
 -include include/config/auto.conf
 
-all: bin/uv.uImage bin/uv.map test
+all: bin/uv.uImage bin/uv.map
 
 LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
@@ -57,8 +57,10 @@ libos-src-y := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
 libos-src-$(CONFIG_NS16550) += $(LIBOS_NS16550)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
-            timers.c paging.c hcalls.c byte_chan.c bcmux.c devtree.c elf.c \
-            vmpic.c
+            timers.c paging.c hcalls.c devtree.c elf.c vmpic.c
+
+hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
+hv-src-$(CONFIG_BCMUX) += bcmux.c
 
 SRCS := $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
@@ -91,11 +93,9 @@ bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) \
 	-include include/libfdt_env.h -c -o $@ $<
 
-bin/%.dtb : dts/%.dts
+bin/%.dtb : %.dts
+	@$(MKDIR) $(@D)
 	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
-
-dts/%.dtb : dts/%.dts
-	$(DTC_DIR)/dtc -O dtb $< -o $@
 
 # include the dependecy files
 -include bin/src/genassym.d
@@ -106,22 +106,25 @@ bin/uv.map: bin/uv
 
 .PHONY: test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
 
-test-hello:
+test-hello: bin/uv.uImage test/hello-test
 	$(SIMICS) test/hello-test/hv-hello.simics
 
-test-msgsnd:
+test-msgsnd: bin/uv.uImage test/msgsnd-test
 	$(SIMICS) test/msgsnd-test/hv-msgsnd.simics
 
-test-vmpic:
+test-vmpic: bin/uv.uImage test/vmpic-test
 	$(SIMICS) test/vmpic-test/hv-vmpic.simics
 
-test-linux-1p:
+test-linux-1p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
 
-test-linux-2p:
+test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 
-.PHONY: test
+.PHONY: FORCE test
+test/%: FORCE
+	make -C $@
+
 test:
 	make -C $@
 
