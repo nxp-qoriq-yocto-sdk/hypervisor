@@ -315,6 +315,11 @@ fail:
 
 #define MAX_PATH 256
 
+// FIXME: we're hard-coding the phys address of flash here, it should
+// read from the DTS instead.
+#define FLASH_ADDR      0xef000000
+#define FLASH_SIZE      (16 * 1024 * 1024)
+
 /*
  * Map flash into memory and return a hypervisor virtual address for the
  * given physical address.
@@ -323,81 +328,62 @@ fail:
  *
  * The TLB entry created by this function is temporary.
  */
-void *map_flash(physaddr_t phys)
+static void *map_flash(physaddr_t phys)
 {
 	/* Make sure 'phys' points to flash */
-	if ((phys < 0xef000000) || (phys > 0xefffffff)) {
+	if ((phys < FLASH_ADDR) || (phys > (FLASH_ADDR + FLASH_SIZE - 1))) {
 		printf("%s: phys addr %llx is out of range\n", __FUNCTION__, phys);
 		return NULL;
 	}
 
-	/* We need to set up a temporary virtual mapping.  Use a VA right
-	   after the CCSR register space.  */
-
-	void *virt = (void *) (CCSRBAR_VA + 16 * 1024 * 1024);
-
 	/*
 	 * There is no permanent TLB entry for flash, so we create a temporary
-	 * one here. BASE_TLB_ENTRY + 1 is a slot reserved for temporary
-	 * mappings.
+	 * one here. TEMPTLB2 is a slot reserved for temporary mappings.  We
+	 * can't use TEMPTLB1, because map_gphys() is using that one.
 	 */
 
-	// FIXME: we're hard-coding the phys address of flash here, it should
-	// read from the DTS instead.
-
-	tlb1_set_entry(BASE_TLB_ENTRY + 1, (unsigned long) virt,
-		       0xef000000, TLB_TSIZE_16M, TLB_MAS2_MEM,
+	tlb1_set_entry(TEMPTLB2, (unsigned long) temp_mapping[1],
+		       FLASH_ADDR, TLB_TSIZE_16M, TLB_MAS2_MEM,
 		       TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
-	return virt + (phys - 0xef000000);
+	return temp_mapping[1] + (phys - FLASH_ADDR);
 }
 
-/*
- * Return a hypervisor virtual address that corresponds to the given guest
- * physical address.
+/**
+ * Load a binary or ELF image into guest memory
+ *
+ * @guest: guest data structure
+ * @image_phys: real physical address of the image
+ * @guest_phys: guest physical address to load the image to
+ * @length: size of the image, optional if image is an ELF
  */
-void *map_guest(guest_t *guest, physaddr_t phys)
+static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr_t guest_phys, size_t length)
 {
-	unsigned long attr;
-	unsigned long rpn;
+	void *image = map_flash(image_phys);
 
-	/*
-	 * The first 4GB - PHYSBASE bytes of RAM are mapped into hypervisor
-	 * virtual address space, starting at virtual address PHYSBASE.  This
-	 * means that the physical memory of all guests is available starting at
-	 * address PHYSBASE.  All we need to do is obtain the corresponding
-	 * hypervisor virtual address that maps to guest_phys.
-	 */
-	rpn = vptbl_xlate(guest->gphys, phys >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
-
-	if (attr & PTE_VALID) {
-		unsigned long offset = (unsigned long) (phys & (PAGE_SIZE - 1));
-
-		return (void *) (PHYSBASE + (rpn << PAGE_SHIFT) + offset);
+	if (!image) {
+		printf("guest %s: image source address %llx not in flash\n",
+			guest->name, image_phys);
+		return ERR_NOMEM;
 	}
 
-	printf("%s: invalid PTE\n", __FUNCTION__);
+	if (is_elf(image)) {
+		printf("guest %s: loading ELF image from flash\n", guest->name);
+		return load_elf(guest, image, length, guest_phys);
+	}
 
-	return NULL;
-}
+	/* It's not an ELF image, so it must be a binary. */
 
-/*
- * Return a hypervisor virtual address that corresponds to the given guest
- * physical address.
- *
- * We assume that the guest physical memory is physically contiguous.  This
- * is because we do a straight memcpy from flash into the guest space, but
- * we only provide a single physical address to map_guest().
- */
-static int load_image_from_flash(guest_t *guest, physaddr_t elf_phys, unsigned long guest_offset)
-{
-	void *image = map_flash(elf_phys);
-	void *target = map_guest(guest, guest_offset);
+	if (!length || (length == (size_t) -1)) {
+		printf("guest %s: missing or invalid fsl,hv-image-size property\n",
+			guest->name);
+		return ERR_INVALID;
+	}
 
-	if (!image || !target)
-		return -1;
+	printf("guest %s: loading binary image from flash\n", guest->name);
 
-	return load_elf(image, 0, target);
+	return copy_to_gphys(guest->gphys, guest_phys, image, length) == length ?
+		0 : ERR_BADIMAGE;
 }
 
 static int process_guest_devtree(guest_t *guest, int partition,
@@ -450,25 +436,35 @@ static int process_guest_devtree(guest_t *guest, int partition,
 
 	if (fdt_getprop(fdt, partition, "fsl,hv-loaded-images", &len)) {
 		const uint64_t *image_addr;
-		const uint32_t *guest_offset;
+		const uint64_t *guest_addr;
+		size_t length = (size_t) -1;
+		const uint32_t *iprop;
 
-		image_addr = fdt_getprop(fdt, partition, "fsl,image-src-addr", &len);
+		image_addr = fdt_getprop(fdt, partition, "fsl,hv-image-src-addr", &len);
 		if (!image_addr) {
 			printf("guest %s: no fsl,image-src-addr property\n", guest->name);
 			ret = -FDT_ERR_NOTFOUND;
 			goto fail;
 		}
 
-		guest_offset = fdt_getprop(fdt, partition, "fsl,image-dest-offset", &len);
-		if (!guest_offset) {
+		guest_addr = fdt_getprop(fdt, partition, "fsl,hv-image-gphys-addr", &len);
+		if (!guest_addr) {
 			printf("guest %s: no fsl,image-dest-offset property\n", guest->name);
 			ret = -FDT_ERR_NOTFOUND;
 			goto fail;
 		}
 
-		ret = load_image_from_flash(guest, *image_addr, *guest_offset);
-		if (ret < 0)
+		/* The size of the image is only required for binary images,
+		   not ELF images. */
+		iprop = fdt_getprop(fdt, partition, "fsl,hv-image-size", &len);
+		if (iprop)
+			length = *iprop;
+
+		ret = load_image_from_flash(guest, *image_addr, *guest_addr, length);
+		if (ret < 0) {
+			printf("guest %s: could not load image\n", guest->name);
 			goto fail;
+		}
 	}
 
 	return 0;
@@ -710,7 +706,7 @@ size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len)
 		size_t chunk;
 		void *vdest;
 		
-		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping,
+		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
 		                  &chunk, TLB_TSIZE_16M, 1);
 		if (!vdest)
 			break;
@@ -729,6 +725,40 @@ size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len)
 	return ret;
 }
 
+/** Fill a block of guest physical memory with zeroes
+ *
+ * @param[in] tbl Guest physical page table
+ * @param[in] dest Guest physical address to copy to
+ * @param[in] len Bytes to zero
+ * @return number of bytes successfully zeroed
+ */
+size_t zero_to_gphys(pte_t *tbl, physaddr_t dest, size_t len)
+{
+	size_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk;
+		void *vdest;
+
+		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
+				  &chunk, TLB_TSIZE_16M, 1);
+		if (!vdest)
+			break;
+
+		if (chunk > len)
+			chunk = len;
+
+		memset(vdest, 0, chunk);
+
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	return ret;
+}
+
+
 /** Copy from a guest physical address to a hypervisor virtual address 
  *
  * @param[in] tbl Guest physical page table
@@ -745,7 +775,7 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len)
 		size_t chunk;
 		void *vsrc;
 		
-		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping,
+		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping[0],
 		                 &chunk, TLB_TSIZE_16M, 0);
 		if (!vsrc)
 			break;

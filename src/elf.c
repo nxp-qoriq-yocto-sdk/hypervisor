@@ -33,6 +33,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <libos/console.h>
+#include <paging.h>
+#include <percpu.h>
+#include <libos/errors.h>
 
 #define PT_NULL      0
 #define PT_LOAD      1
@@ -77,16 +80,24 @@ struct program_header {
 };
 
 /**
- * Parse an ELF image and load the segments into memory
+ * Return non-zero if image is an ELF binary
+ */
+int is_elf(void *image)
+{
+	return strncmp(image, "\177ELF", 4) == 0;
+}
+
+/**
+ * Parse an ELF image and load the segments into guest memory
  *
  * @image: Pointer to the ELF image
- * @length: length of the ELF image, or 0 to ignore length checking
- * @target: destination address
+ * @length: length of the ELF image, or -1 to ignore length checking
+ * @target: guest physical address of the destination
  *
  * Per ePAPR spec, the destination address encoded in the ELF file is
  * ignored.
  */
-int load_elf(void *image, unsigned long length, void *target)
+int load_elf(guest_t *guest, void *image, unsigned long length, physaddr_t target)
 {
 	struct elf_header *hdr = (struct elf_header *) image;
 	struct program_header *phdr = (struct program_header *) (image + hdr->phoff);
@@ -94,41 +105,46 @@ int load_elf(void *image, unsigned long length, void *target)
 	unsigned int i;
 
 	if (strncmp(image, "\177ELF", 4)) {
-		printf("%s: invalid ELF magic\n", __FUNCTION__);
-		return 1;
+		printf("guest %s: invalid ELF magic\n", guest->name);
+		return ERR_BADIMAGE;
 	}
 
-	if (length) {
-		if (length < sizeof(struct elf_header)) {
-			printf("%s: length too small\n", __FUNCTION__);
-			return 1;
-		}
+	if (length < sizeof(struct elf_header)) {
+		printf("guest %s: truncated ELF image\n", guest->name);
+		return ERR_BADIMAGE;
+	}
 
-		if (length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
-			printf("%s: length too small\n", __FUNCTION__);
-			return 1;
-		}
+	if (length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
+		printf("guest %s: truncated ELF image\n", guest->name);
+		return ERR_BADIMAGE;
 	}
 
 	/* We only support 32-bit for now */
 	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
-		printf("%s: not 32-bit\n", __FUNCTION__);
-		return 1;
+		printf("guest %s: only 32-bit ELF images are supported\n", guest->name);
+		return ERR_BADIMAGE;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
 	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
-		printf("%s: not big-endian\n", __FUNCTION__);
-		return 1;
+		printf("guest %s: only big-endian ELF images are supported\n", guest->name);
+		return ERR_BADIMAGE;
 	}
 
-	/* Test the program segment sizes and find the base address at the
-	   same time. */
+	/*
+	 * Test the program segment sizes and find the base address at the
+	 * same time.  The base address is the smallest vaddr of all PT_LOAD
+	 * segments.
+	 */
 
 	for (i = 0; i < hdr->phnum; i++) {
+		if (phdr[i].offset + phdr[i].filesz > length) {
+			printf("guest %s: truncated ELF image\n", guest->name);
+			return ERR_BADIMAGE;
+		}
 		if (phdr[i].filesz > phdr[i].memsz) {
-			printf("%s: invalid program header file size\n", __FUNCTION__);
-			return 1;
+			printf("guest %s: invalid ELF program header file size\n", guest->name);
+			return ERR_BADIMAGE;
 		}
 		if ((phdr[i].type == PT_LOAD) && (phdr[i].vaddr < base))
 			base = phdr[i].vaddr;
@@ -138,11 +154,11 @@ int load_elf(void *image, unsigned long length, void *target)
 
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].type == PT_LOAD) {
-			memcpy(target + (phdr[i].vaddr - base),
-				image + phdr[i].offset,
-				phdr[i].filesz);
-			memset(target + (phdr[i].vaddr - base) + phdr[i].filesz,
-				0,
+			copy_to_gphys(guest->gphys,
+				target + (phdr[i].vaddr - base),
+				image + phdr[i].offset, phdr[i].filesz);
+			zero_to_gphys(guest->gphys,
+				target + (phdr[i].vaddr - base) + phdr[i].filesz,
 				phdr[i].memsz - phdr[i].filesz);
 		}
 	}

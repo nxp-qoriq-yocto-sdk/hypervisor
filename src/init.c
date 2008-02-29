@@ -40,13 +40,14 @@ void start_guest(void);
 void *fdt;
 static physaddr_t mem_end;
 unsigned long CCSRBAR_VA;
-void *temp_mapping;
+void *temp_mapping[2];
 
 void start(unsigned long devtree_ptr)
 {
 	valloc_init(1024 * 1024, PHYSBASE);
 	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
-	temp_mapping = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
 	mem_end = find_end_of_mem();
@@ -167,12 +168,12 @@ static void release_secondary_cores(void)
 
 		printf("starting cpu %u, table %x\n", *reg, *table);
 
-		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping,
+		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping[0],
 		               (*table) & ~(PAGE_SIZE - 1),
 		               TLB_TSIZE_4K, TLB_MAS2_IO,
 		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
-		char *table_va = temp_mapping;
+		char *table_va = temp_mapping[0];
 		table_va += *table & (PAGE_SIZE - 1);
 
 		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
