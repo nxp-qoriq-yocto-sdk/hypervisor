@@ -34,6 +34,7 @@
 #include <paging.h>
 #include <timers.h>
 #include <byte_chan.h>
+#include <vmpic.h>
 #include <devtree.h>
 #include <errors.h>
 #include <elf.h>
@@ -586,6 +587,8 @@ void start_guest(void)
 				continue;
 
 			byte_chan_partition_init(guest);
+
+			vmpic_partition_init(guest);
 
 			ret = copy_to_gphys(guest->gphys, 0x00f00000,
 			                    guest->devtree, fdt_totalsize(fdt));

@@ -24,6 +24,7 @@ struct pte_t;
 // Add pointers here for other handle types as they are needed.
 typedef struct {
 	struct byte_chan_handle_t *bc;
+	struct interrupt_t *int_handle;
 } handle_t;
 
 typedef struct {

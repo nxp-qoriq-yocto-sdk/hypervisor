@@ -37,12 +37,9 @@ void start(void)
 	/* enable interrupts at the UART */
 	out8((uint8_t *)(CCSRBAR_VA+0x11d501),0x1);
 
-	/* enable interrupts at the PIC */
-	mpic_irq_set_inttype(DUART2_IRQ,TYPE_NORM);
-	mpic_irq_set_priority(DUART2_IRQ,15);
-	mpic_irq_unmask(DUART2_IRQ);
-
-	mpic_irq_set_ctpr(0x0);
+	fh_vmpic_set_int_config(0,1,15,0);
+	fh_vmpic_set_mask(0, 0);
+	fh_vmpic_set_priority(0, 0);
 
 	/* enable external interrupts at the core */
 	x = mfmsr();

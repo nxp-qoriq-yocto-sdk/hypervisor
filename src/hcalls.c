@@ -5,6 +5,7 @@
 #include <hv.h>
 #include <percpu.h>
 #include <byte_chan.h>
+#include <vmpic.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
@@ -190,14 +191,14 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 7 */
 	&unimplemented,		/* 8 */
 	&unimplemented,		/* 9 */
-	&unimplemented,		/* 10 */
-	&unimplemented,		/* 11 */
-	&unimplemented,		/* 12 */
+	&fh_vmpic_set_int_config, /* 10 */
+	&fh_vmpic_get_int_config, /* 11 */
+	&fh_vmpic_set_priority, /* 12 */
 	&unimplemented,		/* 13 */
-	&unimplemented,		/* 14 */
+	&fh_vmpic_set_mask,	/* 14 */
 	&unimplemented,		/* 15 */
 	&unimplemented,		/* 16 */
-	&unimplemented,		/* 17 */
+	&fh_vmpic_eoi,		/* 17 */
 	&fh_byte_channel_send,	/* 18 */
 	&fh_byte_channel_receive,/* 19 */
 	&fh_byte_channel_poll,	/* 20 */

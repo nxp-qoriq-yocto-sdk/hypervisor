@@ -11,6 +11,7 @@
 #include <paging.h>
 #include <interrupts.h>
 #include <byte_chan.h>
+#include <vmpic.h>
 #include <bcmux.h>
 #include <devtree.h>
 
@@ -72,6 +73,8 @@ void start(unsigned long devtree_ptr)
 	mpic_irq_set_inttype(0x24, TYPE_CRIT);
 	mpic_irq_set_priority(0x24, 15);
 	mpic_irq_unmask(0x24);
+
+	vmpic_global_init();
 
 	/* byte channel initialization */
 	create_byte_channels();

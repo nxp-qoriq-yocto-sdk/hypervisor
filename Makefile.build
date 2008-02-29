@@ -57,7 +57,8 @@ libos-src-y := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
 libos-src-$(CONFIG_NS16550) += $(LIBOS_NS16550)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
-            timers.c paging.c hcalls.c byte_chan.c bcmux.c devtree.c elf.c
+            timers.c paging.c hcalls.c byte_chan.c bcmux.c devtree.c elf.c \
+            vmpic.c
 
 SRCS := $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)

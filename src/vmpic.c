@@ -1,0 +1,108 @@
+#include <libos/trapframe.h>
+#include <libos/bitops.h>
+#include <libos/mpic.h>
+#include <libos/8578.h>
+
+#include <hv.h>
+#include <vmpic.h>
+#include <percpu.h>
+
+struct pic_ops_t mpic_ops = {
+	mpic_irq_set_priority,
+	mpic_irq_set_destcpu,
+	mpic_irq_set_polarity,
+	mpic_irq_mask,
+	mpic_irq_unmask,
+	mpic_irq_set_inttype,
+	mpic_irq_set_ctpr,
+	mpic_irq_get_ctpr,
+	mpic_eoi
+};
+
+
+void vmpic_global_init(void)
+{
+}
+
+void vmpic_partition_init(guest_t *guest)
+{
+	interrupt_t *interrupt;
+	int handle;
+
+	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
+	if (!interrupt)
+		return;
+
+	interrupt->user.int_handle = interrupt;
+
+	handle = alloc_guest_handle(guest, &interrupt->user);
+
+	interrupt->ops = &mpic_ops;
+	interrupt->irq = 0x25;		// TBD : Hardcoded as of now
+
+	printf("vmpic allocated guest handle %d\n", handle);
+}
+
+void fh_vmpic_set_int_config(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	uint8_t config = regs->gpregs[4];
+	uint8_t priority = regs->gpregs[5];
+	uint8_t cpu_dest = regs->gpregs[6];
+	interrupt_t *int_handle = guest->handles[handle]->int_handle;
+
+	int_handle->ops->ops_set_priority(int_handle->irq, priority);
+	int_handle->ops->ops_set_cpu_dest(int_handle->irq, cpu_dest);
+	int_handle->ops->ops_set_polarity(int_handle->irq, config & 0x01);
+
+	int_handle->ops->ops_irq_set_inttype(int_handle->irq, TYPE_NORM);
+}
+
+void fh_vmpic_get_int_config(trapframe_t *regs)
+{
+}
+
+void fh_vmpic_set_mask(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	uint8_t mask = regs->gpregs[4];
+	interrupt_t *int_handle = guest->handles[handle]->int_handle;
+
+	if (mask)
+		int_handle->ops->ops_irq_mask(int_handle->irq);
+	else
+		int_handle->ops->ops_irq_unmask(int_handle->irq);
+}
+
+void fh_vmpic_eoi(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	interrupt_t *int_handle = guest->handles[handle]->int_handle;
+
+	int_handle->ops->ops_eoi(get_gcpu()->cpu->coreid);
+}
+
+void fh_vmpic_set_priority(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	uint8_t priority = regs->gpregs[4];
+	interrupt_t *int_handle = guest->handles[handle]->int_handle;
+
+	int_handle->ops->ops_set_ctpr(priority);
+}
+
+void fh_vmpic_get_priority(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	int32_t current_ctpr;
+	interrupt_t *int_handle = guest->handles[handle]->int_handle;
+
+	current_ctpr = int_handle->ops->ops_get_ctpr();
+
+	regs->gpregs[4] = current_ctpr;
+}
