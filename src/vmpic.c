@@ -60,23 +60,30 @@ void vmpic_global_init(void)
 {
 }
 
-void vmpic_partition_init(guest_t *guest)
+int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
 {
 	interrupt_t *interrupt;
 	int handle;
 
 	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
 	if (!interrupt)
-		return;
+		return -1;
 
 	interrupt->user.int_handle = interrupt;
 
 	handle = alloc_guest_handle(guest, &interrupt->user);
 
 	interrupt->ops = &mpic_ops;
-	interrupt->irq = 0x25;		// TBD : Hardcoded as of now
+	interrupt->irq = irq;
 
 	printf("vmpic allocated guest handle %d\n", handle);
+
+	return handle;
+}
+
+void vmpic_partition_init(guest_t *guest)
+{
+	vmpic_alloc_mpic_handle(guest, 0x25); // TBD : Hardcoded as of now
 }
 
 void fh_vmpic_set_int_config(trapframe_t *regs)
