@@ -26,6 +26,7 @@ typedef struct interrupt_t {
 	handle_t user;
 } interrupt_t;
 
+int vmpic_alloc_vpic_handle(guest_t *guest);
 void vmpic_global_init(void);
 void vmpic_partition_init(guest_t *guest);
 void fh_vmpic_set_int_config(trapframe_t *regs);

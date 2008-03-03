@@ -143,7 +143,7 @@ void vpic_assert_vint_txq(struct queue_t *q)
 void vpic_assert_vint(guest_t *guest, int irq)
 {
 	register_t save;
-	uint8_t destcpu = vpic_irq_get_destcpu(guest,irq);
+	uint8_t destcpu = vpic_irq_get_destcpu(irq);
 
 	/* set active */
 	save = spin_lock_critsave(&guest->vpic.lock);
@@ -155,88 +155,78 @@ void vpic_assert_vint(guest_t *guest, int irq)
 	}
 }
 
-void vpic_irq_mask(guest_t *guest, int irq)
+void vpic_irq_mask(int irq)
 {
-	register_t save;
-	save = spin_lock_critsave(&guest->vpic.lock);
+	guest_t *guest = get_gcpu()->guest;
+	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
 	guest->vpic.ints[irq].enable = 0;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
 
-void vpic_irq_unmask(guest_t *guest, int irq)
+void vpic_irq_unmask(int irq)
 {
-	register_t save;
-	save = spin_lock_critsave(&guest->vpic.lock);
+	guest_t *guest = get_gcpu()->guest;
+	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
 	guest->vpic.ints[irq].enable = 1;
 	if (guest->vpic.pending) {
-		uint8_t destcpu = vpic_irq_get_destcpu(guest,irq);
+		uint8_t destcpu = vpic_irq_get_destcpu(irq);
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);
 	}
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
 
-void vpic_irq_set_vector(guest_t *guest, int irq, uint32_t vector)
+void vpic_irq_set_vector(int irq, uint32_t vector)
 {
-	register_t save;
-	save = spin_lock_critsave(&guest->vpic.lock);
+	guest_t *guest = get_gcpu()->guest;
+	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
 	guest->vpic.ints[irq].vector = vector;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
 
-uint32_t vpic_irq_get_vector(guest_t *guest, int irq)
+uint32_t vpic_irq_get_vector(int irq)
 {
+	guest_t *guest = get_gcpu()->guest;
 	return guest->vpic.ints[irq].vector;
 }
 
-void vpic_irq_set_priority(guest_t *guest, int irq, uint8_t priority)
+void vpic_irq_set_destcpu(int irq, uint8_t destcpu)
 {
-	register_t save;
-	save = spin_lock_critsave(&guest->vpic.lock);
-
-	guest->vpic.ints[irq].priority = priority;
-
-	spin_unlock_critsave(&guest->vpic.lock, save);
-}
-
-uint8_t vpic_irq_get_priority(guest_t *guest, int irq)
-{
-	return guest->vpic.ints[irq].priority;
-}
-
-void vpic_irq_set_destcpu(guest_t *guest, int irq, uint8_t destcpu)
-{
-	register_t save;
-	save = spin_lock_critsave(&guest->vpic.lock);
+	guest_t *guest = get_gcpu()->guest;
+	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
 	guest->vpic.ints[irq].destcpu = 1 << destcpu;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
 
-uint8_t vpic_irq_get_destcpu(guest_t *guest, int irq)
+uint8_t vpic_irq_get_destcpu(int irq)
 {
+	guest_t *guest = get_gcpu()->guest;
+
 	return guest->vpic.ints[irq].destcpu;
 }
 
-void vpic_eoi(guest_t *guest)
+void vpic_eoi(int coreid)
 {
+	int irq;
+	guest_t *guest = get_gcpu()->guest;
 	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
-	/* get int num */
-	int irq = count_lsb_zeroes(guest->vpic.active);
+	irq = count_lsb_zeroes(guest->vpic.active);
 
 	guest->vpic.active &= ~(1 << irq);
 	guest->vpic.pending &= ~(1 << irq);
 
+	/* check if more vints are pending */
 	if (guest->vpic.pending) {
 		irq = count_lsb_zeroes(guest->vpic.pending);
-		uint8_t destcpu = vpic_irq_get_destcpu(guest,irq);
+		uint8_t destcpu = vpic_irq_get_destcpu(irq);
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);
 	}
 

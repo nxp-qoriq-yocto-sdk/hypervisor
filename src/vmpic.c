@@ -1,7 +1,9 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
-#include <libos/mpic.h>
 #include <libos/8578.h>
+
+#include <libos/mpic.h>
+#include <vpic.h>
 
 #include <hv.h>
 #include <vmpic.h>
@@ -18,6 +20,40 @@ struct pic_ops_t mpic_ops = {
 	mpic_irq_get_ctpr,
 	mpic_eoi
 };
+
+struct pic_ops_t vpic_ops = {
+	0,
+	vpic_irq_set_destcpu,
+	0,  /* set polarity */
+	vpic_irq_mask,
+	vpic_irq_unmask,
+	0,   /* set int type */
+	0,   /* set ctpr */
+	0,   /* get ctpr */
+	vpic_eoi
+};
+
+
+int vmpic_alloc_vpic_handle(guest_t *guest)
+{
+	interrupt_t *interrupt;
+	int handle;
+
+	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
+	if (!interrupt)
+		return -1;
+
+	interrupt->user.int_handle = interrupt;
+
+	handle = alloc_guest_handle(guest, &interrupt->user);
+
+	interrupt->ops = &vpic_ops;
+	interrupt->irq = vpic_alloc_irq(guest);
+
+	printf("vpic handle allocated: vmpic handle %d, vpic irq %d\n", handle, interrupt->irq);
+
+	return handle;
+}
 
 
 void vmpic_global_init(void)

@@ -40,16 +40,14 @@ int vpic_process_pending_ints(guest_t *guest);
 void vpic_assert_vint_rxq(struct queue_t *q);
 void vpic_assert_vint_txq(struct queue_t *q);
 void vpic_assert_vint(guest_t *guest, int irq);
-void vpic_irq_mask(guest_t *guest, int irq);
-void vpic_irq_unmask(guest_t *guest, int irq);
-void vpic_irq_set_vector(guest_t *guest, int irq, uint32_t vector);
-uint32_t vpic_irq_get_vector(guest_t *guest, int irq);
-void vpic_irq_set_priority(guest_t *guest, int irq, uint8_t priority);
-uint8_t vpic_irq_get_priority(guest_t *guest, int irq);
-void vpic_irq_set_destcpu(guest_t *guest, int irq, uint8_t destcpu);
-uint8_t vpic_irq_get_destcpu(guest_t *guest, int irq);
+void vpic_irq_mask(int irq);
+void vpic_irq_unmask(int irq);
+void vpic_irq_set_vector(int irq, uint32_t vector);
+uint32_t vpic_irq_get_vector(int irq);
+void vpic_irq_set_destcpu(int irq, uint8_t destcpu);
+uint8_t vpic_irq_get_destcpu(int irq);
 void critdbell_to_gdbell_glue(trapframe_t *regs);
-void vpic_eoi(guest_t *guest);
+void vpic_eoi(int coreid);
 
 
 #endif

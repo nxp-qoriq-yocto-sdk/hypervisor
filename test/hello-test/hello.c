@@ -11,6 +11,8 @@ void ext_int_handler(trapframe_t *frameptr)
 {
 	printf("ext int\n");
 
+	fh_vmpic_eoi(0);
+
 }
 
 void start(void)
@@ -31,13 +33,15 @@ void start(void)
 
 	printf("Hello World\n");
 
-	channel = 0;
+	channel = 2;
 
 	str = "byte-channel:hi!";  // 16 chars
 	status = fh_byte_channel_send(channel, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
 
 	str = "type some chars:";  // 16 chars
 	status = fh_byte_channel_send(channel, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
+
+	fh_vmpic_set_mask(0, 0);  /* enable */
 
 #define TEST
 #ifdef TEST

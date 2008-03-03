@@ -39,6 +39,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <vpic.h>
+#include <vmpic.h>
 
 // Must be a power of two.
 #define QUEUE_SIZE 256
@@ -312,8 +313,8 @@ void byte_chan_partition_init(guest_t *guest)
 			continue;
 		}
 
-		irq[0] = vpic_alloc_irq(guest);
-		irq[1] = vpic_alloc_irq(guest);
+		irq[0] = vmpic_alloc_vpic_handle(guest);
+		irq[1] = vmpic_alloc_vpic_handle(guest);
 
 		int32_t ghandle = byte_chan_attach_guest(bc, guest, irq[0], irq[1]);
 		if (ghandle < 0) {

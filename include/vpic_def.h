@@ -28,17 +28,9 @@
 #define MAX_VINT_CNT 32
 
 typedef struct {
-	struct {
-		uint32_t hw:1;
-		uint32_t enable:1;
-		uint32_t reserved:10;
-		uint32_t priority:4;
-		uint32_t vector:16;
-	};
-	union {
-		uint32_t hwirq;
-		uint32_t destcpu;
-	};
+	uint8_t enable;
+	uint16_t vector;
+	uint16_t destcpu;
 } vpic_interrupt_t;
 
 typedef struct {
