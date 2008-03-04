@@ -33,7 +33,7 @@ cpu_t cpu0 = {
 static void core_init(void);
 static void release_secondary_cores(void);
 static void partition_init(void);
-void start_guest(void);
+void init_guest(void);
 
 #define UART_OFFSET		0x11c500
 
@@ -230,7 +230,7 @@ static void partition_init(void)
 	//    -add entries to PAMU table
 	// -create guest device tree
 
-	start_guest();
+	init_guest();
 }
 
 static void core_init(void)

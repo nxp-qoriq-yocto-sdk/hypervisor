@@ -502,24 +502,94 @@ static guest_t *node_to_partition(int partition)
 }
 
 static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
-                                     int len)
+                                    int len)
 {
 	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
 	assert(gpir >= 0);
 	
 	guest->gcpus[gpir] = get_gcpu();
 	get_gcpu()->gcpu_num = gpir;
-	mtspr(SPR_GPIR, gpir);
 	return gpir;
 }
 
-void start_guest(void)
+int start_guest_primary(void)
+{
+	guest_t *guest = get_gcpu()->guest; 
+	int ret = copy_to_gphys(guest->gphys, 0x00f00000,
+	                        guest->devtree, fdt_totalsize(guest->devtree));
+	if (ret != fdt_totalsize(guest->devtree)) {
+		printf("Couldn't copy device tree to guest %s, %d\n",
+		       guest->name, ret);
+		return ERR_BADADDR;
+	}
+
+	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
+	               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
+
+	printf("branching to guest %s\n", guest->name);
+
+	asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
+	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
+	             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
+	             "r" (0 << PAGE_SHIFT) :
+	             "r3", "r4", "r5", "r6", "r7", "r8");
+
+	return 0;
+}
+
+void start_guest_secondary(void)
+{
+	register register_t r3 asm("r3");
+	register register_t r4 asm("r4");
+	register register_t r6 asm("r6");
+	register register_t r7 asm("r7");
+
+	unsigned long page;
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	int pir = mfspr(SPR_PIR);
+	int gpir = gcpu->gcpu_num;
+
+	mtspr(SPR_GPIR, gpir);
+
+	printf("cpu %d/%d spinning on table...\n", pir, gpir);
+
+	while (guest->spintbl[gpir].addr & 1) {
+		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
+		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
+		smp_mbar();
+	}
+
+	printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr);
+
+	if (guest->spintbl[gpir].pir != gpir)
+		printf("WARNING: cpu %d (guest cpu %d) changed spin-table "
+		       "PIR to %ld, ignoring\n",
+		       pir, gpir, guest->spintbl[gpir].pir);
+
+	/* Mask for 256M mapping */
+	page = (guest->spintbl[gpir].addr & ~0xfffffff) >> PAGE_SHIFT;
+
+	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
+	               page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+
+	r3 = guest->spintbl[gpir].r3;
+	r4 = guest->spintbl[gpir].r4;
+	r6 = 0;
+	r7 = guest->spintbl[gpir].r7;
+
+	asm volatile("mfmsr %%r5; oris %%r5, %%r5, 0x1000;"
+	             "mtsrr0 %0; mtsrr1 %%r5; li %%r5, 0; rfi" : :
+	             "r" (guest->spintbl[gpir].addr),
+	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
+}
+
+void init_guest(void)
 {
 	int off = -1, found = 0, ret;
 	int pir = mfspr(SPR_PIR);
 	char buf[MAX_PATH];
 	guest_t *guest;
-	unsigned long page;
 	int gpir;
 	
 	while (1) {
@@ -588,30 +658,9 @@ void start_guest(void)
 
 			vmpic_partition_init(guest);
 
-			ret = copy_to_gphys(guest->gphys, 0x00f00000,
-			                    guest->devtree, fdt_totalsize(fdt));
-
-			if (ret != fdt_totalsize(fdt)) {
-				printf("Couldn't copy device tree to guest, %d\n", ret);
+			if (start_guest_primary())
 				continue;
-			}
-
-			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
-			               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
-
-			printf("branching to guest\n");
-
-			asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
-			             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
-			             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
-			             "r" (0 << PAGE_SHIFT) :
-	   		          "r3", "r4", "r5", "r6", "r7", "r8");
 		} else {
-			register register_t r3 asm("r3");
-			register register_t r4 asm("r4");
-			register register_t r6 asm("r6");
-			register register_t r7 asm("r7");
-
 			printf("cpu %d waiting for spintbl on guest %p...\n", pir, guest);
 		
 			// Wait for the boot cpu...
@@ -619,36 +668,7 @@ void start_guest(void)
 				smp_mbar();
 
 			gpir = register_gcpu_with_guest(guest, cpus, len);
-			printf("cpu %d/%d spinning on table...\n", pir, gpir);
-
-			while (guest->spintbl[gpir].addr & 1) {
-				asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
-				asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
-				smp_mbar();
-			}
-
-			printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr);
-
-			if (guest->spintbl[gpir].pir != gpir)
-				printf("WARNING: cpu %d (guest cpu %d) changed spin-table "
-				       "PIR to %ld, ignoring\n",
-				       pir, gpir, guest->spintbl[gpir].pir);
-
-			/* Mask for 256M mapping */
-			page = (guest->spintbl[gpir].addr & ~0xfffffff) >> PAGE_SHIFT;
-
-			guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
-			               page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
-
-			r3 = guest->spintbl[gpir].r3;
-			r4 = guest->spintbl[gpir].r4;
-			r6 = 0;
-			r7 = guest->spintbl[gpir].r7;
-
-			asm volatile("mfmsr %%r5; oris %%r5, %%r5, 0x1000;"
-			             "mtsrr0 %0; mtsrr1 %%r5; li %%r5, 0; rfi" : :
-			             "r" (guest->spintbl[gpir].addr),
-			             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
+			start_guest_secondary();
 		}
 	}
 
