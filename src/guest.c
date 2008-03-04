@@ -741,7 +741,7 @@ size_t zero_to_gphys(pte_t *tbl, physaddr_t dest, size_t len)
 		void *vdest;
 
 		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
-				  &chunk, TLB_TSIZE_16M, 1);
+		                  &chunk, TLB_TSIZE_16M, 1);
 		if (!vdest)
 			break;
 
@@ -804,9 +804,41 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len)
  * @return number of bytes successfully copied
  */
 size_t copy_between_gphys(pte_t *dtbl, physaddr_t dest,
-                          pte_t *stbl, physaddr_t from, size_t len)
+                          pte_t *stbl, physaddr_t src, size_t len)
 {
-	size_t ret = 0;
-	// FIXME implement
+	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
+	
+	/* Initializiations not needed, but GCC is stupid. */
+	void *vdest = NULL, *vsrc = NULL;
+
+	while (len > 0) {
+		if (!schunk) {
+			vsrc = map_gphys(TEMPTLB1, stbl, src, temp_mapping[0],
+			                 &schunk, TLB_TSIZE_16M, 0);
+			if (!vsrc)
+				break;
+		}
+
+		if (!dchunk) {
+			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
+			                  &dchunk, TLB_TSIZE_16M, 1);
+			if (!vdest)
+				break;
+		}
+
+		chunk = min(schunk, dchunk);
+		if (chunk > len)
+			chunk = len;
+
+		memcpy(vdest, vsrc, chunk);
+
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+		dchunk -= chunk;
+		schunk -= chunk;
+	}
+
 	return ret;
 }

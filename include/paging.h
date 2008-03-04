@@ -102,6 +102,6 @@ size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len);
 size_t zero_to_gphys(pte_t *tbl, physaddr_t dest, size_t len);
 size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len);
 size_t copy_between_gphys(pte_t *dtbl, physaddr_t dest,
-                           pte_t *stbl, physaddr_t from, size_t len);
+                           pte_t *stbl, physaddr_t src, size_t len);
 
 #endif
