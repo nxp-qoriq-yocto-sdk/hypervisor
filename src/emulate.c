@@ -163,10 +163,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
-	unsigned long lpid = mfspr(SPR_LPID);
-	va |= (lpid << 5) & 0xfe0;
-	va |= (lpid >> 6) & 0x002;
-
+	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
 	asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
 	return 0;
 }
@@ -226,7 +223,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
 
-	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPID));
+	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
 	return 0;

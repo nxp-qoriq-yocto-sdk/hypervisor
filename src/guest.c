@@ -554,7 +554,7 @@ void start_guest(void)
 		found = 1;
 		
 		guest = node_to_partition(off);
-		mtspr(SPR_LPID, guest->lpid);
+		mtspr(SPR_LPIDR, guest->lpid);
 	
 		get_gcpu()->guest = guest;
 
