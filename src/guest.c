@@ -108,11 +108,11 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 	physaddr_t rangesize, addr, offset = 0;
 	int hvrlen;
 
-	const uint32_t *hvranges = fdt_getprop(fdt, partition,
-	                                       "fsl,hv-ranges", &hvrlen);
-	if (!hvranges && hvrlen != -FDT_ERR_NOTFOUND)
+	const uint32_t *physaddrmap = fdt_getprop(fdt, partition,
+	                                       "fsl,hv-physaddr-map", &hvrlen);
+	if (!physaddrmap && hvrlen != -FDT_ERR_NOTFOUND)
 		return hvrlen;
-	if (!hvranges || hvrlen % 4)
+	if (!physaddrmap || hvrlen % 4)
 		return ERR_BADTREE;
 
 	int ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
@@ -128,10 +128,10 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 	while (offset < size) {
 		val_from_int(addrbuf, gaddr + offset);
 
-		ret = xlate_one(addrbuf, hvranges, hvrlen, 2, 1, 2, 1, &rangesize);
+		ret = xlate_one(addrbuf, physaddrmap, hvrlen, 2, 1, 2, 1, &rangesize);
 		if (ret == -FDT_ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
-			// in hvranges, then none of it is.
+			// in physaddrmap, then none of it is.
 
 			map_guest_range(guest, gaddr + offset,
 			                gaddr + offset, size - offset);

@@ -211,7 +211,7 @@
 			fsl,cpus = <0 1 2 1>;
 			fsl,entry = <0>;
 			fsl,privileged;
-			fsl,hv-ranges = <0 0 0 1000000 17000000
+			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
 			                 0 17000000 0 20000000 1000000>;
 			fsl,dtb = /incbin/("bin/vmpic-p1.dtb");
 		};
