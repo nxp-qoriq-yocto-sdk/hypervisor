@@ -92,7 +92,7 @@ int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 {
 	int ret;
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
-	if (!bc)
+	if (!handle)
 		return ERR_BUSY;
 
 	if (!cd->ops->set_tx_queue || !cd->ops->set_rx_queue)
