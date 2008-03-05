@@ -11,8 +11,12 @@ config NS16550
 		be used for byte channels, byte channel muxes, and the
 		hypervisor console.
 
+config LIBOS_QUEUE
+	bool
+
 config BYTE_CHAN
 	bool "Byte-channel support"
+	select LIBOS_QUEUE
 	help
 		Byte channels are a bidirectional pipe mechanism that
 		allows communication between guests, character devices,

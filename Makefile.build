@@ -52,9 +52,10 @@ include $(LIBOS_DIR)/Makefile.libos
 
 libos-src-y := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
                $(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_MP) \
-               $(LIBOS_MPIC) $(LIBOS_QUEUE)
+               $(LIBOS_MPIC)
 
 libos-src-$(CONFIG_NS16550) += $(LIBOS_NS16550)
+libos-src-$(CONFIG_LIBOS_QUEUE) += $(LIBOS_QUEUE)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c vmpic.c

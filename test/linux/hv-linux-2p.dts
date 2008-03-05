@@ -6,6 +6,7 @@
 
 	aliases {
 		stdout = &uart0;
+		stdin = &uart0;
 		serial0 = &uart0;
 		uartmux = &uartmux;
 	};
