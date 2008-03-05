@@ -457,3 +457,37 @@ int lookup_alias(const void *tree, const char *path)
 
 	return fdt_path_offset(tree, path);
 }
+
+/** Get the interrupt controller for a node
+ *
+ * @param[in] tree the device tree to search
+ * @param[in] the node for which we want the interrupt-parent
+ * @return the node offset within the tree, or a libfdt error.
+ *
+ */
+
+int get_interrupt_controller(const void *tree, int node)
+{
+	const uint32_t *prop;
+	int len;
+
+	// FIXME: update to deal with interrupt maps
+
+	while (1) {
+		prop = fdt_getprop(tree, node,
+                              "interrupt-parent", &len);
+		if (prop) {
+			node = fdt_node_offset_by_phandle(tree, *prop);
+		} else {
+			node = fdt_parent_offset(tree, node);
+    		}
+		if (node < 0)
+			return node;
+
+		prop = fdt_getprop(tree, node,
+                              "interrupt-controller", &len);
+		if (prop)
+			return node;
+	}
+}
+

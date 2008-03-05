@@ -7,11 +7,14 @@
 #define MAX_ADDR_CELLS 4
 #define MAX_SIZE_CELLS 2
 
+#define CELL_SIZE 4
+
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize);
 
 void *ptr_from_node(const void *devtree, int offset, const char *type);
 int lookup_alias(const void *tree, const char *path);
+int get_interrupt_controller(const void *tree, int node);
 
 physaddr_t find_end_of_mem(void);
 
