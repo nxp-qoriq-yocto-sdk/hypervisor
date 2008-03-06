@@ -117,6 +117,11 @@
 			fsl,real-dev = "gpio";
 			fsl,bitmask = <020033ff>;
 		};
+
+		partition@0 {
+			compatible = "fsl,hv-partition";
+			fsl,endpoint = "/partitions/part1";
+		};
 	};
 
 	chosen {

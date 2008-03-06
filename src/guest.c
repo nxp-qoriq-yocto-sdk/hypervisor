@@ -392,9 +392,9 @@ static int process_guest_devtree(guest_t *guest, int partition,
 {
 	int ret, len;
 	int gfdt_size = fdt_totalsize(fdt);
-	const void *guest_origtree;
+	void *guest_origtree;
 
-	guest_origtree = fdt_getprop(fdt, partition, "fsl,dtb", &len);
+	guest_origtree = (void *) fdt_getprop(fdt, partition, "fsl,dtb", &len);
 	if (!guest_origtree) {
 		printf("guest %s: no fsl,dtb property\n", guest->name);
 		ret = -FDT_ERR_NOTFOUND;
@@ -434,7 +434,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	 * mappings we need.
 	 */
 
-	if (fdt_getprop(fdt, partition, "fsl,hv-loaded-images", &len)) {
+	if (fdt_get_property(fdt, partition, "fsl,hv-loaded-images", NULL)) {
 		const uint64_t *image_addr;
 		const uint64_t *guest_addr;
 		size_t length = (size_t) -1;
@@ -467,6 +467,58 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		}
 	}
 
+	/* Look for partition-handle nodes.  These are nodes that are
+	   "fsl,hv-partition"-compatible and are children of a
+	   "fsl,hv-handles"-compatible node. */
+
+	// Get a pointer to the /handles node
+	int off = fdt_node_offset_by_compatible(guest_origtree, -1, "fsl,hv-handles");
+
+	while (off > 0) {
+		// get a pointer to the first/next partition-handle node
+		off = fdt_node_offset_by_compatible(guest_origtree, off, "fsl,hv-partition");
+		if (off < 0)
+			break;
+
+		// Find the partition node in the hypervisor device tree
+
+		const char *s = fdt_getprop(guest_origtree, off, "fsl,endpoint", &ret);
+		if (!s) {
+			printf("guest %s: missing fsl,endpoint property or value\n",
+				guest->name);
+			goto fail;
+		}
+
+		int endpoint = fdt_path_offset(fdt, s);
+		if (endpoint < 0) {
+			printf("guest %s: partition %s does not exist\n",
+				guest->name, s);
+			goto fail;
+		}
+
+		// Get the guest_t for the partition, or create one if necessary
+		guest_t *target_guest = node_to_partition(endpoint);
+		if (!target_guest) {
+			printf("guest %s: partition %s does not exist\n",
+				guest->name, s);
+			goto fail;
+		}
+
+		// Allocate a handle
+		int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
+		if (ghandle < 0) {
+			printf("guest %s: too many handles\n", guest->name);
+			goto fail;
+		}
+
+		// Store the pointer to the target guest in our list of handles
+		guest->handles[ghandle]->guest = target_guest;
+
+		// Insert a 'reg' property into the partition-handle node of the
+		// guest device tree
+		ret = fdt_setprop(guest_origtree, off, "reg", &ghandle, sizeof(ghandle));
+	}
+
 	return 0;
 fail:
 	printf("error %d (%s) building guest device tree for %s\n",
@@ -477,9 +529,16 @@ fail:
 
 uint32_t start_guest_lock;
 
-static guest_t *node_to_partition(int partition)
+guest_t *node_to_partition(int partition)
 {
 	int i;
+
+	// Verify that 'partition' points to a compatible node
+	if (fdt_node_check_compatible(fdt, partition, "fsl,hv-partition")) {
+		printf("%s: invalid offset %u\n", __FUNCTION__, partition);
+		return NULL;
+	}
+
 	spin_lock(&start_guest_lock);
 	
 	for (i = 0; i < last_lpid; i++) {

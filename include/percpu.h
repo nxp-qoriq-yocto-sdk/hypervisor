@@ -17,6 +17,7 @@
 
 #ifndef _ASM
 struct pte_t;
+struct guest;
 
 #define MAX_HANDLES 32
 
@@ -25,14 +26,16 @@ struct pte_t;
 typedef struct {
 	struct byte_chan_handle *bc;
 	struct interrupt *intr;
+	struct guest *guest;
 } handle_t;
 
-typedef struct {
+typedef struct guest {
 	vpic_t vpic;
 	struct pte *gphys;	/* guest phys to real phys mapping */
 	struct pte *gphys_rev;	/* real phys to guest phys mapping */
 	char *name;
 	void *devtree;
+	handle_t handle;	/* The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
 	unsigned int cpucnt;	/* The number of entries in gcpus[] */
 	struct gcpu **gcpus;
@@ -70,6 +73,7 @@ typedef struct gcpu {
 #define get_gcpu() (cpu->client.gcpu)
 
 int alloc_guest_handle(guest_t *guest, handle_t *handle);
+guest_t *node_to_partition(int partition);
 
 #endif
 #endif

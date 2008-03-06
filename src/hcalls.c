@@ -6,6 +6,7 @@
 #include <percpu.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <paging.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
@@ -61,6 +62,93 @@ static void fh_whoami(trapframe_t *regs)
 {
 	regs->gpregs[4] = 0x99;  /* FIXME */
 	regs->gpregs[3] = 0;  /* success */
+}
+
+/**
+ * Structure definition for the fh_memcpy scatter-gather list
+ *
+ * This structure must be aligned on 32-byte boundary
+ *
+ * @source: guest physical address to copy from
+ * @destination: guest physical address to copy to
+ * @size: number of bytes to copy
+ * @reserved: reserved, must be zero
+ */
+struct fh_sg_list {
+	uint64_t source;
+	uint64_t destination;
+	uint64_t size;
+	uint64_t reserved;
+} __attribute__ ((aligned (32)));
+
+#define SG_PER_PAGE	(PAGE_SIZE / sizeof(struct fh_sg_list))
+
+/**
+ * Return a pointer to the guest_t for a given handle, or NULL if the handle
+ * is invalid, does not point to a guest_t, or does not point to a guest_t
+ * that the caller is allowed to access.
+ */
+static inline guest_t *handle_to_guest(guest_t *guest, unsigned int handle)
+{
+	return handle < MAX_HANDLES ? guest->handles[handle]->guest : NULL;
+}
+
+/**
+ * Copy a block of memory from one guest to another
+ */
+static void fh_memcpy(trapframe_t *regs)
+{
+	guest_t *source = get_gcpu()->guest;
+	guest_t *destination = handle_to_guest(source, regs->gpregs[3]);
+	unsigned int num_sgs = regs->gpregs[6];
+	static struct fh_sg_list sg_list[SG_PER_PAGE];
+	size_t sg_size = num_sgs * sizeof(struct fh_sg_list);
+	physaddr_t sg_gphys = (physaddr_t) regs->gpregs[5] << 32 | regs->gpregs[4];
+	static uint32_t sg_lock;
+
+	if (!destination) {
+		regs->gpregs[3] = -2;
+		return;
+	}
+
+	while (num_sgs) {
+		size_t bytes_to_copy = min(PAGE_SIZE, sg_size);
+		unsigned int sg_to_copy = min(SG_PER_PAGE, num_sgs);
+
+		spin_lock(&sg_lock);
+
+		/* Read the next page of the guest's scatter-gather list into
+		   memory. */
+		if (copy_from_gphys(source->gphys, sg_list, sg_gphys, bytes_to_copy) != bytes_to_copy) {
+			regs->gpregs[3] = -1;
+			spin_unlock(&sg_lock);
+			return;
+		}
+
+		/* Now go through that list and copy the memory one entry at a
+		   time. */
+		for (unsigned i = 0; i < sg_to_copy; i++) {
+			size_t size = copy_between_gphys(destination->gphys,
+				sg_list[i].destination,
+				source->gphys,
+				sg_list[i].source,
+				sg_list[i].size);
+
+			if (size != sg_list[i].size) {
+				regs->gpregs[3] = -1;
+				spin_unlock(&sg_lock);
+				return;
+			}
+		}
+
+		spin_unlock(&sg_lock);
+
+		sg_gphys += bytes_to_copy;
+		sg_size -= bytes_to_copy;
+		num_sgs -= sg_to_copy;
+	}
+
+	regs->gpregs[3] = 0;
 }
 
 #ifdef CONFIG_BYTE_CHAN
@@ -196,7 +284,7 @@ static hcallfp_t hcall_table[] = {
 	&fh_partition_get_status,/* 6 */
 	&unimplemented,		/* 7 */
 	&unimplemented,		/* 8 */
-	&unimplemented,		/* 9 */
+	&fh_memcpy,		/* 9 */
 	&fh_vmpic_set_int_config, /* 10 */
 	&fh_vmpic_get_int_config, /* 11 */
 	&fh_vmpic_set_priority, /* 12 */
