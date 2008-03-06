@@ -111,6 +111,7 @@
 			             "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
+			fsl,hv-interrupt-controller;
 		};
 	};
 

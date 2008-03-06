@@ -97,7 +97,7 @@
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
-			interrupts = <1d 2>;
+			interrupts = <25 2>;
 			interrupt-parent = <&mpic>;
 		};
 
@@ -111,7 +111,15 @@
 			             "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
+			fsl,hv-interrupt-controller;
 		};
+	};
+
+
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		fsl,hv-phandle-ref = <&vmpic>;
 	};
 
 	handles {
