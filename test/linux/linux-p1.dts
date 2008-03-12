@@ -115,6 +115,12 @@
 		};
 	};
 
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
+
 	handles {
 		#address-cells = <1>;
 		#size-cells = <0>;
