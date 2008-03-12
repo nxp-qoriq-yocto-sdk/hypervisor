@@ -103,10 +103,10 @@ void vmpic_partition_init(guest_t *guest)
 
 	/* find the vmpic node */
 	node = fdt_node_offset_by_compatible(fdt, -1, "fsl,hv-vmpic");
-	if (node) {
+	if (node >= 0) {
 		vmpic_phandle = fdt_get_phandle(fdt, node);
 	} else {
-		printf("error: no vmpic node found\n");
+		printf("ERROR: no vmpic node found\n");
 		return;
 	}
 
@@ -148,8 +148,9 @@ void vmpic_partition_init(guest_t *guest)
 	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
 		const int *prop = fdt_getprop(fdt, node, "fsl,hv-interrupt-controller", &len);
 		if (prop)
-			fdt_nop_node(fdt, node);
+			fdt_del_node(fdt, node);
 	}
+
 }
 
 void fh_vmpic_set_int_config(trapframe_t *regs)
