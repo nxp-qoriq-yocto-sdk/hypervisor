@@ -187,6 +187,11 @@
 	};
 
 	byte-channels {
+                /* bc0 here is a weird case for testing purposes.
+		 * It sets up a loopback in the mux, so that
+		 * data coming in channel 0 goes out channel 1.
+		 * bc0 is _not_ usable by a guest.
+		 */
 		bc0: byte-channel0 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux &uartmux>;
