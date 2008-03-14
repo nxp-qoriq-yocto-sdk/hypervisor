@@ -127,14 +127,14 @@ int vpic_process_pending_ints(guest_t *guest)
 	return 0;
 }
 
-void vpic_assert_vint_rxq(struct queue_t *q)
+void vpic_assert_vint_rxq(queue_t *q)
 {
 	vint_desc_t *vint = q->consumer;
 
 	vpic_assert_vint(vint->guest, vint->guest->handles[vint->irq]->int_handle->irq);
 }
 
-void vpic_assert_vint_txq(struct queue_t *q)
+void vpic_assert_vint_txq(queue_t *q)
 {
 	vint_desc_t *vint = q->producer;
 

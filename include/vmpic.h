@@ -4,7 +4,7 @@
 #include <libos/trapframe.h>
 #include <percpu.h>
 
-typedef struct pic_ops_t {
+typedef struct pic_ops {
 	void (*ops_set_priority)(int hwirq, uint8_t priority);
 	void (*ops_set_cpu_dest)(int hwirq, uint8_t cpudest);
 	void (*ops_set_polarity)(int hwirq, uint8_t polarity);
@@ -20,7 +20,7 @@ typedef struct pic_ops_t {
  * generic handle to represent all interrupt (hwint,vint) types
  */
 
-typedef struct interrupt_t {
+typedef struct interrupt {
 	pic_ops_t *ops;
 	int irq;
 	handle_t user;

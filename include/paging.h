@@ -61,7 +61,7 @@
 
 #define PTE_ALL (PTE_MAS3_MASK | PTE_VALID | PTE_GS)
 
-typedef struct pte_t {
+typedef struct pte {
 	unsigned long page;
 	unsigned long attr;
 } pte_t;

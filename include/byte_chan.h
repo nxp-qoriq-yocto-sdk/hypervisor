@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <percpu.h>
 
-typedef struct byte_chan_handle_t {
+typedef struct byte_chan_handle {
 	queue_t *tx;      /**< queue for transmitting data */
 	queue_t *rx;      /**< queue for receiving data */
 	uint32_t tx_lock; /**< lock for transmitting data */

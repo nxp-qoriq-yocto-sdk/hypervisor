@@ -30,11 +30,11 @@
 
 #include <byte_chan.h>
 
-typedef struct mux_complex_s {
+typedef struct mux_complex {
 	byte_chan_handle_t *byte_chan;
-	struct connected_bc_s *current_tx_bc;
-	struct connected_bc_s *current_rx_bc;
-	struct connected_bc_s *first_bc;
+	struct connected_bc *current_tx_bc;
+	struct connected_bc *current_rx_bc;
+	struct connected_bc *first_bc;
 	int current_tx;
 	int current_rx;
 	int rx_flag_state;
@@ -45,10 +45,10 @@ typedef struct mux_complex_s {
 	int rx_count;
 } mux_complex_t;
 
-typedef struct connected_bc_s {
+typedef struct connected_bc {
 	byte_chan_handle_t *byte_chan;
 	mux_complex_t *mux_complex; 
-	struct connected_bc_s *next;
+	struct connected_bc *next;
 	char num;
 } connected_bc_t;
 

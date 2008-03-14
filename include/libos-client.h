@@ -10,7 +10,7 @@
 
 #ifndef _ASM
 typedef struct {
-	struct gcpu_t *gcpu;
+	struct gcpu *gcpu;
 } client_cpu_t;
 
 #include <interrupts.h>

@@ -23,19 +23,19 @@ struct pte_t;
 // An extremely crude form of RTTI/multiple interfaces...
 // Add pointers here for other handle types as they are needed.
 typedef struct {
-	struct byte_chan_handle_t *bc;
-	struct interrupt_t *int_handle;
+	struct byte_chan_handle *bc;
+	struct interrupt *int_handle;
 } handle_t;
 
 typedef struct {
 	vpic_t vpic;
-	struct pte_t *gphys;         // guest phys to real phys mapping
-	struct pte_t *gphys_rev;     // real phys to guest phys mapping
+	struct pte *gphys;         // guest phys to real phys mapping
+	struct pte *gphys_rev;     // real phys to guest phys mapping
 	char *name;
 	void *devtree;
 	handle_t *handles[MAX_HANDLES];
 	unsigned int cpucnt;	     // The number of entries in gcpus[]
-	struct gcpu_t **gcpus;
+	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
 
@@ -50,7 +50,7 @@ typedef struct {
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
-typedef struct gcpu_t {
+typedef struct gcpu {
 	kstack_t uvstack;
 	guest_t *guest;
 	cpu_t *cpu;

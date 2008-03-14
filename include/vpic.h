@@ -37,8 +37,8 @@ typedef struct {
 
 int vpic_alloc_irq(guest_t *guest);
 int vpic_process_pending_ints(guest_t *guest);
-void vpic_assert_vint_rxq(struct queue_t *q);
-void vpic_assert_vint_txq(struct queue_t *q);
+void vpic_assert_vint_rxq(queue_t *q);
+void vpic_assert_vint_txq(queue_t *q);
 void vpic_assert_vint(guest_t *guest, int irq);
 void vpic_irq_mask(int irq);
 void vpic_irq_unmask(int irq);

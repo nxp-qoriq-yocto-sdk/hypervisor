@@ -10,7 +10,7 @@
 #include <percpu.h>
 #include <devtree.h>
 
-struct pic_ops_t mpic_ops = {
+pic_ops_t mpic_ops = {
 	mpic_irq_set_priority,
 	mpic_irq_set_destcpu,
 	mpic_irq_set_polarity,
@@ -22,7 +22,7 @@ struct pic_ops_t mpic_ops = {
 	mpic_eoi
 };
 
-struct pic_ops_t vpic_ops = {
+pic_ops_t vpic_ops = {
 	0,
 	vpic_irq_set_destcpu,
 	0,  /* set polarity */
