@@ -34,6 +34,7 @@
 #include <libos/8578.h>
 #include <libos/bitops.h>
 #include <vpic.h>
+#include <vmpic.h>
 #include <doorbell.h>
 #include <events.h>
 
@@ -130,14 +131,14 @@ void vpic_assert_vint_rxq(struct queue_t *q)
 {
 	vint_desc_t *vint = q->consumer;
 
-	vpic_assert_vint(vint->guest, vint->irq);
+	vpic_assert_vint(vint->guest, vint->guest->handles[vint->irq]->int_handle->irq);
 }
 
 void vpic_assert_vint_txq(struct queue_t *q)
 {
 	vint_desc_t *vint = q->producer;
 
-	vpic_assert_vint(vint->guest, vint->irq);
+	vpic_assert_vint(vint->guest, vint->guest->handles[vint->irq]->int_handle->irq);
 }
 
 void vpic_assert_vint(guest_t *guest, int irq)
