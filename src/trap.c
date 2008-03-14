@@ -8,9 +8,10 @@
 #include <guestmemio.h>
 #include <vpic.h>
 
-// Do not use this when entering via guest doorbell, since that saves
-// state in gsrr rather than srr, despite being directed to the
-// hypervisor.
+/* Do not use this when entering via guest doorbell, since that saves
+ * state in gsrr rather than srr, despite being directed to the
+ * hypervisor.
+ */
 
 void reflect_trap(trapframe_t *regs)
 {
@@ -50,7 +51,7 @@ void guest_doorbell(trapframe_t *regs)
 		return;
 	}
 
-	// Then, check for a decrementer.
+	/* Then, check for a decrementer. */
 	if (gcpu->gdbell_pending & GCPU_PEND_DECR) {
 		run_deferred_decrementer();
 
@@ -139,8 +140,8 @@ static void abort_guest_access(trapframe_t *regs, int stat)
 
 void data_storage(trapframe_t *regs)
 {
-	// If it's from the guest, then it was a virtualization
-	// fault.  Currently, we only use that for bad mappings.
+	/* If it's from the guest, then it was a virtualization
+	  fault.  Currently, we only use that for bad mappings. */
 	if (regs->srr1 & MSR_GS)
 		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA, mfspr(SPR_DEAR));
 	else if (mfspr(SPR_ESR) & ESR_EPID)

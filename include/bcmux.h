@@ -1,27 +1,17 @@
-/**************************************************************************//*
-    @file   byte_chan.h
-
-    @brief  This file contain the implementation of general byte_chan interface
-    The byte_chan interface usually implements 
-	
+/*
+ *  @file   byte_chan.h
+ *
+ *  @brief  This file contain the implementation of general byte_chan interface
+ *   The byte_chan interface usually implements 
+ *
+ *  The byte_chan generic interface is a user accessible layer that is responcible primarily
+ *  for data bufferization. The idea is to separate a LLD (Low Level Driver) and
+ *  a higher level, more OS dependent layer.
+ */
     
-    The byte_chan generic interface is a user accessible layer that is responcible primarily
-    for data bufferization. The idea is to separate a LLD (Low Level Driver) and
-    a higher level, more OS dependent layer.
-    
-
-    $Id: $
- **************************************************************************/
-
-
 #include  <libos/queue.h>
 #include  <byte_chan.h>
 #include  <errors.h>
-
-
-/*==================================================================================================
-                                       LOCAL VARIABLES
-==================================================================================================*/
 
 /** byte_chans array and a next free pointer */
 

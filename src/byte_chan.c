@@ -41,10 +41,10 @@
 #include <vpic.h>
 #include <vmpic.h>
 
-// Must be a power of two.
+/* Must be a power of two. */
 #define QUEUE_SIZE 256
 
-/// Allocate a byte channel.
+/* Allocate a byte channel. */
 byte_chan_t *byte_chan_alloc(void)
 {
 	byte_chan_t *ret = alloc(sizeof(byte_chan_t), __alignof__(byte_chan_t));

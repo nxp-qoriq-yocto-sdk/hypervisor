@@ -363,8 +363,9 @@ no_dup:
 			unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
 			                                &attr, PTE_PHYS_LEVELS);
 
-			// If there's no valid mapping, request a virtualization
-			// fault, so a machine check can be reflected upon use.
+			/* If there's no valid mapping, request a virtualization
+			 * fault, so a machine check can be reflected upon use.
+			 */
 			if (unlikely(!(attr & PTE_VALID))) {
 #if 0
 				printf("tlbwe@0x%lx: Invalid gphys %llx for va %lx\n",
@@ -466,7 +467,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	default:
 		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
-//		return 1;
+//FIXME		return 1;
 	}
 	
 	regs->gpregs[reg] = ret;
@@ -558,7 +559,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	default:
 		printf("mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
 		       regs->srr0, spr, val);
-//		return 1;
+//FIXME		return 1;
 	}
 	
 	return 0;

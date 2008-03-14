@@ -13,15 +13,15 @@
 #include <vpic_def.h>
 #endif
 
-#define TLB1_GSIZE 16 // As seen by the guest
+#define TLB1_GSIZE 16 /* As seen by the guest */
 
 #ifndef _ASM
 struct pte_t;
 
 #define MAX_HANDLES 32
 
-// An extremely crude form of RTTI/multiple interfaces...
-// Add pointers here for other handle types as they are needed.
+/* An extremely crude form of RTTI/multiple interfaces...
+  Add pointers here for other handle types as they are needed.*/
 typedef struct {
 	struct byte_chan_handle *bc;
 	struct interrupt *int_handle;
@@ -29,12 +29,12 @@ typedef struct {
 
 typedef struct {
 	vpic_t vpic;
-	struct pte *gphys;         // guest phys to real phys mapping
-	struct pte *gphys_rev;     // real phys to guest phys mapping
+	struct pte *gphys;	/* guest phys to real phys mapping */
+	struct pte *gphys_rev;	/* real phys to guest phys mapping */
 	char *name;
 	void *devtree;
 	handle_t *handles[MAX_HANDLES];
-	unsigned int cpucnt;	     // The number of entries in gcpus[]
+	unsigned int cpucnt;	/* The number of entries in gcpus[] */
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
@@ -43,10 +43,10 @@ typedef struct {
 	int partition;
 } guest_t;
 
-#define GCPU_PEND_DECR     0x00000001 // Decrementer event pending
-#define GCPU_PEND_TCR_DIE  0x00000002 // Set TCR[DIE] after pending decr.
-#define GCPU_PEND_MSGSND   0x00000004 // Guest OS msgsnd
-#define GCPU_PEND_MSGSNDC  0x00000008 // Guest OS critical doorbell msgsnd
+#define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
+#define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
+#define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
+#define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 

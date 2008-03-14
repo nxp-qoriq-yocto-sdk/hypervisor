@@ -9,8 +9,8 @@
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
-// This could have latency implications if compare_and_swap
-// fails often enough -- but it's unlikely.
+/* This could have latency implications if compare_and_swap
+   fails often enough -- but it's unlikely. */
 int alloc_guest_handle(guest_t *guest, handle_t *handle)
 {
 	int again;
@@ -88,7 +88,7 @@ static void fh_byte_channel_send(trapframe_t *regs)
 #endif
 
 	if (len > 16) {
-		regs->gpregs[3] = -2;  // invalid arg
+		regs->gpregs[3] = -2;  /* invalid arg */
 		return;
 	}
 
@@ -107,7 +107,7 @@ static void fh_byte_channel_send(trapframe_t *regs)
 	register_t saved = spin_lock_critsave(&bc->tx_lock);
 
 	if (len > queue_get_space(bc->tx))
-		regs->gpregs[3] = -3;  // insufficient room
+		regs->gpregs[3] = -3;  /* insufficient room */
 	else {
 		/* put chars into bytechannel queue here */
 		int ret = byte_chan_send(bc, buf, len);
@@ -127,7 +127,7 @@ static void fh_byte_channel_receive(trapframe_t *regs)
 	register_t saved;
 
 	if (max_receive > 16) {
-		regs->gpregs[3] = -2;  // invalid arg
+		regs->gpregs[3] = -2;  /* invalid arg */
 		return;
 	}
 
@@ -224,7 +224,7 @@ void hcall(trapframe_t *regs)
 	unsigned int token = regs->gpregs[11];   /* hcall token is in r11 */
 
 	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
-		regs->gpregs[3] = -1; // status
+		regs->gpregs[3] = -1; /* status */
 		return;
 	}
 

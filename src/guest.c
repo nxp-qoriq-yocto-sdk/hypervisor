@@ -631,7 +631,7 @@ void init_guest(void)
 		if (pir == cpus[0]) {
 			int name_len;
 		
-			// Boot CPU
+			/* Boot CPU */
 			/* count number of cpus for this partition and alloc data struct */
 			guest->cpucnt = count_cpus(cpus, len);
 			guest->gcpus = alloc(sizeof(long) * guest->cpucnt, __alignof__(long));
@@ -663,7 +663,7 @@ void init_guest(void)
 		} else {
 			printf("cpu %d waiting for spintbl on guest %p...\n", pir, guest);
 		
-			// Wait for the boot cpu...
+			/* Wait for the boot cpu... */
 			while (!guest->spintbl)
 				smp_mbar();
 

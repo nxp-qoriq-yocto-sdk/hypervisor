@@ -66,21 +66,22 @@ typedef struct pte {
 	unsigned long attr;
 } pte_t;
 
-// The xlate function(s) turn virtual addresses into physical page
-// numbers, not physical addresses.  If attr->PTE_VALID is not set, then
-// the return value will indicate a page size mask that should be skipped
-// when scanning for a valid mapping (0 if there's a valid level 2 page
-// directory entry, 0x3ff if there is not).
-//
-// vptbl deals expects virtual page numbers in page directory entries.
-// levels should be PTE_VIRT_LEVELS for virtual->phys mappings, and
-// PTE_PHYS_LEVELS for guest phys->phys and reverse mappings.
+/* The xlate function(s) turn virtual addresses into physical page
+ * numbers, not physical addresses.  If attr->PTE_VALID is not set, then
+ * the return value will indicate a page size mask that should be skipped
+ * when scanning for a valid mapping (0 if there's a valid level 2 page
+ * directory entry, 0x3ff if there is not).
+ *
+ * vptbl deals expects virtual page numbers in page directory entries.
+ * levels should be PTE_VIRT_LEVELS for virtual->phys mappings, and
+ * PTE_PHYS_LEVELS for guest phys->phys and reverse mappings.
+ */
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
                           unsigned long *attr, int levels);
 
-// attr->PTE_SIZE should be 0; vptbl_map will use the largest
-// page sizes it can.
+/* attr->PTE_SIZE should be 0; vptbl_map will use the largest
+  page sizes it can. */
 void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
                unsigned long npages, unsigned long attr, int levels);
 

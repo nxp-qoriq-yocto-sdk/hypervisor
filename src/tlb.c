@@ -36,9 +36,10 @@
 #include <percpu.h>
 #include <paging.h>
 
-// First TLB1 entry reserved for the hypervisor. Entries below this but
-// above TLB1_GSIZE are used to break up guest TLB1 entries due to
-// alignment, size, or permission holes.
+/* First TLB1 entry reserved for the hypervisor. Entries below this but
+ * above TLB1_GSIZE are used to break up guest TLB1 entries due to
+ * alignment, size, or permission holes.
+ */
 static int tlb1_reserved = BASE_TLB_ENTRY;
 
 static int alloc_tlb1(unsigned int entry)
@@ -138,16 +139,17 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		unsigned long attr, rpn; 
 		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
 
-		// If there's no valid mapping, try again at the next page. Note
-		// that this searching can cause latency.  If you need to do
-		// dynamic TLB1 writes for large pages that include unmapped
-		// guest physical regions, and care about latency, use the
-		// paravirtualized interface.
-		//
-		// Unfortunately, we'll have to reflect a TLB miss rather than
-		// a machine check for accesses to these mapping holes,
-		// as TLB1 entries are a limited resource that we don't want
-		// to spend on VF mappings.
+		/* If there's no valid mapping, try again at the next page. Note
+		 * that this searching can cause latency.  If you need to do
+		 * dynamic TLB1 writes for large pages that include unmapped
+		 * guest physical regions, and care about latency, use the
+		 * paravirtualized interface.
+
+		 * Unfortunately, we'll have to reflect a TLB miss rather than
+		 * a machine check for accesses to these mapping holes,
+		 * as TLB1 entries are a limited resource that we don't want
+		 * to spend on VF mappings.
+		 */
 
 		if (unlikely(!(attr & PTE_VALID))) {
 //			printf("invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);

@@ -88,9 +88,9 @@ void start(unsigned long devtree_ptr)
 
 	enable_critint();
 
-	// pamu init
+	// FIXME pamu init
 
-	// Main device tree must be const after this point.
+	/* Main device tree must be const after this point. */
 	release_secondary_cores();
 	partition_init();
 }
@@ -223,13 +223,6 @@ fail_one:
 
 static void partition_init(void)
 {
-	// -init/alloc partition data structure
-	// -identify partition node in device tree for
-	//  this partition, do partition init
-	//    -configure all interrupts-- irq#,cpu#
-	//    -add entries to PAMU table
-	// -create guest device tree
-
 	init_guest();
 }
 

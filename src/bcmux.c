@@ -109,9 +109,10 @@ static void mux_get_data(queue_t *q)
 			queue_t *txq = mux->current_rx_bc->byte_chan->tx;
 			int ret = queue_writechar(txq, ch);
 
-			// If there's no room in outbound queue, discard the data
-			// rather than stop processing input that could be
-			// for another channel.
+			/* If there's no room in outbound queue, discard the data
+			 * rather than stop processing input that could be
+			 * for another channel.
+			 */
 			if (ret < 0)
 				mux->rx_discarded++;
 			else
@@ -193,7 +194,7 @@ static void mux_send_data_pull(queue_t *q)
 
 	do {
 		ret = __mux_send_data(mux, cbc);
-		if (ret < 0) // no more room
+		if (ret < 0) /* no more room */
 			break;
 
 		if (ret > 0)
@@ -203,11 +204,11 @@ static void mux_send_data_pull(queue_t *q)
 		if (!cbc)
 			cbc = mux->first_bc;
 
-		// Limit total work per invocation to limit latency.
+		/* Limit total work per invocation to limit latency. */
 		total += ret;
 	} while (cbc != first_cbc && total < 64);
 
-	// If we stopped due to a lack of data, remove the pull callback.
+	/* If we stopped due to a lack of data, remove the pull callback. */
 	if (ret >= 0 && total < 64)
 		q->space_avail = NULL;
 	
@@ -230,7 +231,7 @@ static void mux_send_data_push(queue_t *q)
 	if (ret > 0)
 		queue_notify_consumer(mux->byte_chan->tx);
 	else if (ret < 0)
-		// If we ran out of space, arm the pull callback.
+		/* If we ran out of space, arm the pull callback. */
 		mux->byte_chan->tx->space_avail = mux_send_data_pull;
 	else
 		debug("mux_send_data_push: no data\n");

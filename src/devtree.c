@@ -189,9 +189,9 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	if (!add_reg(addr, tmpaddr, naddr))
 		return ERR_BADTREE;
 
-	// Reject ranges that wrap around the address space.  Primarily
-	// intended to enable blacklist entries in fsl,hvranges.
-
+	/* Reject ranges that wrap around the address space.  Primarily
+	 * intended to enable blacklist entries in fsl,hvranges.
+	 */
 	copy_val(tmpaddr, ranges + prev_naddr, naddr);
 	copy_val(tmpaddr2, ranges + prev_naddr + naddr, nsize);
 	

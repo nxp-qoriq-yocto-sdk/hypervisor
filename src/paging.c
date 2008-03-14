@@ -28,7 +28,7 @@
 #include <paging.h>
 #include <libos/fsl-booke-tlb.h>
 
-// epn is already shifted by levels that the caller deals with.
+/* epn is already shifted by levels that the caller deals with. */
 static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
                              int insert)
 {
@@ -97,8 +97,8 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 	return (pte.page & ~(size_pages - 1)) | (epn & (size_pages - 1));
 }
 
-// Large mappings are a latency source -- this should only be done
-// at initialization, when processing the device tree.
+/* Large mappings are a latency source -- this should only be done
+   at initialization, when processing the device tree. */
 
 void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
                unsigned long npages, unsigned long attr, int levels)

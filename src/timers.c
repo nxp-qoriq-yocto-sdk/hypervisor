@@ -47,7 +47,7 @@ void decrementer(trapframe_t *regs)
 		return;
 	}
 
-	// The guest has interrupts disabled, so defer it.
+	/* The guest has interrupts disabled, so defer it. */
 	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_DECR);
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 
