@@ -82,6 +82,7 @@ void start(void *devtree_ptr)
 	str = "type some chars:";  // 16 chars
 	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
 
+	fh_vmpic_set_int_config(irq,0,0,0x00000001);  /* set int to cpu 0 */
 	fh_vmpic_set_mask(irq, 0);  /* enable */
 
 #define TEST

@@ -144,7 +144,7 @@ void vpic_assert_vint_txq(queue_t *q)
 void vpic_assert_vint(guest_t *guest, int irq)
 {
 	register_t save;
-	uint8_t destcpu = vpic_irq_get_destcpu(irq);
+	uint8_t destcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
 
 	/* set active */
 	save = spin_lock_critsave(&guest->vpic.lock);
@@ -173,7 +173,7 @@ void vpic_irq_unmask(int irq)
 
 	guest->vpic.ints[irq].enable = 1;
 	if (guest->vpic.pending) {
-		uint8_t destcpu = vpic_irq_get_destcpu(irq);
+		uint8_t destcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);
 	}
 
@@ -201,7 +201,7 @@ void vpic_irq_set_destcpu(int irq, uint8_t destcpu)
 	guest_t *guest = get_gcpu()->guest;
 	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
-	guest->vpic.ints[irq].destcpu = 1 << destcpu;
+	guest->vpic.ints[irq].destcpu = destcpu;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
@@ -227,7 +227,7 @@ void vpic_eoi(int coreid)
 	/* check if more vints are pending */
 	if (guest->vpic.pending) {
 		irq = count_lsb_zeroes(guest->vpic.pending);
-		uint8_t destcpu = vpic_irq_get_destcpu(irq);
+		uint8_t destcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
 		setevent(guest->gcpus[destcpu], EV_ASSERT_VINT);
 	}
 
