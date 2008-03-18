@@ -43,15 +43,11 @@
  *
  *    Each guest has a vpic struct that contains an array 
  *    of vint data structures.  The index into the array
- *    is the handle given to a guest, and is  allocated 
- *    by vpic_alloc_irq().
+ *    is the vint number, and is  allocated by
+ *    vpic_alloc_irq().
  *
- *    The vpic provides handles for both hardware
- *    and virtual interrupts.  A bit in the vpic struct
- *    distinguishes the 2 types of interrupts.
- *
- *    vpic functions call hardware mpic helper functions
- *    if the irq is a hardware irq.
+ *    The vpic routines are invoked by the fh_vmpic* hypercalls
+ *    through a pic_ops structure (see src/vmpic.c).
  *
  *    Asserting virtual interrupts
  *       -vpic_assert_vint -- asserts a virtual interrupt
@@ -131,14 +127,14 @@ void vpic_assert_vint_rxq(queue_t *q)
 {
 	vint_desc_t *vint = q->consumer;
 
-	vpic_assert_vint(vint->guest, vint->guest->handles[vint->irq]->int_handle->irq);
+	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
 
 void vpic_assert_vint_txq(queue_t *q)
 {
 	vint_desc_t *vint = q->producer;
 
-	vpic_assert_vint(vint->guest, vint->guest->handles[vint->irq]->int_handle->irq);
+	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
 
 void vpic_assert_vint(guest_t *guest, int irq)

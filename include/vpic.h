@@ -31,7 +31,8 @@
 
 /* irq descriptor */
 typedef struct {
-	int irq;
+	int vpic_irq;
+	int guest_handle;
 	guest_t *guest;
 } vint_desc_t;
 

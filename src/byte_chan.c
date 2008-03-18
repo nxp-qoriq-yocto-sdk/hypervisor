@@ -135,7 +135,8 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 		if (!vint)
 			return ERR_NOMEM;
 	
-		vint->irq = rxirq;
+		vint->guest_handle = rxirq;
+		vint->vpic_irq = guest->handles[rxirq]->intr->irq;
 		vint->guest = guest;
 		handle->rx->consumer = vint;
 		handle->rx->data_avail = vpic_assert_vint_rxq;
@@ -146,7 +147,8 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 		if (!vint)
 			return ERR_NOMEM;
 	
-		vint->irq = txirq;
+		vint->guest_handle = txirq;
+		vint->vpic_irq = guest->handles[txirq]->intr->irq;
 		vint->guest = guest;
 		handle->tx->producer = vint;
 		handle->tx->space_avail = vpic_assert_vint_txq;
