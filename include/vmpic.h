@@ -35,5 +35,6 @@ void fh_vmpic_set_mask(trapframe_t *regs);
 void fh_vmpic_eoi(trapframe_t *regs);
 void fh_vmpic_set_priority(trapframe_t *regs);
 void fh_vmpic_get_priority(trapframe_t *regs);
+void fh_vmpic_iack(trapframe_t *regs);
 
 #endif
