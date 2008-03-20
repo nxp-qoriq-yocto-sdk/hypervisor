@@ -1,0 +1,101 @@
+
+#include <libos/libos.h>
+#include <libos/hcalls.h>
+#include <libos/spr.h>
+#include <libos/trapframe.h>
+#include <libos/bitops.h>
+#include <libfdt.h>
+
+extern void init(void *devtree_ptr);
+
+int irq;
+
+void ext_int_handler(trapframe_t *frameptr)
+{
+	printf("ext int\n");
+
+	fh_vmpic_eoi(irq);
+
+}
+
+void dump_dev_tree(void *devtree_ptr)
+{
+	void *fdt = (void *)devtree_ptr;
+	int node = -1;
+	const char *s;
+	int len;
+
+        printf("dev tree ------\n");
+        while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
+                s = fdt_get_name(fdt, node, &len);
+                printf("   node = %s\n",s);
+        }
+        printf("------\n");
+}
+
+
+void start(void *devtree_ptr)
+{
+	uint32_t status;
+	char *str;
+	uint32_t handle;
+	uint32_t rxavail;
+	uint32_t txavail;
+	uint8_t buf[16];
+	uint32_t x;
+	int cnt;
+	int i;
+	int node = -1;
+	int len;
+
+	init(devtree_ptr);
+
+	dump_dev_tree(devtree_ptr);
+
+	enable_extint();
+
+	printf("Hello World\n");
+
+	node = fdt_path_offset(devtree_ptr, "/handles/byte-channel1");
+	if (node < 0) {
+		printf("0 device tree error %d\n",node);
+		return;
+	}
+	const int *prop = fdt_getprop(devtree_ptr, node, "reg", &len);
+	if (prop) {
+		handle = *prop;
+	} else {
+		printf("device tree error\n");
+		return;
+	}
+	prop = fdt_getprop(devtree_ptr, node, "interrupts", &len);
+	if (prop) {
+		irq = *prop;
+	} else {
+		printf("device tree error\n");
+		return;
+	}
+
+	str = "byte-channel:hi!";  // 16 chars
+	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
+
+	str = "type some chars:";  // 16 chars
+	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
+
+	fh_vmpic_set_int_config(irq,0,0,0x00000001);  /* set int to cpu 0 */
+	fh_vmpic_set_mask(irq, 0);  /* enable */
+
+#define TEST
+#ifdef TEST
+	while (1) {
+		status = fh_byte_channel_poll(handle,&rxavail,&txavail);
+		if (rxavail > 0) {
+			status = fh_byte_channel_receive(handle,16,&buf[0],&cnt);
+			for (i=0; i < cnt; i++) {
+				printf("%c",buf[i]);
+			}
+		}
+	}
+#endif
+
+}

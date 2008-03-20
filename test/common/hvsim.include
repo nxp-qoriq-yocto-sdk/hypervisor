@@ -100,6 +100,11 @@ if $use_uart2_tty == 1 {
 	$system.connect uart2 $con3_tty
 }
 
+if $use_uart1_net == 1 {
+	$con2_tty = (create-std-server-console "foo" 9124)
+	$system.connect uart1 $con2_tty
+}
+
 if $use_uart2_net == 1 {
 	$con3_tty = (create-std-server-console "foo" 9999)
 	$system.connect uart2 $con3_tty
