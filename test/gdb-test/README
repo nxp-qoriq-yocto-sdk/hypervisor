@@ -1,0 +1,18 @@
+
+ The gdb-test directory is essentially a clone of the hello-test directory,
+ modulo some modifications (only in the various scripts) to customize the
+ set-up.
+
+ The basic purpose here is to test the GDB hypervisor stub. Using a GDB that
+ has e500mc support, you should be able to remote connect to port 9124 upon a
+ 'target remote :9124' in GDB. That should get you remote connected to the
+ hypervisor's stub which will be used to debug guests running on top of the
+ hypervisor.
+
+ To Run, follow Stuart's instructions off of his Wikipage and type:
+
+	 'make gdb-hello'
+
+ (instead of 'make test-hello' as you would do for the hello test).
+
+ Caution: This is Work In Progress.
