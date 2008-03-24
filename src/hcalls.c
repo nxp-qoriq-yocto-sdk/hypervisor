@@ -76,7 +76,7 @@ static void fh_whoami(trapframe_t *regs)
  */
 struct fh_sg_list {
 	uint64_t source;
-	uint64_t destination;
+	uint64_t target;
 	uint64_t size;
 	uint64_t reserved;
 } __attribute__ ((aligned (32)));
@@ -98,15 +98,20 @@ static inline guest_t *handle_to_guest(guest_t *guest, unsigned int handle)
  */
 static void fh_memcpy(trapframe_t *regs)
 {
-	guest_t *source = get_gcpu()->guest;
-	guest_t *destination = handle_to_guest(source, regs->gpregs[3]);
-	unsigned int num_sgs = regs->gpregs[6];
+	guest_t *source = regs->gpregs[3] == -1 ? get_gcpu()->guest :
+		handle_to_guest(get_gcpu()->guest, regs->gpregs[3]);;
+
+	guest_t *target = regs->gpregs[4] == -1 ? get_gcpu()->guest :
+		handle_to_guest(get_gcpu()->guest, regs->gpregs[4]);;
+
+	unsigned int num_sgs = regs->gpregs[7];
 	static struct fh_sg_list sg_list[SG_PER_PAGE];
 	size_t sg_size = num_sgs * sizeof(struct fh_sg_list);
-	physaddr_t sg_gphys = (physaddr_t) regs->gpregs[5] << 32 | regs->gpregs[4];
+	physaddr_t sg_gphys =
+		(physaddr_t) regs->gpregs[6] << 32 | regs->gpregs[5];
 	static uint32_t sg_lock;
 
-	if (!destination) {
+	if (!source || !target) {
 		regs->gpregs[3] = -2;
 		return;
 	}
@@ -119,7 +124,8 @@ static void fh_memcpy(trapframe_t *regs)
 
 		/* Read the next page of the guest's scatter-gather list into
 		   memory. */
-		if (copy_from_gphys(source->gphys, sg_list, sg_gphys, bytes_to_copy) != bytes_to_copy) {
+		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
+				    bytes_to_copy) != bytes_to_copy) {
 			regs->gpregs[3] = -1;
 			spin_unlock(&sg_lock);
 			return;
@@ -128,8 +134,8 @@ static void fh_memcpy(trapframe_t *regs)
 		/* Now go through that list and copy the memory one entry at a
 		   time. */
 		for (unsigned i = 0; i < sg_to_copy; i++) {
-			size_t size = copy_between_gphys(destination->gphys,
-				sg_list[i].destination,
+			size_t size = copy_between_gphys(target->gphys,
+				sg_list[i].target,
 				source->gphys,
 				sg_list[i].source,
 				sg_list[i].size);
