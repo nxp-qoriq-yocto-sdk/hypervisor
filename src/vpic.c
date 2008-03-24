@@ -61,7 +61,7 @@
  *      -reflecting interrupts is done in the guest doorbell
  *       handler
  *      -if there is no active interrupt and the interrupt is 
- *       not masked it moves into the pending/active state
+ *       not masked it moves into the active state
  *      -it remains active until EOI.
  *      -only one virtual interrupt (per guest) can be active
  *       at a time.
@@ -96,6 +96,7 @@ int vpic_process_pending_ints(guest_t *guest)
 
 	/* look for a pending interrupt that is not masked */
 	while (pending) {
+
 		/* get int num */
 		int irq = count_lsb_zeroes(pending);
 
@@ -106,10 +107,11 @@ int vpic_process_pending_ints(guest_t *guest)
 		if (guest->vpic.ints[irq].enable) {
 			/* int now moves to active state */
 			guest->vpic.active |= 1 << irq;
-	
-			/* get vector and stick it in GEPR */
-			mtspr(SPR_GEPR, guest->vpic.ints[irq].vector);
-	
+
+			if (guest->coreint) {
+				mtspr(SPR_GEPR, guest->vpic.ints[irq].vector);
+			}
+
 			spin_unlock_critsave(&guest->vpic.lock, save);
 	
 			return 1;
@@ -127,12 +129,16 @@ void vpic_assert_vint_rxq(queue_t *q)
 {
 	vint_desc_t *vint = q->consumer;
 
+printf("asserting rxq vint\n");
+
 	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
 
 void vpic_assert_vint_txq(queue_t *q)
 {
 	vint_desc_t *vint = q->producer;
+
+printf("asserting txq vint\n");
 
 	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
@@ -142,7 +148,7 @@ void vpic_assert_vint(guest_t *guest, int irq)
 	register_t save;
 	uint8_t destcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
 
-	/* set active */
+	/* set pending */
 	save = spin_lock_critsave(&guest->vpic.lock);
 	guest->vpic.pending |= 1 << irq;
 	spin_unlock_critsave(&guest->vpic.lock, save);

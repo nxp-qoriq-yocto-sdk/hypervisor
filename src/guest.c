@@ -643,6 +643,28 @@ void start_guest_secondary(void)
 	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
 }
 
+/* Process configuration options in the hypervisor's
+ * chosen node.
+ */
+void partition_config(guest_t *guest)
+{
+	int chosen = fdt_subnode_offset(fdt, 0, "chosen");
+	if (chosen < 0) {
+		/* set defaults */
+		guest->coreint = 1;
+		return;
+	}
+
+	int len;
+	const uint32_t *coreint = fdt_getprop(fdt, chosen, "fsl,hv-pic-coreint", &len);
+	if (coreint) {
+		guest->coreint = *coreint;
+	} else {
+		guest->coreint = 1;
+	}
+}
+
+
 void init_guest(void)
 {
 	int off = -1, found = 0, ret;
@@ -710,6 +732,8 @@ void init_guest(void)
 			ret = process_guest_devtree(guest, off, cpus, len);
 			if (ret < 0)
 				continue;
+
+			partition_config(guest);
 
 #ifdef CONFIG_BYTE_CHAN
 			byte_chan_partition_init(guest);

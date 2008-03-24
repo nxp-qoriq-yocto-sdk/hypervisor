@@ -31,6 +31,7 @@ typedef struct {
 
 typedef struct guest {
 	vpic_t vpic;
+	int coreint:1;		/* config option whether we are in coreint mode */
 	struct pte *gphys;	/* guest phys to real phys mapping */
 	struct pte *gphys_rev;	/* real phys to guest phys mapping */
 	char *name;

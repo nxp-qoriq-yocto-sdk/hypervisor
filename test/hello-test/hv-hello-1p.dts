@@ -222,4 +222,8 @@
 			fsl,dtb = /incbin/("bin/hello-p1.dtb");
 		};
 	};
+
+	chosen {
+		fsl,hv-pic-coreint = <0>;
+	};
 };

@@ -210,4 +210,8 @@
 			fsl,hv-image-gphys-addr = <0 0>;
 		};
 	};
+
+	chosen {
+		fsl,hv-pic-coreint = <0>;
+	};
 };

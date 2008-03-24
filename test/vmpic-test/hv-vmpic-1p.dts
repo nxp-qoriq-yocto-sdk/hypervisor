@@ -217,4 +217,8 @@
 			fsl,dtb = /incbin/("bin/vmpic-p1.dtb");
 		};
 	};
+
+	chosen {
+		fsl,hv-pic-coreint = <0>;
+	};
 };
