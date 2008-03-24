@@ -129,8 +129,6 @@ void vpic_assert_vint_rxq(queue_t *q)
 {
 	vint_desc_t *vint = q->consumer;
 
-printf("asserting rxq vint\n");
-
 	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
 
@@ -215,6 +213,30 @@ uint8_t vpic_irq_get_destcpu(int irq)
 	return guest->vpic.ints[irq].destcpu;
 }
 
+/* 
+ * When iack is called, a single virtual interrupt is active
+ * for the guest's vpic.  The iack call simply
+ * returns the vector, no additional state transitions
+ * occur.
+ * 
+ */
+uint16_t vpic_iack(void)
+{
+	int irq;
+	guest_t *guest = get_gcpu()->guest;
+	if (!guest->vpic.active) {
+		return 0xffff;  /* spurious */
+	}
+
+	irq = count_lsb_zeroes(guest->vpic.active);
+
+	return guest->vpic.ints[irq].vector;
+}
+
+/*
+ * Clears the interrupt from being active.
+ *
+ */
 void vpic_eoi(int coreid)
 {
 	int irq;

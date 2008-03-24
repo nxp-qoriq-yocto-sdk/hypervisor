@@ -12,8 +12,9 @@ int irq;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
-	printf("ext int\n");
-
+	uint16_t vector;
+	fh_vmpic_iack(&vector);
+	printf("ext int %d\n",vector);
 	fh_vmpic_eoi(irq);
 
 }
@@ -75,6 +76,7 @@ void start(void *devtree_ptr)
 		printf("device tree error\n");
 		return;
 	}
+	printf("byte-channel irq = %d\n",irq);
 
 	str = "byte-channel:hi!";  // 16 chars
 	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);

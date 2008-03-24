@@ -51,6 +51,12 @@ int vmpic_alloc_vpic_handle(guest_t *guest)
 	interrupt->ops = &vpic_ops;
 	interrupt->irq = vpic_alloc_irq(guest);
 
+	/*
+	 * update vpic vector to return guest handle directly
+	 * during interrupt acknowledge
+	 */
+	vpic_irq_set_vector(interrupt->irq, handle);
+
 	printf("vpic handle allocated: vmpic handle %d, vpic irq %d\n", handle, interrupt->irq);
 
 	return handle;
@@ -85,7 +91,6 @@ int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
 	 * update mpic vector to return guest handle directly
 	 * during interrupt acknowledge
 	 */
-
 	mpic_irq_set_vector(irq, handle);
 
 	return handle;
@@ -284,6 +289,9 @@ void fh_vmpic_iack(trapframe_t *regs)
 	uint16_t vector;
 
 	vector = mpic_iack(get_gcpu()->cpu->coreid);
+	if (vector == 0xFFFF) {  /* spurious */
+		vector = vpic_iack();
+	}
 
 	regs->gpregs[4] = vector;
 }
