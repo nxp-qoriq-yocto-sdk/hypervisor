@@ -82,7 +82,7 @@
 			             "fsl,ns16550", "ns16550";
 			reg = <11c600 100>;
 			clock-frequency = <0>;
-//			interrupts = <1c 2>;
+			interrupts = <1c 2>;
 			interrupt-parent = <&mpic>;
 		};
 
@@ -98,6 +98,13 @@
 			big-endian;
 			fsl,hv-interrupt-controller;
 		};
+	};
+
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
 	};
 
 	handles {
