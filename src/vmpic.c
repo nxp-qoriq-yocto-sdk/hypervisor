@@ -122,10 +122,13 @@ void vmpic_partition_init(guest_t *guest)
 		return;
 	}
 
-	/* identify all "interrupts" properties that have
-	 * compatible = fsl,mpc8578-mpic as an interrupt parent
+	/* Identify all interrupt sources that have an interrupt
+	 * parent with a "fsl,hv-interrupt-controller" property.  
+	 * This indicates that the source is managed by the
+	 * vmpic and needs to have a handle allocated.
 	 *   -replace mpic as interrupt parent with vmpic
 	 *   -for each irq #, alloc mpic handles for each & replace
+	 *    property value
 	 */
 
 	node = -1;
@@ -139,7 +142,7 @@ void vmpic_partition_init(guest_t *guest)
 			if (fdt_getprop(fdt, intctrl, "fsl,hv-interrupt-controller", &len)) {
 				int i;
 
-				/* allocate handle and update irq */
+				/* allocate handle and update irq for each int specifier */
 				for (i=0; i < (intlen / CELL_SIZE); i += 2) {  // FIXME-- get #cells from devtree
 					int handle = vmpic_alloc_mpic_handle(guest, interrupts[i]);
 					if (handle >= 0)
