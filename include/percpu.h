@@ -32,14 +32,14 @@ typedef struct {
 
 typedef struct guest {
 	vpic_t vpic;
-	int coreint:1;		/* config option whether we are in coreint mode */
-	struct pte *gphys;	/* guest phys to real phys mapping */
+	int coreint:1;          /* config option whether we are in coreint mode */
+	struct pte *gphys;      /* guest phys to real phys mapping */
 	struct pte *gphys_rev;	/* real phys to guest phys mapping */
 	char *name;
 	void *devtree;
-	handle_t handle;	/* The handle of *this* guest */
+	handle_t handle;        /* The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
-	unsigned int cpucnt;	/* The number of entries in gcpus[] */
+	unsigned int cpucnt;    /* The number of entries in gcpus[] */
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
