@@ -31,6 +31,14 @@ config BCMUX
 		other things, sharing a single serial port for the
 		consoles of all guests.
 
+config GDB_STUB
+	bool "GDB Stub Support"
+	depends on BYTE_CHAN
+	help
+		Enable GDB stub support.  This allows you to debug the guest 
+		remotely with GDB.  The stub is located in the hypervisor, 
+		allowing non-intrusive debugging.
+
 config IPI_DOORBELL
 	bool "Inter Partition Interrupt support"
 	select LIBOS_QUEUE

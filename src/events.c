@@ -6,9 +6,15 @@
 #include <events.h>
 #include <vpic.h>
 #include <doorbell.h>
+#include <gdb-stub.h>
 
 static eventfp_t event_table[] = {
 	&critdbell_to_gdbell_glue,		/* EV_ASSERT_VINT */
+#ifdef CONFIG_GDB_STUB
+	&gdb_stub_event_handler,		/* EV_GDB */
+#else
+	NULL,					/* EV_GDB */
+#endif
 };
 
 void setevent(gcpu_t *gcpu, int event)

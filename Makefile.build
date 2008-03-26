@@ -63,6 +63,7 @@ hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
 hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
+hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
 
 SRCS := $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
@@ -106,7 +107,10 @@ bin/%.dtb : %.dts
 bin/uv.map: bin/uv
 	nm -n bin/uv > $@
 
-.PHONY: test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
+.PHONY: test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
+
+test-gdb: bin/uv.uImage test/gdb-test
+	$(SIMICS) test/gdb-test/hv-gdb.simics
 
 test-hello: bin/uv.uImage test/hello-test
 	$(SIMICS) test/hello-test/hv-hello.simics
@@ -122,6 +126,7 @@ test-linux-1p: bin/uv.uImage test/linux
 
 test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
+
 
 .PHONY: FORCE test
 test/%: FORCE

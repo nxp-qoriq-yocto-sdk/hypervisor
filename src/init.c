@@ -14,6 +14,7 @@
 #include <vmpic.h>
 #include <bcmux.h>
 #include <devtree.h>
+#include <gdb-stub.h>
 #include <ipi_doorbell.h>
 
 #include <limits.h>
@@ -87,6 +88,10 @@ void start(unsigned long devtree_ptr)
 	connect_global_byte_channels();
 #endif
 	create_doorbells();
+
+#ifdef CONFIG_GDB_STUB
+	gdb_stub_init();
+#endif
 
 	enable_critint();
 
