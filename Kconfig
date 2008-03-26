@@ -30,3 +30,9 @@ config BCMUX
 		a single combined byte channel.  It is useful for, among
 		other things, sharing a single serial port for the
 		consoles of all guests.
+
+config IPI_DOORBELL
+	bool "Inter Partition Interrupt support"
+	select LIBOS_QUEUE
+	help
+		Provides support for inter partition signalling.

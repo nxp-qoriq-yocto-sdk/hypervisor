@@ -26,6 +26,7 @@ struct guest;
 typedef struct {
 	struct byte_chan_handle *bc;
 	struct interrupt *intr;
+	struct ipi_doorbell_handle *db;
 	struct guest *guest;
 } handle_t;
 

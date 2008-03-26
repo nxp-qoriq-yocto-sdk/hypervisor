@@ -14,6 +14,7 @@
 #include <vmpic.h>
 #include <bcmux.h>
 #include <devtree.h>
+#include <ipi_doorbell.h>
 
 #include <limits.h>
 
@@ -85,6 +86,7 @@ void start(unsigned long devtree_ptr)
 #endif
 	connect_global_byte_channels();
 #endif
+	create_doorbells();
 
 	enable_critint();
 

@@ -24,10 +24,34 @@ static void  core_init(void);
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 #define UART_OFFSET 0x11d500
 
+int get_uart_offset(void);
+
 void *fdt;
+
+int get_uart_offset()
+{
+	int ret;
+	int *handle_p;
+	const char *path;
+
+	ret = fdt_subnode_offset(fdt, 0, "aliases");
+	if (ret < 0)
+		return ret;
+
+	path = fdt_getprop(fdt, ret, "stdout", &ret);
+	if (!path)
+		return ret;
+
+	ret = fdt_path_offset(fdt, path);
+
+	handle_p =  (int *) fdt_getprop(fdt, ret, "reg", &ret);
+
+	return *handle_p;
+}
 
 void init(unsigned long devtree_ptr)
 {
+	int uart_offset;
 	core_init();
 
 	/* alloc the heap */
@@ -37,8 +61,9 @@ void init(unsigned long devtree_ptr)
         heap = (heap + 15) & ~15;
 
         alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
+	uart_offset = get_uart_offset();
 
-	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + UART_OFFSET, 0, 0, 16));
+	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + uart_offset, 0, 0, 16));
 
 }
 

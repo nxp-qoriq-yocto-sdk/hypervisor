@@ -6,6 +6,7 @@
 #include <percpu.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <ipi_doorbell.h>
 #include <paging.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
@@ -274,6 +275,52 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 	return;
 }
+
+static void fh_partition_send_dbell(trapframe_t *regs)
+{
+	register_t saved;
+	guest_t *guest = get_gcpu()->guest;
+	ipi_doorbell_handle_t *db_handle;
+	struct ipi_doorbell *dbell;
+	guest_recv_dbell_list_t *tmp;
+
+	int handle = regs->gpregs[3];
+
+	/* FIXME: race against handle closure */
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	db_handle = guest->handles[handle]->db;
+	if (!db_handle) {
+		regs->gpregs[3] = -1;  /* bad doorbell handle */
+		return;
+	}
+
+	dbell = db_handle->dbell;
+	if (!dbell) {
+		regs->gpregs[3] = -1;  /* bad doorbell */
+		return;
+	}
+
+	saved = spin_lock_critsave(&dbell->dbell_lock);
+	if (dbell->recv_head == NULL) {
+		spin_unlock_critsave(&dbell->dbell_lock, saved);
+		regs->gpregs[3] = -1;  /* bad doorbell */
+		return;
+	} else {
+		tmp =  dbell->recv_head;
+		while (tmp) {
+			vpic_assert_vint(tmp->guest_vint.guest,
+						tmp->guest_vint.vpic_irq);
+			tmp = tmp->next;
+		}
+	}
+	spin_unlock_critsave(&dbell->dbell_lock, saved);
+	regs->gpregs[3] = 0;  /* success */
+	return;
+}
 #else
 #define fh_byte_channel_send unimplemented
 #define fh_byte_channel_receive unimplemented
@@ -311,6 +358,7 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 27 */
 	&unimplemented,		/* 28 */
 	&unimplemented,		/* 29 */
+	&fh_partition_send_dbell,	/* 30 */
 };
 
 void hcall(trapframe_t *regs)

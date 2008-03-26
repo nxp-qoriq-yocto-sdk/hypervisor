@@ -62,6 +62,7 @@ hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
+hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
 
 SRCS := $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)

@@ -1,0 +1,142 @@
+/ {
+	compatible = "fsl,hv-MPC8578SIM",
+	             "fsl,hv-e500mc-partition",
+	             "fsl,hv-partition",
+	             "fsl,MPC8578SIM";
+
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <0>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <1>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+	};
+
+	memory {
+		reg = <0 0 17000000 0 17000000 1000000>;
+		device_type = "memory";
+	};
+
+	ccsr@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		device_type = "soc";
+		ranges = <0 0 fe000000 400000>;
+
+		i2c0: i2c@118000 {
+			device_type = "i2c";
+			compatible = "fsl,mpc8578-i2c",
+			             "fsl,i2c", "fsl-i2c";
+			reg = <118000 100>;
+//			interrupts = <1e 2>;
+//			interrupt-parent = <&mpic>;
+			dfsrr;
+		};
+
+		mdio@31c520 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "mdio";
+			compatible = "fsl,mpc8578-gianfar-mdio",
+			             "fsl,gianfar-mdio",
+			             "gianfar";
+			reg = <31c520 20>;
+			phy0: ethernet-phy@0 {
+//				interrupt-parent = <&mpic>;
+				interrupts = <a 1>;
+				reg = <0>;
+			};
+		};
+
+		ethernet@31c000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "fsl,mpc8578-gianfar",
+			             "fsl,gianfar",
+			             "gianfar";
+			reg = <31c000 1000>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+//			interrupts = <1d 2 1e 2 22 2>;
+//			interrupt-parent = <&mpic>;
+			phy-handle = <&phy0>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		serial@11d500 {
+			device_type = "serial";
+			compatible = "fsl,mpc8578-uart",
+			             "fsl,ns16550", "ns16550";
+			reg = <11d500 100>;
+			clock-frequency = <0>;
+//			interrupts = <1d 2>;
+//			interrupt-parent = <&mpic>;
+		};
+
+	};
+
+	handles {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "fsl,hv-handles";
+
+		byte-channel0 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = "byte-channel1";
+		};
+
+		byte-channel1 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = "byte-channel2";
+		};
+
+		doorbell@0 {
+               compatible = "fsl,doorbell-send";
+               fsl,endpoint = "/doorbells/doorbell@0";
+            };
+		doorbell@1 {
+               compatible = "fsl,doorbell-receive";
+               fsl,endpoint = "/doorbells/doorbell@0";
+            };
+
+	};
+
+	chosen {
+		linux,stdout-path = "/ccsr/serial@11d500";
+		bootargs = "console=ttyS0,115200";
+		linux,initrd-start = <01300000>;
+		linux,initrd-end = <013ca000>;
+	};
+
+	aliases {
+		stdout = "/ccsr/serial@11d500";
+	};
+};

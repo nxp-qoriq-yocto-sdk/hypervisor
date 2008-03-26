@@ -35,6 +35,7 @@
 #include <timers.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <ipi_doorbell.h>
 #include <devtree.h>
 #include <errors.h>
 #include <elf.h>
@@ -738,6 +739,8 @@ void init_guest(void)
 #ifdef CONFIG_BYTE_CHAN
 			byte_chan_partition_init(guest);
 #endif
+			send_dbell_partition_init(guest);
+			recv_dbell_partition_init(guest);
 
 			vmpic_partition_init(guest);
 
