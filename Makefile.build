@@ -127,6 +127,11 @@ test-linux-1p: bin/uv.uImage test/linux
 test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 
+test-ipi-doorbell-1p: bin/uv.uImage test/ipi_doorbell-test
+	$(SIMICS) test/ipi_doorbell-test/hv-ipi.simics
+
+test-ipi-doorbell-2p: bin/uv.uImage test/ipi_doorbell-test
+	$(SIMICS) test/ipi_doorbell-test/hv-ipi-2p.simics
 
 .PHONY: FORCE test
 test/%: FORCE

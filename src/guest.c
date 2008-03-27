@@ -739,8 +739,10 @@ void init_guest(void)
 #ifdef CONFIG_BYTE_CHAN
 			byte_chan_partition_init(guest);
 #endif
+#ifdef CONFIG_IPI_DOORBELL
 			send_dbell_partition_init(guest);
 			recv_dbell_partition_init(guest);
+#endif
 
 			vmpic_partition_init(guest);
 
