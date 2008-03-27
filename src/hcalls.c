@@ -306,11 +306,17 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 	dbell = db_handle->dbell;
 
 	saved = spin_lock_critsave(&dbell->dbell_lock);
-	tmp = db_handle->dbell->recv_head;
-	while (tmp) {
-		vpic_assert_vint(tmp->guest_vint.guest,
-		                 tmp->guest_vint.vpic_irq);
-		tmp = tmp->next;
+	if (dbell->recv_head == NULL) {
+		spin_unlock_critsave(&dbell->dbell_lock, saved);
+		regs->gpregs[3] = -5;  /* bad connection */
+		return;
+	} else {
+		tmp =  dbell->recv_head;
+		while (tmp) {
+			vpic_assert_vint(tmp->guest_vint.guest,
+					 tmp->guest_vint.vpic_irq);
+			tmp = tmp->next;
+		}
 	}
 	spin_unlock_critsave(&dbell->dbell_lock, saved);
 
