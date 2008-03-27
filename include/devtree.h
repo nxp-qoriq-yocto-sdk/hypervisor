@@ -37,7 +37,9 @@ static inline void val_from_int(uint32_t *dest, physaddr_t src)
 
 void create_ns16550(void);
 void open_stdout(void);
+void open_stdin(void);
 
 extern void *fdt;
+extern struct queue *stdin, *stdout;
 
 #endif

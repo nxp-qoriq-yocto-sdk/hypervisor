@@ -31,6 +31,11 @@ SECTIONS
 		extable_begin = .;
 		*(.extable)
 		extable_end = .;
+
+		. = ALIGN(8);
+		shellcmd_begin = .;
+		*(.shellcmd)
+		shellcmd_end = .;
 	}
 
 	. = ALIGN(8);

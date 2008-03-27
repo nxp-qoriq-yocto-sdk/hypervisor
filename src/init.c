@@ -16,6 +16,7 @@
 #include <devtree.h>
 #include <gdb-stub.h>
 #include <ipi_doorbell.h>
+#include <shell.h>
 
 #include <limits.h>
 
@@ -64,7 +65,6 @@ void start(unsigned long devtree_ptr)
 	create_ns16550();
 #endif
 	open_stdout();
-
 	printf("mem_end %llx\n", mem_end);
 
 	printf("=======================================\n");
@@ -78,6 +78,10 @@ void start(unsigned long devtree_ptr)
 	mpic_irq_unmask(0x24);
 
 	vmpic_global_init();
+
+#ifdef CONFIG_SHELL
+	shell_init();
+#endif
 
 	/* byte channel initialization */
 #ifdef CONFIG_BYTE_CHAN
