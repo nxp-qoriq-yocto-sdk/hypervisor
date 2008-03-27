@@ -169,7 +169,7 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 /** Callback for RX interrupt.
  * 
  */ 
-static void rx(struct queue_t *q)
+static void rx(queue_t *q)
 {
 	/* Record the event type and setevent EV_GDB on the current CPU. */
 	event_type = received_data;
