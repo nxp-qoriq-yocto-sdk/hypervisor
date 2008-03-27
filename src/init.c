@@ -86,7 +86,10 @@ void start(unsigned long devtree_ptr)
 #endif
 	connect_global_byte_channels();
 #endif
+
+#ifdef CONFIG_IPI_DOORBELL
 	create_doorbells();
+#endif
 
 	enable_critint();
 
