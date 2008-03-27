@@ -273,9 +273,14 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 	spin_unlock_critsave(&bc->tx_lock, saved);
 
 	regs->gpregs[3] = 0;  /* success */
-	return;
 }
+#else
+#define fh_byte_channel_send unimplemented
+#define fh_byte_channel_receive unimplemented
+#define fh_byte_channel_poll unimplemented
+#endif
 
+#ifdef CONFIG_IPI_DOORBELL
 static void fh_partition_send_dbell(trapframe_t *regs)
 {
 	register_t saved;
@@ -294,37 +299,25 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 
 	db_handle = guest->handles[handle]->db;
 	if (!db_handle) {
-		regs->gpregs[3] = -1;  /* bad doorbell handle */
+		regs->gpregs[3] = -1;  /* not a doorbell */
 		return;
 	}
 
 	dbell = db_handle->dbell;
-	if (!dbell) {
-		regs->gpregs[3] = -1;  /* bad doorbell */
-		return;
-	}
 
 	saved = spin_lock_critsave(&dbell->dbell_lock);
-	if (dbell->recv_head == NULL) {
-		spin_unlock_critsave(&dbell->dbell_lock, saved);
-		regs->gpregs[3] = -1;  /* bad doorbell */
-		return;
-	} else {
-		tmp =  dbell->recv_head;
-		while (tmp) {
-			vpic_assert_vint(tmp->guest_vint.guest,
-						tmp->guest_vint.vpic_irq);
-			tmp = tmp->next;
-		}
+	tmp = db_handle->dbell->recv_head;
+	while (tmp) {
+		vpic_assert_vint(tmp->guest_vint.guest,
+		                 tmp->guest_vint.vpic_irq);
+		tmp = tmp->next;
 	}
 	spin_unlock_critsave(&dbell->dbell_lock, saved);
+
 	regs->gpregs[3] = 0;  /* success */
-	return;
 }
 #else
-#define fh_byte_channel_send unimplemented
-#define fh_byte_channel_receive unimplemented
-#define fh_byte_channel_poll unimplemented
+#define fh_partition_send_dbell unimplemented
 #endif
 
 static hcallfp_t hcall_table[] = {

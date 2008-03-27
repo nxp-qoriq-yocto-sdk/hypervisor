@@ -11,15 +11,12 @@ typedef struct ipi_doorbell {
 	uint32_t dbell_lock;
 } ipi_doorbell_t;
 
-
 typedef struct ipi_doorbell_handle {
 	ipi_doorbell_t *dbell;
 	handle_t user;
 } ipi_doorbell_handle_t;
 
 /* Prototypes for functions in ipi_doorbell.c */
-ipi_doorbell_t *doorbell_alloc(void);
-void  create_doorbells(void);
-int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest);
+void create_doorbells(void);
 void send_dbell_partition_init(guest_t *guest);
 void recv_dbell_partition_init(guest_t *guest);
