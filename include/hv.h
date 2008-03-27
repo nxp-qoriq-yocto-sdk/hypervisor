@@ -3,7 +3,10 @@
 
 #include <libos/libos.h>
 
+struct guest;
+
 void *alloc(unsigned long size, unsigned long align);
-void start_guest(void);
+int start_guest(struct guest *guest);
+int stop_guest(struct guest *guest);
 
 #endif

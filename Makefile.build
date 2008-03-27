@@ -58,7 +58,7 @@ libos-src-$(CONFIG_NS16550) += $(LIBOS_NS16550)
 libos-src-$(CONFIG_LIBOS_QUEUE) += $(LIBOS_QUEUE)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
-            timers.c paging.c hcalls.c devtree.c elf.c vmpic.c
+            timers.c paging.c hcalls.c devtree.c elf.c vmpic.c misc.S
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
@@ -90,6 +90,11 @@ bin/uv: $(OBJS)
 bin/%.o : src/%.c
 	@$(MKDIR) $(@D)
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
+
+bin/%.o : src/%.S $(LIBOS_BIN)/assym.s
+	@$(MKDIR) $(@D)
+	$(CC) -MD $(CC_OPTS) $(CC_OPTS_ASM) -include $(LIBOS_BIN)/assym.s \
+	-include $(LIBOS_CLIENT_H) -c -o $@ $<
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c
 	@$(MKDIR) $(@D)

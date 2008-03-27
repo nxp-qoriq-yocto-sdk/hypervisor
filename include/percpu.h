@@ -1,9 +1,10 @@
+/** @file
+ * Per-guest-cpu and Per-hypervisor-cpu data structures
+ */
+
 #ifndef PERCPU_H
 #define PERCPU_H
 
-/*
- * Per-guest-cpu and Per-hypervisor-cpu data structures
- */
 
 #ifndef _ASM
 #include <stdint.h>
@@ -30,22 +31,33 @@ typedef struct {
 	struct guest *guest;
 } handle_t;
 
+typedef enum {
+	guest_stopped,
+	guest_starting,
+	guest_running,
+	guest_stopping,
+} gstate_t;
+
 typedef struct guest {
 	vpic_t vpic;
-	int coreint:1;          /* config option whether we are in coreint mode */
-	struct pte *gphys;      /* guest phys to real phys mapping */
-	struct pte *gphys_rev;	/* real phys to guest phys mapping */
+	/**  config option whether we are in coreint mode */
+	int coreint:1;
+	struct pte *gphys;      /**< guest phys to real phys mapping */
+	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
 	char *name;
 	void *devtree;
-	handle_t handle;        /* The handle of *this* guest */
+	handle_t handle;        /**< The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
-	unsigned int cpucnt;    /* The number of entries in gcpus[] */
+	/** Used as a reference count when stopping a partition. */
+	unsigned long active_cpus;
+	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
-
-	/** Offset to partition node in main device tree. */
+   /** Offset to partition node in main device tree. */
 	int partition;
+	uint32_t lock;
+	gstate_t state;
 } guest_t;
 
 #define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
@@ -66,10 +78,11 @@ typedef struct gcpu {
 	tlb_entry_t gtlb1[TLB1_GSIZE];
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
 	uint64_t mcar;
-	uint32_t timer_flags;
 	unsigned long gdbell_pending;
 	unsigned long cdbell_pending;
-	int gcpu_num;
+	unsigned long gevent_pending;
+	uint32_t timer_flags;
+	int gcpu_num, waiting_for_gevent;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)

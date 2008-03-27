@@ -82,8 +82,8 @@
 			             "fsl,ns16550", "ns16550";
 			reg = <11c600 100>;
 			clock-frequency = <0>;
-			interrupts = <1c 2>;
-			interrupt-parent = <&mpic>;
+//			interrupts = <1c 2>;
+//			interrupt-parent = <&mpic>;
 		};
 
 		mpic: pic@40000 {

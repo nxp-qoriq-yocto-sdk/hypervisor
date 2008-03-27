@@ -108,6 +108,7 @@ void start(unsigned long devtree_ptr)
 static void secondary_init(void)
 {
 	core_init();
+	enable_critint();
 	partition_init();
 }
 
@@ -234,6 +235,7 @@ fail_one:
 static void partition_init(void)
 {
 	init_guest();
+	BUG();
 }
 
 static void core_init(void)

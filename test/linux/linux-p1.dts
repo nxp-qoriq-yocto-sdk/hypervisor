@@ -49,7 +49,7 @@
 		compatible = "simple-bus";
 		device_type = "soc";
 		ranges = <0 0 fe000000 400000>;
-
+/*
 		i2c0: i2c@118000 {
 			device_type = "i2c";
 			compatible = "fsl,mpc8578-i2c",
@@ -90,15 +90,15 @@
 			phy-handle = <&phy0>;
 			phy-connection-type = "rgmii-id";
 		};
-
+*/
 		serial@11d500 {
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart",
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
-			interrupts = <25 2>;
-			interrupt-parent = <&mpic>;
+//			interrupts = <25 2>;
+//			interrupt-parent = <&mpic>;
 		};
 
 		mpic: pic@40000 {

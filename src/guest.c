@@ -29,6 +29,8 @@
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/spr.h>
+#include <libos/io.h>
+#include <libos/bitops.h>
 
 #include <hv.h>
 #include <paging.h>
@@ -39,6 +41,8 @@
 #include <devtree.h>
 #include <errors.h>
 #include <elf.h>
+#include <events.h>
+#include <doorbell.h>
 
 #define MAX_PARTITIONS 8
 
@@ -220,32 +224,37 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 	return 0;
 }
 
-static int create_guest_spin_table(guest_t *guest)
+static void reset_spintbl(guest_t *guest)
 {
-	unsigned long rpn;
-	unsigned int num_cpus = guest->cpucnt;
-	struct boot_spin_table *spintbl;
-	uint32_t spin_addr;
-	int ret, i;
-	
-	spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
-	if (!spintbl)
-		return ERR_NOMEM;
+	struct boot_spin_table *spintbl = guest->spintbl;
+	int i;
 
-	for (i = 0; i < num_cpus; i++) {
+	for (i = 0; i < guest->cpucnt; i++) {
 		spintbl[i].addr = 1;
 		spintbl[i].pir = i;
 		spintbl[i].r3 = 0;
 		spintbl[i].r4 = 0;
 		spintbl[i].r7 = 0;
 	}
+}
+
+static int create_guest_spin_table(guest_t *guest)
+{
+	unsigned long rpn;
+	unsigned int num_cpus = guest->cpucnt;
+	uint32_t spin_addr;
+	int ret, i;
+	
+	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
+	if (!guest->spintbl)
+		return ERR_NOMEM;
 
 	/* FIXME: hardcoded cache line size */
 	for (i = 0; i < num_cpus * sizeof(struct boot_spin_table); i += 32)
-		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)spintbl + i ) :
+		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)guest->spintbl + i ) :
 		             "memory");
 
-	rpn = ((physaddr_t)(unsigned long)spintbl - PHYSBASE) >> PAGE_SHIFT;
+	rpn = ((physaddr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
 
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
@@ -302,9 +311,6 @@ static int create_guest_spin_table(guest_t *guest)
 		printf("cpu-release-addr of CPU%u: %x\n", cpu, spin_addr);
 	}
 
-	printf("Setting spintbl on guest %p\n", guest);
-	smp_mbar();
-	guest->spintbl = spintbl;
 	return 0;
 
 fail:
@@ -361,11 +367,10 @@ static void *map_flash(physaddr_t phys)
 static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr_t guest_phys, size_t length)
 {
 	void *image = map_flash(image_phys);
-
 	if (!image) {
 		printf("guest %s: image source address %llx not in flash\n",
-			guest->name, image_phys);
-		return ERR_NOMEM;
+		       guest->name, image_phys);
+		return ERR_BADTREE;
 	}
 
 	if (is_elf(image)) {
@@ -378,31 +383,85 @@ static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr
 	if (!length || (length == (size_t) -1)) {
 		printf("guest %s: missing or invalid fsl,hv-image-size property\n",
 			guest->name);
-		return ERR_INVALID;
+		return ERR_BADTREE;
 	}
 
 	printf("guest %s: loading binary image from flash\n", guest->name);
 
-	return copy_to_gphys(guest->gphys, guest_phys, image, length) == length ?
-		0 : ERR_BADIMAGE;
+	if (copy_to_gphys(guest->gphys, guest_phys, image, length) != length)
+		return ERR_BADADDR;
+
+	return 0;
 }
 
+/* Returns 1 if the image is loaded successfully, 0 if no image,
+ * negative on error.
+ */
+static int load_image(guest_t *guest)
+{
+	/*
+	 * If an ELF image exists, load it.  This must be called after
+	 * map_guest_reg_all(), because that function creates some of the TLB
+	 * mappings we need.
+	 */
+	int node = guest->partition;
+	int ret;
+
+	if (!fdt_get_property(fdt, node, "fsl,hv-loaded-images", &ret)) {
+		if (ret == -FDT_ERR_NOTFOUND)
+			return 0;
+
+		return ret;
+	}
+	
+	const uint64_t *image_addr;
+	const uint64_t *guest_addr;
+	size_t length = (size_t) -1;
+	const uint32_t *iprop;
+
+	image_addr = fdt_getprop(fdt, node, "fsl,hv-image-src-addr", &ret);
+	if (!image_addr) {
+		printf("guest %s: no fsl,image-src-addr property\n", guest->name);
+		return ret;
+	}
+
+	guest_addr = fdt_getprop(fdt, node, "fsl,hv-image-gphys-addr", &ret);
+	if (!guest_addr) {
+		printf("guest %s: no fsl,image-dest-offset property\n", guest->name);
+		return ret;
+	}
+
+	/* The size of the image is only required for binary images,
+	   not ELF images. */
+	iprop = fdt_getprop(fdt, node, "fsl,hv-image-size", NULL);
+	if (iprop)
+		length = *iprop;
+
+	ret = load_image_from_flash(guest, *image_addr, *guest_addr, length);
+	if (ret < 0) {
+		printf("guest %s: could not load image\n", guest->name);
+		return ret;
+	}
+	
+	return 1;
+}
+		
 static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
 {
-	int ret, len;
+	int ret;
 	int gfdt_size = fdt_totalsize(fdt);
 	void *guest_origtree;
 
-	guest_origtree = (void *) fdt_getprop(fdt, partition, "fsl,dtb", &len);
+	guest_origtree = fdt_getprop_w(fdt, partition, "fsl,dtb", &ret);
 	if (!guest_origtree) {
 		printf("guest %s: no fsl,dtb property\n", guest->name);
 		ret = -FDT_ERR_NOTFOUND;
 		goto fail;
 	}
 	
-	gfdt_size += len;
+	gfdt_size += ret;
 	
 	guest->devtree = alloc(gfdt_size, 16);
 	if (!guest->devtree) {
@@ -428,45 +487,6 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	ret = map_guest_reg_all(guest, partition);
 	if (ret < 0)
 		goto fail;
-
-	/*
-	 * If an ELF image exists, load it.  This must be called after
-	 * map_guest_reg_all(), because that function creates some of the TLB
-	 * mappings we need.
-	 */
-
-	if (fdt_get_property(fdt, partition, "fsl,hv-loaded-images", NULL)) {
-		const uint64_t *image_addr;
-		const uint64_t *guest_addr;
-		size_t length = (size_t) -1;
-		const uint32_t *iprop;
-
-		image_addr = fdt_getprop(fdt, partition, "fsl,hv-image-src-addr", &len);
-		if (!image_addr) {
-			printf("guest %s: no fsl,image-src-addr property\n", guest->name);
-			ret = -FDT_ERR_NOTFOUND;
-			goto fail;
-		}
-
-		guest_addr = fdt_getprop(fdt, partition, "fsl,hv-image-gphys-addr", &len);
-		if (!guest_addr) {
-			printf("guest %s: no fsl,image-dest-offset property\n", guest->name);
-			ret = -FDT_ERR_NOTFOUND;
-			goto fail;
-		}
-
-		/* The size of the image is only required for binary images,
-		   not ELF images. */
-		iprop = fdt_getprop(fdt, partition, "fsl,hv-image-size", &len);
-		if (iprop)
-			length = *iprop;
-
-		ret = load_image_from_flash(guest, *image_addr, *guest_addr, length);
-		if (ret < 0) {
-			printf("guest %s: could not load image\n", guest->name);
-			goto fail;
-		}
-	}
 
 	/* Look for partition-handle nodes.  These are nodes that are
 	   "fsl,hv-partition"-compatible and are children of a
@@ -566,15 +586,28 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 {
 	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
 	assert(gpir >= 0);
+
+	while (!guest->gcpus)
+		smp_mbar();
 	
 	guest->gcpus[gpir] = get_gcpu();
 	get_gcpu()->gcpu_num = gpir;
 	return gpir;
 }
 
-int start_guest_primary(void)
+static int start_guest_primary_nowait(void)
 {
 	guest_t *guest = get_gcpu()->guest; 
+	int i;
+	
+	assert(!(mfmsr() & MSR_CE));
+
+	assert(guest->state == guest_starting);
+	reset_spintbl(guest);
+
+	/* FIXME: append device tree to image, or use address provided by
+	 * the device tree, or something sensible like that.
+	 */
 	int ret = copy_to_gphys(guest->gphys, 0x00f00000,
 	                        guest->devtree, fdt_totalsize(guest->devtree));
 	if (ret != fdt_totalsize(guest->devtree)) {
@@ -586,7 +619,13 @@ int start_guest_primary(void)
 	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 	               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	printf("branching to guest %s\n", guest->name);
+	printf("branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
+	guest->active_cpus = guest->cpucnt;
+	guest->state = guest_running;
+	smp_mbar();
+
+	for (i = 1; i < guest->cpucnt; i++)
+		setgevent(guest->gcpus[i], GEV_START);
 
 	asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
 	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
@@ -594,15 +633,57 @@ int start_guest_primary(void)
 	             "r" (0 << PAGE_SHIFT) :
 	             "r3", "r4", "r5", "r6", "r7", "r8");
 
-	return 0;
+	BUG();
 }
 
-void start_guest_secondary(void)
+static void start_guest_primary(void)
+{
+	guest_t *guest = get_gcpu()->guest; 
+	int ret;
+
+	assert(!(mfmsr() & MSR_CE));
+	if (cpu->ret_user_hook)
+		return;
+
+	spin_lock(&guest->lock);
+	assert(guest->state == guest_starting);
+
+	ret = load_image(guest);
+	if (ret < 0) {
+		guest->state = guest_stopped;
+
+		// TODO: send signal to manager
+		spin_unlock(&guest->lock);
+		return;
+	}
+
+	spin_unlock(&guest->lock);
+
+	if (ret > 0)
+		start_guest_primary_nowait();
+	
+	if (ret < 0) {
+		printf("Couldn't load image for guest %s, %d\n", guest->name, ret);
+		return;
+	}
+
+	if (ret == 0) {
+		/* No hypervisor-loadable image; wait for a manager to start us. */
+		printf("Guest %s waiting for manager start\n", guest->name);
+		return;
+	}
+	
+	guest->state = guest_starting;
+	start_guest_primary_nowait();
+}
+
+static void start_guest_secondary(void)
 {
 	register register_t r3 asm("r3");
 	register register_t r4 asm("r4");
 	register register_t r6 asm("r6");
 	register register_t r7 asm("r7");
+	register_t msr;
 
 	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
@@ -610,15 +691,26 @@ void start_guest_secondary(void)
 	int pir = mfspr(SPR_PIR);
 	int gpir = gcpu->gcpu_num;
 
+	enable_critint();
+		
 	mtspr(SPR_GPIR, gpir);
 
 	printf("cpu %d/%d spinning on table...\n", pir, gpir);
+
+	msr = mfmsr() | MSR_GS;
 
 	while (guest->spintbl[gpir].addr & 1) {
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
+
+		if (cpu->ret_user_hook)
+			break;
 	}
+
+	disable_critint();
+	if (cpu->ret_user_hook)
+		return;
 
 	printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr);
 
@@ -638,16 +730,104 @@ void start_guest_secondary(void)
 	r6 = 0;
 	r7 = guest->spintbl[gpir].r7;
 
-	asm volatile("mfmsr %%r5; oris %%r5, %%r5, 0x1000;"
-	             "mtsrr0 %0; mtsrr1 %%r5; li %%r5, 0; rfi" : :
-	             "r" (guest->spintbl[gpir].addr),
+	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
+	             "r" (guest->spintbl[gpir].addr), "r" (msr),
 	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
+
+	BUG();
+}
+
+void start_core(trapframe_t *regs)
+{
+	printf("start core %lu\n", mfspr(SPR_PIR));
+
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	if (gcpu == guest->gcpus[0]) {
+		assert(guest->state == guest_starting);
+		start_guest_primary_nowait();
+	} else {
+		assert(guest->state == guest_running);
+		start_guest_secondary();
+	}
+
+	wait_for_gevent(regs);
+}
+
+void start_wait_core(trapframe_t *regs)
+{
+	printf("start_wait core %lu\n", mfspr(SPR_PIR));
+
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	assert(gcpu == guest->gcpus[0]);
+	assert(guest->state == guest_starting);
+
+	start_guest_primary();
+
+ 	assert(guest->state != guest_running);
+	wait_for_gevent(regs);
+}
+
+void stop_core(trapframe_t *regs)
+{
+	printf("stop core %lu\n", mfspr(SPR_PIR));
+
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	assert(guest->state == guest_stopping);
+
+	if (atomic_add(&guest->active_cpus, -1) == 0)
+		guest->state = guest_stopped;
+
+	wait_for_gevent(regs);
+}
+
+int stop_guest(guest_t *guest)
+{
+	unsigned int i, ret = 0;
+	register_t saved = spin_lock_critsave(&guest->lock);
+
+	if (guest->state != guest_running)
+		ret = -ERR_INVALID;
+	else
+		guest->state = guest_stopping;
+
+	spin_unlock_critsave(&guest->lock, saved);
+	
+	if (ret)
+		return ret;
+
+	for (i = 0; i < guest->cpucnt; i++)
+		setgevent(guest->gcpus[i], GEV_STOP);
+
+	return ret;
+}
+
+int start_guest(guest_t *guest)
+{
+	int ret = 0;
+	register_t saved = spin_lock_critsave(&guest->lock);
+
+	if (guest->state != guest_stopped)
+		ret = -ERR_INVALID;
+	else
+		guest->state = guest_starting;
+
+	spin_unlock_critsave(&guest->lock, saved);
+	
+	if (ret)
+		return ret;
+
+	setgevent(guest->gcpus[0], GEV_START);
+	return ret;
 }
 
 /* Process configuration options in the hypervisor's
  * chosen node.
  */
-void partition_config(guest_t *guest)
+static void partition_config(guest_t *guest)
 {
 	int chosen = fdt_subnode_offset(fdt, 0, "chosen");
 	if (chosen < 0) {
@@ -666,21 +846,21 @@ void partition_config(guest_t *guest)
 }
 
 
-void init_guest(void)
+__attribute__((noreturn)) void init_guest(void)
 {
 	int off = -1, found = 0, ret;
 	int pir = mfspr(SPR_PIR);
+	const uint32_t *cpus = NULL;
 	char buf[MAX_PATH];
-	guest_t *guest;
-	int gpir;
+	guest_t *guest = NULL;
+	int gpir, len;
 	
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
 		if (off < 0)
-			break;
+			goto wait;
 
-		int len;
-		const uint32_t *cpus = fdt_getprop(fdt, off, "fsl,cpus", &len);
+		cpus = fdt_getprop(fdt, off, "fsl,cpus", &len);
 		if (!cpus) {
 			ret = fdt_get_path(fdt, off, buf, sizeof(buf));
 			printf("No fsl,cpus in guest %s\n", buf);
@@ -709,61 +889,73 @@ void init_guest(void)
 		mtspr(SPR_LPIDR, guest->lpid);
 	
 		get_gcpu()->guest = guest;
+		break;
+	};
 
-		if (pir == cpus[0]) {
-			int name_len;
+	if (pir == cpus[0]) {
+		int name_len;
+	
+		/* Boot CPU */
+		/* count number of cpus for this partition and alloc data struct */
+		guest->cpucnt = count_cpus(cpus, len);
+		guest->gcpus = alloc(sizeof(long) * guest->cpucnt, __alignof__(long));
+		if (!guest->gcpus)
+			goto nomem;
+
+		gpir = register_gcpu_with_guest(guest, cpus, len);
+		assert(gpir == 0);
 		
-			/* Boot CPU */
-			/* count number of cpus for this partition and alloc data struct */
-			guest->cpucnt = count_cpus(cpus, len);
-			guest->gcpus = alloc(sizeof(long) * guest->cpucnt, __alignof__(long));
-			if (!guest->gcpus)
-				goto nomem;
+		name_len = strlen(buf) + 1;
+		guest->name = alloc(name_len, 1);
+		if (!guest->name)
+			goto nomem;
+		
+		memcpy(guest->name, buf, name_len);
+		
+		ret = process_guest_devtree(guest, off, cpus, len);
+		if (ret < 0)
+			goto wait;
 
-			gpir = register_gcpu_with_guest(guest, cpus, len);
-			assert(gpir == 0);
-			
-			name_len = strlen(buf) + 1;
-			guest->name = alloc(name_len, 1);
-			if (!guest->name)
-				goto nomem;
-			
-			memcpy(guest->name, buf, name_len);
-			
-			ret = process_guest_devtree(guest, off, cpus, len);
-			if (ret < 0)
-				continue;
-
-			partition_config(guest);
+		partition_config(guest);
 
 #ifdef CONFIG_BYTE_CHAN
-			byte_chan_partition_init(guest);
+		byte_chan_partition_init(guest);
 #endif
 #ifdef CONFIG_IPI_DOORBELL
-			send_dbell_partition_init(guest);
-			recv_dbell_partition_init(guest);
+		send_dbell_partition_init(guest);
+		recv_dbell_partition_init(guest);
 #endif
 
-			vmpic_partition_init(guest);
+		vmpic_partition_init(guest);
 
-			if (start_guest_primary())
-				continue;
-		} else {
-			printf("cpu %d waiting for spintbl on guest %p...\n", pir, guest);
-		
-			/* Wait for the boot cpu... */
-			while (!guest->spintbl)
-				smp_mbar();
-
-			gpir = register_gcpu_with_guest(guest, cpus, len);
-			start_guest_secondary();
-		}
+		disable_critint();
+		guest->state = guest_starting;
+		start_guest_primary();
+	} else {
+		gpir = register_gcpu_with_guest(guest, cpus, len);
 	}
 
-	return;
+wait: {
+		/* Like wait_for_gevent(), but without a
+		 * stack frame to return on.
+		 */
+		register_t new_r1 = (register_t)&cpu->kstack[KSTACK_SIZE - FRAMELEN];
+
+		/* Terminate the callback chain. */
+		cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
+
+		get_gcpu()->waiting_for_gevent = 1;
+	
+		asm volatile("mtsrr0 %0; mtsrr1 %1; mr %%r1, %2; rfi" : :
+		             "r" (wait_for_gevent_loop),
+		             "r" (mfmsr() | MSR_CE),
+		             "r" (new_r1) : "memory");
+		BUG();
+	}	
 
 nomem:
 	printf("out of memory in start_guest\n");
+	goto wait;
 } 
 
 void *map_gphys(int tlbentry, pte_t *tbl, physaddr_t addr,
