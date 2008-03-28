@@ -662,11 +662,6 @@ static void start_guest_primary(void)
 	if (ret > 0)
 		start_guest_primary_nowait();
 	
-	if (ret < 0) {
-		printf("Couldn't load image for guest %s, %d\n", guest->name, ret);
-		return;
-	}
-
 	if (ret == 0) {
 		/* No hypervisor-loadable image; wait for a manager to start us. */
 		printf("Guest %s waiting for manager start\n", guest->name);
