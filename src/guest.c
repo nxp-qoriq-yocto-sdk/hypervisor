@@ -370,7 +370,7 @@ static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr
 
 	if (is_elf(image)) {
 		printf("guest %s: loading ELF image from flash\n", guest->name);
-		return load_elf(guest, image, length, guest_phys);
+		return load_elf(guest, image, length, guest_phys, &guest->entry);
 	}
 
 	/* It's not an ELF image, so it must be a binary. */
@@ -383,8 +383,11 @@ static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr
 
 	printf("guest %s: loading binary image from flash\n", guest->name);
 
-	return copy_to_gphys(guest->gphys, guest_phys, image, length) == length ?
-		0 : ERR_BADIMAGE;
+	if (copy_to_gphys(guest->gphys, guest_phys, image, length) != length)
+		return ERR_BADIMAGE;
+
+	guest->entry = guest_phys;
+	return 0;
 }
 
 static int process_guest_devtree(guest_t *guest, int partition,
@@ -588,10 +591,17 @@ int start_guest_primary(void)
 
 	printf("branching to guest %s\n", guest->name);
 
+	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
+	// map 256MB, so we don't support loading/booting an OS above that
+	// address.  Also, we pass the guest physical address even though it
+	// should be a guest virtual address, but since we program the TLBs such
+	// that guest virtual == guest physical at boot time, this works.
+	// Also, the IMA needs to be put into r7.
+
 	asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
 	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
 	             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
-	             "r" (0 << PAGE_SHIFT) :
+	             "r" (guest->entry) :
 	             "r3", "r4", "r5", "r6", "r7", "r8");
 
 	return 0;

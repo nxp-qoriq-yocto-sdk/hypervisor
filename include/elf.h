@@ -7,4 +7,5 @@
 
 int is_elf(void *image);
 
-int load_elf(guest_t *guest, void *image, unsigned long length, physaddr_t target);
+int load_elf(guest_t *guest, void *image, unsigned long length,
+	physaddr_t target, physaddr_t *entry);

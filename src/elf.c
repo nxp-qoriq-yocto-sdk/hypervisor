@@ -93,11 +93,13 @@ int is_elf(void *image)
  * @image: Pointer to the ELF image
  * @length: length of the ELF image, or -1 to ignore length checking
  * @target: guest physical address of the destination
+ * @entry: guest phys address of entry point, if not NULL
  *
  * Per ePAPR spec, the destination address encoded in the ELF file is
  * ignored.
  */
-int load_elf(guest_t *guest, void *image, unsigned long length, physaddr_t target)
+int load_elf(guest_t *guest, void *image, unsigned long length,
+	physaddr_t target, physaddr_t *entry)
 {
 	struct elf_header *hdr = (struct elf_header *) image;
 	struct program_header *phdr = (struct program_header *) (image + hdr->phoff);
@@ -162,6 +164,10 @@ int load_elf(guest_t *guest, void *image, unsigned long length, physaddr_t targe
 				phdr[i].memsz - phdr[i].filesz);
 		}
 	}
+
+	/* Return the entry point for the image if requested */
+	if (entry)
+		*entry = target + base - hdr->entry;
 
 	return 0;
 }
