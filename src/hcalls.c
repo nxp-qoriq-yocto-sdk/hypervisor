@@ -8,6 +8,7 @@
 #include <vmpic.h>
 #include <ipi_doorbell.h>
 #include <paging.h>
+#include <events.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
@@ -39,6 +40,49 @@ static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
 	regs->gpregs[3] = -1;
+}
+
+static void fh_partition_reboot(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	unsigned int i, ret = 0;
+	
+	register_t saved = spin_lock_critsave(&guest->lock);
+
+	if (guest->state != guest_running)
+		ret = -1;
+	else
+		guest->state = guest_stopping;
+
+	spin_unlock_critsave(&guest->lock, saved);
+	
+	if (ret) {
+		regs->gpregs[3] = -1;
+		return;
+	}
+
+	for (i = 0; i < guest->cpucnt; i++)
+		setgevent(guest->gcpus[i], GEV_RESTART);
+
+	assert(cpu->ret_user_hook);
+}
+
+void restart_core(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	printf("restart_core %lu\n", mfspr(SPR_PIR));
+
+	assert(guest->state == guest_stopping);
+
+	unsigned long ret = atomic_add(&guest->active_cpus, -1);
+	if (ret == 0) {
+		guest->state = guest_starting;
+		setgevent(guest->gcpus[0], GEV_START_WAIT);
+	}
+
+	wait_for_gevent(regs);
 }
 
 static void fh_partition_get_status(trapframe_t *regs)
@@ -326,13 +370,24 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 #define fh_partition_send_dbell unimplemented
 #endif
 
+static void fh_partition_exit(trapframe_t *regs)
+{
+	int ret = stop_guest(get_gcpu()->guest);
+	if (ret) {
+		regs->gpregs[3] = -1;
+		return;
+	}
+
+	assert(cpu->ret_user_hook);
+}
+
 static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 0 */
 	&fh_whoami,		/* 1 */
 	&unimplemented,		/* 2 */
 	&unimplemented,		/* 3 */
 	&unimplemented,		/* 4 */
-	&unimplemented,		/* 5 */
+	&fh_partition_reboot,	/* 5 */
 	&fh_partition_get_status,/* 6 */
 	&unimplemented,		/* 7 */
 	&unimplemented,		/* 8 */
@@ -357,7 +412,8 @@ static hcallfp_t hcall_table[] = {
 	&unimplemented,		/* 27 */
 	&unimplemented,		/* 28 */
 	&unimplemented,		/* 29 */
-	&fh_partition_send_dbell,	/* 30 */
+	&fh_partition_send_dbell,/* 30 */
+	&fh_partition_exit,	/* 31 */
 };
 
 void hcall(trapframe_t *regs)

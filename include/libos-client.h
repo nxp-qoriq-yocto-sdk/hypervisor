@@ -7,6 +7,7 @@
 #define PHYSBASE 0x40000000 /**< Virtual base of physical address space */
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
+#define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
 
 #ifndef _ASM
 typedef struct {
@@ -31,5 +32,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_HCALL_HANDLER hcall
 #define EXC_EHPRIV_HANDLER hvpriv
 #define EXC_DOORBELLC_HANDLER critical_doorbell_int
+
+#define LIBOS_RET_USER_HOOK ret_to_guest
 
 #endif
