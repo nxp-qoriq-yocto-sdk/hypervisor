@@ -76,6 +76,7 @@ int vpic_alloc_irq(guest_t *guest)
 
 	save = spin_lock_critsave(&guest->vpic.lock);
 	int irq = guest->vpic.alloc_next++;
+	guest->vpic.ints[irq].destcpu = 1;
 	spin_unlock_critsave(&guest->vpic.lock,save);
 
 	return irq;
@@ -201,7 +202,8 @@ void vpic_irq_set_destcpu(int irq, uint8_t destcpu)
 	guest_t *guest = get_gcpu()->guest;
 	register_t save = spin_lock_critsave(&guest->vpic.lock);
 
-	guest->vpic.ints[irq].destcpu = destcpu;
+	if (destcpu != 0 && (destcpu & ((1 << guest->cpucnt) - 1)))
+		guest->vpic.ints[irq].destcpu = destcpu;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
