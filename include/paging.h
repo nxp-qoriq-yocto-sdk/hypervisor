@@ -90,6 +90,8 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
                     unsigned long epn, unsigned long grpn,
                     uint32_t mas2flags, uint32_t mas3flags);
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
+void guest_reset_tlb(void);
+void tlbsync(void);
 
 #define CCSRBAR_PA              0xfe000000
 #define CCSRBAR_SIZE            TLB_TSIZE_16M

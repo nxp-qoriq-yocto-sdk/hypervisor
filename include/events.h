@@ -10,6 +10,7 @@ typedef void (*eventfp_t)(trapframe_t *regs);
 void setevent(gcpu_t *gcpu, int event);
 void setgevent(gcpu_t *gcpu, int event);
 
+void do_stop_core(trapframe_t *regs, int restart);
 void stop_core(trapframe_t *regs);
 void start_core(trapframe_t *regs);
 void restart_core(trapframe_t *regs);

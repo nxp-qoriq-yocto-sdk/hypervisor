@@ -84,7 +84,10 @@ static void free_tlb1(unsigned int entry)
 			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
 			assert(idx + bit < tlb1_reserved);
 			
-//			printf("clearing tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
+#if 0
+			printf("clearing tlb1[%d] for gtlb1[%d], cpu%lu\n",
+			       idx + bit, entry, mfspr(SPR_PIR));
+#endif
 
 			cpu->tlb1[idx + bit].mas1 = 0;
 			tlb1_write_entry(idx + bit);
@@ -186,6 +189,37 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
+}
+
+void guest_reset_tlb(void)
+{
+	int i;
+
+	/* Invalidate TLB0.  Note that there seems to be no way
+	 * to partition a whole-array TLB invalidation, but it's
+	 * unlikely to be a performance issue given the rarity of
+	 * reboots.
+	 */	
+	asm volatile("tlbivax 0, %0" : : "r" (4) : "memory");
+	tlbsync();
+
+	for (i = 0; i < TLB1_GSIZE; i++)
+		free_tlb1(i);
+
+	for (i = 0; i < tlb1_reserved; i++) {
+		mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
+		asm volatile("tlbre" : : : "memory");
+		assert(!(mfspr(SPR_MAS1) & MAS1_VALID));
+	}
+}
+
+void tlbsync(void)
+{
+	static uint32_t tlbsync_lock;
+
+	register_t saved = spin_lock_critsave(&tlbsync_lock);
+	asm volatile("mbar 1; tlbsync" : : : "memory");
+	spin_unlock_critsave(&tlbsync_lock, saved);
 }
 
 void tlb1_init(void)

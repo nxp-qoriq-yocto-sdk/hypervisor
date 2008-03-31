@@ -69,20 +69,7 @@ static void fh_partition_reboot(trapframe_t *regs)
 
 void restart_core(trapframe_t *regs)
 {
-	gcpu_t *gcpu = get_gcpu();
-	guest_t *guest = gcpu->guest;
-
-	printf("restart_core %lu\n", mfspr(SPR_PIR));
-
-	assert(guest->state == guest_stopping);
-
-	unsigned long ret = atomic_add(&guest->active_cpus, -1);
-	if (ret == 0) {
-		guest->state = guest_starting;
-		setgevent(guest->gcpus[0], GEV_START_WAIT);
-	}
-
-	wait_for_gevent(regs);
+	do_stop_core(regs, 1);
 }
 
 static void fh_partition_get_status(trapframe_t *regs)

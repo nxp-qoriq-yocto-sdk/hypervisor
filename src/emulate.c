@@ -154,6 +154,7 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+/* FIXME: if the address hits a TLB1 entry, invalidate all pieces. */
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
@@ -170,11 +171,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
-	static uint32_t tlbsync_lock;
-
-	spin_lock(&tlbsync_lock);
-	asm volatile("tlbsync" : : : "memory");
-	spin_unlock(&tlbsync_lock);
+	tlbsync();
 	return 0;
 }
 

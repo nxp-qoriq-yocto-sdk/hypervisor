@@ -774,18 +774,31 @@ void start_wait_core(trapframe_t *regs)
 	wait_for_gevent(regs);
 }
 
-void stop_core(trapframe_t *regs)
+void do_stop_core(trapframe_t *regs, int restart)
 {
-	printf("stop core %lu\n", mfspr(SPR_PIR));
+	printf("%s core %lu\n", restart ? "restart" : "stop", mfspr(SPR_PIR));
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	assert(guest->state == guest_stopping);
 
-	if (atomic_add(&guest->active_cpus, -1) == 0)
-		guest->state = guest_stopped;
+	guest_reset_tlb();
+
+	if (atomic_add(&guest->active_cpus, -1) == 0) {
+		if (restart) {
+			guest->state = guest_starting;
+			setgevent(guest->gcpus[0], GEV_START_WAIT);
+		} else {
+			guest->state = guest_stopped;
+		}
+	}
 
 	wait_for_gevent(regs);
+}
+
+void stop_core(trapframe_t *regs)
+{
+	do_stop_core(regs, 0);
 }
 
 int stop_guest(guest_t *guest)
