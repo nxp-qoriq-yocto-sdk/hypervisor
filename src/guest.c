@@ -230,11 +230,11 @@ static void reset_spintbl(guest_t *guest)
 	int i;
 
 	for (i = 0; i < guest->cpucnt; i++) {
-		spintbl[i].addr = 1;
+		spintbl[i].addr_hi = 0;
+		spintbl[i].addr_lo = 1;
 		spintbl[i].pir = i;
-		spintbl[i].r3 = 0;
-		spintbl[i].r4 = 0;
-		spintbl[i].r7 = 0;
+		spintbl[i].r3_hi = 0;
+		spintbl[i].r3_lo = 0;
 	}
 }
 
@@ -703,7 +703,7 @@ static void start_guest_secondary(void)
 
 	msr = mfmsr() | MSR_GS;
 
-	while (guest->spintbl[gpir].addr & 1) {
+	while (guest->spintbl[gpir].addr_lo & 1) {
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
@@ -716,7 +716,7 @@ static void start_guest_secondary(void)
 	if (cpu->ret_user_hook)
 		return;
 
-	printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr);
+	printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr_lo);
 
 	if (guest->spintbl[gpir].pir != gpir)
 		printf("WARNING: cpu %d (guest cpu %d) changed spin-table "
@@ -724,18 +724,18 @@ static void start_guest_secondary(void)
 		       pir, gpir, guest->spintbl[gpir].pir);
 
 	/* Mask for 256M mapping */
-	page = (guest->spintbl[gpir].addr & ~0xfffffff) >> PAGE_SHIFT;
+	page = ((((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
+		guest->spintbl[gpir].addr_lo) & ~0xfffffff) >> PAGE_SHIFT;
 
 	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
 	               page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	r3 = guest->spintbl[gpir].r3;
-	r4 = guest->spintbl[gpir].r4;
+	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
 	r6 = 0;
-	r7 = guest->spintbl[gpir].r7;
+	// FIXME: set r7 to IMA size
 
 	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
-	             "r" (guest->spintbl[gpir].addr), "r" (msr),
+	             "r" (guest->spintbl[gpir].addr_lo), "r" (msr),
 	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
 
 	BUG();

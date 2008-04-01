@@ -105,7 +105,7 @@ void start(unsigned long devtree_ptr)
 	partition_init();
 }
 
-static void secondary_init(void)
+void secondary_init(void)
 {
 	core_init();
 	enable_critint();
@@ -203,8 +203,7 @@ static void release_secondary_cores(void)
 
 		cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
 
-		if (start_secondary_spin_table((void *)table_va, *reg, cpu,
-		                               secondary_init, NULL))
+		if (start_secondary_spin_table((void *)table_va, *reg, cpu))
 			printf("couldn't spin up CPU%u\n", *reg);
 
 next_core:

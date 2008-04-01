@@ -76,6 +76,12 @@ static void core_init(void)
 
 }
 
+void secondary_init(void)
+{
+	/*  stub for now */
+}
+
+
 /*
  *    after tlb1_init:
  *        TLB1[0]  = CCSR
