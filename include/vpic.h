@@ -49,7 +49,7 @@ void vpic_irq_set_destcpu(int irq, uint8_t destcpu);
 uint8_t vpic_irq_get_destcpu(int irq);
 void critdbell_to_gdbell_glue(trapframe_t *regs);
 uint16_t vpic_iack(void);
-void vpic_eoi(int coreid);
+void vpic_eoi(void);
 
 
 #endif

@@ -10,6 +10,23 @@
 #include <percpu.h>
 #include <devtree.h>
 
+static void vmpic_reset(handle_t *h)
+{
+	guest_t *guest = get_gcpu()->guest;
+	h->intr->ops->ops_irq_mask(h->intr->irq);
+
+	if (h->intr->ops->ops_set_priority)
+		h->intr->ops->ops_set_priority(h->intr->irq, 0);
+	if (h->intr->ops->ops_set_cpu_dest)
+		h->intr->ops->ops_set_cpu_dest(h->intr->irq,
+		                               1 << (guest->gcpus[0]->cpu->coreid));
+	/* FIXME: remember initial polarity from devtree? */
+	if (h->intr->ops->ops_set_polarity)
+		h->intr->ops->ops_set_polarity(h->intr->irq, 0);
+	if (h->intr->ops->ops_irq_set_inttype)
+		h->intr->ops->ops_irq_set_inttype(h->intr->irq, TYPE_NORM);
+}
+
 pic_ops_t mpic_ops = {
 	mpic_irq_set_priority,
 	mpic_irq_set_destcpu,
@@ -34,6 +51,9 @@ pic_ops_t vpic_ops = {
 	vpic_eoi
 };
 
+handle_ops_t vmpic_handle_ops = {
+	.reset = vmpic_reset,
+};
 
 int vmpic_alloc_vpic_handle(guest_t *guest)
 {
@@ -45,6 +65,7 @@ int vmpic_alloc_vpic_handle(guest_t *guest)
 		return -1;
 
 	interrupt->user.intr = interrupt;
+	interrupt->user.ops = &vmpic_handle_ops;
 
 	handle = alloc_guest_handle(guest, &interrupt->user);
 
@@ -270,7 +291,7 @@ void fh_vmpic_eoi(trapframe_t *regs)
 		return;
 	}
 
-	int_handle->ops->ops_eoi(get_gcpu()->cpu->coreid);
+	int_handle->ops->ops_eoi();
 }
 
 void fh_vmpic_set_priority(trapframe_t *regs)
@@ -291,7 +312,7 @@ void fh_vmpic_iack(trapframe_t *regs)
 {
 	uint16_t vector;
 
-	vector = mpic_iack(get_gcpu()->cpu->coreid);
+	vector = mpic_iack();
 	if (vector == 0xFFFF) {  /* spurious */
 		vector = vpic_iack();
 	}

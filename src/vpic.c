@@ -239,7 +239,7 @@ uint16_t vpic_iack(void)
  * Clears the interrupt from being active.
  *
  */
-void vpic_eoi(int coreid)
+void vpic_eoi(void)
 {
 	int irq;
 	guest_t *guest = get_gcpu()->guest;

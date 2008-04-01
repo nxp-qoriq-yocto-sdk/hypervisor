@@ -13,7 +13,7 @@ typedef struct pic_ops {
 	void (*ops_irq_set_inttype)(int hwirq, uint8_t type);
 	void (*ops_set_ctpr) (uint8_t priority);
 	int32_t (*ops_get_ctpr) (void);
-	void (*ops_eoi)(int);
+	void (*ops_eoi)(void);
 } pic_ops_t;
 
 /*

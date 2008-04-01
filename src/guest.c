@@ -31,6 +31,7 @@
 #include <libos/spr.h>
 #include <libos/io.h>
 #include <libos/bitops.h>
+#include <libos/mpic.h>
 
 #include <hv.h>
 #include <paging.h>
@@ -776,6 +777,7 @@ void start_wait_core(trapframe_t *regs)
 
 void do_stop_core(trapframe_t *regs, int restart)
 {
+	int i;
 	printf("%s core %lu\n", restart ? "restart" : "stop", mfspr(SPR_PIR));
 
 	gcpu_t *gcpu = get_gcpu();
@@ -783,6 +785,15 @@ void do_stop_core(trapframe_t *regs, int restart)
 	assert(guest->state == guest_stopping);
 
 	guest_reset_tlb();
+
+	for (i = 0; i < MAX_HANDLES; i++) {
+		handle_t *h = guest->handles[i];
+
+		if (h && h->ops && h->ops->reset)
+			h->ops->reset(h);
+	}
+
+	mpic_reset_core();
 
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
 		if (restart) {

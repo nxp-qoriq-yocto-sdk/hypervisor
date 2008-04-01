@@ -22,9 +22,23 @@ struct guest;
 
 #define MAX_HANDLES 32
 
+struct handle;
+
+/** General handle operations that many types of handle will implement.
+ * Any member may be NULL.
+ */
+typedef struct {
+	/** Reset the handle to partition boot state.
+	 * If the handle was dynamically created, rather than
+	 * device-tree-originated, then close the handle.
+	 */
+	void (*reset)(struct handle *h);
+} handle_ops_t;
+
 /* An extremely crude form of RTTI/multiple interfaces...
   Add pointers here for other handle types as they are needed.*/
-typedef struct {
+typedef struct handle {
+	handle_ops_t *ops;
 	struct byte_chan_handle *bc;
 	struct interrupt *intr;
 	struct ipi_doorbell_handle *db;
