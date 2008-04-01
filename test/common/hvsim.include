@@ -53,7 +53,7 @@ if $want_magic_inst == 1 {
 ###
 
 if not defined freq_mhz      {$freq_mhz      = 1333.3}
-if not defined memory_megs   {$memory_megs   = 1024}
+if not defined memory_megs   {$memory_megs   = 2048}
 if not defined cpu_cores     {$cpu_cores     = 8}
 ###
 
@@ -128,17 +128,11 @@ foreach $phy_idx in (range 4) {
         $system.connect (phy + $phy_idx) $phy[$phy_idx]
 }
 
-# Create memory and connect it in the DIMM slots
-# (2 slots, equal amount of memory in each slot ($memory_megs/2))
-#create-and-connect-ddr-memory $system $memory_megs "AA"
-
-# all memory on a single slot controller, not sure if on one CS? (kkg)
-#create-and-connect-ddr-memory $system $memory_megs "A"
-
-(create-and-connect-ddr-memory $system $memory_megs "ABCD"
+# setup CS0/CS1 on DDR2 w/1G and CS0/1 on DDR2 w/1G
+(create-and-connect-ddr-memory $system $memory_megs "A-A-"
                                ranks_per_module = 2
-                              max_module_size = 2048
-                              ddr_type = DDR2)
+			       max_module_size = 2048
+			       ddr_type = DDR2)
 
 # Pulls in the create-pci commands
 load-module pci-components
@@ -151,6 +145,8 @@ load-module pci-components
 #$system.connect pcie0-slot0 $sil
 
 instantiate-components
+
+cpu0->compat_magic = FALSE
 
 # work arounds
 
