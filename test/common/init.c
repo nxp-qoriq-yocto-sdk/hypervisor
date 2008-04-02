@@ -12,8 +12,8 @@
 extern uint8_t init_stack_top;
 
 cpu_t cpu0 = {
-        .kstack = &init_stack_top - FRAMELEN,
-        .client = 0,
+	.kstack = &init_stack_top - FRAMELEN,
+	.client = 0,
 };
 
 static void tlb1_init(void);
@@ -44,7 +44,7 @@ int get_uart_offset()
 
 	ret = fdt_path_offset(fdt, path);
 
-	handle_p =  (int *) fdt_getprop(fdt, ret, "reg", &ret);
+	handle_p = (int *)fdt_getprop(fdt, ret, "reg", &ret);
 
 	return *handle_p;
 }
@@ -55,25 +55,22 @@ void init(unsigned long devtree_ptr)
 	core_init();
 
 	/* alloc the heap */
-        fdt = (void *)(devtree_ptr + PHYSBASE);
+	fdt = (void *)(devtree_ptr + PHYSBASE);
 
-        unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
-        heap = (heap + 15) & ~15;
+	unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+	heap = (heap + 15) & ~15;
 
-        alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
+	alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
 	uart_offset = get_uart_offset();
 
 	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + uart_offset, 0, 0, 16));
-
 }
 
 
 static void core_init(void)
 {
-
-    /* set up a TLB entry for CCSR space */
-    tlb1_init();
-
+	/* set up a TLB entry for CCSR space */
+	tlb1_init();
 }
 
 void secondary_init(void)
