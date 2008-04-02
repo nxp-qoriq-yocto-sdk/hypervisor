@@ -201,24 +201,26 @@ static void fixup_tlb_sx_re(void)
 	                (mas3 & (MAS3_FLAGS | MAS3_USER)));
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 
-	uint32_t mas0 = mfspr(SPR_MAS0);
-
-	if (MAS0_GET_TLBSEL(mas0) == 1) {
-		unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
-		mas0 &= ~MAS0_ESEL_MASK;
-		mas0 |= MAS0_ESEL(guest_tlb1_to_gtlb1(entry));
-
-		mtspr(SPR_MAS0, mas0);
-		mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
-		mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
-		mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
-		mtspr(SPR_MAS7, gcpu->gtlb1[entry].mas7);
-	}
+	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
 }
 
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
+	gcpu_t *gcpu = get_gcpu();
 	uint32_t va = get_ea_indexed(regs, insn);
+	unsigned long mas1 = (1 << MAS1_TSIZE_SHIFT) |
+	                     ((mfspr(SPR_MAS6) & MAS6_SAS) << MAS1_TS_SHIFT) |
+	                     (mfspr(SPR_MAS6) & MAS6_SPID_MASK);
+
+	int tlb1 = guest_find_tlb1(-1, mas1, mfspr(SPR_MAS2) >> PAGE_SHIFT);
+	if (tlb1 >= 0) {
+		mtspr(SPR_MAS0, MAS0_TLBSEL(1) | MAS0_ESEL(tlb1));
+		mtspr(SPR_MAS1, gcpu->gtlb1[tlb1].mas1);
+		mtspr(SPR_MAS2, gcpu->gtlb1[tlb1].mas2);
+		mtspr(SPR_MAS3, gcpu->gtlb1[tlb1].mas3);
+		mtspr(SPR_MAS7, gcpu->gtlb1[tlb1].mas7);
+		return 0;
+	}
 
 	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
@@ -260,7 +262,8 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
-	guest_t *guest = get_gcpu()->guest;
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
 	unsigned long mas0 = mfspr(SPR_MAS0);
 	unsigned long mas1 = mfspr(SPR_MAS1);
 	unsigned long mas2 = mfspr(SPR_MAS2);
@@ -299,41 +302,77 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	 * adding a duplicate entry.
 	 */
 	if (mas1 & MAS1_VALID) {
+		unsigned long epn = mas2 >> PAGE_SHIFT;
+		unsigned long pages;
+		unsigned long i;
+		int tlb1esel;
+
+		if (mas0 & MAS0_TLBSEL1) {
+			pages = tsize_to_pages(MAS1_GETTSIZE(mas1));
+			tlb1esel = MAS0_GET_TLB1ESEL(mas0);
+		} else {
+			/* The hardware ignores tsize in TLB0, but it's
+			 * convenient for us for it to be set properly.
+			 */
+			mas1 &= ~MAS1_TSIZE_MASK;
+			mas1 |= 1 << MAS1_TSIZE_SHIFT;
+			pages = 1;
+			tlb1esel = -1;
+		}
+
+		int dup = guest_find_tlb1(tlb1esel, mas1, epn);
+		if (dup >= 0) {
+			printf("tlbwe@%d,0x%lx: duplicate TLB1 entry\n",
+			       cpu->coreid, regs->srr0);
+			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			       cpu->coreid, regs->srr0, mas0, mas1, mas2, mas3, mas7);
+			printf("tlbwe@%d,0x%lx: dup: entry = %d, mas1 = 0x%lx,\n"
+			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			       cpu->coreid, regs->srr0, dup,
+			       gcpu->gtlb1[dup].mas1, gcpu->gtlb1[dup].mas2,
+			       gcpu->gtlb1[dup].mas3, gcpu->gtlb1[dup].mas7);
+
+			return 1;
+		}
+
 		mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
 		mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
 		                ((mas1 >> MAS1_TS_SHIFT) & 1));
-		asm volatile("tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
 
-		unsigned long sx_mas0 = mfspr(SPR_MAS0);
+		for (i = epn; i < epn + pages; i++) {
+			unsigned long sx_mas0;
+		
+			mtspr(SPR_MAS2, i << PAGE_SHIFT);
+			asm volatile("tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
+			sx_mas0 = mfspr(SPR_MAS0);
 
-		if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
-			goto no_dup;
+			if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
+				continue;
 
-		if (MAS0_GET_TLBSEL(mas0) == 0 && 
-		    (mas0 & (MAS0_TLBSEL_MASK | MAS0_ESEL_MASK)) ==
-		    (sx_mas0 & (MAS0_TLBSEL_MASK | MAS0_ESEL_MASK)))
-			goto no_dup;
+			if (!(mas0 & MAS0_TLBSEL1)) {
+				assert(MAS0_GET_TLBSEL(sx_mas0) == 0);
+				if ((mas0 & MAS0_ESEL_MASK) == (sx_mas0 & MAS0_ESEL_MASK))
+					continue; 
+			} else if (sx_mas0 & MAS0_TLBSEL1) {
+				continue;
+			}
 
-		if (MAS0_GET_TLBSEL(mas0) == 1 && MAS0_GET_TLBSEL(sx_mas0) == 1 &&
-		    MAS0_GET_TLB1ESEL(mas0) ==
-		    guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(sx_mas0)))
-			goto no_dup;
+			printf("tlbwe@%d,0x%lx: duplicate TLB0 entry\n",
+			       cpu->coreid, regs->srr0);
+			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			       cpu->coreid, regs->srr0, mas0, mas1, mas2, mas3, mas7);
+			printf("tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
+			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			       cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
+			       mfspr(SPR_MAS1), mfspr(SPR_MAS2),
+			       mfspr(SPR_MAS3), mfspr(SPR_MAS7));
 
-		printf("tlbwe@0x%lx: duplicate entry for vaddr 0x%lx\n",
-		       regs->srr0, mas2 & MAS2_EPN);
-
-		printf("mas0 %lx mas1 %lx mas2 %lx mas3 %lx mas7 %lx\n",
-		       mas0, mas1, mas2, mas3, mas7);
-		printf("dup0 %lx dup1 %lx dup2 %lx dup3 %lx dup7 %lx dup8 %lx\n",
-		       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mfspr(SPR_MAS2),
-		       mfspr(SPR_MAS3), mfspr(SPR_MAS7), mfspr(SPR_MAS8));
-
-		printf("guest_tlb1_to_gtlb1 %d\n", guest_tlb1_to_gtlb1(MAS0_GET_TLB1ESEL(mas0)));
-
-		return 1;
+			return 1;
+		}
 	}
 
-no_dup:	
 	if (mas0 & MAS0_TLBSEL1) {
 		unsigned long epn = mas2 >> PAGE_SHIFT;
 		int entry = MAS0_GET_TLB1ESEL(mas0);

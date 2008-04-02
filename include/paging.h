@@ -86,10 +86,11 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
                unsigned long npages, unsigned long attr, int levels);
 
 
-void guest_set_tlb1(unsigned int entry, uint32_t mas1,
+void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long epn, unsigned long grpn,
-                    uint32_t mas2flags, uint32_t mas3flags);
+                    unsigned long mas2flags, unsigned long mas3flags);
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
+int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
 void guest_reset_tlb(void);
 void tlbsync(void);
 

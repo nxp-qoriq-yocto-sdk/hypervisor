@@ -101,23 +101,9 @@ static void free_tlb1(unsigned int entry)
 	} while (idx < TLB1_SIZE);
 }
 
-unsigned int guest_tlb1_to_gtlb1(unsigned int idx)
-{
-	gcpu_t *gcpu = get_gcpu();
-	int i = idx / LONG_BITS;
-	int bit = idx % LONG_BITS;
-	unsigned int entry;
-
-	for (entry = 0; entry < TLB1_GSIZE; entry++)
-		if (gcpu->tlb1_map[entry][i] & (1UL << bit))
-			return entry;
-
-	return TLB1_GSIZE;
-}
-
-void guest_set_tlb1(unsigned int entry, uint32_t mas1,
+void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long epn, unsigned long grpn,
-                    uint32_t mas2flags, uint32_t mas3flags)
+                    unsigned long mas2flags, unsigned long mas3flags)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -135,6 +121,9 @@ void guest_set_tlb1(unsigned int entry, uint32_t mas1,
 	gcpu->gtlb1[entry].mas2 = (epn << PAGE_SHIFT) | mas2flags;
 	gcpu->gtlb1[entry].mas3 = (grpn << PAGE_SHIFT) | mas3flags;
 	gcpu->gtlb1[entry].mas7 = grpn >> (32 - PAGE_SHIFT);
+
+	if (!(mas1 & MAS1_VALID))
+		return;
 	
 	while (epn < end) {
 		int size = max_page_size(epn, end - epn);
@@ -212,6 +201,46 @@ void guest_reset_tlb(void)
 		assert(!(mfspr(SPR_MAS1) & MAS1_VALID));
 	}
 }
+
+/** Return the index of a conflicting guest TLB1 entry, or -1 if none.
+ *
+ * @param[in] entry TLB1 entry to ignore during search, or -1 if none.
+ * @param[in] mas1 MAS1 value describing entry being added/searched for.
+ * @param[in] epn Virtual page number describing the beginning of the
+ * mapping to be added, or the page to be searched for.
+ */
+int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
+{
+	gcpu_t *gcpu = get_gcpu();
+	int pid = MAS1_GETTID(mas1);
+	int i;
+	
+	for (i = 0; i < TLB1_GSIZE; i++) {
+		tlb_entry_t *other = &gcpu->gtlb1[i];
+		unsigned long otherepn = other->mas2 >> PAGE_SHIFT;
+		int otherpid = MAS1_GETTID(other->mas1);
+		
+//		printf("checking %x/%x/%lx against %x/%lx/%lx\n",
+//		       entry, mas1, epn, i, other->mas1, other->mas2);
+
+		if (entry == i)
+			continue;
+		if (!(other->mas1 & MAS1_VALID))
+			continue;
+		if ((mas1 & MAS1_TS) != (other->mas1 & MAS1_TS))
+			continue;
+		if (pid && otherpid && pid != otherpid)
+			continue;
+		if (otherepn >= epn + tsize_to_pages(MAS1_GETTSIZE(mas1)))
+			continue;
+		if (otherepn + tsize_to_pages(MAS1_GETTSIZE(other->mas1)) <= epn)
+			continue;
+
+		return i;
+	}
+	
+	return -1;
+}                         
 
 void tlbsync(void)
 {

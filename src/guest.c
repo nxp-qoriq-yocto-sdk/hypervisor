@@ -619,8 +619,8 @@ static int start_guest_primary_nowait(void)
 		return ERR_BADADDR;
 	}
 
-	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
-	               0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
+	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) |
+	                  MAS1_IPROT, 0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	printf("branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
 	guest->active_cpus = guest->cpucnt;
@@ -728,8 +728,8 @@ static void start_guest_secondary(void)
 	page = ((((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
 		guest->spintbl[gpir].addr_lo) & ~0xfffffff) >> PAGE_SHIFT;
 
-	guest_set_tlb1(0, (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) | MAS1_IPROT,
-	               page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) |
+	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
 	r6 = 0;
