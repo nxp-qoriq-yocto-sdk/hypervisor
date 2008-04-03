@@ -10,7 +10,6 @@ SIMICS=simics
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 DTC_DIR := ../dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
-LIBOS_DIR := ../libos/lib
 LIBOS_INC := ../libos/include
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := include/libos-client.h
@@ -50,12 +49,9 @@ LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
-libos-src-y := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-               $(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_MP) \
-               $(LIBOS_MPIC)
-
-libos-src-$(CONFIG_NS16550) += $(LIBOS_NS16550)
-libos-src-$(CONFIG_LIBOS_QUEUE) += $(LIBOS_QUEUE)
+LIBOS_SRC := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
+             $(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_MP) \
+             $(LIBOS_MPIC) $(libos-src-y)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c vmpic.c misc.S
@@ -65,10 +61,10 @@ hv-src-$(CONFIG_BCMUX) += bcmux.c
 hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
 hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
 
-SRCS := $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
+SRCS := $(LIBOS_SRC:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
 
-OBJS := $(basename $(libos-src-y:%=libos/%) $(hv-src-y:%=%))
+OBJS := $(basename $(LIBOS_SRC:%=libos/%) $(hv-src-y:%=%))
 OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 OBJS := $(OBJS:%=bin/%)
 

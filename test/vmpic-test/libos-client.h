@@ -15,4 +15,7 @@ typedef int client_cpu_t;
 #define EXC_DOORBELL_HANDLER ext_doorbell_handler
 #define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
 
+#define CONFIG_LIBOS_QUEUE
+#define CONFIG_LIBOS_NS16550
+
 #endif

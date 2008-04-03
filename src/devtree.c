@@ -332,7 +332,7 @@ void *ptr_from_node(const void *tree, int offset, const char *type)
 	return *ptr;
 }
 
-#ifdef CONFIG_NS16550
+#ifdef CONFIG_LIBOS_NS16550
 void create_ns16550(void)
 {
 	int off = -1, ret;
