@@ -2,6 +2,9 @@
 # Script to run 8578/u-boot/ultravisor/linux on simulator
 #
 
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
 $use_uart1 = 1
 
 $guest_image[0]  = "vmlinux"

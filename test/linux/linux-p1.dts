@@ -60,14 +60,12 @@
 			dfsrr;
 		};
 
-		serial@11d500 {
+		serial@11d500 {		// UART2
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart",
-			             "fsl,ns16550", "ns16550";
+				     "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
-//			interrupts = <25 2>;
-//			interrupt-parent = <&mpic>;
 		};
 
 		mpic: pic@40000 {
@@ -97,9 +95,9 @@
 		compatible = "fsl,hv-handles";
 		
 		byte-channel@0 {
-			reg = <0>;
 			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "/uartmux";
+			fsl,endpoint = "byte-channel0";
+			interrupt-parent = <&vmpic>;
 		};
 
 		gpio {
@@ -118,6 +116,7 @@
 	};
 
 	aliases {
-		stdout = "/ccsr@fe000000/serial@11d500";
+//		stdout = "/handles/byte-channel@0";
+//		stdout = "/ccsr@fe000000/serial@11d500";
 	};
 };

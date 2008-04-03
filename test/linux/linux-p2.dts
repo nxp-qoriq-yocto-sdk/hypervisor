@@ -76,15 +76,12 @@
 		device_type = "soc";
 		ranges = <0 0 fe000000 400000>;
 
-		serial@11c600 {
+		serial@11d600 {		// UART3
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart",
-			             "fsl,ns16550", "ns16550";
-			reg = <11c600 100>;
+				     "fsl,ns16550", "ns16550";
+			reg = <11d600 100>;
 			clock-frequency = <0>;
-			// NOTE: no interrupts for this device
-			// because HV has the interrupt.
-			// Linux console polls.
 		};
 
 		mpic: pic@40000 {
@@ -114,9 +111,9 @@
 		compatible = "fsl,hv-handles";
 		
 		byte-channel@0 {
-			reg = <0>;
 			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "/uartmux";
+			fsl,endpoint = "byte-channel1";
+			interrupt-parent = <&vmpic>;
 		};
 
 		gpio {
@@ -133,13 +130,14 @@
 	};
 
 	chosen {
-		linux,stdout-path = "/ccsr@fe000000/serial@11c600";
-		bootargs = "console=ttyS0,115200";
+//		linux,stdout-path = "/ccsr@fe000000/serial@11d600";
+//		bootargs = "console=ttyS0,115200";
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
 	};
 	
 	aliases {
-		stdout = "/ccsr@fe000000/serial@11c600";
+		stdout = "/handles/byte-channel@0";
+//		stdout = "/ccsr@fe000000/serial@11d600";
 	};
 };

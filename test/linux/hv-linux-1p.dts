@@ -8,7 +8,7 @@
 		stdout = &uart0;
 		stdin = &uart0;
 		serial0 = &uart0;
-		uartmux = &uartmux;
+		byte-channel0 = &bc0;
 	};
 
 	cpus {
@@ -150,17 +150,13 @@
 			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
 			reg = <11c500 100>;
 			clock-frequency = <0>;
-//			interrupts = <1c 2>;
-//			interrupt-parent = <&mpic>;
 		};
 
-		uart3: serial@11d600 {
+		uart1: serial@11c600 {
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
-			reg = <11d600 100>;
+			reg = <11c600 100>;
 			clock-frequency = <0>;
-//			interrupts = <1d 2>;
-//			interrupt-parent = <&mpic>;
 		};
 
 		global-utilities@e0000 {	//global utilities block
@@ -170,10 +166,11 @@
 		};
 	};
 
-	uartmux: uartmux {
-		compatible = "fsl,hv-byte-channel-mux";
-		fsl,real-dev = &uart3;
-		fsl,protocol = "tcp-over-ppp";
+	byte-channels {
+		bc0: byte-channel0 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uart1>;
+		};
 	};
 
 	partitions {
