@@ -27,9 +27,17 @@ static void vmpic_reset(handle_t *h)
 		h->intr->ops->ops_irq_set_inttype(h->intr->irq, TYPE_NORM);
 }
 
+void vmpic_irq_set_destcpu_wrapper(int irq, uint8_t log_destcpu_mask)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint8_t cpu_dest = count_lsb_zeroes(log_destcpu_mask);
+
+	mpic_irq_set_destcpu(irq, guest->gcpus[cpu_dest]->cpu->coreid);
+}
+
 pic_ops_t mpic_ops = {
 	mpic_irq_set_priority,
-	mpic_irq_set_destcpu,
+	vmpic_irq_set_destcpu_wrapper,
 	mpic_irq_set_polarity,
 	mpic_irq_mask,
 	mpic_irq_unmask,
@@ -194,7 +202,7 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 	uint32_t handle = regs->gpregs[3];
 	uint8_t config = regs->gpregs[4];
 	uint8_t priority = regs->gpregs[5];
-	uint8_t cpu_dest = regs->gpregs[6];
+	uint8_t log_cpu_dest_mask = regs->gpregs[6];
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -211,7 +219,8 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 	if (int_handle->ops->ops_set_priority)
 		int_handle->ops->ops_set_priority(int_handle->irq, priority);
 	if (int_handle->ops->ops_set_cpu_dest)
-		int_handle->ops->ops_set_cpu_dest(int_handle->irq, cpu_dest);
+		int_handle->ops->ops_set_cpu_dest(int_handle->irq,
+							log_cpu_dest_mask);
 	if (int_handle->ops->ops_set_polarity)
 		int_handle->ops->ops_set_polarity(int_handle->irq, config & 0x01);
 	if (int_handle->ops->ops_irq_set_inttype)
