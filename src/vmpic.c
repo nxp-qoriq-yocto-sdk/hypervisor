@@ -99,9 +99,31 @@ void vmpic_global_init(void)
 int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
 {
 	interrupt_t *interrupt;
-	int handle;
+	int handle, vector;
 
 	// FIXME: we should probably range check the irq here 
+
+	/*
+	 * Handle shared interrupts, check if handle already allocated.
+	 * Currently, the trick to find this is to get the MPIC vector
+	 * and see if this MPIC vector is a valid guest handle & it's
+	 * type is an interrupt type, then simply resuse it.
+	 */
+
+	/*
+	 * FIXME : races between hype instances allocating handle for
+	 * shared interrupts
+	 */
+
+	vector = mpic_irq_get_vector(irq);
+	if (vector < MAX_HANDLES && guest->handles[vector]) {
+		interrupt = guest->handles[vector]->intr;
+		if (interrupt &&
+		    interrupt->ops == &mpic_ops && interrupt->irq == irq) {
+			printf("vmpic reusing shared ghandle %d\n", vector);
+			return vector;
+		}
+	}
 
 	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
 	if (!interrupt)
