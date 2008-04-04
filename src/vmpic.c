@@ -35,6 +35,19 @@ void vmpic_irq_set_destcpu_wrapper(int irq, uint8_t log_destcpu_mask)
 	mpic_irq_set_destcpu(irq, guest->gcpus[cpu_dest]->cpu->coreid);
 }
 
+uint8_t vmpic_irq_get_destcpu_wrapper(int irq)
+{
+	guest_t *guest = get_gcpu()->guest;
+	int i;
+	uint8_t coreid = count_lsb_zeroes(mpic_irq_get_destcpu(irq));
+
+	for (i=0; i < guest->cpucnt; i++)
+		if (guest->gcpus[i]->cpu->coreid == coreid)
+			return (1 << i);
+
+	return 0;
+}
+
 pic_ops_t mpic_ops = {
 	mpic_irq_set_priority,
 	vmpic_irq_set_destcpu_wrapper,
@@ -44,7 +57,12 @@ pic_ops_t mpic_ops = {
 	mpic_irq_set_inttype,
 	mpic_irq_set_ctpr,
 	mpic_irq_get_ctpr,
-	mpic_eoi
+	mpic_eoi,
+	mpic_irq_get_priority,
+	mpic_irq_get_polarity,
+	vmpic_irq_get_destcpu_wrapper,
+	mpic_irq_get_mask,
+	mpic_irq_get_activity
 };
 
 pic_ops_t vpic_ops = {
@@ -251,10 +269,9 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 
 void fh_vmpic_get_int_config(trapframe_t *regs)
 {
-/* FIXME : pic_ops_t to be modified to support get_int_config */
-#if 0
 	guest_t *guest = get_gcpu()->guest;
 	uint32_t handle = regs->gpregs[3];
+	uint8_t priority=0, cpu_dest=0, config=0;
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -273,12 +290,11 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 	if (int_handle->ops->ops_get_cpu_dest)
 		cpu_dest = int_handle->ops->ops_get_cpu_dest(int_handle->irq);
 	if (int_handle->ops->ops_get_polarity)
-		config = int_handle->ops->ops_set_polarity(int_handle->irq);
+		config = int_handle->ops->ops_get_polarity(int_handle->irq);
 
 	regs->gpregs[4] = config;
-	regs->gpregs[4] = priority;
-	regs->gpregs[4] = cpu_dest;
-#endif
+	regs->gpregs[5] = priority;
+	regs->gpregs[6] = cpu_dest;
 }
 
 void fh_vmpic_set_mask(trapframe_t *regs)
@@ -303,6 +319,30 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 		int_handle->ops->ops_irq_mask(int_handle->irq);
 	else
 		int_handle->ops->ops_irq_unmask(int_handle->irq);
+}
+
+void fh_vmpic_get_mask(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	uint8_t mask=0;
+
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	interrupt_t *int_handle = guest->handles[handle]->intr;
+	if (!int_handle) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	if (int_handle->ops->ops_irq_get_mask)
+		mask = int_handle->ops->ops_irq_get_mask(int_handle->irq);
+
+	regs->gpregs[4] = mask;
 }
 
 void fh_vmpic_eoi(trapframe_t *regs)
@@ -349,4 +389,28 @@ void fh_vmpic_iack(trapframe_t *regs)
 	}
 
 	regs->gpregs[4] = vector;
+}
+
+void fh_vmpic_get_activity(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t handle = regs->gpregs[3];
+	uint8_t active=0;
+
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	interrupt_t *int_handle = guest->handles[handle]->intr;
+	if (!int_handle) {
+		regs->gpregs[3] = -1;  /* bad handle */
+		return;
+	}
+
+	if (int_handle->ops->ops_irq_get_activity)
+		active  = int_handle->ops->ops_irq_get_activity(int_handle->irq);
+
+	regs->gpregs[4] = active;
 }

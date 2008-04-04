@@ -14,6 +14,11 @@ typedef struct pic_ops {
 	void (*ops_set_ctpr) (uint8_t priority);
 	int32_t (*ops_get_ctpr) (void);
 	void (*ops_eoi)(void);
+	uint8_t (*ops_get_priority)(int hwirq);
+	uint8_t (*ops_get_polarity)(int hwirq);
+	uint8_t (*ops_get_cpu_dest)(int hwirq);
+	uint8_t (*ops_irq_get_mask)(int hwirq);
+	uint8_t (*ops_irq_get_activity)(int hwirq);
 } pic_ops_t;
 
 /*
@@ -36,5 +41,7 @@ void fh_vmpic_eoi(trapframe_t *regs);
 void fh_vmpic_set_priority(trapframe_t *regs);
 void fh_vmpic_get_priority(trapframe_t *regs);
 void fh_vmpic_iack(trapframe_t *regs);
+void fh_vmpic_get_mask(trapframe_t *regs);
+void fh_vmpic_get_activity(trapframe_t *regs);
 
 #endif

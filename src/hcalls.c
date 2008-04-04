@@ -384,8 +384,8 @@ static hcallfp_t hcall_table[] = {
 	&fh_vmpic_set_priority, /* 12 */
 	&unimplemented,		/* 13 */
 	&fh_vmpic_set_mask,	/* 14 */
-	&unimplemented,		/* 15 */
-	&unimplemented,		/* 16 */
+	&fh_vmpic_get_mask,	/* 15 */
+	&fh_vmpic_get_activity,	/* 16 */
 	&fh_vmpic_eoi,		/* 17 */
 	&fh_byte_channel_send,	/* 18 */
 	&fh_byte_channel_receive,/* 19 */
