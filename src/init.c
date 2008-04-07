@@ -60,7 +60,7 @@ void start(unsigned long devtree_ptr)
 
 	alloc_init(heap, mem_end + PHYSBASE);
 
-#ifdef CONFIG_NS16550
+#ifdef CONFIG_LIBOS_NS16550
 	create_ns16550();
 #endif
 	open_stdout();

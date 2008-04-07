@@ -44,11 +44,14 @@ GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
 MKDIR=mkdir -p
 
 include $(LIBFDT_DIR)/Makefile.libfdt
+
+CONFIG_LIBOS_QUEUE=y
+CONFIG_LIBOS_NS16550=y
 include $(LIBOS_DIR)/Makefile.libos
 
 LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-	$(LIBOS_LIB) $(LIBOS_NS16550) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
-	$(LIBOS_MPIC) $(LIBOS_QUEUE)
+	$(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
+	$(LIBOS_MPIC) $(libos-src-y)
 
 ####################
 

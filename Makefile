@@ -1,3 +1,8 @@
+export LIBOS_DIR := ../libos/lib
+export LIBOS_INC := ../libos/include
+
+$(shell ln -sfn $(LIBOS_DIR) libos)
+
 export PROJECTVERSION=0.0
 export srctree=$(CURDIR)
 
@@ -27,3 +32,4 @@ clean:
 	find * -name bin | xargs rm -rf
 	rm -rf include/config
 	rm -f dts/*.dtb
+	rm -f libos
