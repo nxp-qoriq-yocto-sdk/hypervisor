@@ -137,8 +137,6 @@ void vpic_assert_vint_txq(queue_t *q)
 {
 	vint_desc_t *vint = q->producer;
 
-printf("asserting txq vint\n");
-
 	vpic_assert_vint(vint->guest, vint->vpic_irq);
 }
 
