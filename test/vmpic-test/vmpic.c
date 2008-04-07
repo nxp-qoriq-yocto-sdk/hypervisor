@@ -51,7 +51,7 @@ int test_init(unsigned long devtree_ptr)
 	handle_p = (int *)fdt_getprop(fdt, node, "interrupts", &len);
 
 	/* VMPIC config */
-	fh_vmpic_set_int_config(*handle_p,1,15,0);
+	fh_vmpic_set_int_config(*handle_p,1,15,0x00000001);
 	fh_vmpic_set_mask(*handle_p, 0);
 	fh_vmpic_set_priority(*handle_p, 0);
 
