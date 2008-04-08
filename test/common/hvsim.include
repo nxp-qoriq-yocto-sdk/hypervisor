@@ -23,7 +23,7 @@ if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
 if not defined guest_image	{$guest_image = ""}
 if not defined initrd_image	{$initrd_image = ""}
-if not defined boot_command  {$boot_command  = "bootm 0x40000 - 0x20000"}
+if not defined boot_command  {$boot_command  = "bootm 0xef040000 - 0xef020000"}
 if not defined mac_address   {$mac_address   = "00:01:af:07:9b:8a"}
 if not defined mac_address1  {$mac_address1  = "00:01:af:07:9b:8b"}
 if not defined mac_address2  {$mac_address2  = "00:01:af:07:9b:8c"}
@@ -172,6 +172,18 @@ default-port-forward-target $ip_address
 $phys_mem = ($system:phys_mem)
 $phys_mem.load-file $uboot 0xfff80000
 
+if ($kernel_image != "") {
+	flash0_space.load-file $kernel_image $kernel_addr
+}
+
+foreach $i in (range (list-length $guest_image)) {
+	flash0_space.load-file $guest_image[$i] $guest_addr[$i]
+}
+
+if ($dtb_image != "") {
+	flash0_space.load-file $dtb_image $dtb_addr
+}
+
 # U-boot uses l1 cache without backing RAM
 # the address has to match u-boot build/config
 ($phys_mem.add-map
@@ -242,28 +254,11 @@ if $do_boot == "yes" {
                 $con.wait-then-write "=> " "setenv serverip 10.10.0.1\n"
         }
 
-        # Boot the linux kernel
-        $con.wait-for-string "=> "
-
-        if ($kernel_image != "") {
-            $phys_mem.load-file $kernel_image $kernel_addr
-        }
-
-	foreach $i in (range (list-length $guest_image)) {
-            $phys_mem.load-file $guest_image[$i] $guest_addr[$i]
-        }
-
-        if ($initrd_image != "") {
-	    foreach $i in (range (list-length $initrd_image)) {
-                $phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
-            }
+	if ($initrd_image != "") {
+		foreach $i in (range (list-length $initrd_image)) {
+			$phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
+		}
 	}
-
-        if ($dtb_image != "") {
-            # Must load to address covered by initial TLB entry
-            $phys_mem.load-file $dtb_image $dtb_addr
-        }
-	$con.input "# images has been forced into memory\n"
 
         if ($cmdline != "") {
             $con.wait-then-write "=> " "setenv bootargs " + $cmdline + "\n"
