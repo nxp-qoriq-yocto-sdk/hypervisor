@@ -89,22 +89,24 @@
 		fsl,hv-phandle-ref = <&vmpic>;
 	};
 
-	handles {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "fsl,hv-handles";
-		
-		byte-channel@0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "byte-channel0";
-			interrupt-parent = <&vmpic>;
-		};
-
-		gpio {
-			reg = <1>;
-			compatible = "fsl,hv-gpio";
-			fsl,real-dev = "gpio";
-			fsl,bitmask = <103ecc00>;
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			
+			byte-channel@0 {
+				compatible = "fsl,hv-byte-channel";
+				fsl,endpoint = "byte-channel0";
+				interrupt-parent = <&vmpic>;
+			};
+	
+			gpio {
+				reg = <1>;
+				compatible = "fsl,hv-gpio";
+				fsl,real-dev = "gpio";
+				fsl,bitmask = <103ecc00>;
+			};
 		};
 	};
 
@@ -113,10 +115,5 @@
 		bootargs = "console=ttyS0,115200";
 		linux,initrd-start = <01300000>;
 		linux,initrd-end = <013ca000>;
-	};
-
-	aliases {
-//		stdout = "/handles/byte-channel@0";
-//		stdout = "/ccsr@fe000000/serial@11d500";
 	};
 };

@@ -75,28 +75,38 @@
 		};
 	};
 
-	handles {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "fsl,hv-handles";
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
 
-		byte-channel@0 {
-			reg = <0>;
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "/uartmux";
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
+	
+			byte-channel@0 {
+				reg = <0>;
+				compatible = "fsl,hv-byte-channel";
+				fsl,endpoint = "/uartmux";
+			};
+	
+			gpio {
+				reg = <1>;
+				compatible = "fsl,hv-gpio";
+				fsl,real-dev = "gpio";
+				fsl,bitmask = <020033ff>;
+			};
+	
+			door-bell@0 {
+	               compatible = "fsl,doorbell-receive";
+	               fsl,endpoint = "/doorbells/doorbell@0";
+	            };
 		};
-
-		gpio {
-			reg = <1>;
-			compatible = "fsl,hv-gpio";
-			fsl,real-dev = "gpio";
-			fsl,bitmask = <020033ff>;
-		};
-
-		door-bell@0 {
-               compatible = "fsl,doorbell-receive";
-               fsl,endpoint = "/doorbells/doorbell@0";
-            };
 	};
 
 	chosen {

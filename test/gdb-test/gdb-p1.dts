@@ -71,10 +71,13 @@
 		};
 	};
 
-	handles {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "fsl,hv-handles";
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
+		};
 	};
 
 	chosen {
