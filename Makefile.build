@@ -60,6 +60,7 @@ hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
 hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
 hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
+hv-src-$(CONFIG_SHELL) += shell.c
 
 SRCS := $(LIBOS_SRC:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
 	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)

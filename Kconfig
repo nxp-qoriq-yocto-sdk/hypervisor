@@ -34,3 +34,11 @@ config IPI_DOORBELL
 	select LIBOS_QUEUE
 	help
 		Provides support for inter partition signalling.
+
+config SHELL
+	bool "Command-line shell"
+	select LIBOS_QUEUE
+	select LIBOS_READLINE
+	help
+		A command-line shell with various debugging and
+		configuration commands.

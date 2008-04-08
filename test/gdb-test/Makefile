@@ -6,28 +6,28 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: hello_all
+all: gdb_all
 
 include ../Makefile.inc
 
-HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) hello.c
-HELLO_OBJS := $(basename $(HELLO_SRCS))
-HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
+GDB_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdb.c
+GDB_OBJS := $(basename $(GDB_SRCS))
+GDB_OBJS := $(GDB_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+GDB_OBJS := $(GDB_OBJS:%=bin/%)
 
-hello_all: bin/hello.bin bin/hello.map bin/hv-hello-1p.dtb
+gdb_all: bin/gdb.bin bin/gdb.map bin/hv-gdb.dtb
 
-bin/hello.bin: bin/hello
+bin/gdb.bin: bin/gdb
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/hello: $(HELLO_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(HELLO_OBJS) -lgcc
+bin/gdb: $(GDB_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDB_OBJS) -lgcc
 
-bin/hello.map: bin/hello
-	nm -n bin/hello > $@
+bin/gdb.map: bin/gdb
+	nm -n bin/gdb > $@
 
--include $(HELLO_OBJS:.o=.d)
+-include $(GDB_OBJS:.o=.d)
 
-bin/hv-hello-1p.dtb: hv-hello-1p.dts bin/hello-p1.dtb
+bin/hv-gdb.dtb: hv-gdb.dts bin/gdb-p1.dtb
 
-bin/hello-p1.dtb: hello-p1.dts
+bin/gdb-p1.dtb: gdb-p1.dts

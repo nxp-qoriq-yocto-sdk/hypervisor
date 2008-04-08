@@ -223,6 +223,9 @@
 			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
 			                 0 17000000 0 20000000 1000000>;
 			fsl,dtb = /incbin/("bin/ipi-p1.dtb");
+			fsl,hv-loaded-images;
+			fsl,hv-image-src-addr = <0 efa00000>;
+			fsl,hv-image-gphys-addr = <0 0>;
 		};
 	};
 };

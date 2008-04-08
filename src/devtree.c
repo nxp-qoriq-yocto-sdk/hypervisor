@@ -30,6 +30,8 @@
 #include <errors.h>
 
 #include <libos/ns16550.h>
+#include <libos/queue.h>
+#include <libos/chardev.h>
 
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize)
@@ -363,16 +365,56 @@ void create_ns16550(void)
 }
 #endif
 
+queue_t *stdout, *stdin;
+
 void open_stdout(void)
 {
-	int off = lookup_alias(fdt, "stdout");
-	if (off < 0)
+	int ret = lookup_alias(fdt, "stdout");
+	if (ret < 0)
 		return;
 
-	chardev_t *cd = ptr_from_node(fdt, off, "chardev");
-	if (cd)
+	chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
+	if (cd) {
 		console_init(cd);
+
+		if (cd->ops->set_tx_queue) {
+			queue_t *q = alloc_type(queue_t);
+			ret = queue_init(q, 2048);
+			if (ret < 0)
+				return;
+
+			ret = cd->ops->set_tx_queue(cd, q);
+			if (ret < 0)
+				return;
+		
+			stdout = q;
+		}
+	}
 }
+
+#ifdef CONFIG_SHELL
+void open_stdin(void)
+{
+	int ret = lookup_alias(fdt, "stdin");
+	if (ret < 0)
+		return;
+
+	chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
+	if (cd && cd->ops->set_rx_queue) {
+		queue_t *q = alloc_type(queue_t);
+
+		ret = queue_init(q, 2048);
+		if (ret < 0)
+			return;
+
+		ret = cd->ops->set_rx_queue(cd, q);
+		if (ret < 0)
+			return;
+		
+		stdin = q;
+	}
+}
+#endif
 
 // FIXME: memory holes
 physaddr_t find_end_of_mem(void)
