@@ -11,7 +11,7 @@ OUTPUT_ARCH(powerpc:common)
 
 SECTIONS
 {
-    . = 0x0;
+    . = 0x20000000;
 
     .text : {
         *(.text)
@@ -38,5 +38,3 @@ SECTIONS
     _end = .;
 
 }
-
-

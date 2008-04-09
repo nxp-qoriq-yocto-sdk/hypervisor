@@ -3,7 +3,7 @@
 
 #define CCSRBAR_VA              0xfe000000
 
-#define PHYSBASE 0
+#define PHYSBASE 0x20000000
 #define BASE_TLB_ENTRY 15
 
 #ifndef _ASM
