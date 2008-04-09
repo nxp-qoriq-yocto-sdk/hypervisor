@@ -57,7 +57,7 @@ void start(void *devtree_ptr)
 
 	printf("Hello World\n");
 
-	node = fdt_path_offset(devtree_ptr, "/handles/byte-channel1");
+	node = fdt_path_offset(devtree_ptr, "/hypervisor/handles/byte-channel1");
 	if (node < 0) {
 		printf("0 device tree error %d\n",node);
 		return;

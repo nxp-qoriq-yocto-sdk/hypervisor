@@ -256,6 +256,11 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
+	if (!log_cpu_dest_mask) {  /* mask must have a bit set */
+		regs->gpregs[3] = -2;  /* bad parameter */
+		return;
+	}
+
 	if (int_handle->ops->ops_set_priority)
 		int_handle->ops->ops_set_priority(int_handle->irq, priority);
 	if (int_handle->ops->ops_set_cpu_dest)

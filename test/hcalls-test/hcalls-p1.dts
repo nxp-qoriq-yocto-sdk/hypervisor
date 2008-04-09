@@ -71,19 +71,22 @@
 		};
 	};
 
-	handles {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "fsl,hv-handles";
-		
-		byte-channel0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "byte-channel1";
-		};
-
-		byte-channel1 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = "byte-channel2";
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
+			
+			byte-channel0 {
+				compatible = "fsl,hv-byte-channel";
+				fsl,endpoint = "byte-channel1";
+			};
+	
+			byte-channel1 {
+				compatible = "fsl,hv-byte-channel";
+				fsl,endpoint = "byte-channel2";
+			};
 		};
 	};
 
