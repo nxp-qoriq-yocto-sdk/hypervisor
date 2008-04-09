@@ -5,7 +5,7 @@
 #include <libos/bitops.h>
 #include <libfdt.h>
 
-void init(unsigned long devtree_ptr)
+void init(unsigned long devtree_ptr);
 
 void fit_handler(trapframe_t *frameptr)
 {
