@@ -8,7 +8,8 @@
 #include <libos/trapframe.h>
 #include <libfdt.h>
 
-extern void init(unsigned long);
+extern void init(unsigned long devtree_ptr);
+extern void *fdt;
 
 int extint_cnt = 0;;
 void ext_int_handler(trapframe_t *frameptr)
@@ -22,12 +23,11 @@ void ext_int_handler(trapframe_t *frameptr)
 	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
 }
 
-int test_init(unsigned long devtree_ptr)
+int test_init(void)
 {
 	int ret;
 	int node;
 	int *handle_p;
-	void *fdt = (void *)devtree_ptr;
 	const char *s;
 	const char *path;
 	int len;
@@ -64,19 +64,18 @@ int test_init(unsigned long devtree_ptr)
 	return 0;
 }
 
-void dump_dev_tree(unsigned long devtree_ptr)
+void dump_dev_tree(void)
 {
-	void *fdt = (void *)devtree_ptr;
 	int node = -1;
 	const char *s;
 	int len;
 
-        printf("dev tree ------\n");
-        while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
-                s = fdt_get_name(fdt, node, &len);
-                printf("   node = %s\n",s);
-        }
-        printf("------\n");
+	printf("dev tree ------\n");
+	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
+		s = fdt_get_name(fdt, node, &len);
+		printf("   node = %s\n",s);
+	}
+	printf("------\n");
 }
 
 void start(unsigned long devtree_ptr)
@@ -92,9 +91,9 @@ void start(unsigned long devtree_ptr)
 
 	printf("vmpic test\n");
 
-	dump_dev_tree(devtree_ptr);
+	dump_dev_tree();
 
-	rc = test_init(devtree_ptr);
+	rc = test_init();
 	if (rc) {
 		printf("error: test init failed\n");
 	}

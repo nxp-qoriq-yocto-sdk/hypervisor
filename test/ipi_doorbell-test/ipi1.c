@@ -9,6 +9,7 @@
 extern void init(unsigned long);
 volatile int extint_cnt;
 int *handle_p_int;
+extern void *fdt;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -17,9 +18,8 @@ void ext_int_handler(trapframe_t *frameptr)
 
 }
 
-int test_init(unsigned long devtree_ptr)
+int test_init(void)
 {
-	void *fdt = (void *)devtree_ptr;
 	int len;
 	int off = -1, ret;
 
@@ -44,9 +44,8 @@ int test_init(unsigned long devtree_ptr)
 	return 0;
 }
 
-void dump_dev_tree(unsigned long devtree_ptr)
+void dump_dev_tree(void)
 {
-	void *fdt = (void *)devtree_ptr;
 	int node = -1;
 	const char *s;
 	int len;
@@ -67,9 +66,9 @@ void start(unsigned long devtree_ptr)
 
 	printf("ipi_doorbell-p2 test\n");
 
-	dump_dev_tree(devtree_ptr);
+	dump_dev_tree();
 
-	rc = test_init(devtree_ptr);
+	rc = test_init();
 	if (rc) {
 		printf("error: test init failed\n");
 	}
