@@ -627,8 +627,26 @@ static int start_guest_primary_nowait(void)
 	guest->state = guest_running;
 	smp_mbar();
 
-	for (i = 1; i < guest->cpucnt; i++)
+	for (i = 1; i < guest->cpucnt; i++) {
+		if (!guest->gcpus[i]) {
+			enable_critint();
+			printf("guest %s waiting for cpu %d...\n", guest->name, i);
+		
+			while (!guest->gcpus[i]) {
+				if (cpu->ret_user_hook)
+					break;
+
+				smp_mbar();
+			}
+
+			disable_critint();
+
+			if (cpu->ret_user_hook)
+				return 0;
+		}
+
 		setgevent(guest->gcpus[i], GEV_START);
+	}
 
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
 	// map 256MB, so we don't support loading/booting an OS above that
