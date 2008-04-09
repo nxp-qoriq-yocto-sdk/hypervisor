@@ -71,6 +71,13 @@
 		};
 	};
 
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
+
 	hypervisor {
 		handles {
 			#address-cells = <1>;
