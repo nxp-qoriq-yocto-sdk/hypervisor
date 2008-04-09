@@ -36,10 +36,6 @@
 #include <libos/spr.h>
 #include <doorbell.h>
 
-/* gcpu->timer_flags */
-#define TF_ENABLED        1
-#define TF_ENABLED_SHIFT  0
-
 void decrementer(trapframe_t *regs)
 {
 	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
@@ -59,7 +55,7 @@ void run_deferred_decrementer(void)
 	gcpu_t *gcpu = get_gcpu();
 	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
 
-	if (gcpu->timer_flags & TF_ENABLED) {
+	if (gcpu->timer_flags & TCR_DIE) {
 		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_TCR_DIE);
 		send_local_guest_doorbell();
 	}
@@ -70,34 +66,69 @@ void enable_tcr_die(void)
 	gcpu_t *gcpu = get_gcpu();
 	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_TCR_DIE);
 
-	if (gcpu->timer_flags & TF_ENABLED)
+	if (gcpu->timer_flags & TCR_DIE)
 		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
+}
+
+void fit(trapframe_t *regs)
+{
+	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
+		reflect_trap(regs);
+		return;
+	}
+
+	/* The guest has interrupts disabled, so defer it. */
+	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_FIT);
+	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_FIE);
+
+	send_local_guest_doorbell();
+}
+
+void run_deferred_fit(void)
+{
+	gcpu_t *gcpu = get_gcpu();
+	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_FIT);
+
+	if (gcpu->timer_flags & TCR_FIE) {
+		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_TCR_FIE);
+		send_local_guest_doorbell();
+	}
+}
+
+void enable_tcr_fie(void)
+{
+	gcpu_t *gcpu = get_gcpu();
+	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_TCR_DIE);
+
+	if (gcpu->timer_flags & TCR_FIE)
+		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_FIE);
 }
 
 void set_tcr(uint32_t val)
 {
 	gcpu_t *gcpu = get_gcpu();
 
-	gcpu->timer_flags &= ~TF_ENABLED;
-	gcpu->timer_flags |= (val >> (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
-	                     TF_ENABLED;
+	gcpu->timer_flags = val & (TCR_DIE | TCR_FIE);
 
 	if (gcpu->gdbell_pending & GCPU_PEND_DECR)
 		val &= ~TCR_DIE;
+	if (gcpu->gdbell_pending & GCPU_PEND_FIT)
+		val &= ~TCR_FIE;
 
 	mtspr(SPR_TCR, val);
 }
 
 void set_tsr(uint32_t val)
 {
-	if (val & TSR_DIS) {
-		gcpu_t *gcpu = get_gcpu();
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
-		
-		if (gcpu->timer_flags & TF_ENABLED)
-			mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
-	}
+	gcpu_t *gcpu = get_gcpu();
 
+	if (val & TSR_DIS)
+		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
+
+	if (val & TSR_FIS) 
+		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_FIT);
+
+	mtspr(SPR_TCR, mfspr(SPR_TCR) | gcpu->timer_flags);
 	mtspr(SPR_TSR, val);
 }
 
@@ -105,9 +136,8 @@ uint32_t get_tcr(void)
 {
 	uint32_t val = mfspr(SPR_TCR);
 
-	val &= ~TCR_DIE;
-	val |= (get_gcpu()->timer_flags << (TCR_DIE_SHIFT - TF_ENABLED_SHIFT)) &
-	       TCR_DIE;
+	val &= ~(TCR_DIE | TCR_FIE);
+	val |= get_gcpu()->timer_flags;
 
 	return val;
 }

@@ -80,6 +80,8 @@ typedef struct guest {
 #define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
 #define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
+#define GCPU_PEND_FIT      0x00000010 /* FIT event pending */
+#define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 

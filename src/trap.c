@@ -51,6 +51,15 @@ void guest_doorbell(trapframe_t *regs)
 		return;
 	}
 
+	/* Then, check for a FIT. */
+	if (gcpu->gdbell_pending & GCPU_PEND_FIT) {
+		run_deferred_fit();
+
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_FIT];
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		return;
+	}
+
 	/* Then, check for a decrementer. */
 	if (gcpu->gdbell_pending & GCPU_PEND_DECR) {
 		run_deferred_decrementer();
@@ -60,6 +69,8 @@ void guest_doorbell(trapframe_t *regs)
 		return;
 	}
 
+	if (gcpu->gdbell_pending & GCPU_PEND_TCR_FIE)
+		enable_tcr_fie();
 	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
 		enable_tcr_die();
 

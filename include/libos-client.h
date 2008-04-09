@@ -26,6 +26,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_PROGRAM_HANDLER reflect_trap
 #define EXC_FPUNAVAIL_HANDLER reflect_trap
 #define EXC_DECR_HANDLER decrementer
+#define EXC_FIT_HANDLER fit
 #define EXC_DTLB_HANDLER dtlb_miss
 #define EXC_GDOORBELL_HANDLER guest_doorbell
 #define EXC_GDOORBELLC_HANDLER guest_critical_doorbell
