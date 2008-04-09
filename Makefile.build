@@ -135,6 +135,9 @@ test-ipi-doorbell-1p: bin/uv.uImage test/ipi_doorbell-test
 test-ipi-doorbell-2p: bin/uv.uImage test/ipi_doorbell-test
 	$(SIMICS) test/ipi_doorbell-test/hv-ipi-2p.simics
 
+test-fit: bin/uv.uImage test/fit-test
+	$(SIMICS) test/fit-test/hv-fit.simics
+
 .PHONY: FORCE test
 test/%: FORCE
 	make -C $@
