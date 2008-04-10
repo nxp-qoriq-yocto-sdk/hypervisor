@@ -13,18 +13,18 @@
 static void vmpic_reset(handle_t *h)
 {
 	guest_t *guest = get_gcpu()->guest;
-	h->intr->ops->ops_irq_mask(h->intr->irq);
+	h->intr->ops->irq_mask(h->intr->irq);
 
-	if (h->intr->ops->ops_set_priority)
-		h->intr->ops->ops_set_priority(h->intr->irq, 0);
-	if (h->intr->ops->ops_set_cpu_dest)
-		h->intr->ops->ops_set_cpu_dest(h->intr->irq,
+	if (h->intr->ops->set_priority)
+		h->intr->ops->set_priority(h->intr->irq, 0);
+	if (h->intr->ops->set_cpu_dest)
+		h->intr->ops->set_cpu_dest(h->intr->irq,
 		                               1 << (guest->gcpus[0]->cpu->coreid));
 	/* FIXME: remember initial polarity from devtree? */
-	if (h->intr->ops->ops_set_polarity)
-		h->intr->ops->ops_set_polarity(h->intr->irq, 0);
-	if (h->intr->ops->ops_irq_set_inttype)
-		h->intr->ops->ops_irq_set_inttype(h->intr->irq, TYPE_NORM);
+	if (h->intr->ops->set_polarity)
+		h->intr->ops->set_polarity(h->intr->irq, 0);
+	if (h->intr->ops->irq_set_inttype)
+		h->intr->ops->irq_set_inttype(h->intr->irq, TYPE_NORM);
 }
 
 void vmpic_irq_set_destcpu_wrapper(int irq, uint8_t log_destcpu_mask)
@@ -261,15 +261,15 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
-	if (int_handle->ops->ops_set_priority)
-		int_handle->ops->ops_set_priority(int_handle->irq, priority);
-	if (int_handle->ops->ops_set_cpu_dest)
-		int_handle->ops->ops_set_cpu_dest(int_handle->irq,
+	if (int_handle->ops->set_priority)
+		int_handle->ops->set_priority(int_handle->irq, priority);
+	if (int_handle->ops->set_cpu_dest)
+		int_handle->ops->set_cpu_dest(int_handle->irq,
 							log_cpu_dest_mask);
-	if (int_handle->ops->ops_set_polarity)
-		int_handle->ops->ops_set_polarity(int_handle->irq, config & 0x01);
-	if (int_handle->ops->ops_irq_set_inttype)
-		int_handle->ops->ops_irq_set_inttype(int_handle->irq, TYPE_NORM);
+	if (int_handle->ops->set_polarity)
+		int_handle->ops->set_polarity(int_handle->irq, config & 0x01);
+	if (int_handle->ops->irq_set_inttype)
+		int_handle->ops->irq_set_inttype(int_handle->irq, TYPE_NORM);
 }
 
 void fh_vmpic_get_int_config(trapframe_t *regs)
@@ -290,12 +290,12 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 		return;
 	}
 
-	if (int_handle->ops->ops_get_priority)
-		priority = int_handle->ops->ops_get_priority(int_handle->irq);
-	if (int_handle->ops->ops_get_cpu_dest)
-		cpu_dest = int_handle->ops->ops_get_cpu_dest(int_handle->irq);
-	if (int_handle->ops->ops_get_polarity)
-		config = int_handle->ops->ops_get_polarity(int_handle->irq);
+	if (int_handle->ops->get_priority)
+		priority = int_handle->ops->get_priority(int_handle->irq);
+	if (int_handle->ops->get_cpu_dest)
+		cpu_dest = int_handle->ops->get_cpu_dest(int_handle->irq);
+	if (int_handle->ops->get_polarity)
+		config = int_handle->ops->get_polarity(int_handle->irq);
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
@@ -321,9 +321,9 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 	}
 
 	if (mask)
-		int_handle->ops->ops_irq_mask(int_handle->irq);
+		int_handle->ops->irq_mask(int_handle->irq);
 	else
-		int_handle->ops->ops_irq_unmask(int_handle->irq);
+		int_handle->ops->irq_unmask(int_handle->irq);
 }
 
 void fh_vmpic_get_mask(trapframe_t *regs)
@@ -344,8 +344,8 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 		return;
 	}
 
-	if (int_handle->ops->ops_irq_get_mask)
-		mask = int_handle->ops->ops_irq_get_mask(int_handle->irq);
+	if (int_handle->ops->irq_get_mask)
+		mask = int_handle->ops->irq_get_mask(int_handle->irq);
 
 	regs->gpregs[4] = mask;
 }
@@ -367,7 +367,7 @@ void fh_vmpic_eoi(trapframe_t *regs)
 		return;
 	}
 
-	int_handle->ops->ops_eoi();
+	int_handle->ops->eoi();
 }
 
 void fh_vmpic_set_priority(trapframe_t *regs)
@@ -414,8 +414,8 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 		return;
 	}
 
-	if (int_handle->ops->ops_irq_get_activity)
-		active  = int_handle->ops->ops_irq_get_activity(int_handle->irq);
+	if (int_handle->ops->irq_get_activity)
+		active  = int_handle->ops->irq_get_activity(int_handle->irq);
 
 	regs->gpregs[4] = active;
 }
