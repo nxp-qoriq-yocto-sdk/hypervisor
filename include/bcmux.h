@@ -8,7 +8,7 @@
  *  for data bufferization. The idea is to separate a LLD (Low Level Driver) and
  *  a higher level, more OS dependent layer.
  */
-    
+
 #include  <libos/queue.h>
 #include  <byte_chan.h>
 #include  <errors.h>

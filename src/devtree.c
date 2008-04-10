@@ -517,19 +517,18 @@ int get_interrupt_controller(const void *tree, int node)
 
 	while (1) {
 		prop = fdt_getprop(tree, node,
-                              "interrupt-parent", &len);
+		                   "interrupt-parent", &len);
 		if (prop) {
 			node = fdt_node_offset_by_phandle(tree, *prop);
 		} else {
 			node = fdt_parent_offset(tree, node);
-    		}
+		}
 		if (node < 0)
 			return node;
 
 		prop = fdt_getprop(tree, node,
-                              "interrupt-controller", &len);
+		                   "interrupt-controller", &len);
 		if (prop)
 			return node;
 	}
 }
-

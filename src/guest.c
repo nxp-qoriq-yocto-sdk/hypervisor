@@ -789,7 +789,7 @@ void start_wait_core(trapframe_t *regs)
 
 	start_guest_primary();
 
- 	assert(guest->state != guest_running);
+	assert(guest->state != guest_running);
 	wait_for_gevent(regs);
 }
 

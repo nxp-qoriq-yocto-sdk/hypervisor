@@ -2,7 +2,7 @@
  *
  * Byte channel multiplexing
  */
-    
+
 /*
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
  * 
