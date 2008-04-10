@@ -176,16 +176,15 @@ int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
  */
 void vmpic_partition_init(guest_t *guest)
 {
-	void *fdt = guest->devtree;
-	int len;
-	int intlen;
+	void *tree = guest->devtree;
+	int len, ret;
 	int node;
 	uint32_t vmpic_phandle;
 
 	/* find the vmpic node */
-	node = fdt_node_offset_by_compatible(fdt, -1, "fsl,hv-vmpic");
+	node = fdt_node_offset_by_compatible(tree, -1, "fsl,hv-vmpic");
 	if (node >= 0) {
-		vmpic_phandle = fdt_get_phandle(fdt, node);
+		vmpic_phandle = fdt_get_phandle(tree, node);
 	} else {
 		printf("ERROR: no vmpic node found\n");
 		return;
@@ -201,38 +200,82 @@ void vmpic_partition_init(guest_t *guest)
 	 */
 
 	node = -1;
-	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
-		uint32_t *interrupts = fdt_getprop_w(fdt, node, "interrupts", &intlen);
-		if (interrupts != NULL) {
-			int intctrl = -1;
-			intctrl = get_interrupt_controller(fdt, node);
+	while ((node = fdt_next_node(tree, node, NULL)) >= 0) {
+		int i, nints;
+		uint32_t *vintspec;
+		
+		nints = get_num_interrupts(tree, node);
+		if (nints == 0)
+			continue;
+		if (nints < 0) {
+			printf("vmpic_partition_init: error %d in get_num_interrupts\n",
+			       nints);
+			continue;
+		}
+		
+		vintspec = alloc(nints * CELL_SIZE * 2, CELL_SIZE);
+		if (!vintspec) {
+			printf("vmpic_partition_init: out of memory\n");
+			return;
+		}
+
+		for (i = 0; i < nints; i++) {
+			const uint32_t *intspec;
+			int handle;
+			int intctrl = get_interrupt(tree, node, i, &intspec);
+			
+			if (intctrl < 0) {
+				printf("vmpic_partition_init: error %d in get_interrupt\n",
+				       intctrl);
+			
+				break;
+			}
 
 			/* identify interrupt sources to transform */
-			if (fdt_getprop(fdt, intctrl, "fsl,hv-interrupt-controller", &len)) {
-				int i;
+			if (!fdt_getprop(tree, intctrl, "fsl,hv-interrupt-controller", &len))
+				continue;
 
-				/* allocate handle and update irq for each int specifier */
-				for (i=0; i < (intlen / CELL_SIZE); i += 2) {  // FIXME-- get #cells from devtree
-					int handle = vmpic_alloc_mpic_handle(guest, interrupts[i]);
-					if (handle >= 0)
-						interrupts[i] = handle;
-						// FIXME config mpic level/sense here
-					else
-						break;  /* error occured */
-				}
-
-				/* set the interrupt parent to the vmpic */
-				fdt_setprop(fdt, node, "interrupt-parent", &vmpic_phandle, sizeof(vmpic_phandle));
+			/* FIXME: support more than just MPIC */
+			handle = vmpic_alloc_mpic_handle(guest, intspec[0]);
+			if (handle < 0) {
+				printf("vmpic_partition_init: error %d allocating handle\n",
+				       handle);
+				
+				return;
 			}
+			
+			vintspec[i * 2] = handle;
+			vintspec[i * 2 + 1] = intspec[1];
+			// FIXME config mpic level/sense here
+		}
+		
+		/* Write the new interrupts to the guest tree.  We don't
+		 * write in place, as once we support pics other than mpic,
+		 * we may have #interrupt-cells = <1> in the real pic, and
+		 * it wouldn't fit.
+		 */
+		ret = fdt_setprop(tree, node, "interrupts", vintspec,
+		                  nints * CELL_SIZE * 2);
+		if (ret < 0) {
+			printf("vmpic_partition_init: error %d setting interrupts\n", ret);
+			return;
+		}
+
+		/* set the interrupt parent to the vmpic */
+		ret = fdt_setprop(tree, node, "interrupt-parent",
+		                  &vmpic_phandle, sizeof(vmpic_phandle));
+		if (ret < 0) {
+			printf("vmpic_partition_init: error %d setting interrupts\n", ret);
+			return;
 		}
 	}
 
 	/* delete the real mpic node(s) so guests don't get confused */
 	node = -1;
-	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
-		const int *prop = fdt_getprop(fdt, node, "fsl,hv-interrupt-controller", &len);
+	while ((node = fdt_next_node(tree, node, NULL)) >= 0) {
+		const int *prop = fdt_getprop(tree, node, "fsl,hv-interrupt-controller", &len);
 		if (prop)
-			fdt_del_node(fdt, node);
+			fdt_del_node(tree, node);
 	}
 }
 
