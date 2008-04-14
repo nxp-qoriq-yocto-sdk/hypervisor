@@ -103,7 +103,7 @@ bin/%.dtb : %.dts
 	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
 
 # include the dependecy files
--include bin/src/genassym.d
+-include bin/libos/libos_assym.d
 -include $(OBJS:.o=.d)
 
 bin/uv.map: bin/uv

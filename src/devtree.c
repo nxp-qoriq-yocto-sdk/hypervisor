@@ -32,6 +32,8 @@
 #include <libos/ns16550.h>
 #include <libos/queue.h>
 #include <libos/chardev.h>
+#include <libos/interrupts.h>
+#include <libos/mpic.h>
 
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize)
@@ -339,6 +341,8 @@ void create_ns16550(void)
 {
 	int off = -1, ret;
 	physaddr_t addr;
+	const uint32_t *prop;
+	int ncells;
 
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "ns16550");
@@ -346,16 +350,29 @@ void create_ns16550(void)
 			break;
 
 		ret = dt_get_reg(fdt, off, 0, &addr, NULL);
-		if (ret < 0)
+		if (ret < 0) {
+			printf("ns16550 failed to get reg: %d\n", ret);
 			continue;
+		}
 
-		if (addr < 0)
-			continue;
+		// FIXME: clock-frequency
+		ret = get_interrupt(fdt, off, 0, &prop, &ncells);
+		
+		interrupt_t *irq = get_mpic_irq(prop, ncells);
+		if (irq) {
+			ret = irq->ops->config_by_intspec(irq, prop, ncells);
+			if (ret < 0) {
+				printf("ns16550 irq config failed: %d\n", ret);
+				irq = NULL;
+			} else {
+				irq->ops->set_delivery_type(irq, TYPE_CRIT);
+				irq->ops->set_priority(irq, 15);
+			}
+		}
 
-		// FIXME: IRQ, clock-frequency
 		chardev_t *cd = ns16550_init((uint8_t *)(unsigned long)
 		                             (CCSRBAR_VA + (addr - CCSRBAR_PA)),
-		                             0x24, 0, 16);
+		                             irq, 0, 16);
 
 		ret = fdt_setprop(fdt, off, "fsl,hv-internal-chardev-ptr",
 		                  &cd, sizeof(cd));
@@ -578,10 +595,11 @@ int get_num_interrupts(const void *tree, int node)
  * @param[in] the node for which we want the interrupt
  * @param[in] intnum index into interrupts node
  * @param[out] intspec the returned interrupt spec
+ * @param[out] ncells the number of cells in the intspec (optional)
  * @return the node offset of the interrupt controller, or an error.
  */
 int get_interrupt(const void *tree, int node, int intnum,
-                  const uint32_t **intspec)
+                  const uint32_t **intspec, int *ncellsp)
 {
 	const uint32_t *prop;
 	int len, domain, speclen, ncells;
@@ -604,6 +622,9 @@ int get_interrupt(const void *tree, int node, int intnum,
 		ncells = get_int_cells(tree, domain);
 		if (ncells < 0)
 			return ncells;
+
+		if (ncellsp)
+			*ncellsp = ncells;
 
 		if ((intnum + 1) * ncells * 4 > speclen)
 			return -ERR_BADTREE;

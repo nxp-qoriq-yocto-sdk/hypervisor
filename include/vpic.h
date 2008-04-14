@@ -25,31 +25,39 @@
 #ifndef _VPIC_H
 #define _VPIC_H
 
+#include <libos/interrupts.h>
 #include <libos/trapframe.h>
-#include <percpu.h>
 #include <stdint.h>
 
-/* irq descriptor */
-typedef struct {
-	int vpic_irq;
-	int guest_handle;
-	guest_t *guest;
-} vint_desc_t;
+#define MAX_VINT_CNT 32
 
-int vpic_alloc_irq(guest_t *guest);
-int vpic_process_pending_ints(guest_t *guest);
+struct guest;
+
+typedef struct vpic_interrupt {
+	interrupt_t irq;
+	struct guest *guest;
+	uint32_t destcpu;
+	uint8_t enable, irqnum, pending, active, level;
+} vpic_interrupt_t;
+
+typedef struct vpic {
+	vpic_interrupt_t ints[MAX_VINT_CNT];
+	int alloc_next;
+	uint32_t lock;
+} vpic_t;
+
+typedef struct vpic_cpu {
+	uint32_t active;
+	uint32_t pending;
+} vpic_cpu_t;
+
+vpic_interrupt_t *vpic_alloc_irq(struct guest *guest);
 void vpic_assert_vint_rxq(queue_t *q);
 void vpic_assert_vint_txq(queue_t *q);
-void vpic_assert_vint(guest_t *guest, int irq);
-void vpic_irq_mask(int irq);
-void vpic_irq_unmask(int irq);
-void vpic_irq_set_vector(int irq, uint32_t vector);
-uint32_t vpic_irq_get_vector(int irq);
-void vpic_irq_set_destcpu(int irq, uint8_t destcpu);
-uint8_t vpic_irq_get_destcpu(int irq);
-void critdbell_to_gdbell_glue(trapframe_t *regs);
-uint16_t vpic_iack(void);
-void vpic_eoi(void);
+void vpic_assert_vint(vpic_interrupt_t *irq);
+void vpic_deassert_vint(vpic_interrupt_t *irq);
 
+void critdbell_to_gdbell_glue(trapframe_t *regs);
+interrupt_t *vpic_iack(void);
 
 #endif

@@ -2,103 +2,67 @@
 #include <libos/bitops.h>
 #include <libos/8578.h>
 #include <libos/mpic.h>
-#include <libfdt.h>
-#include <vpic.h>
+#include <libos/interrupts.h>
 
+#include <libfdt.h>
+
+#include <vpic.h>
 #include <hv.h>
 #include <vmpic.h>
 #include <percpu.h>
 #include <devtree.h>
+#include <errors.h>
+
+static uint32_t vmpic_lock;
 
 static void vmpic_reset(handle_t *h)
 {
 	guest_t *guest = get_gcpu()->guest;
-	h->intr->ops->irq_mask(h->intr->irq);
+	interrupt_t *irq = h->intr->irq;
 
-	if (h->intr->ops->set_priority)
-		h->intr->ops->set_priority(h->intr->irq, 0);
-	if (h->intr->ops->set_cpu_dest)
-		h->intr->ops->set_cpu_dest(h->intr->irq,
-		                               1 << (guest->gcpus[0]->cpu->coreid));
+	irq->ops->disable(irq);
+
+	if (irq->ops->set_priority)
+		irq->ops->set_priority(irq, 0);
+	if (irq->ops->set_cpu_dest_mask)
+		irq->ops->set_cpu_dest_mask(irq, 1 << (guest->gcpus[0]->cpu->coreid));
 	/* FIXME: remember initial polarity from devtree? */
-	if (h->intr->ops->set_polarity)
-		h->intr->ops->set_polarity(h->intr->irq, 0);
-	if (h->intr->ops->irq_set_inttype)
-		h->intr->ops->irq_set_inttype(h->intr->irq, TYPE_NORM);
+	if (irq->ops->set_config)
+		irq->ops->set_config(irq, IRQ_LEVEL | IRQ_HIGH);
+	if (irq->ops->set_delivery_type)
+		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
-
-pic_ops_t mpic_ops = {
-	mpic_irq_set_priority,
-	mpic_irq_set_destcpu,
-	mpic_irq_set_polarity,
-	mpic_irq_mask,
-	mpic_irq_unmask,
-	mpic_irq_set_inttype,
-	mpic_irq_set_ctpr,
-	mpic_irq_get_ctpr,
-	mpic_eoi,
-	mpic_irq_get_priority,
-	mpic_irq_get_polarity,
-	mpic_irq_get_destcpu,
-	mpic_irq_get_mask,
-	mpic_irq_get_activity
-};
-
-pic_ops_t vpic_ops = {
-	0,
-	vpic_irq_set_destcpu,
-	0,  /* set polarity */
-	vpic_irq_mask,
-	vpic_irq_unmask,
-	0,   /* set int type */
-	0,   /* set ctpr */
-	0,   /* get ctpr */
-	vpic_eoi
-};
 
 handle_ops_t vmpic_handle_ops = {
 	.reset = vmpic_reset,
 };
 
-int vmpic_alloc_vpic_handle(guest_t *guest)
+int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq)
 {
-	interrupt_t *interrupt;
-	int handle;
+	vmpic_interrupt_t *vmirq;
 
-	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
-	if (!interrupt)
-		return -1;
+	vmirq = alloc_type(vmpic_interrupt_t);
+	if (!vmirq)
+		return -ERR_NOMEM;
 
-	interrupt->user.intr = interrupt;
-	interrupt->user.ops = &vmpic_handle_ops;
+	vmirq->irq = irq;
+	irq->priv = vmirq;
 
-	handle = alloc_guest_handle(guest, &interrupt->user);
+	vmirq->user.intr = vmirq;
+	vmirq->user.ops = &vmpic_handle_ops;
 
-	interrupt->ops = &vpic_ops;
-	interrupt->irq = vpic_alloc_irq(guest);
-
-	/*
-	 * update vpic vector to return guest handle directly
-	 * during interrupt acknowledge
-	 */
-	vpic_irq_set_vector(interrupt->irq, handle);
-
-	printf("vpic handle allocated: vmpic handle %d, vpic irq %d\n", handle, interrupt->irq);
-
-	return handle;
+	return alloc_guest_handle(guest, &vmirq->user);
 }
-
 
 void vmpic_global_init(void)
 {
 }
 
-int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
+int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
 {
-	interrupt_t *interrupt;
-	int handle, vector;
-
-	// FIXME: we should probably range check the irq here 
+	interrupt_t *irq;
+	register_t saved;
+	int handle;
 
 	/*
 	 * Handle shared interrupts, check if handle already allocated.
@@ -107,40 +71,36 @@ int vmpic_alloc_mpic_handle(guest_t *guest, int irq)
 	 * type is an interrupt type, then simply resuse it.
 	 */
 
-	/*
-	 * FIXME : races between hype instances allocating handle for
-	 * shared interrupts
-	 */
+ 	irq = get_mpic_irq(irqspec, ncells);
+ 	if (!irq)
+ 		return -ERR_INVALID;
 
-	vector = mpic_irq_get_vector(irq);
-	if (vector < MAX_HANDLES && guest->handles[vector]) {
-		interrupt = guest->handles[vector]->intr;
-		if (interrupt &&
-		    interrupt->ops == &mpic_ops && interrupt->irq == irq) {
-			printf("vmpic reusing shared ghandle %d\n", vector);
-			return vector;
+	saved = spin_lock_critsave(&vmpic_lock);
+ 	
+ 	handle = mpic_irq_get_vector(irq);
+	if (handle < MAX_HANDLES && guest->handles[handle]) {
+		vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+		if (vmirq && vmirq->irq == irq) {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
+			         "vmpic reusing shared ghandle %d\n", handle);
+			return handle;
 		}
 	}
 
-	interrupt  = alloc(sizeof(interrupt_t), __alignof__(interrupt_t));
-	if (!interrupt)
-		return -1;
+	spin_unlock_critsave(&vmpic_lock, saved);
 
-	interrupt->user.intr = interrupt;
+	handle = vmpic_alloc_handle(guest, irq);
+	if (handle < 0)
+		return handle;
 
-	handle = alloc_guest_handle(guest, &interrupt->user);
-
-	interrupt->ops = &mpic_ops;
-	interrupt->irq = irq;
-
-	printf("vmpic allocated guest handle %d\n", handle);
+	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
+	         "vmpic allocated guest handle %d\n", handle);
 
 	/*
 	 * update mpic vector to return guest handle directly
 	 * during interrupt acknowledge
 	 */
 	mpic_irq_set_vector(irq, handle);
-
 	return handle;
 }
 
@@ -158,7 +118,7 @@ void vmpic_partition_init(guest_t *guest)
 	void *tree = guest->devtree;
 	int len, ret;
 	int node;
-	uint32_t vmpic_phandle;
+	int vmpic_phandle;
 
 	/* find the vmpic node */
 	node = fdt_node_offset_by_compatible(tree, -1, "fsl,hv-vmpic");
@@ -182,7 +142,10 @@ void vmpic_partition_init(guest_t *guest)
 	while ((node = fdt_next_node(tree, node, NULL)) >= 0) {
 		int i, intlen, domain;
 		uint32_t *intspec;
+		static char buf[1024];
 
+		fdt_get_path(guest->devtree, node, buf, sizeof(buf));
+		
 		intspec = fdt_getprop_w(tree, node, "interrupts", &intlen);
 		if (!intspec) {
 			if (intlen != -FDT_ERR_NOTFOUND)
@@ -198,7 +161,7 @@ void vmpic_partition_init(guest_t *guest)
 			       domain);
 			continue;
 		}
-
+		
 		/* identify interrupt sources to transform */
 		if (!fdt_getprop(tree, domain, "fsl,hv-interrupt-controller", &len))
 			continue;
@@ -207,7 +170,7 @@ void vmpic_partition_init(guest_t *guest)
 			int handle;
 
 			/* FIXME: support more than just MPIC */
-			handle = vmpic_alloc_mpic_handle(guest, intspec[0]);
+			handle = vmpic_alloc_mpic_handle(guest, &intspec[i * 2], 2);
 			if (handle < 0) {
 				printf("vmpic_partition_init: error %d allocating handle\n",
 				       handle);
@@ -216,7 +179,6 @@ void vmpic_partition_init(guest_t *guest)
 			}
 			
 			intspec[i * 2] = handle;
-			// FIXME config mpic level/sense here
 		}
 		
 		/* set the interrupt parent to the vmpic */
@@ -240,11 +202,12 @@ void vmpic_partition_init(guest_t *guest)
 void fh_vmpic_set_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
-	uint8_t config = regs->gpregs[4];
-	uint8_t priority = regs->gpregs[5];
-	uint8_t lcpu_mask = regs->gpregs[6];
-	uint8_t lcpu_dest = count_lsb_zeroes(lcpu_mask);
+	int handle = regs->gpregs[3];
+	int config = regs->gpregs[4];
+	int priority = regs->gpregs[5];
+	uint32_t lcpu_mask = regs->gpregs[6];
+	int lcpu_dest = count_lsb_zeroes(lcpu_mask);
+	interrupt_t *irq;
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -252,8 +215,8 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
@@ -263,22 +226,25 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
-	if (int_handle->ops->set_priority)
-		int_handle->ops->set_priority(int_handle->irq, priority);
-	if (int_handle->ops->set_cpu_dest)
-		int_handle->ops->set_cpu_dest(int_handle->irq,
-					guest->gcpus[lcpu_dest]->cpu->coreid);
-	if (int_handle->ops->set_polarity)
-		int_handle->ops->set_polarity(int_handle->irq, config & 0x01);
-	if (int_handle->ops->irq_set_inttype)
-		int_handle->ops->irq_set_inttype(int_handle->irq, TYPE_NORM);
+	irq = vmirq->irq;
+
+	if (irq->ops->set_priority)
+		irq->ops->set_priority(irq, priority);
+	if (irq->ops->set_cpu_dest_mask)
+		irq->ops->set_cpu_dest_mask(irq, 1 << guest->gcpus[lcpu_dest]->cpu->coreid);
+	if (irq->ops->set_config)
+		irq->ops->set_config(irq, config);
+	if (irq->ops->set_delivery_type)
+		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
 
 void fh_vmpic_get_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
-	int priority=0, pcpu_mask=0, pcpu_dest=0, lcpu_mask=0, config=0, i;
+	int handle = regs->gpregs[3];
+	int priority = 0, config = IRQ_LEVEL;
+	uint32_t lcpu_mask = 1;
+	interrupt_t *irq;
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -286,18 +252,21 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
-	if (int_handle->ops->get_priority)
-		priority = int_handle->ops->get_priority(int_handle->irq);
+	irq = vmirq->irq;
 
-	if (int_handle->ops->get_cpu_dest) {
-		pcpu_mask = int_handle->ops->get_cpu_dest(int_handle->irq);
-		pcpu_dest = count_lsb_zeroes(pcpu_mask);
+	if (irq->ops->get_priority)
+		priority = irq->ops->get_priority(irq);
+
+	if (irq->ops->get_cpu_dest_mask) {
+		uint32_t pcpu_mask = irq->ops->get_cpu_dest_mask(irq);
+		int pcpu_dest = count_lsb_zeroes(pcpu_mask);
+		int i;
 
 		/* Map physical cpu to logical cpu within partition */
 		for (i = 0; i < guest->cpucnt; i++)
@@ -305,8 +274,8 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 				lcpu_mask = 1 << i;
 	}
 
-	if (int_handle->ops->get_polarity)
-		config = int_handle->ops->get_polarity(int_handle->irq);
+	if (irq->ops->get_config)
+		config = irq->ops->get_config(irq);
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
@@ -316,32 +285,31 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 void fh_vmpic_set_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
-	uint8_t mask = regs->gpregs[4];
-
+	int handle = regs->gpregs[3];
+	int mask = regs->gpregs[4];
+	
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
 	if (mask)
-		int_handle->ops->irq_mask(int_handle->irq);
+		vmirq->irq->ops->disable(vmirq->irq);
 	else
-		int_handle->ops->irq_unmask(int_handle->irq);
+		vmirq->irq->ops->enable(vmirq->irq);
 }
 
 void fh_vmpic_get_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
-	uint8_t mask=0;
+	int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -349,22 +317,19 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
-	if (int_handle->ops->irq_get_mask)
-		mask = int_handle->ops->irq_get_mask(int_handle->irq);
-
-	regs->gpregs[4] = mask;
+	regs->gpregs[4] = vmirq->irq->ops->is_enabled(vmirq->irq);
 }
 
 void fh_vmpic_eoi(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
+	int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -372,27 +337,13 @@ void fh_vmpic_eoi(trapframe_t *regs)
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
-	int_handle->ops->eoi();
-}
-
-void fh_vmpic_set_priority(trapframe_t *regs)
-{
-	uint8_t priority = regs->gpregs[3];
-
-	mpic_irq_set_ctpr(priority);
-}
-
-void fh_vmpic_get_priority(trapframe_t *regs)
-{
-	int32_t current_ctpr = mpic_irq_get_ctpr();
-
-	regs->gpregs[4] = current_ctpr;
+	vmirq->irq->ops->eoi(vmirq->irq);
 }
 
 void fh_vmpic_iack(trapframe_t *regs)
@@ -401,7 +352,11 @@ void fh_vmpic_iack(trapframe_t *regs)
 
 	vector = mpic_iack();
 	if (vector == 0xFFFF) {  /* spurious */
-		vector = vpic_iack();
+		interrupt_t *irq = vpic_iack();
+		if (irq) {
+			vmpic_interrupt_t *vmirq = irq->priv;
+			vector = vmirq->handle;
+		}
 	}
 
 	regs->gpregs[4] = vector;
@@ -410,8 +365,7 @@ void fh_vmpic_iack(trapframe_t *regs)
 void fh_vmpic_get_activity(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	uint32_t handle = regs->gpregs[3];
-	uint8_t active=0;
+	int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -419,14 +373,11 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 		return;
 	}
 
-	interrupt_t *int_handle = guest->handles[handle]->intr;
-	if (!int_handle) {
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
 		regs->gpregs[3] = -1;  /* bad handle */
 		return;
 	}
 
-	if (int_handle->ops->irq_get_activity)
-		active  = int_handle->ops->irq_get_activity(int_handle->irq);
-
-	regs->gpregs[4] = active;
+	regs->gpregs[4] = vmirq->irq->ops->is_active(vmirq->irq);
 }
