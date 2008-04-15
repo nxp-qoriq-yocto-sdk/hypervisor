@@ -1,9 +1,9 @@
 / {
-	compatible = "fsl,hv-MPC8578SIM",
-	             "fsl,hv-e500mc-partition",
-	             "fsl,hv-partition",
-	             "fsl,MPC8578SIM";
-
+	compatible = "fsl,hv-platform-mpc8578",
+                     "fsl,hv-platform",
+                     "fsl,MPC8578SIM";
+	model = "fsl,hv-demo-linux-p1";
+	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
 	#size-cells = <1>;
 
