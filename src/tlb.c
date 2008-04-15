@@ -58,10 +58,10 @@ static int alloc_tlb1(unsigned int entry)
 			gcpu->tlb1_inuse[i] |= 1UL << bit;
 			gcpu->tlb1_map[entry][i] |= 1UL << bit;
 
-#if 0
-			printf("tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
-			printf("using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
-#endif
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
 
 			return idx + bit;
 		}
@@ -84,10 +84,9 @@ static void free_tlb1(unsigned int entry)
 			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
 			assert(idx + bit < tlb1_reserved);
 			
-#if 0
-			printf("clearing tlb1[%d] for gtlb1[%d], cpu%lu\n",
-			       idx + bit, entry, mfspr(SPR_PIR));
-#endif
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "clearing tlb1[%d] for gtlb1[%d], cpu%lu\n",
+			         idx + bit, entry, mfspr(SPR_PIR));
 
 			cpu->tlb1[idx + bit].mas1 = 0;
 			tlb1_write_entry(idx + bit);
@@ -111,10 +110,10 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	unsigned long size_pages = tsize_to_pages(size);
 	unsigned long end = epn + size_pages;
 
-#if 0
-	printf("gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %x\n",
-	       entry, epn, end, grpn, mas1);
-#endif 
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+	         "gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %lx\n",
+	         entry, epn, end, grpn, mas1);
+
 	free_tlb1(entry);
 
 	gcpu->gtlb1[entry].mas1 = mas1;
@@ -143,8 +142,9 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		 * to spend on VF mappings.
 		 */
 
-		if (unlikely(!(attr & PTE_VALID))) {
-//			printf("invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
+		if (!(attr & PTE_VALID)) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
 			epn = (epn | rpn) + 1;
 			grpn = (grpn | rpn) + 1;
 			continue;
@@ -220,8 +220,9 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 		unsigned long otherepn = other->mas2 >> PAGE_SHIFT;
 		int otherpid = MAS1_GETTID(other->mas1);
 		
-//		printf("checking %x/%x/%lx against %x/%lx/%lx\n",
-//		       entry, mas1, epn, i, other->mas1, other->mas2);
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+		         "checking %x/%lx/%lx against %x/%lx/%lx\n",
+		         entry, mas1, epn, i, other->mas1, other->mas2);
 
 		if (entry == i)
 			continue;

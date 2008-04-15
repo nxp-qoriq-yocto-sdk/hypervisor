@@ -99,8 +99,9 @@ static void map_guest_range(guest_t *guest, physaddr_t gaddr,
 	                       (grpn << PAGE_SHIFT) +
 	                       (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 
-//	printf("cpu%ld mapping guest %lx to real %lx, %lx pages\n",
-//	       mfspr(SPR_PIR), grpn, rpn, pages);
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+	         "cpu%ld mapping guest %lx to real %lx, %lx pages\n",
+	         mfspr(SPR_PIR), grpn, rpn, pages);
 
 	vptbl_map(guest->gphys, grpn, rpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
@@ -184,7 +185,7 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 	ret = fdt_get_path(guest->devtree, node, path, sizeof(path));
 	if (ret < 0)
 		return ret;
-//	printf("found reg in %s\n", path);
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG, "found reg in %s\n", path);
 
 	int parent = fdt_parent_offset(guest->devtree, node);
 	if (parent < 0)
@@ -309,7 +310,8 @@ static int create_guest_spin_table(guest_t *guest)
 		if (ret < 0)
 			goto fail;
 
-		printf("cpu-release-addr of CPU%u: %x\n", cpu, spin_addr);
+		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+		         "cpu-release-addr of CPU%u: %x\n", cpu, spin_addr);
 	}
 
 	return 0;
@@ -722,7 +724,8 @@ static void start_guest_secondary(void)
 		
 	mtspr(SPR_GPIR, gpir);
 
-	printf("cpu %d/%d spinning on table...\n", pir, gpir);
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+	         "cpu %d/%d spinning on table...\n", pir, gpir);
 
 	msr = mfmsr() | MSR_GS;
 
@@ -739,12 +742,15 @@ static void start_guest_secondary(void)
 	if (cpu->ret_user_hook)
 		return;
 
-	printf("secondary %d/%d spun up, addr %lx\n", pir, gpir, guest->spintbl[gpir].addr_lo);
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+	         "secondary %d/%d spun up, addr %lx\n",
+	         pir, gpir, guest->spintbl[gpir].addr_lo);
 
 	if (guest->spintbl[gpir].pir != gpir)
-		printf("WARNING: cpu %d (guest cpu %d) changed spin-table "
-		       "PIR to %ld, ignoring\n",
-		       pir, gpir, guest->spintbl[gpir].pir);
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "WARNING: cpu %d (guest cpu %d) changed spin-table "
+		         "PIR to %ld, ignoring\n",
+		         pir, gpir, guest->spintbl[gpir].pir);
 
 	/* Mask for 256M mapping */
 	page = ((((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
@@ -766,7 +772,7 @@ static void start_guest_secondary(void)
 
 void start_core(trapframe_t *regs)
 {
-	printf("start core %lu\n", mfspr(SPR_PIR));
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "start core %lu\n", mfspr(SPR_PIR));
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -784,7 +790,8 @@ void start_core(trapframe_t *regs)
 
 void start_wait_core(trapframe_t *regs)
 {
-	printf("start_wait core %lu\n", mfspr(SPR_PIR));
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+	         "start wait core %lu\n", mfspr(SPR_PIR));
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -800,7 +807,8 @@ void start_wait_core(trapframe_t *regs)
 void do_stop_core(trapframe_t *regs, int restart)
 {
 	int i;
-	printf("%s core %lu\n", restart ? "restart" : "stop", mfspr(SPR_PIR));
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+	         "%s core %lu\n", restart ? "restart" : "stop", mfspr(SPR_PIR));
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
