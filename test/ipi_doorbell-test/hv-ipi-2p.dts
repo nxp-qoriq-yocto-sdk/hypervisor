@@ -201,7 +201,7 @@
 			fsl,entry = <0>;
 			fsl,dtb = /incbin/("bin/ipi-p2.dtb");
 			fsl,hv-physaddr-map = <0 0 0 21000000 04000000>;
-			fsl,hv-load-image-table = <0 efa00000 0 0 0>;
+			fsl,hv-load-image-table = <0 efb00000 0 0 0>;
 		};
 	};
 };
