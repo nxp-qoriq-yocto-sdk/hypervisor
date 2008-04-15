@@ -14,5 +14,5 @@ include ../Makefile.inc
 
 dtbs: bin/hv-demo.dtb
 
-bin/hv-demo.dtb: bin/linux-p3.dtb bin/linux-p2.dtb bin/linux-p1.dtb hv-demo.dts
+bin/hv-demo.dtb: bin/linux-p2.dtb bin/linux-p1.dtb hv-demo.dts
 

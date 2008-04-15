@@ -363,7 +363,13 @@ static void *map_flash(physaddr_t phys)
  * @guest: guest data structure
  * @image_phys: real physical address of the image
  * @guest_phys: guest physical address to load the image to
- * @length: size of the image, optional if image is an ELF
+ * @length: size of the image, can be -1 if image is an ELF
+ *
+ * If the image is a plain binary, then 'length' must be the exact size of
+ * the image.
+ *
+ * If the image is an ELF, then 'length' is used only to verify the image
+ * data.  To skip verification, set length to -1.
  */
 static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr_t guest_phys, size_t length)
 {
@@ -397,53 +403,51 @@ static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr
 	return 0;
 }
 
-/* Returns 1 if the image is loaded successfully, 0 if no image,
- * negative on error.
+/**
+ * If an ELF or binary image exists, load it.  This must be called after
+ * map_guest_reg_all(), because that function creates some of the TLB
+ * mappings we need.
+ *
+ * Returns 1 if the image is loaded successfully, 0 if no image, negative on
+ * error.
  */
 static int load_image(guest_t *guest)
 {
-	/*
-	 * If an ELF image exists, load it.  This must be called after
-	 * map_guest_reg_all(), because that function creates some of the TLB
-	 * mappings we need.
-	 */
+	const struct {
+		uint64_t image_addr;
+		uint64_t guest_addr;
+		uint32_t length;
+	} __attribute__ ((packed)) *table;
 	int node = guest->partition;
-	int ret;
+	int ret, size;
 
-	if (!fdt_get_property(fdt, node, "fsl,hv-loaded-images", &ret)) {
-		if (ret == -FDT_ERR_NOTFOUND)
+	table = fdt_getprop(fdt, node, "fsl,hv-load-image-table", &size);
+	if (!table) {
+		/* 'size' will never equal zero if table is NULL */
+		if (size == -FDT_ERR_NOTFOUND)
 			return 0;
 
-		return ret;
-	}
-	
-	const uint64_t *image_addr;
-	const uint64_t *guest_addr;
-	size_t length = (size_t) -1;
-	const uint32_t *iprop;
-
-	image_addr = fdt_getprop(fdt, node, "fsl,hv-image-src-addr", &ret);
-	if (!image_addr) {
-		printf("guest %s: no fsl,image-src-addr property\n", guest->name);
-		return ret;
+		printf("guest %s: could not read fsl,hv-load-image-table property\n",
+			guest->name);
+		return size;
 	}
 
-	guest_addr = fdt_getprop(fdt, node, "fsl,hv-image-gphys-addr", &ret);
-	if (!guest_addr) {
-		printf("guest %s: no fsl,image-dest-offset property\n", guest->name);
-		return ret;
+	if (!size || (size % sizeof(*table))) {
+		printf("guest %s: invalid fsl,hv-load-image-table property\n",
+			guest->name);
+		return ERR_BADTREE;
 	}
 
-	/* The size of the image is only required for binary images,
-	   not ELF images. */
-	iprop = fdt_getprop(fdt, node, "fsl,hv-image-size", NULL);
-	if (iprop)
-		length = *iprop;
+	while (size) {
+		ret = load_image_from_flash(guest, table->image_addr,
+			table->guest_addr, table->length ? table->length : -1);
+		if (ret < 0) {
+			printf("guest %s: could not load image\n", guest->name);
+			return ret;
+		}
 
-	ret = load_image_from_flash(guest, *image_addr, *guest_addr, length);
-	if (ret < 0) {
-		printf("guest %s: could not load image\n", guest->name);
-		return ret;
+                table++;
+		size -= sizeof(*table);
 	}
 	
 	return 1;
