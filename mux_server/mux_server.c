@@ -473,17 +473,17 @@ no_read(struct iochan *ic, char *buf, int len, int block)
 static struct iochan*
 basic_channel(int fd, int out_only)
 {
-    struct iochan* c = get_channel(fd);
+	struct iochan* c = get_channel(fd);
 	fprintf(stderr, "basic_channel");
-    c->write = default_write;
-    if (out_only) {
-	polled_fd[c->poll_idx].events = 0;
-	c->read = no_read;
-    } else {
-	polled_fd[c->poll_idx].events = POLLIN | POLLERR | POLLHUP;
-	c->read = default_read;
-    }
-    return c;
+	c->write = default_write;
+	if (out_only) {
+		polled_fd[c->poll_idx].events = 0;
+		c->read = no_read;
+	} else {
+		polled_fd[c->poll_idx].events = POLLIN | POLLERR | POLLHUP;
+		c->read = default_read;
+	}
+	return c;
 }
 
 
@@ -661,7 +661,6 @@ void *channel_thread(void * p)
 		//sleep(1);
 		if(num <= 0)
 		{
-			int k;
 			fprintf(stderr, "Socket exit %d\n", c->fd);
 			close(c->fd);
 //			c->fd = socket(PF_INET, SOCK_STREAM, 0);
@@ -694,100 +693,94 @@ void *channel_thread(void * p)
 static struct iochan*
 tcp_listen_channel(int port, int stream_id, struct iochan *c, int fd)
 {
-    struct sockaddr_in sockaddr;
-
-    int num_bind_retries = 0;
-
-   	
+	struct sockaddr_in sockaddr;
+	int num_bind_retries = 0;
 	int rc;
 
-    if (fd < 0) {
-	Fatal("socket() failed for stream %d", stream_id);
-    }
+	if (fd < 0) {
+		Fatal("socket() failed for stream %d", stream_id);
+	}
 
-    /* Allow rapid reuse of this port. */
-    SetSocketFlag(fd, SOL_SOCKET, SO_REUSEADDR);
+	/* Allow rapid reuse of this port. */
+	SetSocketFlag(fd, SOL_SOCKET, SO_REUSEADDR);
 #ifndef __linux__
 #ifndef PLATFORM_CYGWIN
-    SetSocketFlag(fd, SOL_SOCKET, SO_REUSEPORT);
+	SetSocketFlag(fd, SOL_SOCKET, SO_REUSEPORT);
 #endif /* #ifndef PLATFORM_CYGWIN */
 #endif /* #ifndef __linux__ */
 
-    sockaddr.sin_family = PF_INET;
-    sockaddr.sin_addr.s_addr = INADDR_ANY;
-    sockaddr.sin_port = htons(port);
-  retry:
+	sockaddr.sin_family = PF_INET;
+	sockaddr.sin_addr.s_addr = INADDR_ANY;
+	sockaddr.sin_port = htons(port);
+
+retry:
 	fprintf(stderr, "PORT = %d\n", port);
-    if (bind(fd, (struct sockaddr *) &sockaddr, sizeof(sockaddr)) != 0) {
-	if (errno == EADDRINUSE) {
-	    if (num_bind_retries>MAX_RETRY_BIND_PORT) {
-		Fatal("Too many retries for bind on port %d for stream %d\n",
-		      port, stream_id);
-	    }
-	    Message("Retrying bind on port %d", port);
-	    num_bind_retries++;
-	    sleep(1);
-	    goto retry;
-	} else {
-	    Fatal("Bind failed");
+	if (bind(fd, (struct sockaddr *) &sockaddr, sizeof(sockaddr)) != 0) {
+		if (errno == EADDRINUSE) {
+			if (num_bind_retries > MAX_RETRY_BIND_PORT) {
+				Fatal("Too many retries for bind on port %d for stream %d\n",
+					port, stream_id);
+			}
+			Message("Retrying bind on port %d", port);
+			num_bind_retries++;
+			sleep(1);
+			goto retry;
+		} else {
+			Fatal("Bind failed");
+		}
 	}
-    }
 	
-    listen(fd, 4);
+	listen(fd, 4);
     
-    
-
-    
-
-    polled_fd[c->poll_idx].events = POLLIN;
+	polled_fd[c->poll_idx].events = POLLIN;
 
 	c->initial_fd = fd;
 	fprintf(stderr, "initial_fd %d\n", c->initial_fd);
-    c->state = tcp_listen_state;
-    c->detach = tcp_detach_listen;
-    c->stream_id = stream_id;
-    c->data = fd;
-    c->status = 0;
+	c->state = tcp_listen_state;
+	c->detach = tcp_detach_listen;
+	c->stream_id = stream_id;
+	c->data = fd;
+	c->status = 0;
 	c->write = default_write;
 	c->port  = port;
 	
-    Message("IO Channel %d listening on port %d for stream %d",
+	Message("IO Channel %d listening on port %d for stream %d",
 	    c->poll_idx, port, stream_id);
 	    
 	rc = pthread_create(&c->net_thread, NULL, channel_thread, c);    
-    return c;
+	return c;
 }
 
 static int
 check_channel(struct iochan *c, int timeout)
 {
-    int idx = c->poll_idx;
-    int ret = poll(&polled_fd[idx], 1, timeout);
-    if (ret) {
-    fprintf(stderr, "check_channel\n");
-	c->state(c, polled_fd[idx].revents & polled_fd[idx].events);
-    }
-    return ret;
+	int idx = c->poll_idx;
+	int ret = poll(&polled_fd[idx], 1, timeout);
+	if (ret) {
+		fprintf(stderr, "check_channel\n");
+		c->state(c, polled_fd[idx].revents & polled_fd[idx].events);
+	}
+	return ret;
 }
 
 static void
 check_all_channels(int timeout)
 {
-    int i = 0;
-    int retry;
-    do {
+	int i = 0;
+	int retry;
+	do {
 	int ret;
 	ret = poll(&polled_fd[0], last_channel, timeout);
 	retry = 0;
 	for (i = 0; i < last_channel; ++i) {
-	    if (channels[i].state) {
-	    fprintf(stderr, "check_all_channels\n");
+		if (channels[i].state) {
+		fprintf(stderr, "check_all_channels\n");
 		retry |= channels[i].state(&channels[i],
-					   polled_fd[i].events &
-					   polled_fd[i].revents);
-	    }
+		   polled_fd[i].events &
+		   polled_fd[i].revents);
+		}
 	}
-    } while (retry);
+	} while (retry);
 }
 
 
@@ -806,17 +799,13 @@ Usage(void)
 }
 
 
-void
-ParseCommandLine(int argc, char **argv)
+void ParseCommandLine(int argc, char **argv)
 {
-	int channel;
     program_name = argv[0];
 
     if (argc < 2) {
 	Usage();
     }
-
-	fprintf(stderr, "AAAABBBB\n");
 
     ++argv; --argc;
     while (1) {
@@ -843,16 +832,10 @@ ParseCommandLine(int argc, char **argv)
 	argv++; argc--;
     }
 
-	fprintf(stderr, "AAAACCCCC\n");
-	
-    fprintf(stderr, "BBBB\n");
-
     victim_name = argv[0];
     nchannels = 0;
     argv++; argc--;
 
-	fprintf(stderr, "CCCC\n");
-	
     for (nchannels = 0; nchannels < MAX_STREAMS; ++nchannels) {
 	streams[nchannels] = NULL;
     }
@@ -870,7 +853,6 @@ ParseCommandLine(int argc, char **argv)
 	    continue;
 	}
 
-	fprintf(stderr, "DDDD\n");
 	if (strcmp(argv[0],"stdout")==0) {
 	    streams[nchannels] = stdout_channel(1, 1);
 	} else if (strcmp(argv[0],"stderr")==0) {
@@ -883,10 +865,11 @@ ParseCommandLine(int argc, char **argv)
 	} else {
 	    Fatal("Unrecognizable stream spec: '%s'", argv[0]);
 	}
+
 	if (streams[nchannels]) {
 	    streams[nchannels]->stream_id = channel;
 	}
-	fprintf(stderr, "SSSS\n");
+
 	++nchannels;
 	++argv; --argc;
     }
@@ -894,8 +877,6 @@ ParseCommandLine(int argc, char **argv)
 	Fatal("%d stream maximum, %d specified", MAX_STREAMS, nchannels+argc);
     }
 }
-
-
 
 
 void VictimConnect(char *victim_name, int speed)
@@ -925,7 +906,6 @@ void VictimConnect(char *victim_name, int speed)
 	    Fatal("unknown victim host: %s", host);
 	}
 
-	fprintf(stderr, "FFFFFFFFFFFFFFFFFFFFFFFF\n");
 	Message("connecting to victim (host \"%s\", port %d)", host, port);
 	while (1) {
 	    victim_fd = socket(PF_INET, SOCK_STREAM, 0);
@@ -1048,39 +1028,45 @@ void VictimConnect(char *victim_name, int speed)
 
 int VictimRead(char *buf, int len)
 {
-    int cnt = victim->read(victim, buf, len, 1);
+	int cnt = victim->read(victim, buf, len, 1);
 
-    if (debug) {
-	Message("VictimRead: %d/%d bytes from fd %d", cnt, len, victim->fd);
-	DumpCharHex("raw read: ", buf, cnt);
-    }
+	if (debug) {
+		Message("VictimRead: %d/%d bytes from fd %d", cnt, len, victim->fd);
+		DumpCharHex("raw read: ", buf, cnt);
+	}
 
-    if (cnt < 0) {
-	Fatal("read() failed for victim");
-    }
-    if (cnt == 0) {
-    	fprintf(stderr, "Problem AAA\n");
-	//Fatal("EOF on read from victim");
-    }
-    return cnt;
+	if (cnt < 0) {
+		Fatal("read() failed for victim");
+	}
+	if (cnt == 0) {
+		fprintf(stderr, "Problem AAA\n");
+	Fatal("EOF on read from victim");
+	}
+	return cnt;
 }
 
 void VictimWrite(char *buf, int len)
 {
-    int ret;
-    if (debug) {
-	Message("VictimWrite: %d bytes to fd %d", len, victim->fd);
-	DumpCharHex("raw write:", buf, len);
-    }
+	int ret;
+
+	if (!victim)
+		return;	  /* if we're not connected just ignore */
+
+	if (debug) {
+		Message("VictimWrite: %d bytes to fd %d", len, victim->fd);
+		DumpCharHex("raw write:", buf, len);
+	}
+
 	ser_tx_num_of_chars += len;
-    while((ret = victim->write(victim, buf, len, 1)) != len);
-    if (ret != len) {
-	Fatal("write() failed for victim socket  %d %d", ret, len);
-    }
+
+	while((ret = victim->write(victim, buf, len, 1)) != len);
+
+	if (ret != len) {
+		Fatal("write() failed for victim socket  %d %d", ret, len);
+	}
 }
 
-int
-StreamWrite(int id, char *buf, int len, int block_for_connect)
+int StreamWrite(int id, char *buf, int len, int block_for_connect)
 {
     int n;
     int total = 0;
@@ -1091,7 +1077,6 @@ StreamWrite(int id, char *buf, int len, int block_for_connect)
 
   restart:
     if (! (streams[id]->status & STREAM_READY)) {
-    //fprintf(stderr, "StreamWrite AAA %d\n", id);
 	/* Perhaps somebody will connect */
 	if (block_for_connect == 0) {
 	    check_channel(streams[id], 0);
@@ -1101,7 +1086,6 @@ StreamWrite(int id, char *buf, int len, int block_for_connect)
 	}
     }
 
-	//fprintf(stderr, "StreamWrite BBB\n");
     if (! (streams[id]->status & STREAM_READY)) {
 	/* Here we know block_for_connect == 0 ,
 	 *  so non-blocking, thus quietly abort */
@@ -1112,9 +1096,7 @@ StreamWrite(int id, char *buf, int len, int block_for_connect)
 	Display(id, '>', buf, len);
     }
     while (len) {
-    //fprintf(stderr, "StreamWrite CCC %d %p\n", id, streams[id]->write);
 	n = streams[id]->write(streams[id], buf, len, 1);
-	//fprintf(stderr, "StreamWrite DDD\n");
 	if (n < 0) {
 	    /* Should we go to restart if block_for_connect? */
 	    streams[id]->detach(streams[id]);
@@ -1223,14 +1205,8 @@ int rx_flag_state;
 int rx_problem;
 int ProcessPackets(char *buf, int length)
 {
-    unsigned int pktlen, chan;
-    static char inbuf[5 + MAX_PACKET_LEN];
-    int line = 0;
     int i;
-    int ret;
     int stream;
-
-//	fprintf(stderr, "ProcessPackets\n");
 
 	for(i = 0; i < length; i++)
 	{
@@ -1284,7 +1260,6 @@ int ProcessPackets(char *buf, int length)
 void
 sighandler(int sig)
 {
-    int x;
     Message("Cleaning up");
 
 		fprintf(stderr, "\nserial received %d\n", ser_rx_num_of_chars);
@@ -1300,8 +1275,6 @@ sighandler(int sig)
     exit(0);
 }
 
-
-
 const char match[]="***thinwire***";
 #define STARTERLEN 14
 
@@ -1312,17 +1285,15 @@ int main(int argc, char **argv)
 {
     int leftover, len;
     char buf[5 + (2*MAX_PACKET_LEN)];
-    int matchlen = 0;
-    sigset_t set;
+/*    sigset_t set; */
     int first_time = 1;
 
 #ifdef _POSIX_THREADS 
-    printf("sysconf(_SC_THREADS): %d\n", sysconf(_SC_THREADS)); 
+    printf("sysconf(_SC_THREADS): %ld\n", sysconf(_SC_THREADS)); 
 #else 
     printf("_POSIX_THREADS not defined\n"); 
 #endif 
 
-    printf("AAAA\n");
     fflush(stdout);
     ParseCommandLine(argc, argv);
 

@@ -1,0 +1,104 @@
+/ {
+	compatible = "fsl,hv-MPC8578SIM",
+	             "fsl,hv-e500mc-partition",
+	             "fsl,hv-partition",
+	             "fsl,MPC8578SIM";
+
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <0>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <1>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+	};
+	
+	memory {
+		reg = <0 0 18000000>;
+		device_type = "memory";
+	};
+	
+	ccsr@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		device_type = "soc";
+		ranges = <0 0 fe000000 400000>;
+
+		mpic: pic@40000 {
+			clock-frequency = <0>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			reg = <40000 40000>;
+			compatible = "fsl,mpc8578-mpic", "fsl,mpic",
+			             "chrp,open-pic";
+			device_type = "open-pic";
+			big-endian;
+			fsl,hv-interrupt-controller;
+		};
+	};
+
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
+
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
+			
+			byte-channel@0 {
+				compatible = "fsl,hv-byte-channel";
+				fsl,endpoint = "byte-channel0";
+				interrupt-parent = <&vmpic>;
+			};
+	
+			gpio {
+				reg = <1>;
+				compatible = "fsl,hv-gpio";
+				fsl,real-dev = "gpio";
+				fsl,bitmask = <103ecc00>;
+			};
+		};
+	};
+
+	chosen {
+		linux,initrd-start = <01300000>;
+		linux,initrd-end = <013ca000>;
+	};
+
+	aliases {
+		stdout = "/hypervisor/handles/byte-channel@0";
+	};
+};

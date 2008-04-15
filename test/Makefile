@@ -1,7 +1,7 @@
 
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 
-SUBDIRS = gdb-test hello-test hcalls-test linux  msgsnd-test  vmpic-test
+SUBDIRS = gdb-test hello-test hcalls-test linux  msgsnd-test ipi_doorbell-test  vmpic-test demo
 
 .PHONY: subdirs $(SUBDIRS)
 
