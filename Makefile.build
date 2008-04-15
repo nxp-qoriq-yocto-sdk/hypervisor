@@ -139,7 +139,7 @@ test-fit: bin/uv.uImage test/fit-test
 	$(SIMICS) test/fit-test/hv-fit.simics
 
 demo: bin/uv.uImage test/demo
-	$(SIMICS) -e c test/demo/hv-demo.simics
+	$(SIMICS) test/demo/hv-demo.simics -e c
 
 .PHONY: FORCE test
 test/%: FORCE
