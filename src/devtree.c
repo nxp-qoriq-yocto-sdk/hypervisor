@@ -500,36 +500,122 @@ int lookup_alias(const void *tree, const char *path)
 	return fdt_path_offset(tree, path);
 }
 
-/** Get the interrupt controller for a node
- *
- * @param[in] tree the device tree to search
- * @param[in] the node for which we want the interrupt-parent
- * @return the node offset within the tree, or a libfdt error.
- *
- */
-
-int get_interrupt_controller(const void *tree, int node)
+int get_interrupt_domain(const void *tree, int node)
 {
 	const uint32_t *prop;
 	int len;
 
-	// FIXME: update to deal with interrupt maps
-
 	while (1) {
 		prop = fdt_getprop(tree, node,
-                              "interrupt-parent", &len);
+		                   "interrupt-parent", &len);
 		if (prop) {
 			node = fdt_node_offset_by_phandle(tree, *prop);
 		} else {
 			node = fdt_parent_offset(tree, node);
-    		}
+		}
 		if (node < 0)
 			return node;
 
-		prop = fdt_getprop(tree, node,
-                              "interrupt-controller", &len);
+		prop = fdt_getprop(tree, node, "interrupt-controller", &len);
+		if (prop)
+			return node;
+
+		prop = fdt_getprop(tree, node, "interrupt-map", &len);
 		if (prop)
 			return node;
 	}
 }
 
+static int get_int_cells(const void *tree, int domain)
+{
+	int len;
+	const uint32_t *prop;
+	
+	prop = fdt_getprop(tree, domain, "#interrupt-cells", &len);
+	if (!prop) {
+		if (len == -FDT_ERR_NOTFOUND) {
+			printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
+			len = -ERR_BADTREE;
+		}
+
+		return len;
+	}
+	
+	return *prop;
+}
+
+/** Get the interrupt controller and intspec for a node.
+ *
+ * @param[in] tree the device tree to search
+ * @param[in] the node for which we want the interrupt
+ * @param[in] intnum index into interrupts node
+ * @param[out] intspec the returned interrupt spec
+ * @return the node offset of the interrupt controller, or an error.
+ */
+int get_num_interrupts(const void *tree, int node)
+{
+	const uint32_t *intspec;
+	int domain, len;
+
+	intspec = fdt_getprop(tree, node, "interrupts", &len);
+	if (!intspec) {
+		if (len == -FDT_ERR_NOTFOUND)
+			len = 0;
+	
+		return len;
+	}
+	
+	domain = get_interrupt_domain(tree, node);
+	if (domain < 0)
+		return domain;
+	
+	return len / get_int_cells(tree, domain);
+}
+
+/** Get the interrupt controller and intspec for a node.
+ *
+ * @param[in] tree the device tree to search
+ * @param[in] the node for which we want the interrupt
+ * @param[in] intnum index into interrupts node
+ * @param[out] intspec the returned interrupt spec
+ * @return the node offset of the interrupt controller, or an error.
+ */
+int get_interrupt(const void *tree, int node, int intnum,
+                  const uint32_t **intspec)
+{
+	const uint32_t *prop;
+	int len, domain, speclen, ncells;
+
+	while (1) {
+		*intspec = fdt_getprop(tree, node, "interrupts", &speclen);
+		if (!*intspec)
+			return speclen;
+		
+		domain = get_interrupt_domain(tree, node);
+		if (domain < 0) {
+			if (domain == -FDT_ERR_NOTFOUND) {
+				printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
+				domain = -ERR_BADTREE;
+			}
+
+			return domain;
+		}
+
+		ncells = get_int_cells(tree, domain);
+		if (ncells < 0)
+			return ncells;
+
+		if ((intnum + 1) * ncells * 4 > speclen)
+			return -ERR_BADTREE;
+
+		*intspec += ncells * intnum;
+
+		prop = fdt_getprop(tree, domain, "interrupt-controller", &len);
+		if (prop)
+			return domain;
+
+		/* FIXME: Translate interrupt here */
+		printf("get_interrupt: interrupt-map not yet supported\n");
+		return -ERR_BADTREE;
+	}
+}

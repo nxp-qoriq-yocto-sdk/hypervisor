@@ -5,20 +5,20 @@
 #include <percpu.h>
 
 typedef struct pic_ops {
-	void (*ops_set_priority)(int hwirq, uint8_t priority);
-	void (*ops_set_cpu_dest)(int hwirq, uint8_t cpudest);
-	void (*ops_set_polarity)(int hwirq, uint8_t polarity);
-	void (*ops_irq_mask)(int hwirq);
-	void (*ops_irq_unmask)(int hwirq);
-	void (*ops_irq_set_inttype)(int hwirq, uint8_t type);
-	void (*ops_set_ctpr) (uint8_t priority);
-	int32_t (*ops_get_ctpr) (void);
-	void (*ops_eoi)(void);
-	uint8_t (*ops_get_priority)(int hwirq);
-	uint8_t (*ops_get_polarity)(int hwirq);
-	uint8_t (*ops_get_cpu_dest)(int hwirq);
-	uint8_t (*ops_irq_get_mask)(int hwirq);
-	uint8_t (*ops_irq_get_activity)(int hwirq);
+	void (*set_priority)(int hwirq, uint8_t priority);
+	void (*set_cpu_dest)(int hwirq, uint8_t cpudest);
+	void (*set_polarity)(int hwirq, uint8_t polarity);
+	void (*irq_mask)(int hwirq);
+	void (*irq_unmask)(int hwirq);
+	void (*irq_set_inttype)(int hwirq, uint8_t type);
+	void (*set_ctpr) (uint8_t priority);
+	int32_t (*get_ctpr) (void);
+	void (*eoi)(void);
+	uint8_t (*get_priority)(int hwirq);
+	uint8_t (*get_polarity)(int hwirq);
+	uint8_t (*get_cpu_dest)(int hwirq);
+	uint8_t (*irq_get_mask)(int hwirq);
+	uint8_t (*irq_get_activity)(int hwirq);
 } pic_ops_t;
 
 /*
