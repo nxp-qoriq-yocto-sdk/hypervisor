@@ -502,17 +502,17 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	   "fsl,hv-handles"-compatible node. */
 
 	// Get a pointer to the /handles node
-	int off = fdt_node_offset_by_compatible(guest_origtree, -1, "fsl,hv-handles");
+	int off = fdt_node_offset_by_compatible(guest->devtree, -1, "fsl,hv-handles");
 
 	while (off > 0) {
 		// get a pointer to the first/next partition-handle node
-		off = fdt_node_offset_by_compatible(guest_origtree, off, "fsl,hv-partition");
+		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition");
 		if (off < 0)
 			break;
 
 		// Find the partition node in the hypervisor device tree
 
-		const char *s = fdt_getprop(guest_origtree, off, "fsl,endpoint", &ret);
+		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
 		if (!s) {
 			printf("guest %s: missing fsl,endpoint property or value\n",
 				guest->name);
@@ -546,7 +546,9 @@ static int process_guest_devtree(guest_t *guest, int partition,
 
 		// Insert a 'reg' property into the partition-handle node of the
 		// guest device tree
-		ret = fdt_setprop(guest_origtree, off, "reg", &ghandle, sizeof(ghandle));
+		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
+		if (ret)
+			goto fail;
 	}
 
 	return 0;
