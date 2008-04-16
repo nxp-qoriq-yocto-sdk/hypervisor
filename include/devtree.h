@@ -15,6 +15,7 @@ int get_addr_format(const void *tree, int node,
 
 void *ptr_from_node(const void *devtree, int offset, const char *type);
 int lookup_alias(const void *tree, const char *path);
+int get_interrupt_domain(const void *tree, int node);
 int get_interrupt(const void *tree, int node, int intnum,
                   const uint32_t **intspec);
 int get_num_interrupts(const void *tree, int node);

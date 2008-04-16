@@ -181,7 +181,8 @@ static void release_secondary_cores(void)
 			goto fail_one;
 		}
 
-		printf("starting cpu %u, table %x\n", *reg, *table);
+		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+		         "starting cpu %u, table %x\n", *reg, *table);
 
 		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping[0],
 		               (*table) & ~(PAGE_SIZE - 1),

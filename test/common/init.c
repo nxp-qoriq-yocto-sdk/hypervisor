@@ -87,14 +87,10 @@ void secondary_init(void)
 
 
 
-extern int print_ok;  /* set to indicate printf can work now */
-
 static void tlb1_init(void)
 {
 	tlb1_set_entry(0, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
 		TLB_MAS3_KERN, 0, 0, 0);
-
-	print_ok = 1;
 }
 
 void dec_handler(trapframe_t *frameptr)

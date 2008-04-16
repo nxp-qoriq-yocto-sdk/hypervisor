@@ -28,6 +28,7 @@ void reflect_trap(trapframe_t *regs)
 
 	mtspr(SPR_GSRR0, regs->srr0);
 	mtspr(SPR_GSRR1, regs->srr1);
+	mtspr(SPR_GESR, mfspr(SPR_ESR));
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
 	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE;

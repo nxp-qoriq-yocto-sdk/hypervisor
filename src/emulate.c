@@ -188,8 +188,9 @@ static void fixup_tlb_sx_re(void)
 	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
 	                     (mas3 >> MAS3_RPN_SHIFT);
 
-//	printf("sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
-//	       mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+	         "sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
+	         mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
 
 	unsigned long attr;
 	unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
@@ -628,8 +629,9 @@ void hvpriv(trapframe_t *regs)
 	int ret;
 
 	guestmem_set_insn(regs);
-//	printf("hvpriv trap from 0x%lx, srr1 0x%lx, eplc 0x%lx\n", regs->srr0,
-//	       regs->srr1, mfspr(SPR_EPLC));
+	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,
+	         "hvpriv trap from 0x%lx, srr1 0x%lx, eplc 0x%lx\n", regs->srr0,
+	         regs->srr1, mfspr(SPR_EPLC));
 
 	ret = guestmem_in32((uint32_t *)regs->srr0, &insn);
 	if (ret != GUESTMEM_OK) {
@@ -712,7 +714,9 @@ void hvpriv(trapframe_t *regs)
 	}
 
 fault:
-	printf("unhandled hvpriv trap from 0x%lx, insn 0x%08x\n", regs->srr0, insn);
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+	         "unhandled hvpriv trap from 0x%lx, insn 0x%08x\n",
+	         regs->srr0, insn);
 	regs->exc = EXC_PROGRAM;
 	reflect_trap(regs);
 }

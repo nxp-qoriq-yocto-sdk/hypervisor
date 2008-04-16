@@ -36,4 +36,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 
 #define LIBOS_RET_USER_HOOK ret_to_guest
 
+#define LOGTYPE_GUEST_MMU    (CLIENT_BASE_LOGTYPE + 0)
+#define LOGTYPE_EMU          (CLIENT_BASE_LOGTYPE + 1)
+
 #endif

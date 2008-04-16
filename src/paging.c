@@ -35,10 +35,11 @@ static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
 	while (--*levels >= 0) {
 		int idx = (epn >> (PGDIR_SHIFT * *levels)) & (PGDIR_SIZE - 1);
 		pte_t *ptep = &tbl[idx];
-#if 0
-		printf("pte %lx attr %lx epn %lx level %d\n", ptep->page, ptep->attr,
-		       epn, *levels);
-#endif
+
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+		         "pte %lx attr %lx epn %lx level %d\n", ptep->page, ptep->attr,
+		         epn, *levels);
+
 		if (!(ptep->attr & PTE_VALID)) {
 			if (!insert)
 				return NULL;
@@ -69,7 +70,8 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 
 	if (unlikely(!ptep)) {
 		*attr = 0;
-//		printf("2 vtable xlate %p 0x%lx %i\n", tbl, epn << PAGE_SHIFT, level);
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+		         "2 vtable xlate %p 0x%lx %i\n", tbl, epn << PAGE_SHIFT, level);
 		return (1UL << (PGDIR_SHIFT * level)) - 1;
 	}
 
@@ -77,7 +79,9 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 	unsigned int size = pte.attr >> PTE_SIZE_SHIFT;
 	unsigned long size_pages;
 
-//	printf("vtable xlate %p 0x%lx 0x%lx\n", tbl, epn << PAGE_SHIFT, pte.attr);
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+	         "vtable xlate %p 0x%lx 0x%lx\n", tbl,
+	         epn << PAGE_SHIFT, pte.attr);
 
 	size = pte.attr >> PTE_SIZE_SHIFT;
 
@@ -114,12 +118,13 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 		assert(size_pages <= end - epn);
 		attr = (attr & ~PTE_SIZE) | (size << PTE_SIZE_SHIFT);
 
-#if 0
-		printf("max_page_size(epn, end - epn) %u\n", max_page_size(epn, end - epn));
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+		         "max_page_size(epn, end - epn) %u\n",
+		         max_page_size(epn, end - epn));
 
-		printf("epn %lx rpn %lx end %lx size %u size_pages %lx sub_end %lx\n", epn, rpn, end,
-		       size, size_pages, sub_end);
-#endif
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+		         "epn %lx rpn %lx end %lx size %u size_pages %lx sub_end %lx\n",
+		         epn, rpn, end, size, size_pages, sub_end);
 
 		assert(size > 0);
 		int largepage = size >= TLB_TSIZE_4M;
@@ -132,23 +137,26 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 			                             1);
 
 			if (largepage && ptep->page && !(ptep->attr & PTE_SIZE)) {
-				printf("vptbl_map: Tried to overwrite a small page with "
-				       "a large page at %llx\n",
-				       ((uint64_t )epn) << PAGE_SHIFT);
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+				         "vptbl_map: Tried to overwrite a small page with "
+				         "a large page at %llx\n",
+				         ((uint64_t )epn) << PAGE_SHIFT);
 				return;
 			}
 
 			if (!largepage && level != 0) {
-				printf("vptbl_map: Tried to overwrite a large page with "
-				       "a small page at %llx\n",
-				       ((uint64_t )epn) << PAGE_SHIFT);
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+				         "vptbl_map: Tried to overwrite a large page with "
+				         "a small page at %llx\n",
+				         ((uint64_t )epn) << PAGE_SHIFT);
 				return;
 			}
 
 			ptep->page = rpn;
 			ptep->attr = attr;
 			
-//			printf("epn %lx: setting rpn %lx attr %lx\n", epn, rpn, attr);
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "epn %lx: setting rpn %lx attr %lx\n", epn, rpn, attr);
 
 			epn = (epn | incr) + 1;
 			rpn = (rpn | incr) + 1;
