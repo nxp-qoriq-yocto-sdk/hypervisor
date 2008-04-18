@@ -199,9 +199,11 @@ void vpic_irq_set_destcpu(int irq, uint8_t destcpu)
 {
 	guest_t *guest = get_gcpu()->guest;
 	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	int i;
 
-	if (destcpu != 0 && (destcpu & ((1 << guest->cpucnt) - 1)))
-		guest->vpic.ints[irq].destcpu = destcpu;
+	for (i=0; i < guest->cpucnt; i++)
+		if (guest->gcpus[i]->cpu->coreid == destcpu)
+			guest->vpic.ints[irq].destcpu = 1 << i;
 
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
@@ -211,6 +213,18 @@ uint8_t vpic_irq_get_destcpu(int irq)
 	guest_t *guest = get_gcpu()->guest;
 
 	return guest->vpic.ints[irq].destcpu;
+}
+
+uint8_t vpic_irq_get_phys_destcpu_mask(int irq)
+{
+	guest_t *guest = get_gcpu()->guest;
+	uint8_t lcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
+
+	/*
+	 * Try to emulate an actual interrupt controller like mpic
+	 * which returns a physical cpu bitmap
+	 */
+	return (1 << guest->gcpus[lcpu]->cpu->coreid);
 }
 
 /* 

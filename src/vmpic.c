@@ -27,30 +27,9 @@ static void vmpic_reset(handle_t *h)
 		h->intr->ops->irq_set_inttype(h->intr->irq, TYPE_NORM);
 }
 
-void vmpic_irq_set_destcpu_wrapper(int irq, uint8_t log_destcpu_mask)
-{
-	guest_t *guest = get_gcpu()->guest;
-	uint8_t cpu_dest = count_lsb_zeroes(log_destcpu_mask);
-
-	mpic_irq_set_destcpu(irq, guest->gcpus[cpu_dest]->cpu->coreid);
-}
-
-uint8_t vmpic_irq_get_destcpu_wrapper(int irq)
-{
-	guest_t *guest = get_gcpu()->guest;
-	int i;
-	uint8_t coreid = count_lsb_zeroes(mpic_irq_get_destcpu(irq));
-
-	for (i=0; i < guest->cpucnt; i++)
-		if (guest->gcpus[i]->cpu->coreid == coreid)
-			return (1 << i);
-
-	return 0;
-}
-
 pic_ops_t mpic_ops = {
 	mpic_irq_set_priority,
-	vmpic_irq_set_destcpu_wrapper,
+	mpic_irq_set_destcpu,
 	mpic_irq_set_polarity,
 	mpic_irq_mask,
 	mpic_irq_unmask,
@@ -60,7 +39,7 @@ pic_ops_t mpic_ops = {
 	mpic_eoi,
 	mpic_irq_get_priority,
 	mpic_irq_get_polarity,
-	vmpic_irq_get_destcpu_wrapper,
+	mpic_irq_get_destcpu,
 	mpic_irq_get_mask,
 	mpic_irq_get_activity
 };
@@ -264,7 +243,8 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 	uint32_t handle = regs->gpregs[3];
 	uint8_t config = regs->gpregs[4];
 	uint8_t priority = regs->gpregs[5];
-	uint8_t log_cpu_dest_mask = regs->gpregs[6];
+	uint8_t lcpu_mask = regs->gpregs[6];
+	uint8_t lcpu_dest = count_lsb_zeroes(lcpu_mask);
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -278,7 +258,7 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
-	if (!log_cpu_dest_mask) {  /* mask must have a bit set */
+	if (!lcpu_mask) {  /* mask must have a bit set */
 		regs->gpregs[3] = -2;  /* bad parameter */
 		return;
 	}
@@ -287,7 +267,7 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		int_handle->ops->set_priority(int_handle->irq, priority);
 	if (int_handle->ops->set_cpu_dest)
 		int_handle->ops->set_cpu_dest(int_handle->irq,
-							log_cpu_dest_mask);
+					guest->gcpus[lcpu_dest]->cpu->coreid);
 	if (int_handle->ops->set_polarity)
 		int_handle->ops->set_polarity(int_handle->irq, config & 0x01);
 	if (int_handle->ops->irq_set_inttype)
@@ -298,7 +278,7 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	uint32_t handle = regs->gpregs[3];
-	uint8_t priority=0, cpu_dest=0, config=0;
+	int priority=0, pcpu_mask=0, pcpu_dest=0, lcpu_mask=0, config=0, i;
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -314,14 +294,23 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 
 	if (int_handle->ops->get_priority)
 		priority = int_handle->ops->get_priority(int_handle->irq);
-	if (int_handle->ops->get_cpu_dest)
-		cpu_dest = int_handle->ops->get_cpu_dest(int_handle->irq);
+
+	if (int_handle->ops->get_cpu_dest) {
+		pcpu_mask = int_handle->ops->get_cpu_dest(int_handle->irq);
+		pcpu_dest = count_lsb_zeroes(pcpu_mask);
+
+		/* Map physical cpu to logical cpu within partition */
+		for (i = 0; i < guest->cpucnt; i++)
+			if (guest->gcpus[i]->cpu->coreid == pcpu_dest)
+				lcpu_mask = 1 << i;
+	}
+
 	if (int_handle->ops->get_polarity)
 		config = int_handle->ops->get_polarity(int_handle->irq);
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
-	regs->gpregs[6] = cpu_dest;
+	regs->gpregs[6] = lcpu_mask;
 }
 
 void fh_vmpic_set_mask(trapframe_t *regs)
