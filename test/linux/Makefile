@@ -24,8 +24,8 @@ rootfs: partman
 	gunzip rootfs.ext2.gz
 	mkdir -p rootfs
 	sudo mount -t ext2 -o rw,loop rootfs.ext2 rootfs
-	sudo cp partman rootfs/bin/
-	sudo cp vmlinux rootfs/
+	sudo cp -u partman rootfs/bin/
+	sudo cp -u vmlinux rootfs/
 	[ -e rootfs/dev/fsl-hv ] || sudo mknod rootfs/dev/fsl-hv c 253 0
 	sudo umount -d rootfs
 	rmdir rootfs

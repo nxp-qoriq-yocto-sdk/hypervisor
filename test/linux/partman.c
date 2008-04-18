@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <fsl_hypervisor.h>
 
@@ -81,6 +82,9 @@ struct program_header {
 
 /* Support functions */
 
+/**
+ * Display command line parameters
+ */
 static void usage(void)
 {
 	printf("Usage:\n\n");
@@ -88,15 +92,22 @@ static void usage(void)
 	printf("Show partition status:\n\tpartman -s\n\n");
 
 	printf("Load image:\n\tpartman -l -h <handle> -f <file> [-a <address>]\n");
-	printf("\t\t-a is optional for ELF images only\n\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n\n");
 
-	printf("Start partition:\n\tpartman -g -h <handle>\n\n");
+	printf("Start partition:\n\tpartman -g -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n");
+	printf("\t\tDefault value for -e is 0, or the entry point for ELF images.\n\n");
 
 	printf("Stop partition:\n\tpartman -x -h <handle>\n\n");
 
-	printf("Restart partition:\n\tpartman -r -h <handle>\n");
+	printf("Restart partition:\n\tpartman -r -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n");
+	printf("\t\tDefault value for -e is 0, or the entry point for ELF images.\n");
 }
 
+/**
+ * Call the hypervisor management driver
+ */
 static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 {
 	int ret = 0;
@@ -118,6 +129,10 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 	return ret;
 }
 
+/**
+ * Copy a block of memory to another partition via the hypervisor management
+ * driver.
+ */
 static int copy_to_partition(unsigned int partition, void *buffer,
 	unsigned long target, size_t count)
 {
@@ -135,122 +150,104 @@ static int copy_to_partition(unsigned int partition, void *buffer,
 	return hv(FSL_HV_IOCTL_MEMCPY, (void *) &im);
 }
 
-static int zero_to_partition(unsigned int partition,
-	unsigned long target, size_t count)
-{
-	struct fsl_hv_ioctl_memcpy im;
-	void *buffer;
-	int ret = 0;
-
-	if (!count)
-		return 0;
-
-	buffer = calloc(count, 1);
-	if (!buffer) {
-		perror(__func__);
-		return errno;
-	}
-
-	im.source = -1;
-	im.target = partition;
-	im.local_vaddr = (__u64) (unsigned long) buffer;
-	im.remote_paddr = target;
-	im.count = count;
-
-	ret = hv(FSL_HV_IOCTL_MEMCPY, (void *) &im);
-
-	free(buffer);
-
-	return ret;
-}
-
 /**
- * Parse an ELF image and load the segments into guest memory
+ * Parse an ELF image into a buffer
  *
- * @image: Pointer to the ELF image
- * @length: length of the ELF image, or -1 to ignore length checking
- * @address: guest physical address
- *
+ * @elf: Pointer to the ELF image
+ * @elf_length: length of the ELF image, or -1 to ignore length checking
+ * @bin_length: pointer to returned buffer length
+ * @load_address: pointer to returned load address
+ * @entry: pointer to returned offset of entry address within buffer
  */
-static int write_elf(unsigned int partition, void *image, unsigned long length,
-	unsigned long address)
+static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
+	unsigned long *load_address, unsigned long *entry)
 {
-	struct elf_header *hdr = (struct elf_header *) image;
-	struct program_header *phdr = (struct program_header *) (image + hdr->phoff);
+	struct elf_header *hdr = (struct elf_header *) elf;
+	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
+	void *buffer = NULL;
+	size_t size = 0;
 	unsigned long base = -1;
 	unsigned int i;
-	int ret;
 
-	if (length < sizeof(struct elf_header)) {
+printf("%s:%u\n", __FUNCTION__, __LINE__);
+
+	if (elf_length < sizeof(struct elf_header)) {
 		printf("Truncated ELF image\n");
-		return EINVAL;
+		return NULL;
 	}
 
-	if (length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
+	if (elf_length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
 		printf("Truncated ELF image\n");
-		return EINVAL;
+		return NULL;
 	}
 
 	/* We only support 32-bit for now */
 	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
 		printf("Only 32-bit ELF images are supported\n");
-		return EINVAL;
+		return NULL;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
 	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
 		printf("Only big-endian ELF images are supported\n");
-		return EINVAL;
+		return NULL;
 	}
 
 	/*
 	 * Test the program segment sizes and find the base address at the
-	 * same time.  The base address is the smallest vaddr of all PT_LOAD
+	 * same time.  The base address is the smallest paddr of all PT_LOAD
 	 * segments.
 	 */
 	for (i = 0; i < hdr->phnum; i++) {
-		if (phdr[i].offset + phdr[i].filesz > length) {
+		if (phdr[i].offset + phdr[i].filesz > elf_length) {
 			printf("Truncated ELF image\n");
-			return EINVAL;
+			return NULL;
 		}
 		if (phdr[i].filesz > phdr[i].memsz) {
 			printf("Invalid ELF program header file size\n");
-			return EINVAL;
+			return NULL;
 		}
 		if ((phdr[i].type == PT_LOAD) && (phdr[i].paddr < base))
 			base = phdr[i].paddr;
 	}
 
-	/* If the address wasn't specified on the command-line, then just use
-	   the actual paddr in the ELF image. */
-	if (address == -1)
-		address = base;
-
 	/* Copy each PT_LOAD segment to memory */
 
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].type == PT_LOAD) {
-			ret = copy_to_partition(partition,
-				image + phdr[i].offset,
-				address + (phdr[i].paddr - base),
-				phdr[i].filesz);
-			if (ret)
-				return ret;
+			size_t newsize = (phdr[i].paddr - base) + phdr[i].memsz;
 
-			ret = zero_to_partition(partition,
-				address + (phdr[i].paddr - base) + phdr[i].filesz,
-				phdr[i].memsz - phdr[i].filesz);
-			if (ret)
-				return ret;
+			if (size < newsize) {
+				buffer = realloc(buffer, newsize);
+				size = newsize;
+			}
+
+printf("%s:%u\n", __FUNCTION__, __LINE__);
+			memcpy(buffer + (phdr[i].paddr - base), elf + phdr[i].offset, phdr[i].filesz);
+printf("%s:%u\n", __FUNCTION__, __LINE__);
+			memset(buffer + (phdr[i].paddr - base) + phdr[i].filesz, 0, phdr[i].memsz - phdr[i].filesz);
+printf("%s:%u\n", __FUNCTION__, __LINE__);
 		}
 	}
 
-	printf("Entry point is 0x%lx\n", address + base - hdr->entry);
+	if (load_address)
+		*load_address = base;
 
-	return 0;
+	if (entry)
+		*entry = hdr->entry - base;
+
+	if (bin_length)
+		*bin_length = size;
+
+printf("%s:%u\n", __FUNCTION__, __LINE__);
+
+	return buffer;
 }
 
-static void *read_file(const char *filename, size_t *size)
+/**
+ * Read a device tree property file into memory
+ */
+static void *read_property(const char *filename, size_t *size)
 {
 	off_t off;
 	int f;
@@ -298,6 +295,87 @@ fail:
 	return NULL;
 }
 
+/**
+ * Load an image file into memory and parse it if it's an ELF
+ *
+ * Returns a pointer to a buffer if success.  The buffer must be released
+ * with free().
+ *
+ * Returns NULL if there was an error
+ */
+static void *load_image_file(const char *filename, size_t *size,
+	unsigned long *load_address, unsigned long *entry)
+{
+	off_t off;
+	int f;
+	void *mapped = NULL;
+	void *buffer = NULL;
+	struct stat buf;
+
+	f = open(filename, O_RDONLY);
+	if (f == -1) {
+		perror(__func__);
+		return NULL;
+	}
+
+	if (fstat(f, &buf)) {
+		perror(__func__);
+		goto fail;
+	}
+
+	off = buf.st_size;
+	if (off < 4) {
+		printf("%s: file %s is too small\n", __func__, filename);
+		goto fail;
+	}
+
+	mapped = mmap(0, off, PROT_READ, MAP_SHARED, f, 0);
+	if (!mapped) {
+		perror(__func__);
+		goto fail;
+	}
+
+	if (memcmp(mapped, "\177ELF", 4) == 0) {
+		buffer = parse_elf(mapped, off, size, load_address, entry);
+	} else {
+		buffer = malloc(off);
+		if (!buffer) {
+			perror(__func__);
+			goto fail;
+		}
+		memcpy(buffer, mapped, off);
+
+		if (size)
+			*size = off;
+		if (load_address)
+			*load_address = 0;
+		if (entry)
+			*entry = 0;
+	}
+
+	munmap(mapped, off);
+	close(f);
+
+	return buffer;
+
+fail:
+	if (mapped)
+		munmap(mapped, off);
+
+	free(buffer);
+	close(f);
+
+	return NULL;
+}
+
+/**
+ * Returns non-zero if the property is compatible
+ *
+ * @haystack - pointer to NULL-terminated strings that contain the value of
+ *           the 'compatible' property to test
+ * @length - length of 'haystack'
+ * @needle - compatible string to search for
+ */
 static int is_compatible(const char *haystack, size_t length, const char *needle)
 {
 	while (length > 0) {
@@ -312,13 +390,11 @@ static int is_compatible(const char *haystack, size_t length, const char *needle
 
 	return 0;
 }
+
+/* Command parsers */
+
 /**
- * Partition
- * handle              Status
- * ---------------------------------
- *    3                running
- *    5                stopped
- *    6                running
+ * Displays a list of partitions and their status
  */
 static int cmd_status(void)
 {
@@ -349,7 +425,7 @@ static int cmd_status(void)
 			uint32_t *reg;
 
 			sprintf(filename, "%s/compatible", dp->d_name);
-			compatible = read_file(filename, &size);
+			compatible = read_property(filename, &size);
 			if (!compatible)
 				goto exit;
 			if (!is_compatible(compatible, size, "fsl,hv-partition"))
@@ -357,7 +433,7 @@ static int cmd_status(void)
 			free(compatible);
 
 			sprintf(filename, "%s/reg", dp->d_name);
-			reg = read_file(filename, &size);
+			reg = read_property(filename, &size);
 			if (!reg)
 				goto exit;
 			if (size != sizeof(uint32_t)) {
@@ -375,71 +451,34 @@ exit:
 	return ret;
 }
 
-/*
- *
- * Image loading
- * -------------
- * partman -l -h <handle> -f <file> [-a <phys address>]
- *
- * For ELF images, -a is optional.  If omitted, the base address specified
- * in the image is used.
- *
- * For ELF images, partman reports the entry point with a status message.
- *
- * Example
- * To load an image at physical 0x0:
- *   $ partman -l -h 5 -f vmlinux.elf -a 0x0
- *     Loaded vmlinux.elf...entry point is 0x1000.
- *
- * Example
- * To load an image at physical 0x01000000:
- *
- *   $ partman -l -h 5 -f rootfs.ext2.gz -a 0x01000000
- *     Loaded rootfs.ext2.gz.
-*/
+/**
+ * Load an ELF or binary file into another partition
+ */
 static int cmd_load_image(struct parameters *p)
 {
 	void *image;
-	int f = 0;
 	size_t filesize;
+	unsigned long load_address;
 	int ret = 0;
 
-	/* Check parameters */
 	if (!p->h_specified || !p->f_specified) {
 		usage();
 		ret = EINVAL;
 		goto exit;
 	}
 
-	image = read_file(p->f, &filesize);
+	image = load_image_file(p->f, &filesize, &load_address, NULL);
 	if (!image) {
 		ret = EIO;
 		goto exit;
 	}
-	if (filesize < 4) {
-		printf("File %s too small\n", p->f);
-		ret = EPERM;
-		goto exit;
-	}
 
-	if (memcmp(image, "\177ELF", 4) == 0) {
-		ret = write_elf(p->h, image, filesize, p->a_specified ? p->a : -1);
-		goto exit;
-	}
-
-	/* Binary file, copy it directly to target */
-
-	if (!p->a_specified) {
-		usage();
-		ret = EINVAL;
-		goto exit;
-	}
+	if (!p->a_specified)
+		p->a = load_address;
 
 	ret = copy_to_partition(p->h, image, p->a, filesize);
-exit:
-	if (f)
-		close(f);
 
+exit:
 	free(image);
 
 	return ret;
@@ -449,7 +488,36 @@ static int cmd_start(struct parameters *p)
 {
 	struct fsl_hv_ioctl_start im;
 
-	if (!p->h_specified || !p->e_specified) {
+	if (!p->h_specified) {
+		usage();
+		return EINVAL;
+	}
+
+	if (p->f_specified) {
+		void *image;
+		size_t filesize;
+		unsigned long load_address;
+		unsigned long entry;
+		int ret = 0;
+
+		image = load_image_file(p->f, &filesize, &load_address, &entry);
+		if (!image)
+			return EIO;
+
+		if (!p->a_specified)
+			p->a = load_address;
+
+		if (!p->e_specified)
+			p->e = entry;
+
+		ret = copy_to_partition(p->h, image, p->a, filesize);
+
+		free(image);
+		if (ret)
+			return ret;
+	}
+
+	if (!p->e_specified) {
 		usage();
 		return EINVAL;
 	}
@@ -484,6 +552,30 @@ static int cmd_restart(struct parameters *p)
 		return EINVAL;
 	}
 
+	if (p->f_specified) {
+		void *image;
+		size_t filesize;
+		unsigned long load_address;
+		unsigned long entry;
+		int ret = 0;
+
+		image = load_image_file(p->f, &filesize, &load_address, &entry);
+		if (!image)
+			return EIO;
+
+		if (!p->a_specified)
+			p->a = load_address;
+
+		if (!p->e_specified)
+			p->e = entry;
+
+		ret = copy_to_partition(p->h, image, p->a, filesize);
+
+		free(image);
+		if (ret)
+			return ret;
+	}
+
 	im.partition = p->h;
 
 	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
@@ -511,7 +603,7 @@ int main(int argc, char *argv[])
 			cmd = e_start;
 			break;
 		case 'x':
-			cmd = e_load;
+			cmd = e_stop;
 			break;
 		case 'r':
 			cmd = e_restart;
