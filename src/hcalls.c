@@ -42,7 +42,7 @@ static void unimplemented(trapframe_t *regs)
 	regs->gpregs[3] = -1;
 }
 
-static void fh_partition_reboot(trapframe_t *regs)
+static void fh_partition_restart(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int i, ret = 0;
@@ -97,7 +97,7 @@ static void fh_whoami(trapframe_t *regs)
 }
 
 /**
- * Structure definition for the fh_memcpy scatter-gather list
+ * Structure definition for the fh_partition_memcpy scatter-gather list
  *
  * This structure must be aligned on 32-byte boundary
  *
@@ -120,21 +120,24 @@ struct fh_sg_list {
  * is invalid, does not point to a guest_t, or does not point to a guest_t
  * that the caller is allowed to access.
  */
-static inline guest_t *handle_to_guest(guest_t *guest, unsigned int handle)
+static inline guest_t *handle_to_guest(int handle)
 {
-	return handle < MAX_HANDLES ? guest->handles[handle]->guest : NULL;
+	if (handle == -1)
+		return get_gcpu()->guest;
+
+	if (handle >= MAX_HANDLES)
+		return NULL;
+
+	return get_gcpu()->guest->handles[handle]->guest;
 }
 
 /**
  * Copy a block of memory from one guest to another
  */
-static void fh_memcpy(trapframe_t *regs)
+static void fh_partition_memcpy(trapframe_t *regs)
 {
-	guest_t *source = regs->gpregs[3] == -1 ? get_gcpu()->guest :
-		handle_to_guest(get_gcpu()->guest, regs->gpregs[3]);;
-
-	guest_t *target = regs->gpregs[4] == -1 ? get_gcpu()->guest :
-		handle_to_guest(get_gcpu()->guest, regs->gpregs[4]);;
+	guest_t *source = handle_to_guest(regs->gpregs[3]);
+	guest_t *target = handle_to_guest(regs->gpregs[4]);
 
 	unsigned int num_sgs = regs->gpregs[7];
 	static struct fh_sg_list sg_list[SG_PER_PAGE];
@@ -357,50 +360,63 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 #define fh_partition_send_dbell unimplemented
 #endif
 
-static void fh_partition_exit(trapframe_t *regs)
+static void fh_partition_start(trapframe_t *regs)
 {
-	int ret = stop_guest(get_gcpu()->guest);
-	if (ret) {
+	guest_t *guest = handle_to_guest(regs->gpregs[3]);
+	if (!guest) {
 		regs->gpregs[3] = -1;
 		return;
 	}
 
-	assert(cpu->ret_user_hook);
+	regs->gpregs[3] = start_guest(guest) ? -1 : 0;
+}
+
+
+static void fh_partition_stop(trapframe_t *regs)
+{
+	guest_t *guest = handle_to_guest(regs->gpregs[3]);
+	if (!guest) {
+		regs->gpregs[3] = -1;
+		return;
+	}
+
+	regs->gpregs[3] = stop_guest(guest) ? -1 : 0;
 }
 
 static hcallfp_t hcall_table[] = {
-	&unimplemented,		/* 0 */
-	&fh_whoami,		/* 1 */
-	&unimplemented,		/* 2 */
-	&unimplemented,		/* 3 */
-	&unimplemented,		/* 4 */
-	&fh_partition_reboot,	/* 5 */
-	&fh_partition_get_status,/* 6 */
-	&unimplemented,		/* 7 */
-	&unimplemented,		/* 8 */
-	&fh_memcpy,		/* 9 */
-	&fh_vmpic_set_int_config, /* 10 */
-	&fh_vmpic_get_int_config, /* 11 */
-	&fh_vmpic_set_priority, /* 12 */
-	&unimplemented,		/* 13 */
-	&fh_vmpic_set_mask,	/* 14 */
-	&fh_vmpic_get_mask,	/* 15 */
-	&fh_vmpic_get_activity,	/* 16 */
-	&fh_vmpic_eoi,		/* 17 */
-	&fh_byte_channel_send,	/* 18 */
-	&fh_byte_channel_receive,/* 19 */
-	&fh_byte_channel_poll,	/* 20 */
-	&fh_vmpic_iack,		/* 21 */
-	&unimplemented,		/* 22 */
-	&unimplemented,		/* 23 */
-	&unimplemented,		/* 24 */
-	&unimplemented,		/* 25 */
-	&unimplemented,		/* 26 */
-	&unimplemented,		/* 27 */
-	&unimplemented,		/* 28 */
-	&unimplemented,		/* 29 */
-	&fh_partition_send_dbell,/* 30 */
-	&fh_partition_exit,	/* 31 */
+	unimplemented,                     /* 0 */
+	fh_whoami,
+	unimplemented,
+	unimplemented,
+	unimplemented,                     /* 4 */
+	fh_partition_restart,
+	fh_partition_get_status,
+	fh_partition_start,
+	fh_partition_stop,                 /* 8 */
+	fh_partition_memcpy,
+	fh_vmpic_set_int_config,
+	fh_vmpic_get_int_config,
+	unimplemented,                     /* 12 */
+	unimplemented,
+	fh_vmpic_set_mask,
+	fh_vmpic_get_mask,
+	fh_vmpic_get_activity,             /* 16 */
+	fh_vmpic_eoi,
+	fh_byte_channel_send,
+	fh_byte_channel_receive,
+	fh_byte_channel_poll,              /* 20 */
+	fh_vmpic_iack,
+	unimplemented,
+	unimplemented,
+	unimplemented,                     /* 24 */
+	unimplemented,
+	unimplemented,
+	unimplemented,
+	unimplemented,                     /* 28 */
+	unimplemented,
+	unimplemented,
+	unimplemented,
+	fh_partition_send_dbell            /* 32 */
 };
 
 void hcall(trapframe_t *regs)
