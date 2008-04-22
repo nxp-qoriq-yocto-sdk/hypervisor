@@ -36,6 +36,22 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 	return -1;
 }
 
+/**
+ * Return a pointer to the guest_t for a given handle, or NULL if the handle
+ * is invalid, does not point to a guest_t, or does not point to a guest_t
+ * that the caller is allowed to access.
+ */
+static inline guest_t *handle_to_guest(int handle)
+{
+	if (handle == -1)
+		return get_gcpu()->guest;
+
+	if (handle >= MAX_HANDLES)
+		return NULL;
+
+	return get_gcpu()->guest->handles[handle]->guest;
+}
+
 static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
@@ -74,19 +90,14 @@ void restart_core(trapframe_t *regs)
 
 static void fh_partition_get_status(trapframe_t *regs)
 {
-	int lpar_id = regs->gpregs[3];
-	printf("id = %d\n",lpar_id);
+	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 
-	/* processing goes here */
+	if (!guest) {
+		regs->gpregs[3] = -2;
+		return;
+	}
 
-	/* if calling lpar is not privileged, return error */
-
-	/* return values */
-	regs->gpregs[4] = 0;  /* FIXME lpar status */
-	regs->gpregs[5] = 2;  /* FIXME # cpus */
-	regs->gpregs[6] = 0x1000000;  /* FIXME mem size */
-
-	/* success */
+	regs->gpregs[4] = guest->state;
 	regs->gpregs[3] = 0;  
 }
 
@@ -114,22 +125,6 @@ struct fh_sg_list {
 } __attribute__ ((aligned (32)));
 
 #define SG_PER_PAGE	(PAGE_SIZE / sizeof(struct fh_sg_list))
-
-/**
- * Return a pointer to the guest_t for a given handle, or NULL if the handle
- * is invalid, does not point to a guest_t, or does not point to a guest_t
- * that the caller is allowed to access.
- */
-static inline guest_t *handle_to_guest(int handle)
-{
-	if (handle == -1)
-		return get_gcpu()->guest;
-
-	if (handle >= MAX_HANDLES)
-		return NULL;
-
-	return get_gcpu()->guest->handles[handle]->guest;
-}
 
 /**
  * Copy a block of memory from one guest to another

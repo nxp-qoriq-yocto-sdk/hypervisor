@@ -45,11 +45,18 @@ typedef struct handle {
 	struct guest *guest;
 } handle_t;
 
+/**
+ * Guest states
+ *
+ * The first state (value 0) must be the default state
+ *
+ * This list is ordered based on the GET_STATUS hypercall API.
+ */
 typedef enum {
-	guest_stopped,
-	guest_starting,
-	guest_running,
-	guest_stopping,
+	guest_stopped = 0,
+	guest_running = 1,
+	guest_starting = 2,
+	guest_stopping = 3
 } gstate_t;
 
 typedef struct guest {
