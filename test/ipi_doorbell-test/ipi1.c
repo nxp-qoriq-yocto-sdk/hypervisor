@@ -37,7 +37,6 @@ int test_init(void)
 	/* VMPIC config */
 	fh_vmpic_set_int_config(*handle_p_int, 1, 15, 0x00000001);
 	fh_vmpic_set_mask(*handle_p_int, 0);
-	fh_vmpic_set_priority(*handle_p_int, 0);
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 

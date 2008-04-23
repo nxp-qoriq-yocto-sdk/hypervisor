@@ -53,7 +53,6 @@ int test_init(void)
 	/* VMPIC config */
 	fh_vmpic_set_int_config(*handle_p,1,15,0x00000001);
 	fh_vmpic_set_mask(*handle_p, 0);
-	fh_vmpic_set_priority(*handle_p, 0);
 
 	/* enable interrupts at the UART */
 	out8((uint8_t *)(CCSRBAR_VA+0x11d501),0x1);
