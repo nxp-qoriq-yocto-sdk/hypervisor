@@ -272,6 +272,7 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		int_handle->ops->set_polarity(int_handle->irq, config & 0x01);
 	if (int_handle->ops->irq_set_inttype)
 		int_handle->ops->irq_set_inttype(int_handle->irq, TYPE_NORM);
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_get_int_config(trapframe_t *regs)
@@ -311,6 +312,7 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
 	regs->gpregs[6] = lcpu_mask;
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_set_mask(trapframe_t *regs)
@@ -335,6 +337,7 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 		int_handle->ops->irq_mask(int_handle->irq);
 	else
 		int_handle->ops->irq_unmask(int_handle->irq);
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_get_mask(trapframe_t *regs)
@@ -359,6 +362,7 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 		mask = int_handle->ops->irq_get_mask(int_handle->irq);
 
 	regs->gpregs[4] = mask;
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_eoi(trapframe_t *regs)
@@ -379,6 +383,7 @@ void fh_vmpic_eoi(trapframe_t *regs)
 	}
 
 	int_handle->ops->eoi();
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_set_priority(trapframe_t *regs)
@@ -405,6 +410,7 @@ void fh_vmpic_iack(trapframe_t *regs)
 	}
 
 	regs->gpregs[4] = vector;
+	regs->gpregs[3] = 0;  /* success */
 }
 
 void fh_vmpic_get_activity(trapframe_t *regs)
@@ -429,4 +435,5 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 		active  = int_handle->ops->irq_get_activity(int_handle->irq);
 
 	regs->gpregs[4] = active;
+	regs->gpregs[3] = 0;  /* success */
 }
