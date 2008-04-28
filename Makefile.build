@@ -138,6 +138,9 @@ test-ipi-doorbell-2p: bin/uv.uImage test/ipi_doorbell-test
 test-fit: bin/uv.uImage test/fit-test
 	$(SIMICS) test/fit-test/hv-fit.simics
 
+test-byte-chan-test: bin/uv.uImage test/byte_chan-test
+	$(SIMICS) test/byte_chan-test/hv-byte_chan.simics
+
 demo: bin/uv.uImage test/demo
 	$(SIMICS) test/demo/hv-demo.simics -e c
 

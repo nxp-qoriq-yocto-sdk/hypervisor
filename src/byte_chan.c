@@ -368,5 +368,8 @@ ssize_t byte_chan_receive(byte_chan_handle_t *bc, uint8_t *buf, size_t len)
 	if (ret > 0)
 		queue_notify_producer(bc->rx);
 
+	if (ret == -1)
+		ret = 0;
+
 	return ret;
 }
