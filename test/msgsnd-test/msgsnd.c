@@ -22,9 +22,9 @@ void start(void)
 	uint32_t channel;
 	uint32_t rxavail;
 	uint32_t txavail;
-	uint8_t buf[16];
+	char buf[16];
 	uint32_t x;
-	int cnt;
+	unsigned int cnt;
 	int i;
 
 	init();
@@ -47,7 +47,7 @@ void start(void)
 	while (1) {
 		status = fh_byte_channel_poll(channel,&rxavail,&txavail);
 		if (rxavail > 0) {
-			status = fh_byte_channel_receive(channel,16,&buf[0],&cnt);
+			status = fh_byte_channel_receive(channel, &cnt, buf);
 			for (i=0; i < cnt; i++) {
 				printf("%c",buf[i]);
 			}
