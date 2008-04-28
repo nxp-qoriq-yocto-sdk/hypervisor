@@ -32,7 +32,7 @@ void start(void)
 	enable_extint();
 	enable_critint();
 
-	printf("Hello World\n");
+	printf("msgsnd test\n");
 
 	channel = 0;
 
@@ -42,17 +42,6 @@ void start(void)
 	// Critical doorbell
 	asm volatile ("msgsnd %0" : : "r" (0x08000000 | mfspr(SPR_PIR)));
 
-#define TEST
-#ifdef TEST
-	while (1) {
-		status = fh_byte_channel_poll(channel,&rxavail,&txavail);
-		if (rxavail > 0) {
-			status = fh_byte_channel_receive(channel, &cnt, buf);
-			for (i=0; i < cnt; i++) {
-				printf("%c",buf[i]);
-			}
-		}
-	}
-#endif
+	printf("Test Complete\n");
 
 }
