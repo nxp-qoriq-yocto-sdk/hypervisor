@@ -283,7 +283,7 @@ void byte_chan_partition_init(guest_t *guest)
 
 	while (1) {
 		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,hv-byte-channel");
+		                                    "fsl,hv-byte-channel-handle");
 		if (ret == -FDT_ERR_NOTFOUND)
 			return;
 		if (ret < 0)

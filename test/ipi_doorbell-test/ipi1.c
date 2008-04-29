@@ -26,7 +26,7 @@ int test_init(void)
 	ret = fdt_check_header(fdt);
 	if (ret)
 		return -1;
-	ret = fdt_node_offset_by_compatible(fdt, off, "fsl,doorbell-receive");
+	ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-doorbell-receive-handle");
 	if (ret == -FDT_ERR_NOTFOUND)
 		return ret;
 	if (ret < 0)

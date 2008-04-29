@@ -99,13 +99,13 @@
 			
 			byte-channel@0 {
 				reg = <0>;
-				compatible = "fsl,hv-byte-channel";
+				compatible = "fsl,hv-byte-channel-handle";
 				fsl,endpoint = "uartmux";
 			};
 	
 			gpio {
 				reg = <1>;
-				compatible = "fsl,hv-gpio";
+				compatible = "fsl,hv-gpio-handle";
 				fsl,real-dev = "gpio";
 				fsl,bitmask = <020033ff>;
 			};

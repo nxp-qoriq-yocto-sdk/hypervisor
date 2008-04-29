@@ -169,8 +169,6 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 	unsigned long base = -1;
 	unsigned int i;
 
-printf("%s:%u\n", __FUNCTION__, __LINE__);
-
 	if (elf_length < sizeof(struct elf_header)) {
 		printf("Truncated ELF image\n");
 		return NULL;
@@ -222,11 +220,8 @@ printf("%s:%u\n", __FUNCTION__, __LINE__);
 				size = newsize;
 			}
 
-printf("%s:%u\n", __FUNCTION__, __LINE__);
 			memcpy(buffer + (phdr[i].paddr - base), elf + phdr[i].offset, phdr[i].filesz);
-printf("%s:%u\n", __FUNCTION__, __LINE__);
 			memset(buffer + (phdr[i].paddr - base) + phdr[i].filesz, 0, phdr[i].memsz - phdr[i].filesz);
-printf("%s:%u\n", __FUNCTION__, __LINE__);
 		}
 	}
 
@@ -238,8 +233,6 @@ printf("%s:%u\n", __FUNCTION__, __LINE__);
 
 	if (bin_length)
 		*bin_length = size;
-
-printf("%s:%u\n", __FUNCTION__, __LINE__);
 
 	return buffer;
 }
@@ -428,7 +421,7 @@ static int cmd_status(void)
 			compatible = read_property(filename, &size);
 			if (!compatible)
 				goto exit;
-			if (!is_compatible(compatible, size, "fsl,hv-partition"))
+			if (!is_compatible(compatible, size, "fsl,hv-partition-handle"))
 				continue;
 			free(compatible);
 

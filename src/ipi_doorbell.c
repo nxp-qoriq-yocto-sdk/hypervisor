@@ -92,7 +92,7 @@ void send_dbell_partition_init(guest_t *guest)
 
 	while (1) {
 		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,doorbell-send");
+		                                    "fsl,doorbell-send-handle");
 		if (ret == -FDT_ERR_NOTFOUND)
 			return;
 		if (ret < 0)
@@ -143,7 +143,7 @@ void recv_dbell_partition_init(guest_t *guest)
 
 	while (1) {
 		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,doorbell-receive");
+		                                    "fsl,hv-doorbell-receive-handle");
 		if (ret == -FDT_ERR_NOTFOUND)
 			return;
 		if (ret < 0)

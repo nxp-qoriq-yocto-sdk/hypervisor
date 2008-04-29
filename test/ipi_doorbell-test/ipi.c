@@ -43,7 +43,7 @@ int test_init(void)
 	int ret;
 	int *handle_p;
 
-	handle_p_int = get_handle("fsl,doorbell-receive", "interrupts", fdt);
+	handle_p_int = get_handle("fsl,hv-doorbell-receive-handle", "interrupts", fdt);
 
 	if (!handle_p_int) {
 		printf("Couldn't get recv doorbell handle\n");
@@ -56,7 +56,7 @@ int test_init(void)
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 
-	handle_p = get_handle("fsl,doorbell-send", "reg", fdt);
+	handle_p = get_handle("fsl,doorbell-send-handle", "reg", fdt);
 
 	if (!handle_p) {
 		printf("Couldn't get send doorbell handle\n");

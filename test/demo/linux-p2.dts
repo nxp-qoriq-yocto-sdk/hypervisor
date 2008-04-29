@@ -114,20 +114,20 @@
 			interrupt-parent = <&vmpic>;
 			
 			byte-channel@0 {
-				compatible = "fsl,hv-byte-channel";
+				compatible = "fsl,hv-byte-channel-handle";
 				fsl,endpoint = "byte-channel1";
 				interrupt-parent = <&vmpic>;
 			};
 	
 			gpio {
 				reg = <1>;
-				compatible = "fsl,hv-gpio";
+				compatible = "fsl,hv-gpio-handle";
 				fsl,real-dev = "gpio";
 				fsl,bitmask = <020033ff>;
 			};
 	
 			partition@0 {
-				compatible = "fsl,hv-partition";
+				compatible = "fsl,hv-partition-handle";
 				fsl,endpoint = "/partitions/part1";
 			};
 		};

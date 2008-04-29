@@ -460,6 +460,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
                                  int cpulist_len)
 {
 	int ret;
+	int off = -1;
 	int gfdt_size = fdt_totalsize(fdt);
 	void *guest_origtree;
 
@@ -497,20 +498,15 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 
-	/* Look for partition-handle nodes.  These are nodes that are
-	   "fsl,hv-partition"-compatible and are children of a
-	   "fsl,hv-handles"-compatible node. */
+	// Add a 'reg' property to every partition-handle node
 
-	// Get a pointer to the /handles node
-	int off = fdt_node_offset_by_compatible(guest->devtree, -1, "fsl,hv-handles");
-
-	while (off > 0) {
+	while (1) {
 		// get a pointer to the first/next partition-handle node
-		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition");
+		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition-handle");
 		if (off < 0)
 			break;
 
-		// Find the partition node in the hypervisor device tree
+		// Find the end-point partition node in the hypervisor device tree
 
 		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
 		if (!s) {
@@ -547,8 +543,10 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		// Insert a 'reg' property into the partition-handle node of the
 		// guest device tree
 		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
-		if (ret)
+		if (ret) {
+			printf("guest %s: could not insert 'reg' property\n", guest->name);
 			goto fail;
+		}
 	}
 
 	return 0;
