@@ -51,7 +51,13 @@ int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq)
 	vmirq->user.intr = vmirq;
 	vmirq->user.ops = &vmpic_handle_ops;
 
-	return alloc_guest_handle(guest, &vmirq->user);
+	vmirq->handle = alloc_guest_handle(guest, &vmirq->user);
+
+	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
+	         "vmpic: %p is handle %d in %s\n",
+	         irq, vmirq->handle, guest->name);
+
+	return vmirq->handle;
 }
 
 void vmpic_global_init(void)
@@ -92,9 +98,6 @@ int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
 	handle = vmpic_alloc_handle(guest, irq);
 	if (handle < 0)
 		return handle;
-
-	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
-	         "vmpic allocated guest handle %d\n", handle);
 
 	/*
 	 * update mpic vector to return guest handle directly
@@ -307,6 +310,9 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 		return;
 	}
 
+	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic unmask: %p %d\n",
+	         vmirq->irq, handle);
+
 	if (mask)
 		vmirq->irq->ops->disable(vmirq->irq);
 	else
@@ -366,6 +372,8 @@ void fh_vmpic_iack(trapframe_t *regs)
 		}
 	}
 
+	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
+	         "cpu%d: iack %x\n", cpu->coreid, vector);
 	regs->gpregs[4] = vector;
 }
 

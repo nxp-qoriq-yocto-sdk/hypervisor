@@ -277,6 +277,8 @@ static void vpic_eoi(interrupt_t *irq)
 
 	assert(gcpu->guest == guest);
 
+	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic eoi: %p\n", virq);
+
 	gcpu->vpic.active &= ~(1 << virq->irqnum);
 	virq->active = 0;
 
