@@ -13,7 +13,7 @@ extern void *fdt;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
-	uint16_t vector;
+	unsigned int vector;
 	fh_vmpic_iack(&vector);
 	printf("ext int %d\n",vector);
 	fh_vmpic_eoi(irq);
@@ -42,9 +42,9 @@ void start(unsigned long devtree_ptr)
 	uint32_t handle;
 	uint32_t rxavail;
 	uint32_t txavail;
-	uint8_t buf[16];
+	char buf[16];
 	uint32_t x;
-	int cnt;
+	unsigned int cnt;
 	int i;
 	int node = -1;
 	int len;
@@ -79,10 +79,10 @@ void start(unsigned long devtree_ptr)
 	printf("byte-channel irq = %d\n",irq);
 
 	str = "byte-channel:hi!";  // 16 chars
-	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
+	status = fh_byte_channel_send(handle, 16, str);
 
 	str = "type some chars:";  // 16 chars
-	status = fh_byte_channel_send(handle, 16, *(uint32_t *)&str[0], *(uint32_t *)&str[4], *(uint32_t *)&str[8],*(uint32_t *)&str[12]);
+	status = fh_byte_channel_send(handle, 16, str);
 
 	fh_vmpic_set_int_config(irq,0,0,0x00000001);  /* set int to cpu 0 */
 	fh_vmpic_set_mask(irq, 0);  /* enable */
@@ -92,7 +92,7 @@ void start(unsigned long devtree_ptr)
 	while (1) {
 		status = fh_byte_channel_poll(handle,&rxavail,&txavail);
 		if (rxavail > 0) {
-			status = fh_byte_channel_receive(handle,16,&buf[0],&cnt);
+			status = fh_byte_channel_receive(handle, &cnt, buf);
 			for (i=0; i < cnt; i++) {
 				printf("%c",buf[i]);
 			}
