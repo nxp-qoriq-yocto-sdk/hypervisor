@@ -147,9 +147,23 @@
 		compatible = "fsl,mpc8578-ccsr", "simple-bus";
 		ranges = <0 0 fe000000 400000>;
 
+		mpic: pic@40000 {
+			clock-frequency = <0>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			reg = <40000 40000>;
+			compatible = "fsl,mpc8578-mpic", "fsl,mpic",
+			             "chrp,open-pic";
+			device_type = "open-pic";
+			big-endian;
+		};
+
 		uart0: serial@11c500 {
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			interrupts = <24 2>;
+			interrupt-parent = <&mpic>;
 			reg = <11c500 100>;
 			clock-frequency = <0>;
 		};
@@ -157,6 +171,8 @@
 		uart1: serial@11c600 {
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			interrupts = <24 2>;
+			interrupt-parent = <&mpic>;
 			reg = <11c600 100>;
 			clock-frequency = <0>;
 		};
