@@ -97,13 +97,13 @@ static void __vpic_assert_vint(vpic_interrupt_t *virq)
 	virq->pending = 1;
 
 	if (!(gcpu->vpic.pending & (1 << virq->irqnum))) {
-		gcpu->vpic.pending |= 1 << virq->irqnum;
-
-		if (virq->enable)
+		if (virq->enable) {
+			gcpu->vpic.pending |= 1 << virq->irqnum;
 			send_vint(gcpu);
-		else
+		} else {
 			printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
 			         "VPIC IRQ %p disabled\n", virq);
+		}
 	} else {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
 		         "VPIC IRQ %p already pending in CPU\n", virq);
@@ -290,14 +290,7 @@ static void vpic_eoi(interrupt_t *irq)
 static uint32_t vpic_irq_get_destcpu(interrupt_t *irq)
 {
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
-	guest_t *guest = virq->guest;
-	int lcpu = count_lsb_zeroes(vpic_irq_get_destcpu(irq));
-
-	/*
-	 * Try to emulate an actual interrupt controller like mpic
-	 * which returns a physical cpu bitmap
-	 */
-	return (1 << guest->gcpus[lcpu]->cpu->coreid);
+	return virq->destcpu;
 }
 
 static int vpic_irq_is_active(interrupt_t *irq)

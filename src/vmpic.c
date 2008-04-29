@@ -221,7 +221,8 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
-	if (!lcpu_mask) {  /* mask must have a bit set */
+	/* mask must have a valid bit set */
+	if (!(lcpu_mask & ((1 << guest->cpucnt) - 1))) {
 		regs->gpregs[3] = -2;  /* bad parameter */
 		return;
 	}
@@ -230,8 +231,12 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 
 	if (irq->ops->set_priority)
 		irq->ops->set_priority(irq, priority);
-	if (irq->ops->set_cpu_dest_mask)
+
+	if (irq->ops == &vpic_ops)
+		irq->ops->set_cpu_dest_mask(irq, lcpu_mask);
+	else if (irq->ops->set_cpu_dest_mask)
 		irq->ops->set_cpu_dest_mask(irq, 1 << guest->gcpus[lcpu_dest]->cpu->coreid);
+
 	if (irq->ops->set_config)
 		irq->ops->set_config(irq, config);
 	if (irq->ops->set_delivery_type)
@@ -263,7 +268,9 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 	if (irq->ops->get_priority)
 		priority = irq->ops->get_priority(irq);
 
-	if (irq->ops->get_cpu_dest_mask) {
+	if (irq->ops == &vpic_ops)
+		lcpu_mask = irq->ops->get_cpu_dest_mask(irq);
+	else if (irq->ops->get_cpu_dest_mask) {
 		uint32_t pcpu_mask = irq->ops->get_cpu_dest_mask(irq);
 		int pcpu_dest = count_lsb_zeroes(pcpu_mask);
 		int i;
