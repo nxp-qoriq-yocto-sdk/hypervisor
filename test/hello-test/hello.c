@@ -92,6 +92,7 @@ void start(unsigned long devtree_ptr)
 	while (1) {
 		status = fh_byte_channel_poll(handle,&rxavail,&txavail);
 		if (rxavail > 0) {
+			cnt = 16;
 			status = fh_byte_channel_receive(handle, &cnt, buf);
 			for (i=0; i < cnt; i++) {
 				printf("%c",buf[i]);
