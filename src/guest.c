@@ -390,7 +390,7 @@ static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr
 	/* It's not an ELF image, so it must be a binary. */
 
 	if (!length || (length == (size_t) -1)) {
-		printf("guest %s: missing or invalid fsl,hv-image-size property\n",
+		printf("guest %s: missing or invalid image size\n",
 			guest->name);
 		return ERR_BADTREE;
 	}
