@@ -20,18 +20,18 @@ int get_interrupt(const void *tree, int node, int intnum,
                   const uint32_t **intspec, int *ncells);
 int get_num_interrupts(const void *tree, int node);
 
-physaddr_t find_end_of_mem(void);
+phys_addr_t find_end_of_mem(void);
 
 int xlate_one(uint32_t *addr, const uint32_t *ranges,
               int rangelen, uint32_t naddr, uint32_t nsize,
               uint32_t prev_naddr, uint32_t prev_nsize,
-              physaddr_t *rangesize);
+              phys_addr_t *rangesize);
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
-                  physaddr_t *size);
+                  phys_addr_t *size);
 
-static inline void val_from_int(uint32_t *dest, physaddr_t src)
+static inline void val_from_int(uint32_t *dest, phys_addr_t src)
 {
 	dest[0] = 0;
 	dest[1] = 0;

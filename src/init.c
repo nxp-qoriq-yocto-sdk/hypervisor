@@ -41,7 +41,7 @@ void init_guest(void);
 #define UART_OFFSET		0x11c500
 
 void *fdt;
-static physaddr_t mem_end;
+static phys_addr_t mem_end;
 unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
 

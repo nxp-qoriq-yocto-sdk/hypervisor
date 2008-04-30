@@ -90,8 +90,8 @@ static int count_cpus(const uint32_t *cpulist, int len)
 	return total;
 }
 
-static void map_guest_range(guest_t *guest, physaddr_t gaddr,
-                            physaddr_t addr, physaddr_t size)
+static void map_guest_range(guest_t *guest, phys_addr_t gaddr,
+                            phys_addr_t addr, phys_addr_t size)
 {
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
@@ -110,9 +110,9 @@ static void map_guest_range(guest_t *guest, physaddr_t gaddr,
 static int map_guest_reg_one(guest_t *guest, int node, int partition,
                              const uint32_t *reg)
 {
-	physaddr_t gaddr, size;
+	phys_addr_t gaddr, size;
 	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr = 0;
-	physaddr_t rangesize, addr, offset = 0;
+	phys_addr_t rangesize, addr, offset = 0;
 	int hvrlen;
 
 	const uint32_t *physaddrmap = fdt_getprop(fdt, partition,
@@ -256,7 +256,7 @@ static int create_guest_spin_table(guest_t *guest)
 		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)guest->spintbl + i ) :
 		             "memory");
 
-	rpn = ((physaddr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
+	rpn = ((phys_addr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
 
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
@@ -338,7 +338,7 @@ fail:
  *
  * The TLB entry created by this function is temporary.
  */
-static void *map_flash(physaddr_t phys)
+static void *map_flash(phys_addr_t phys)
 {
 	/* Make sure 'phys' points to flash */
 	if ((phys < FLASH_ADDR) || (phys > (FLASH_ADDR + FLASH_SIZE - 1))) {
@@ -373,7 +373,7 @@ static void *map_flash(physaddr_t phys)
  * If the image is an ELF, then 'length' is used only to verify the image
  * data.  To skip verification, set length to -1.
  */
-static int load_image_from_flash(guest_t *guest, physaddr_t image_phys, physaddr_t guest_phys, size_t length)
+static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys, phys_addr_t guest_phys, size_t length)
 {
 	void *image = map_flash(image_phys);
 	if (!image) {
@@ -1016,13 +1016,13 @@ nomem:
 	goto wait;
 } 
 
-void *map_gphys(int tlbentry, pte_t *tbl, physaddr_t addr,
+void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
                 void *vpage, size_t *len, int maxtsize, int write)
 {
 	size_t offset, bytesize;
 	unsigned long attr;
 	unsigned long rpn;
-	physaddr_t physaddr;
+	phys_addr_t physaddr;
 	int tsize;
 
 	rpn = vptbl_xlate(tbl, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
@@ -1037,7 +1037,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, physaddr_t addr,
 
 	bytesize = (uintptr_t)tsize_to_pages(tsize) << PAGE_SHIFT;
 	offset = addr & (bytesize - 1);
-	physaddr = (physaddr_t)rpn << PAGE_SHIFT;
+	physaddr = (phys_addr_t)rpn << PAGE_SHIFT;
 
 	if (len)
 		*len = bytesize - offset;
@@ -1056,7 +1056,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, physaddr_t addr,
  * @param[in] len Bytes to copy
  * @return number of bytes successfully copied
  */
-size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len)
+size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
 {
 	size_t ret = 0;
 
@@ -1090,7 +1090,7 @@ size_t copy_to_gphys(pte_t *tbl, physaddr_t dest, void *src, size_t len)
  * @param[in] len Bytes to zero
  * @return number of bytes successfully zeroed
  */
-size_t zero_to_gphys(pte_t *tbl, physaddr_t dest, size_t len)
+size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
 {
 	size_t ret = 0;
 
@@ -1125,7 +1125,7 @@ size_t zero_to_gphys(pte_t *tbl, physaddr_t dest, size_t len)
  * @param[in] len Bytes to copy
  * @return number of bytes successfully copied
  */
-size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len)
+size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len)
 {
 	size_t ret = 0;
 
@@ -1161,8 +1161,8 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, physaddr_t src, size_t len)
  * @param[in] len Bytes to copy
  * @return number of bytes successfully copied
  */
-size_t copy_between_gphys(pte_t *dtbl, physaddr_t dest,
-                          pte_t *stbl, physaddr_t src, size_t len)
+size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
+                          pte_t *stbl, phys_addr_t src, size_t len)
 {
 	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
 	

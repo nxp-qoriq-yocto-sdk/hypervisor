@@ -162,7 +162,7 @@ static int find_range(const uint32_t *reg, const uint32_t *ranges,
 int xlate_one(uint32_t *addr, const uint32_t *ranges,
               int rangelen, uint32_t naddr, uint32_t nsize,
               uint32_t prev_naddr, uint32_t prev_nsize,
-              physaddr_t *rangesize)
+              phys_addr_t *rangesize)
 {
 	uint32_t tmpaddr[MAX_ADDR_CELLS], tmpaddr2[MAX_ADDR_CELLS];
 	int offset = find_range(addr, ranges, prev_naddr,
@@ -207,7 +207,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
-                  physaddr_t *size)
+                  phys_addr_t *size)
 {
 	int parent;
 	uint32_t naddr, nsize, prev_naddr, prev_nsize;
@@ -271,7 +271,7 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 }
 
 int xlate_reg(const void *tree, int node, const uint32_t *reg,
-              physaddr_t *addr, physaddr_t *size)
+              phys_addr_t *addr, phys_addr_t *size)
 {
 	uint32_t addrbuf[MAX_ADDR_CELLS];
 	uint32_t rootnaddr;
@@ -291,7 +291,7 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 }
 
 int dt_get_reg(const void *tree, int node, int res,
-               physaddr_t *addr, physaddr_t *size)
+               phys_addr_t *addr, phys_addr_t *size)
 {
 	int ret, len;
 	uint32_t naddr, nsize;
@@ -340,7 +340,7 @@ void *ptr_from_node(const void *tree, int offset, const char *type)
 void create_ns16550(void)
 {
 	int off = -1, ret;
-	physaddr_t addr;
+	phys_addr_t addr;
 	const uint32_t *prop;
 	int ncells;
 
@@ -434,9 +434,9 @@ void open_stdin(void)
 #endif
 
 // FIXME: memory holes
-physaddr_t find_end_of_mem(void)
+phys_addr_t find_end_of_mem(void)
 {
-	physaddr_t mem_end = 0;
+	phys_addr_t mem_end = 0;
 	int memnode = fdt_subnode_offset(fdt, 0, "memory");
 	if (memnode < 0) {
 		printf("error %d (%s) opening /memory\n", memnode,
@@ -470,13 +470,13 @@ physaddr_t find_end_of_mem(void)
 
 	const uint32_t *reg = memreg;
 	while (reg + naddr + nsize <= memreg + len / 4) {
-		physaddr_t addr = *reg++;
+		phys_addr_t addr = *reg++;
 		if (naddr == 2) {
 			addr <<= 32;
 			addr |= *reg++;
 		}
 
-		physaddr_t size = *reg++;
+		phys_addr_t size = *reg++;
 		if (nsize == 2) {
 			size <<= 32;
 			size |= *reg++;

@@ -168,7 +168,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		}
 
 		tlb1_set_entry(real_entry, epn << PAGE_SHIFT,
-		               ((physaddr_t)rpn) << PAGE_SHIFT,
+		               ((phys_addr_t)rpn) << PAGE_SHIFT,
 		               size,
 		               mas2flags, mas3flags,
 		               (mas1 >> MAS1_TID_SHIFT) & 0xff,
@@ -260,7 +260,7 @@ void tlb1_init(void)
 	               CCSRBAR_SIZE, TLB_MAS2_IO,
 	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
-	physaddr_t addr = 256 * 1024 * 1024; 
+	phys_addr_t addr = 256 * 1024 * 1024;
 	while (addr < 4096ULL * 1024 * 1024 - PHYSBASE) {
 		int tsize = natural_alignment(addr >> PAGE_SHIFT);
 		tlb1_set_entry(--tlb, PHYSBASE + addr,

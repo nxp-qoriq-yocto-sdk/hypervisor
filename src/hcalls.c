@@ -137,8 +137,8 @@ static void fh_partition_memcpy(trapframe_t *regs)
 	unsigned int num_sgs = regs->gpregs[7];
 	static struct fh_sg_list sg_list[SG_PER_PAGE];
 	size_t sg_size = num_sgs * sizeof(struct fh_sg_list);
-	physaddr_t sg_gphys =
-		(physaddr_t) regs->gpregs[6] << 32 | regs->gpregs[5];
+	phys_addr_t sg_gphys =
+		(phys_addr_t) regs->gpregs[6] << 32 | regs->gpregs[5];
 	static uint32_t sg_lock;
 
 	if (!source || !target) {
