@@ -103,7 +103,7 @@ static void fh_partition_get_status(trapframe_t *regs)
 
 static void fh_whoami(trapframe_t *regs)
 {
-	regs->gpregs[4] = 0x99;  /* FIXME */
+	regs->gpregs[4] = get_gcpu()->gcpu_num;
 	regs->gpregs[3] = 0;  /* success */
 }
 

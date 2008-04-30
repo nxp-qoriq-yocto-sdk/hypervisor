@@ -1,5 +1,6 @@
 
 #include <libos/libos.h>
+#include <libos/hcalls.h>
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/trapframe.h>
@@ -75,7 +76,16 @@ static void core_init(void)
 
 void secondary_init(void)
 {
-	/*  stub for now */
+	uint32_t cpu_index;
+	uint32_t pir = mfspr(SPR_PIR);
+
+	core_init();
+	fh_cpu_whoami(&cpu_index);
+	printf("in secondary_init, on processor (FH_CPU_WHOAMI)=%d\n", cpu_index);
+	if (cpu_index == pir)
+		printf(" ----- PASS\n");
+	else
+		printf(" ----- FAIL\n");
 }
 
 
