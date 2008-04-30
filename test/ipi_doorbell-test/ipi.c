@@ -56,7 +56,7 @@ int test_init(void)
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 
-	handle_p = get_handle("fsl,doorbell-send-handle", "reg", fdt);
+	handle_p = get_handle("fsl,hv-doorbell-send-handle", "reg", fdt);
 
 	if (!handle_p) {
 		printf("Couldn't get send doorbell handle\n");

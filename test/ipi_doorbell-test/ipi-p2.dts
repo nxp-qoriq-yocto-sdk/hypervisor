@@ -88,12 +88,6 @@
 			compatible = "fsl,hv-handles";
 			interrupt-parent = <&vmpic>;
 	
-			byte-channel@0 {
-				reg = <0>;
-				compatible = "fsl,hv-byte-channel-handle";
-				fsl,endpoint = "/uartmux";
-			};
-	
 			gpio {
 				reg = <1>;
 				compatible = "fsl,hv-gpio-handle";

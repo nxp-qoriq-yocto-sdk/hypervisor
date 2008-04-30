@@ -85,16 +85,6 @@
 			compatible = "fsl,hv-handles";
 			interrupt-parent = <&vmpic>;
 	
-			byte-channel0 {
-				compatible = "fsl,hv-byte-channel-handle";
-				fsl,endpoint = "byte-channel1";
-			};
-	
-			byte-channel1 {
-				compatible = "fsl,hv-byte-channel-handle";
-				fsl,endpoint = "byte-channel2";
-			};
-	
 			doorbell@0 {
 				compatible = "fsl,hv-doorbell-send-handle";
 				fsl,endpoint = "/doorbells/doorbell@0";
