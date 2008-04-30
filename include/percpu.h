@@ -11,7 +11,7 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
 #include <hv.h>
-#include <vpic_def.h>
+#include <vpic.h>
 #endif
 
 #define TLB1_GSIZE 16 /* As seen by the guest */
@@ -40,7 +40,7 @@ typedef struct {
 typedef struct handle {
 	handle_ops_t *ops;
 	struct byte_chan_handle *bc;
-	struct interrupt *intr;
+	struct vmpic_interrupt *intr;
 	struct ipi_doorbell_handle *db;
 	struct guest *guest;
 } handle_t;
@@ -89,6 +89,7 @@ typedef struct guest {
 #define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 #define GCPU_PEND_FIT      0x00000010 /* FIT event pending */
 #define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
+#define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
@@ -108,6 +109,7 @@ typedef struct gcpu {
 	unsigned long gevent_pending;
 	uint32_t timer_flags;
 	int gcpu_num, waiting_for_gevent;
+	vpic_cpu_t vpic;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)

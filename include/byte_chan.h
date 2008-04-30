@@ -38,6 +38,7 @@ ssize_t byte_chan_receive(byte_chan_handle_t *bc,
 byte_chan_handle_t *byte_chan_claim(byte_chan_t *handle);
 int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd);
 int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
-                           int rxirq, int txirq);
+                           vpic_interrupt_t *rxirq,
+                           vpic_interrupt_t *txirq);
 
 #endif

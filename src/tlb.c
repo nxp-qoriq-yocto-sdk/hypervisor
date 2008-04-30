@@ -272,4 +272,6 @@ void tlb1_init(void)
 
 	if (mfspr(SPR_PIR))
 		tlb1_reserved = tlb;
+
+	cpu->console_ok = 1;
 }

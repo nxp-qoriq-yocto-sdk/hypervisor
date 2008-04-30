@@ -2,7 +2,7 @@
 #include <libos/trapframe.h>
 #include <libos/libos.h>
 #include <libos/bitops.h>
-#include <interrupts.h>
+#include <libos/interrupts.h>
 #include <events.h>
 #include <vpic.h>
 #include <doorbell.h>

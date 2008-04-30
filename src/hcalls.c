@@ -342,8 +342,7 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 	} else {
 		tmp =  dbell->recv_head;
 		while (tmp) {
-			vpic_assert_vint(tmp->guest_vint.guest,
-					 tmp->guest_vint.vpic_irq);
+			vpic_assert_vint(tmp->guest_vint);
 			tmp = tmp->next;
 		}
 	}

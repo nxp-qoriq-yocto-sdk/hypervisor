@@ -7,6 +7,7 @@
 #include <timers.h>
 #include <guestmemio.h>
 #include <vpic.h>
+#include <vmpic.h>
 
 /* Do not use this when entering via guest doorbell, since that saves
  * state in gsrr rather than srr, despite being directed to the
@@ -38,6 +39,8 @@ void guest_doorbell(trapframe_t *regs)
 {
 	unsigned long gsrr1 = mfspr(SPR_GSRR1);
 	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	interrupt_t *irq;
 
 	assert(gsrr1 & MSR_GS);
 	assert(gsrr1 & MSR_EE);
@@ -46,12 +49,23 @@ void guest_doorbell(trapframe_t *regs)
 	regs->srr1 = gsrr1;
 
 	/* check for pending virtual interrupts */
-	if (vpic_process_pending_ints(gcpu->guest)) {
+	if (gcpu->gdbell_pending & GCPU_PEND_VIRQ) {
+		if (guest->coreint) {
+			irq = vpic_iack();
+			if (irq) {
+				vmpic_interrupt_t *vmirq = irq->priv;
+				mtspr(SPR_GEPR, vmirq->handle);
+			} else {
+				goto no_virq;
+			}
+		}
+		
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_EXT_INT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
 		return;
 	}
 
+no_virq:
 	/* Then, check for a FIT. */
 	if (gcpu->gdbell_pending & GCPU_PEND_FIT) {
 		run_deferred_fit();

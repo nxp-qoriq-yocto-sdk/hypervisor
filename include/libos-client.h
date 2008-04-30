@@ -14,8 +14,6 @@ typedef struct {
 	struct gcpu *gcpu;
 } client_cpu_t;
 
-#include <interrupts.h>
-
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #endif
 

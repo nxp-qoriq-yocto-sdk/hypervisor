@@ -5,11 +5,11 @@
 #include <libos/mpic.h>
 #include <libos/8578.h>   // FIXME-- remove when UART is moved
 #include <libos/ns16550.h>
+#include <libos/interrupts.h>
  
 #include <hv.h>
 #include <percpu.h>
 #include <paging.h>
-#include <interrupts.h>
 #include <byte_chan.h>
 #include <vmpic.h>
 #include <bcmux.h>
@@ -60,6 +60,7 @@ void start(unsigned long devtree_ptr)
 	heap = (heap + 15) & ~15;
 
 	alloc_init(heap, mem_end + PHYSBASE);
+	mpic_init((unsigned long)fdt);
 
 #ifdef CONFIG_LIBOS_NS16550
 	create_ns16550();
@@ -69,13 +70,6 @@ void start(unsigned long devtree_ptr)
 
 	printf("=======================================\n");
 	printf("Freescale Ultravisor 0.1\n");
-
-	mpic_init((unsigned long)fdt);
-
-// FIXME-- need mpic_irq_setup func
-	mpic_irq_set_inttype(0x24, TYPE_CRIT);
-	mpic_irq_set_priority(0x24, 15);
-	mpic_irq_unmask(0x24);
 
 	vmpic_global_init();
 
@@ -112,6 +106,7 @@ void start(unsigned long devtree_ptr)
 void secondary_init(void)
 {
 	core_init();
+	mpic_reset_core();
 	enable_critint();
 	partition_init();
 }

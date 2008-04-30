@@ -137,7 +137,8 @@ void recv_dbell_partition_init(guest_t *guest)
 	const char *endpoint;
 	guest_recv_dbell_list_t *dbell_node;
 	register_t saved;
-	uint32_t irq[2], virq;
+	uint32_t irq[2];
+	vpic_interrupt_t *virq;
 	ipi_doorbell_t *dbell;
 
 	while (1) {
@@ -170,12 +171,11 @@ void recv_dbell_partition_init(guest_t *guest)
 		if (!dbell_node)
 			return;
 
-		irq[0] = vmpic_alloc_vpic_handle(guest);
-		irq[1] = 2;
-		virq = guest->handles[irq[0]]->intr->irq;
+		virq = vpic_alloc_irq(guest);
+		irq[0] = vmpic_alloc_handle(guest, &virq->irq);
+		irq[1] = 0;
 
-		dbell_node->guest_vint.vpic_irq = virq;
-		dbell_node->guest_vint.guest = guest;
+		dbell_node->guest_vint = virq;
 
 		saved = spin_lock_critsave(&dbell->dbell_lock);
 		dbell_node->next = dbell->recv_head;

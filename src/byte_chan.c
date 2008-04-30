@@ -116,7 +116,8 @@ err:
 }
 
 int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
-                           int rxirq, int txirq)
+                           vpic_interrupt_t *rxirq,
+                           vpic_interrupt_t *txirq)
 {
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!handle)
@@ -130,27 +131,15 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 		return ERR_NOMEM;
 	}
 
-	if (rxirq != -1) {
-		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
-		if (!vint)
-			return ERR_NOMEM;
-	
-		vint->guest_handle = rxirq;
-		vint->vpic_irq = guest->handles[rxirq]->intr->irq;
-		vint->guest = guest;
-		handle->rx->consumer = vint;
+	if (rxirq) {
+		rxirq->guest = guest;
+		handle->rx->consumer = rxirq;
 		handle->rx->data_avail = vpic_assert_vint_rxq;
 	}
 
-	if (txirq != -1) {
-		vint_desc_t *vint = alloc(sizeof(vint_desc_t), __alignof__(vint_desc_t));
-		if (!vint)
-			return ERR_NOMEM;
-	
-		vint->guest_handle = txirq;
-		vint->vpic_irq = guest->handles[txirq]->intr->irq;
-		vint->guest = guest;
-		handle->tx->producer = vint;
+	if (txirq) {
+		txirq->guest = guest;
+		handle->tx->producer = rxirq;
 		handle->tx->space_avail = vpic_assert_vint_txq;
 	}
 
@@ -289,7 +278,8 @@ void byte_chan_partition_init(guest_t *guest)
 	int off = -1, ret;
 	const char *endpoint;
 	byte_chan_t *bc;
-	uint32_t irq[2];
+	uint32_t irq[4];
+	vpic_interrupt_t *virq[2];
 
 	while (1) {
 		ret = fdt_node_offset_by_compatible(guest->devtree, off,
@@ -315,10 +305,25 @@ void byte_chan_partition_init(guest_t *guest)
 			continue;
 		}
 
-		irq[0] = vmpic_alloc_vpic_handle(guest);
-		irq[1] = vmpic_alloc_vpic_handle(guest);
+		virq[0] = vpic_alloc_irq(guest);
+		virq[1] = vpic_alloc_irq(guest);
 
-		int32_t ghandle = byte_chan_attach_guest(bc, guest, irq[0], irq[1]);
+		if (!virq[0] || !virq[1]) {
+			printf("byte_chan_partition_init: can't alloc vpic irqs\n");
+			return;
+		}
+		
+		irq[0] = vmpic_alloc_handle(guest, &virq[0]->irq);
+		irq[1] = 0;
+		irq[2] = vmpic_alloc_handle(guest, &virq[1]->irq);
+		irq[3] = 0;
+		
+		if (irq[0] < 0 || irq[2] < 0) {
+			printf("byte_chan_partition_init: can't alloc vmpic irqs\n");
+			return;
+		} 
+
+		int32_t ghandle = byte_chan_attach_guest(bc, guest, virq[0], virq[1]);
 		if (ghandle < 0) {
 			printf("byte_chan_partition_init: cannot attach\n");
 			return;

@@ -17,7 +17,7 @@ void *ptr_from_node(const void *devtree, int offset, const char *type);
 int lookup_alias(const void *tree, const char *path);
 int get_interrupt_domain(const void *tree, int node);
 int get_interrupt(const void *tree, int node, int intnum,
-                  const uint32_t **intspec);
+                  const uint32_t **intspec, int *ncells);
 int get_num_interrupts(const void *tree, int node);
 
 physaddr_t find_end_of_mem(void);

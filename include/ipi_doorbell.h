@@ -2,7 +2,7 @@
 #include <vpic.h>
 
 typedef struct guest_recv_dbell_list {
-	vint_desc_t guest_vint;
+	vpic_interrupt_t *guest_vint;
 	struct guest_recv_dbell_list *next;
 } guest_recv_dbell_list_t;
 
