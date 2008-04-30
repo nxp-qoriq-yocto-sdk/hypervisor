@@ -220,7 +220,7 @@
 			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
 			                 0 17000000 0 20000000 1000000>;
 			fsl,dtb = /incbin/("bin/hello-p1.dtb");
-			fsl,hv-load-image-table = <0 efa00000 0 0 0>;
+			fsl,hv-load-image-table = <0 ef200000 0 0 0>;
 		};
 	};
 

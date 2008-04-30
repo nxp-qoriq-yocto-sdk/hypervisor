@@ -10,12 +10,12 @@ $use_uart1 = 1
 $use_uart3 = 1
 
 $guest_image[0]  = "vmlinux"
-$guest_addr[0]   = 0xefa00000
+$guest_addr[0]   = 0xef200000
 $initrd_image[0]  = "rootfs.ext2.gz"
 $initrd_addr[0]   = 0x02300000
 
 $guest_image[1]  = "vmlinux"
-$guest_addr[1]   = 0xefa00000
+$guest_addr[1]   = 0xef200000
 $initrd_image[1]  = "rootfs.ext2.gz"
 $initrd_addr[1]   = 0x22300000
 
