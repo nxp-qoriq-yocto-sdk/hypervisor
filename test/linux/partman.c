@@ -416,6 +416,7 @@ static int cmd_status(void)
 			char filename[300];
 			char *compatible;
 			uint32_t *reg;
+			struct fsl_hv_ioctl_status status;
 
 			sprintf(filename, "%s/compatible", dp->d_name);
 			compatible = read_property(filename, &size);
@@ -434,7 +435,21 @@ static int cmd_status(void)
 				goto exit;
 			}
 
-			printf("  %2u                unknown\n", *reg);
+			printf("  %2u                ", *reg);
+
+			status.partition = *reg;
+			ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
+			if (ret)
+				printf("error %i\n", ret);
+			else {
+				switch (status.status) {
+				case 0: printf("stopped\n"); break;
+				case 1: printf("running\n"); break;
+				case 2: printf("starting\n"); break;
+				case 3: printf("stopping\n"); break;
+				default: printf("unknown %i\n", status.status); break;
+				}
+			}
 			free(reg);
 		}
 
@@ -517,7 +532,6 @@ static int cmd_start(struct parameters *p)
 
 	im.partition = p->h;
 	im.entry_point = p->e;
-	im.device_tree = -1;
 
 	return hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
 }
