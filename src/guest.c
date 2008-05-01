@@ -654,6 +654,8 @@ static int start_guest_primary_nowait(void)
 		setgevent(guest->gcpus[i], GEV_START);
 	}
 
+	cpu->traplevel = 0;
+
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
 	// map 256MB, so we don't support loading/booting an OS above that
 	// address.  Also, we pass the guest physical address even though it
@@ -763,6 +765,7 @@ static void start_guest_secondary(void)
 	r6 = 0;
 	// FIXME: set r7 to IMA size
 
+	cpu->traplevel = 0;
 	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
 	             "r" (guest->spintbl[gpir].addr_lo), "r" (msr),
 	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
