@@ -827,6 +827,8 @@ void do_stop_core(trapframe_t *regs, int restart)
 	}
 
 	mpic_reset_core();
+	memset(&gcpu->gdbell_pending, 0,
+	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
 		if (restart) {

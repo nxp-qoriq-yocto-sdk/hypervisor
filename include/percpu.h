@@ -97,19 +97,23 @@ typedef struct gcpu {
 	kstack_t uvstack;
 	guest_t *guest;
 	cpu_t *cpu;
-	register_t ivpr;
-	register_t ivor[38];
 	tlbmap_t tlb1_inuse;
 	tlbmap_t tlb1_map[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
-	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
-	uint64_t mcar;
-	unsigned long gdbell_pending;
 	unsigned long cdbell_pending;
 	unsigned long gevent_pending;
-	uint32_t timer_flags;
 	int gcpu_num, waiting_for_gevent;
 	vpic_cpu_t vpic;
+
+	/* Fields after this point are cleared on reset -- do not
+	 * insert new fields before gdbell_pending.
+	 */
+	unsigned long gdbell_pending;
+	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
+	uint64_t mcar;
+	register_t ivpr;
+	register_t ivor[38];
+	uint32_t timer_flags;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
