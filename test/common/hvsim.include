@@ -173,15 +173,15 @@ $phys_mem = ($system:phys_mem)
 $phys_mem.load-file $uboot 0xfff80000
 
 if ($kernel_image != "") {
-	flash0_space.load-file $kernel_image $kernel_addr
+	flash1_space.load-file $kernel_image $kernel_addr
 }
 
 foreach $i in (range (list-length $guest_image)) {
-	flash0_space.load-file $guest_image[$i] $guest_addr[$i]
+	flash1_space.load-file $guest_image[$i] $guest_addr[$i]
 }
 
 if ($dtb_image != "") {
-	flash0_space.load-file $dtb_image $dtb_addr
+	flash1_space.load-file $dtb_image $dtb_addr
 }
 
 # U-boot uses l1 cache without backing RAM

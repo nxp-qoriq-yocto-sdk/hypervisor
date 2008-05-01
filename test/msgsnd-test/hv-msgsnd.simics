@@ -5,7 +5,7 @@
 $use_uart1 = 1
 
 $guest_image[0]  = "msgsnd"
-$guest_addr[0]   = 0xefa00000
+$guest_addr[0]   = 0xef200000
 
 $kernel_image  = "uv.uImage"
 

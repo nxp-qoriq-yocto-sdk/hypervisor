@@ -169,7 +169,7 @@ static void release_secondary_cores(void)
 			return;
 		}
 
-		const uint32_t *table = fdt_getprop(fdt, node, "cpu-release-addr", &len);
+		const uint64_t *table = fdt_getprop(fdt, node, "cpu-release-addr", &len);
 		if (!table) {
 			printf("Missing cpu-release-addr property in cpu node\n");
 			node = len;
@@ -177,7 +177,7 @@ static void release_secondary_cores(void)
 		}
 
 		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-		         "starting cpu %u, table %x\n", *reg, *table);
+		         "starting cpu %u, table %llx\n", *reg, *table);
 
 		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping[0],
 		               (*table) & ~(PAGE_SIZE - 1),
