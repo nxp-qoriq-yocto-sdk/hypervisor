@@ -24,8 +24,12 @@ static void vmpic_reset(handle_t *h)
 
 	if (irq->ops->set_priority)
 		irq->ops->set_priority(irq, 0);
-	if (irq->ops->set_cpu_dest_mask)
+
+	if (irq->ops == &vpic_ops)
+		irq->ops->set_cpu_dest_mask(irq, 1);
+	else if (irq->ops->set_cpu_dest_mask)
 		irq->ops->set_cpu_dest_mask(irq, 1 << (guest->gcpus[0]->cpu->coreid));
+
 	/* FIXME: remember initial polarity from devtree? */
 	if (irq->ops->set_config)
 		irq->ops->set_config(irq, IRQ_LEVEL | IRQ_HIGH);
