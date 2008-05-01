@@ -244,7 +244,7 @@ static int create_guest_spin_table(guest_t *guest)
 {
 	unsigned long rpn;
 	unsigned int num_cpus = guest->cpucnt;
-	uint32_t spin_addr;
+	uint64_t spin_addr;
 	int ret, i;
 	
 	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
@@ -306,12 +306,12 @@ static int create_guest_spin_table(guest_t *guest)
 
 		spin_addr = 0xfffff000 + cpu * sizeof(struct boot_spin_table);
 		ret = fdt_setprop(guest->devtree, off,
-		                  "cpu-release-addr", &spin_addr, 4);
+		                  "cpu-release-addr", &spin_addr, 8);
 		if (ret < 0)
 			goto fail;
 
 		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-		         "cpu-release-addr of CPU%u: %x\n", cpu, spin_addr);
+		         "cpu-release-addr of CPU%u: %llx\n", cpu, spin_addr);
 	}
 
 	return 0;
