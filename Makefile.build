@@ -141,6 +141,12 @@ test-fit: bin/uv.uImage test/fit-test
 test-byte-chan-test: bin/uv.uImage test/byte_chan-test
 	$(SIMICS) test/byte_chan-test/hv-byte_chan.simics
 
+test-whoami: bin/uv.uImage test/whoami-test
+	$(SIMICS) test/whoami-test/hv-whoami.simics
+
+test-hcalls: bin/uv.uImage test/hcalls-test
+	$(SIMICS) test/hcalls-test/hv-hcalls.simics
+
 demo: bin/uv.uImage test/demo
 	$(SIMICS) test/demo/hv-demo.simics -e c
 
