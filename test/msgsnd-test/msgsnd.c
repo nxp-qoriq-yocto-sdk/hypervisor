@@ -10,37 +10,165 @@
 
 extern void init(void);
 
+volatile unsigned int doorbell;
+volatile unsigned int critical_doorbell;
+
 void ext_int_handler(trapframe_t *frameptr)
 {
 	printf("External interrupt\n");
 }
 
+void ext_doorbell_handler(trapframe_t *frameptr)
+{
+	doorbell = 1;
+}
+
+void ext_critical_doorbell_handler(trapframe_t *frameptr)
+{
+	critical_doorbell = 1;
+}
+
 void start(void)
 {
-	uint32_t status;
-	char *str;
-	uint32_t channel;
-	uint32_t rxavail;
-	uint32_t txavail;
-	char buf[16];
-	uint32_t x;
-	unsigned int cnt;
-	int i;
+	volatile unsigned int timeout;
 
 	init();
 
-	enable_extint();
-	enable_critint();
+	printf("msgsnd test\n\n");
 
-	printf("msgsnd test\n");
-
-	channel = 0;
+	disable_extint();
+	disable_critint();
+	sync();
 
         // Normal doorbell
+	printf("msgsnd while interrupts enabled: ");
+
+	doorbell = 0;
+	sync();
+	enable_extint();
 	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
 
+	timeout = 10000;
+	while (--timeout && !doorbell);
+	if (timeout)
+		printf("passed (timeout=%u)\n", timeout);
+	else
+		printf("failed\n");
+
+	// Delayed doorbell
+	printf("msgsnd while interrupts disabled: ");
+
+	disable_extint();
+	sync();
+	doorbell = 0;
+	sync();
+	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
+
+	timeout = 10000;
+	while (--timeout && !doorbell);
+	if (timeout)
+		printf("failed (timeout=%u)\n", timeout);
+	else {
+		doorbell = 0;
+		sync();
+		enable_extint();
+		timeout = 10000;
+		while (--timeout && !doorbell);
+		if (timeout)
+			printf("passed (timeout=%u)\n", timeout);
+		else
+			printf("failed\n");
+	}
+	disable_extint();
+
 	// Critical doorbell
+	printf("critical msgsnd while interrupts enabled: ");
+
+	critical_doorbell = 0;
+	sync();
+	enable_critint();
+	sync();
+	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
+
+	timeout = 10000;
+	while (--timeout && !doorbell);
+	if (timeout)
+		printf("passed (timeout=%u)\n", timeout);
+	else
+		printf("failed\n");
+
+	// Delayed critical doorbell
+	printf("critical msgsnd while interrupts disabled: ");
+
+	disable_critint();
+	sync();
+	critical_doorbell = 0;
+	sync();
 	asm volatile ("msgsnd %0" : : "r" (0x08000000 | mfspr(SPR_PIR)));
+
+	timeout = 10000;
+	while (--timeout && !critical_doorbell);
+	if (timeout)
+		printf("failed (timeout=%u)\n", timeout);
+	else {
+		critical_doorbell = 0;
+		sync();
+		enable_critint();
+		timeout = 10000;
+		while (--timeout && !critical_doorbell);
+		if (timeout)
+			printf("passed (timeout=%u)\n", timeout);
+		else
+			printf("failed\n");
+	}
+	disable_critint();
+
+	// Normal doorbell msgclr
+	printf("msgclr test: ");
+
+	disable_extint();
+	sync();
+	doorbell = 0;
+	sync();
+	asm volatile ("msgsnd %0" : : "r" (mfspr(SPR_PIR)));
+	sync();
+	asm volatile ("msgclr %0" : : "r" (mfspr(SPR_PIR)));
+	sync();
+	enable_extint();
+	sync();
+
+	timeout = 10000;
+	while (--timeout && !doorbell);
+	if (timeout)
+		printf("failed (timeout=%u)\n", timeout);
+	else {
+		printf("passed\n");
+	}
+	disable_extint();
+
+	// Normal doorbell msgclr
+	printf("critical msgclr test: ");
+
+	disable_critint();
+	sync();
+	critical_doorbell = 0;
+	sync();
+	asm volatile ("msgsnd %0" : : "r" (0x08000000 | mfspr(SPR_PIR)));
+	sync();
+	asm volatile ("msgclr %0" : : "r" (0x08000000 | mfspr(SPR_PIR)));
+	sync();
+	enable_critint();
+	sync();
+
+	timeout = 10000;
+	while (--timeout && !critical_doorbell);
+	if (timeout)
+		printf("failed (timeout=%u)\n", timeout);
+	else {
+		printf("passed\n");
+	}
+	disable_critint();
+
 
 	printf("Test Complete\n");
 

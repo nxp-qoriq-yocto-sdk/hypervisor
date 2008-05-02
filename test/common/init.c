@@ -107,16 +107,6 @@ void dec_handler(trapframe_t *frameptr)
 {
 }
 
-void ext_doorbell_handler(trapframe_t *frameptr)
-{
-	printf("Doorbell\n");
-}
-
-void ext_critical_doorbell_handler(trapframe_t *frameptr)
-{
-	printf("Critical doorbell\n");
-}
-
 #if 0
 int extint_cnt = 0;;
 void ext_int_handler(trapframe_t *frameptr)

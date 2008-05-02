@@ -18,6 +18,16 @@ void ext_int_handler(trapframe_t *frameptr)
 
 }
 
+void ext_doorbell_handler(trapframe_t *frameptr)
+{
+	printf("Doorbell\n");
+}
+
+void ext_critical_doorbell_handler(trapframe_t *frameptr)
+{
+	printf("Critical doorbell\n");
+}
+
 int *get_handle(const char *dbell_type, const char *prop, void *fdt)
 {
 	int off = -1, ret;
