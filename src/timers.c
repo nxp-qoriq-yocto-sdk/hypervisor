@@ -118,18 +118,23 @@ void set_tcr(uint32_t val)
 	mtspr(SPR_TCR, val);
 }
 
-void set_tsr(uint32_t val)
+void set_tsr(uint32_t tsr)
 {
 	gcpu_t *gcpu = get_gcpu();
+	register_t tcr = mfspr(SPR_TCR);
 
-	if (val & TSR_DIS)
+	if (tsr & TSR_DIS) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
+		tcr |= (gcpu->timer_flags & TCR_DIE);
+	}
 
-	if (val & TSR_FIS) 
+	if (tsr & TSR_FIS) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_FIT);
+		tcr |= (gcpu->timer_flags & TCR_FIE);
+	}
 
-	mtspr(SPR_TCR, mfspr(SPR_TCR) | gcpu->timer_flags);
-	mtspr(SPR_TSR, val);
+	mtspr(SPR_TSR, tsr);
+	mtspr(SPR_TCR, tcr);
 }
 
 uint32_t get_tcr(void)
