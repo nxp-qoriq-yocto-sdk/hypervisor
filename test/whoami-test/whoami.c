@@ -85,7 +85,7 @@ static void release_secondary_cores(void)
 			return;
 		}
 
-		const uint32_t *table =
+		const uint64_t *table =
 		    fdt_getprop(fdt, node, "cpu-release-addr", &len);
 		if (!table) {
 			printf
@@ -94,7 +94,7 @@ static void release_secondary_cores(void)
 			goto fail_one;
 		}
 
-		printf("starting cpu %u, table %x\n", *reg, *table);
+		printf("starting cpu %u, table %llx\n", *reg, *table);
 
 		tlb1_set_entry(1, (unsigned long)temp_mapping[0],
 			       (*table) & ~(PAGE_SIZE - 1),
