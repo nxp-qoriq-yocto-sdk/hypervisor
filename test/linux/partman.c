@@ -16,7 +16,11 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-#include <fsl_hypervisor.h>
+/*
+ * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
+ * tree.  So every time that file is updated, you need to copy it here.
+ */
+#include "fsl_hypervisor.h"
 
 enum command {
 	e_none = 0,

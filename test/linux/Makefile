@@ -4,7 +4,7 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: dtbs partman
+all: dtbs bin/partman
 
 include ../Makefile.inc
 
@@ -16,17 +16,17 @@ bin/hv-linux-1p.dtb: bin/linux-p1.dtb hv-linux-1p.dts
 
 bin/hv-linux-2p.dtb: bin/linux-p2.dtb bin/linux-p1.dtb hv-linux-2p.dts
 
-partman: partman.c
-	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -I../../../linux/drivers/misc/ -o $@ $<
+bin/partman: partman.c
+	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
 	powerpc-e500mc-linux-gnu-strip $@
 
-rootfs: partman
+rootfs: bin/partman
 	gunzip rootfs.ext2.gz
-	mkdir -p rootfs
-	sudo mount -t ext2 -o rw,loop rootfs.ext2 rootfs
-	sudo cp -u partman rootfs/bin/
-	sudo cp -u vmlinux rootfs/
-	[ -e rootfs/dev/fsl-hv ] || sudo mknod rootfs/dev/fsl-hv c 253 0
-	sudo umount -d rootfs
-	rmdir rootfs
+	mkdir -p bin/rootfs
+	sudo mount -t ext2 -o rw,loop rootfs.ext2 bin/rootfs
+	sudo cp -u bin/partman bin/rootfs/bin/
+	sudo cp -u vmlinux bin/rootfs/
+	[ -e bin/rootfs/dev/fsl-hv ] || sudo mknod bin/rootfs/dev/fsl-hv c 253 0
+	sudo umount -d bin/rootfs
+	rmdir bin/rootfs
 	gzip rootfs.ext2
