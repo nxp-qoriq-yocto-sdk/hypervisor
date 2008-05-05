@@ -60,10 +60,17 @@ static void unimplemented(trapframe_t *regs)
 
 static void fh_partition_restart(trapframe_t *regs)
 {
-	guest_t *guest = get_gcpu()->guest;
 	unsigned int i, ret = 0;
+	register_t saved;
+	guest_t *guest;
 	
-	register_t saved = spin_lock_critsave(&guest->lock);
+	guest = handle_to_guest(regs->gpregs[3]);
+	if (!guest) {
+		regs->gpregs[3] = -1;
+		return;
+	}
+	
+	saved = spin_lock_critsave(&guest->lock);
 
 	if (guest->state != guest_running)
 		ret = -1;
@@ -80,7 +87,7 @@ static void fh_partition_restart(trapframe_t *regs)
 	for (i = 0; i < guest->cpucnt; i++)
 		setgevent(guest->gcpus[i], GEV_RESTART);
 
-	assert(cpu->ret_user_hook);
+	regs->gpregs[3] = 0;
 }
 
 void restart_core(trapframe_t *regs)
