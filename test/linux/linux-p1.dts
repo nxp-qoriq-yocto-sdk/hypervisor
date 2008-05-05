@@ -55,7 +55,7 @@
 			compatible = "fsl,mpc8578-i2c",
 			             "fsl,i2c", "fsl-i2c";
 			reg = <118000 100>;
-			interrupts = <1e 2>;
+			interrupts = <26 2>;
 			interrupt-parent = <&mpic>;
 			dfsrr;
 		};
