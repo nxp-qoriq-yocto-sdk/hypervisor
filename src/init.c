@@ -62,9 +62,20 @@ void start(unsigned long devtree_ptr)
 	alloc_init(heap, mem_end + PHYSBASE);
 	mpic_init((unsigned long)fdt);
 
+	enable_critint();
+
 #ifdef CONFIG_LIBOS_NS16550
 	create_ns16550();
 #endif
+
+#ifdef CONFIG_BYTE_CHAN
+	create_byte_channels();
+#ifdef CONFIG_BCMUX
+	create_muxes();
+#endif
+	connect_global_byte_channels();
+#endif
+
 	open_stdout();
 	printf("mem_end %llx\n", mem_end);
 
@@ -77,15 +88,6 @@ void start(unsigned long devtree_ptr)
 	shell_init();
 #endif
 
-	/* byte channel initialization */
-#ifdef CONFIG_BYTE_CHAN
-	create_byte_channels();
-#ifdef CONFIG_BCMUX
-	create_muxes();
-#endif
-	connect_global_byte_channels();
-#endif
-
 #ifdef CONFIG_IPI_DOORBELL
 	create_doorbells();
 #endif
@@ -93,8 +95,6 @@ void start(unsigned long devtree_ptr)
 #ifdef CONFIG_GDB_STUB
 	gdb_stub_init();
 #endif
-
-	enable_critint();
 
 	// FIXME pamu init
 

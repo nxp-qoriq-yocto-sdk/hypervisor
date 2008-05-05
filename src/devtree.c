@@ -28,6 +28,7 @@
 #include <devtree.h>
 #include <paging.h>
 #include <errors.h>
+#include <byte_chan.h>
 
 #include <libos/ns16550.h>
 #include <libos/queue.h>
@@ -382,7 +383,57 @@ void create_ns16550(void)
 }
 #endif
 
+chardev_t *cd_console;
+byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;
+
+int open_stdout_chardev(int node)
+{
+	chardev_t *cd;
+	int ret;
+	
+	cd = ptr_from_node(fdt, node, "chardev");
+	if (!cd)
+		return -ERR_INVALID;
+
+	console_init(cd);
+
+	if (!cd->ops->set_tx_queue)
+		return -ERR_INVALID;
+
+	queue_t *q = alloc_type(queue_t);
+	if (!q)
+		return -ERR_NOMEM;
+
+	ret = queue_init(q, 2048);
+	if (ret < 0)
+		return ret;
+
+	ret = cd->ops->set_tx_queue(cd, q);
+	if (ret < 0)
+		return ret;
+		
+	stdout = q;
+	cd_console = cd;
+	return 0;
+}
+
+int open_stdout_bytechan(int node)
+{
+	byte_chan_t *bc;
+	
+	bc = ptr_from_node(fdt, node, "bc");
+	if (!bc)
+		return -ERR_INVALID;
+
+	bc_console = byte_chan_claim(bc);
+	if (!bc_console)
+		return -ERR_BUSY;
+
+	qconsole_init(bc_console->tx);
+	stdout = bc_console->tx;
+	return 0;
+}
 
 void open_stdout(void)
 {
@@ -390,46 +441,47 @@ void open_stdout(void)
 	if (ret < 0)
 		return;
 
-	chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
-	if (cd) {
-		console_init(cd);
-
-		if (cd->ops->set_tx_queue) {
-			queue_t *q = alloc_type(queue_t);
-			ret = queue_init(q, 2048);
-			if (ret < 0)
-				return;
-
-			ret = cd->ops->set_tx_queue(cd, q);
-			if (ret < 0)
-				return;
-		
-			stdout = q;
-		}
-	}
+	open_stdout_chardev(ret);
+	open_stdout_bytechan(ret);
 }
 
 #ifdef CONFIG_SHELL
+int open_stdin_chardev(chardev_t *cd)
+{
+	queue_t *q;
+	int ret;
+
+	if (!cd->ops->set_rx_queue)
+		return -ERR_INVALID;
+
+	q = alloc_type(queue_t);
+	if (!q)
+		return -ERR_NOMEM;
+
+	ret = queue_init(q, 2048);
+	if (ret < 0)
+		return ret;
+
+	ret = cd->ops->set_rx_queue(cd, q);
+	if (ret < 0)
+		return ret;
+		
+	stdin = q;
+	return 0;
+}
+
+int open_stdin_bytechan(byte_chan_handle_t *bc)
+{
+	stdin = bc->rx;
+	return 0;
+}
+
 void open_stdin(void)
 {
-	int ret = lookup_alias(fdt, "stdin");
-	if (ret < 0)
-		return;
-
-	chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
-	if (cd && cd->ops->set_rx_queue) {
-		queue_t *q = alloc_type(queue_t);
-
-		ret = queue_init(q, 2048);
-		if (ret < 0)
-			return;
-
-		ret = cd->ops->set_rx_queue(cd, q);
-		if (ret < 0)
-			return;
-		
-		stdin = q;
-	}
+	if (cd_console)
+		open_stdin_chardev(cd_console);
+	if (bc_console)
+		open_stdin_bytechan(bc_console);
 }
 #endif
 
