@@ -418,6 +418,7 @@ int open_stdout_chardev(int node)
 	return 0;
 }
 
+#ifdef CONFIG_BYTE_CHAN
 int open_stdout_bytechan(int node)
 {
 	byte_chan_t *bc;
@@ -432,8 +433,10 @@ int open_stdout_bytechan(int node)
 
 	qconsole_init(bc_console->tx);
 	stdout = bc_console->tx;
+
 	return 0;
 }
+#endif
 
 void open_stdout(void)
 {
@@ -442,7 +445,9 @@ void open_stdout(void)
 		return;
 
 	open_stdout_chardev(ret);
+#ifdef CONFIG_BYTE_CHAN
 	open_stdout_bytechan(ret);
+#endif
 }
 
 #ifdef CONFIG_SHELL
@@ -470,18 +475,22 @@ int open_stdin_chardev(chardev_t *cd)
 	return 0;
 }
 
+#ifdef CONFIG_BYTE_CHAN
 int open_stdin_bytechan(byte_chan_handle_t *bc)
 {
 	stdin = bc->rx;
 	return 0;
 }
+#endif
 
 void open_stdin(void)
 {
 	if (cd_console)
 		open_stdin_chardev(cd_console);
+#ifdef CONFIG_BYTE_CHAN
 	if (bc_console)
 		open_stdin_bytechan(bc_console);
+#endif
 }
 #endif
 
