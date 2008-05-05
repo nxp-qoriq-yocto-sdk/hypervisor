@@ -3,7 +3,12 @@ export LIBOS_INC := ../libos/include
 
 $(shell ln -sfn $(LIBOS_DIR) libos)
 
-export PROJECTVERSION=0.0
+export VERSION=0
+export SUBVERSION=0
+export EXTRAVERSION=
+export LOCALVERSION := $(shell tools/setlocalversion)
+
+export PROJECTVERSION=$(VERSION).$(SUBVERSION)$(EXTRAVERSION)$(LOCALVERSION)
 export srctree=$(CURDIR)
 
 .PHONY: all

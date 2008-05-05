@@ -2,6 +2,10 @@ config PROJECTVERSION
 	string
 	option env="PROJECTVERSION"
 
+config HV_VERSION
+	string
+	default PROJECTVERSION
+
 source "libos/Kconfig"
 
 config BYTE_CHAN

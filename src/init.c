@@ -69,7 +69,7 @@ void start(unsigned long devtree_ptr)
 	printf("mem_end %llx\n", mem_end);
 
 	printf("=======================================\n");
-	printf("Freescale Ultravisor 0.1\n");
+	printf("Freescale Ultravisor %s\n", CONFIG_HV_VERSION);
 
 	vmpic_global_init();
 
