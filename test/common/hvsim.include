@@ -125,7 +125,7 @@ foreach $phy_idx in (range 4) {
         # Create a generic MII transceiver identified as a Marvell 88E1011S
         $phy[$phy_idx] = (create-phy-mii-transceiver phy_id = 0x01410c60
                                                      mii_address = $phy_idx)
-        $system.connect (phy + $phy_idx) $phy[$phy_idx]
+        $system.connect (etsec-phy + $phy_idx) $phy[$phy_idx]
 }
 
 # setup CS0/CS1 on DDR2 w/1G and CS0/1 on DDR2 w/1G
