@@ -590,6 +590,7 @@ guest_t *node_to_partition(int partition)
 		if (last_lpid >= MAX_PARTITIONS) {
 			printf("too many partitions\n");
 		} else {
+			guests[i].state = guest_starting;
 			guests[i].partition = partition;
 			guests[i].lpid = ++last_lpid;
 		}
@@ -613,13 +614,16 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 	return gpir;
 }
 
-static int start_guest_primary_nowait(void)
+static void start_guest_primary_nowait(void)
 {
 	register register_t r3 asm("r3");
 	guest_t *guest = get_gcpu()->guest; 
 	int i;
 	
-	assert(!(mfmsr() & MSR_CE));
+	disable_critint();
+
+	if (cpu->ret_user_hook)
+		return;
 
 	assert(guest->state == guest_starting);
 	reset_spintbl(guest);
@@ -632,7 +636,7 @@ static int start_guest_primary_nowait(void)
 	if (ret != fdt_totalsize(guest->devtree)) {
 		printf("Couldn't copy device tree to guest %s, %d\n",
 		       guest->name, ret);
-		return ERR_BADADDR;
+		return;
 	}
 
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
@@ -658,7 +662,7 @@ static int start_guest_primary_nowait(void)
 			disable_critint();
 
 			if (cpu->ret_user_hook)
-				return 0;
+				return;
 		}
 
 		setgevent(guest->gcpus[i], GEV_START);
@@ -667,10 +671,10 @@ static int start_guest_primary_nowait(void)
 	cpu->traplevel = 0;
 
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
-	// map 256MB, so we don't support loading/booting an OS above that
+	// map 1GiB, so we don't support loading/booting an OS above that
 	// address.  Also, we pass the guest physical address even though it
-	// should be a guest virtual address, but since we program the TLBs such
-	// that guest virtual == guest physical at boot time, this works.
+	// should be a guest virtual address, but since we program the TLBs
+	// such that guest virtual == guest physical at boot time, this works. 
 	// Also, the IMA needs to be put into r7.
 
 	r3 = guest->dtb_gphys;
@@ -688,7 +692,8 @@ static void start_guest_primary(void)
 	guest_t *guest = get_gcpu()->guest; 
 	int ret;
 
-	assert(!(mfmsr() & MSR_CE));
+	enable_critint();
+
 	if (cpu->ret_user_hook)
 		return;
 
@@ -715,7 +720,6 @@ static void start_guest_primary(void)
 		return;
 	}
 	
-	guest->state = guest_starting;
 	start_guest_primary_nowait();
 }
 
@@ -861,14 +865,14 @@ void stop_core(trapframe_t *regs)
 int stop_guest(guest_t *guest)
 {
 	unsigned int i, ret = 0;
-	register_t saved = spin_lock_critsave(&guest->lock);
+	spin_lock(&guest->lock);
 
 	if (guest->state != guest_running)
 		ret = -ERR_INVALID;
 	else
 		guest->state = guest_stopping;
 
-	spin_unlock_critsave(&guest->lock, saved);
+	spin_unlock(&guest->lock);
 	
 	if (ret)
 		return ret;
@@ -882,14 +886,14 @@ int stop_guest(guest_t *guest)
 int start_guest(guest_t *guest)
 {
 	int ret = 0;
-	register_t saved = spin_lock_critsave(&guest->lock);
+	spin_lock(&guest->lock);
 
 	if (guest->state != guest_stopped)
 		ret = -ERR_INVALID;
 	else
 		guest->state = guest_starting;
 
-	spin_unlock_critsave(&guest->lock, saved);
+	spin_unlock(&guest->lock);
 	
 	if (ret)
 		return ret;
@@ -918,7 +922,6 @@ static void partition_config(guest_t *guest)
 		guest->coreint = 1;
 	}
 }
-
 
 __attribute__((noreturn)) void init_guest(void)
 {
@@ -1001,9 +1004,6 @@ __attribute__((noreturn)) void init_guest(void)
 #endif
 
 		vmpic_partition_init(guest);
-
-		disable_critint();
-		guest->state = guest_starting;
 		start_guest_primary();
 	} else {
 		gpir = register_gcpu_with_guest(guest, cpus, len);
