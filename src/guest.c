@@ -461,15 +461,24 @@ static int process_guest_devtree(guest_t *guest, int partition,
 {
 	int ret;
 	int off = -1;
-	int gfdt_size = fdt_totalsize(fdt);
-	void *guest_origtree;
+	uint32_t gfdt_size;
+	const void *guest_origtree;
+	const uint32_t *prop;
 
-	guest_origtree = fdt_getprop_w(fdt, partition, "fsl,dtb", &ret);
-	if (!guest_origtree) {
-		printf("guest %s: no fsl,dtb property\n", guest->name);
-		ret = -FDT_ERR_NOTFOUND;
+	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
+	if (!prop)
+		goto fail;
+	if (ret < 12) {
+		ret = -ERR_BADTREE;
 		goto fail;
 	}
+
+	guest->dtb_gphys = ((uint64_t)prop[0] << 32) | prop[1];
+	gfdt_size = prop[2];
+
+	guest_origtree = fdt_getprop(fdt, partition, "fsl,dtb", &ret);
+	if (!guest_origtree)
+		goto fail;
 	
 	gfdt_size += ret;
 	
@@ -606,6 +615,7 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 
 static int start_guest_primary_nowait(void)
 {
+	register register_t r3 asm("r3");
 	guest_t *guest = get_gcpu()->guest; 
 	int i;
 	
@@ -617,7 +627,7 @@ static int start_guest_primary_nowait(void)
 	/* FIXME: append device tree to image, or use address provided by
 	 * the device tree, or something sensible like that.
 	 */
-	int ret = copy_to_gphys(guest->gphys, 0x00f00000,
+	int ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
 	                        guest->devtree, fdt_totalsize(guest->devtree));
 	if (ret != fdt_totalsize(guest->devtree)) {
 		printf("Couldn't copy device tree to guest %s, %d\n",
@@ -625,7 +635,7 @@ static int start_guest_primary_nowait(void)
 		return ERR_BADADDR;
 	}
 
-	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) |
+	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, 0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	printf("branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
@@ -663,11 +673,12 @@ static int start_guest_primary_nowait(void)
 	// that guest virtual == guest physical at boot time, this works.
 	// Also, the IMA needs to be put into r7.
 
-	asm volatile("mfmsr %%r3; oris %%r3, %%r3, 0x1000;"
+	r3 = guest->dtb_gphys;
+	asm volatile("mfmsr %%r8; oris %%r8, %%r8, 0x1000;"
 	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
-	             "mtsrr0 %0; mtsrr1 %%r3; lis %%r3, 0x00f0; rfi" : :
-	             "r" (guest->entry) :
-	             "r3", "r4", "r5", "r6", "r7", "r8");
+	             "mtsrr0 %0; mtsrr1 %%r8; rfi" : :
+	             "r" (guest->entry), "r" (r3) :
+	             "r4", "r5", "r6", "r7", "r8");
 
 	BUG();
 }
@@ -758,7 +769,7 @@ static void start_guest_secondary(void)
 	page = ((((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
 		guest->spintbl[gpir].addr_lo) & ~0xfffffff) >> PAGE_SHIFT;
 
-	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_256M << MAS1_TSIZE_SHIFT) |
+	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit

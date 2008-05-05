@@ -75,7 +75,8 @@ typedef struct guest {
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
 	uint32_t lpid;
-	phys_addr_t entry;	/* Guest physical addr of the OS entry point */
+	phys_addr_t entry;      /**< Guest physical addr of the OS entry point */
+	phys_addr_t dtb_gphys;  /**< Guest physical addr of DTB image */
 
 	/** Offset to partition node in main device tree. */
 	int partition;

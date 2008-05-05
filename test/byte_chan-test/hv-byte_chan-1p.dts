@@ -225,6 +225,7 @@
 			                 0 17000000 0 20000000 1000000>;
 			fsl,dtb = /incbin/("bin/byte_chan-p1.dtb");
 			fsl,hv-load-image-table = <0 efa00000 0 0 0>;
+			fsl,hv-dtb-window = <0 01000000 10000>;
 		};
 	};
 

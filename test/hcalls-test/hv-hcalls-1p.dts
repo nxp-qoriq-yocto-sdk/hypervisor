@@ -216,6 +216,7 @@
 			                 0 17000000 0 20000000 1000000>;
 			fsl,dtb = /incbin/("bin/hcalls-p1.dtb");
 			fsl,hv-load-image-table = <0 ef200000 0 0 0>;
+			fsl,hv-dtb-window = <0 01000000 10000>;
 		};
 	};
 
