@@ -216,7 +216,8 @@
 			                 0 fe060000 0 fe060000 1000
 			                 0 fe061000 0 fe062000 1000
 			                 0 fe062000 ffffffff ffffffff 1e000>;
-			fsl,hv-load-image-table = <0 ef200000 0 0 0>;
+			fsl,hv-load-image-table = <0 ef100000 0 0 0
+			                           0 ef600000 0 01300000 00100000>;
 			fsl,hv-dtb-window = <0 01000000 10000>;
 		};
 
@@ -231,7 +232,8 @@
 			                 0 fe062000 0 fe061000 1000
 			                 0 fe063000 0 fe063000 1000
 			                 0 fe064000 ffffffff ffffffff 1c000>;
-			fsl,hv-load-image-table = <0 ef200000 0 0 0>;
+			fsl,hv-load-image-table = <0 ef100000 0 0 0
+			                           0 ef600000 0 01300000 00100000>;
 			fsl,hv-dtb-window = <0 01000000 10000>;
 		};
 	};

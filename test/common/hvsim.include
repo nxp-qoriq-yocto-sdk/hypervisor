@@ -22,7 +22,6 @@ if not defined create_network  {$create_network = "yes"}
 if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
 if not defined guest_image	{$guest_image = ""}
-if not defined initrd_image	{$initrd_image = ""}
 if not defined boot_command  {$boot_command  = "bootm 0xef040000 - 0xef020000"}
 if not defined mac_address   {$mac_address   = "00:01:af:07:9b:8a"}
 if not defined mac_address1  {$mac_address1  = "00:01:af:07:9b:8b"}
@@ -208,8 +207,6 @@ if $do_boot == "yes" {
 	local $con          = ($console:con)
         local $phys_mem     = ($system:phys_mem)
 
-        local $initrd_image = $initrd_image
-        local $initrd_addr  = $initrd_addr
         local $kernel_image = $kernel_image
         local $kernel_addr  = $kernel_addr
         local $boot_command = $boot_command
@@ -253,12 +250,6 @@ if $do_boot == "yes" {
                 $con.wait-then-write "=> " "setenv gatewayip 10.10.0.1\n"
                 $con.wait-then-write "=> " "setenv serverip 10.10.0.1\n"
         }
-
-	if ($initrd_image != "") {
-		foreach $i in (range (list-length $initrd_image)) {
-			$phys_mem.load-file $initrd_image[$i] $initrd_addr[$i]
-		}
-	}
 
         if ($cmdline != "") {
             $con.wait-then-write "=> " "setenv bootargs " + $cmdline + "\n"
