@@ -209,7 +209,7 @@ void vmpic_partition_init(guest_t *guest)
 void fh_vmpic_set_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 	int config = regs->gpregs[4];
 	int priority = regs->gpregs[5];
 	uint32_t lcpu_mask = regs->gpregs[6];
@@ -217,20 +217,20 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 	interrupt_t *irq;
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	/* mask must have a valid bit set */
 	if (!(lcpu_mask & ((1 << guest->cpucnt) - 1))) {
-		regs->gpregs[3] = -2;  /* bad parameter */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -254,20 +254,20 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 void fh_vmpic_get_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 	int priority = 0, config = IRQ_LEVEL;
 	uint32_t lcpu_mask = 1;
 	interrupt_t *irq;
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -301,22 +301,22 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 void fh_vmpic_set_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 	int mask = regs->gpregs[4];
 	
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
-	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic unmask: %p %d\n",
+	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic unmask: %p %u\n",
 	         vmirq->irq, handle);
 
 	if (mask)
@@ -329,17 +329,17 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 void fh_vmpic_get_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -350,17 +350,17 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 void fh_vmpic_eoi(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -390,17 +390,17 @@ void fh_vmpic_iack(trapframe_t *regs)
 void fh_vmpic_get_activity(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 

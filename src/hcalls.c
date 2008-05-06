@@ -9,6 +9,7 @@
 #include <ipi_doorbell.h>
 #include <paging.h>
 #include <events.h>
+#include <errors.h>
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
@@ -55,18 +56,19 @@ static inline guest_t *handle_to_guest(int handle)
 static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
-	regs->gpregs[3] = -1;
+	regs->gpregs[3] = FH_ERR_INVALID_PARM;
 }
 
 static void fh_partition_restart(trapframe_t *regs)
 {
-	unsigned int i, ret = 0;
+	unsigned int i;
+	int ret = 0;
 	register_t saved;
 	guest_t *guest;
 	
 	guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = -1;
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 	
@@ -80,7 +82,7 @@ static void fh_partition_restart(trapframe_t *regs)
 	spin_unlock_critsave(&guest->lock, saved);
 	
 	if (ret) {
-		regs->gpregs[3] = -1;
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
 		return;
 	}
 
@@ -100,7 +102,7 @@ static void fh_partition_get_status(trapframe_t *regs)
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 
 	if (!guest) {
-		regs->gpregs[3] = -2;
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -149,7 +151,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 	static uint32_t sg_lock;
 
 	if (!source || !target) {
-		regs->gpregs[3] = -2;
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -163,7 +165,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 		   memory. */
 		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
 				    bytes_to_copy) != bytes_to_copy) {
-			regs->gpregs[3] = -1;
+			regs->gpregs[3] = FH_ERR_INVALID_PARM;
 			spin_unlock(&sg_lock);
 			return;
 		}
@@ -178,7 +180,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 				sg_list[i].size);
 
 			if (size != sg_list[i].size) {
-				regs->gpregs[3] = -1;
+				regs->gpregs[3] = FH_ERR_INVALID_PARM;
 				spin_unlock(&sg_lock);
 				return;
 			}
@@ -219,26 +221,26 @@ static void fh_byte_channel_send(trapframe_t *regs)
 #endif
 
 	if (len > 16) {
-		regs->gpregs[3] = -2;  /* invalid arg */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	register_t saved = spin_lock_critsave(&bc->tx_lock);
 
 	if (len > queue_get_space(bc->tx))
-		regs->gpregs[3] = -3;  /* insufficient room */
+		regs->gpregs[3] = FH_ERR_NO_SPACE;
 	else {
 		/* put chars into bytechannel queue here */
 		int ret = byte_chan_send(bc, buf, len);
@@ -252,25 +254,25 @@ static void fh_byte_channel_send(trapframe_t *regs)
 static void fh_byte_channel_receive(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 	size_t max_receive = regs->gpregs[4];
 	uint8_t *outbuf = (uint8_t *)&regs->gpregs[5];
 	register_t saved;
 
 	if (max_receive > 16) {
-		regs->gpregs[3] = -2;  /* invalid arg */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -286,17 +288,17 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 	register_t saved;
 	guest_t *guest = get_gcpu()->guest;
 
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = -1;  /* bad handle */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -325,17 +327,17 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 	struct ipi_doorbell *dbell;
 	guest_recv_dbell_list_t *tmp;
 
-	int handle = regs->gpregs[3];
+	unsigned int handle = regs->gpregs[3];
 
 	/* FIXME: race against handle closure */
-	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = -1;  /* bad handle */
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
 	db_handle = guest->handles[handle]->db;
 	if (!db_handle) {
-		regs->gpregs[3] = -1;  /* not a doorbell */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
@@ -344,7 +346,7 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 	saved = spin_lock_critsave(&dbell->dbell_lock);
 	if (dbell->recv_head == NULL) {
 		spin_unlock_critsave(&dbell->dbell_lock, saved);
-		regs->gpregs[3] = -5;  /* bad connection */
+		regs->gpregs[3] = FH_ERR_CONFIG;
 		return;
 	} else {
 		tmp =  dbell->recv_head;
@@ -365,11 +367,11 @@ static void fh_partition_start(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = -1;
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
-	regs->gpregs[3] = start_guest(guest) ? -1 : 0;
+	regs->gpregs[3] = start_guest(guest) ? FH_ERR_FAILED : 0;
 }
 
 
@@ -377,11 +379,11 @@ static void fh_partition_stop(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = -1;
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
-	regs->gpregs[3] = stop_guest(guest) ? -1 : 0;
+	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_FAILED : 0;
 }
 
 static hcallfp_t hcall_table[] = {
@@ -425,7 +427,7 @@ void hcall(trapframe_t *regs)
 	unsigned int token = regs->gpregs[11];   /* hcall token is in r11 */
 
 	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
-		regs->gpregs[3] = -1; /* status */
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
 	}
 
