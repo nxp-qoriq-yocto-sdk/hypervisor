@@ -16,7 +16,9 @@ LIBOS_CLIENT_H := include/libos-client.h
 
 CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
-CC_OPTS=-m32 -Wa,-me500 -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
+GCCINCDIR := $(shell $(CC) -print-file-name=include)
+CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
+        -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
         -std=gnu99  -include $(LIBOS_CLIENT_H)
 
 CC_OPTS_C= -Wall \
