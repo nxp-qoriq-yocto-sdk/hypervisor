@@ -4,7 +4,7 @@ export LIBOS_INC := ../libos/include
 $(shell ln -sfn $(LIBOS_DIR) libos)
 
 export VERSION=0
-export SUBVERSION=0
+export SUBVERSION=1
 export EXTRAVERSION=
 export LOCALVERSION := $(shell tools/setlocalversion)
 
