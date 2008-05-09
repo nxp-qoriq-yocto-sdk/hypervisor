@@ -19,7 +19,7 @@ COMMON_SRCS := common/init.c
 CC=$(CROSS_COMPILE)gcc
 GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -I. -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
+        -I. -I../common -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
         -std=gnu99  -include $(LIBOS_CLIENT_H)
 
 CC_OPTS_C= -Wall \
