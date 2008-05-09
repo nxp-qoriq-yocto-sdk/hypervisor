@@ -108,12 +108,12 @@
 		compatible = "fsl,hv-handles";
 
 		byte-channelA {
-			compatible = "fsl,hv-byte-channel";
+			compatible = "fsl,hv-byte-channel-handle";
 			fsl,endpoint = "byte-channel3";
 		};
 
 		byte-channelB {
-			compatible = "fsl,hv-byte-channel";
+			compatible = "fsl,hv-byte-channel-handle";
 			fsl,endpoint = "byte-channel3";
 		};
 	};
