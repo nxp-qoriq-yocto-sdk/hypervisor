@@ -13,6 +13,9 @@
 #include <devtree.h>
 #include <errors.h>
 
+#define VMPIC_ADDR_CELLS 0
+#define VMPIC_INTR_CELLS 2
+
 static uint32_t vmpic_lock;
 
 static void vmpic_reset(handle_t *h)
@@ -111,6 +114,181 @@ int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
 	return handle;
 }
 
+static int calc_new_imaplen(void *tree, const uint32_t *imap, int imaplen, int cell_len)
+{
+	const uint32_t *prop, *addr, *intr;
+	int len, par_len, new_addr_cell, new_intr_cell;
+	int vmpic_parlen, node;
+	int found = 0;
+	int newmaplen = 0;
+
+	vmpic_parlen = VMPIC_ADDR_CELLS +  VMPIC_INTR_CELLS + 1;
+
+	while (imaplen > (cell_len + 1)) {
+		imap += cell_len;
+		imaplen -= cell_len;
+		newmaplen += cell_len;
+		node = fdt_node_offset_by_phandle(tree, *imap);
+		if (node < 0) {
+			printf("calc_new_imaplen : unable get phandle error %d\n", node);
+			return -1;
+		}
+		addr = fdt_getprop(tree, node, "#address-cells", &len);
+		intr = fdt_getprop(tree, node, "#interrupt-cells", &len);
+		if (addr == NULL || intr == NULL) {
+			printf("calc_new_imaplen : no address-cells and interrupt-cells property in  parent imap node error = %d \n", len);
+			return -1;
+		}
+		new_addr_cell = *addr;
+		new_intr_cell = *intr;
+		par_len = new_addr_cell + new_intr_cell + 1;
+		prop = fdt_getprop(tree, node,
+					"fsl,hv-interrupt-controller", &len);
+		if (prop) {
+			found = 1;
+			newmaplen += vmpic_parlen;
+		} else {
+			newmaplen += par_len;
+		}
+		imap += par_len;
+		imaplen -= par_len;
+	}
+	if (!found)
+		newmaplen = 0;
+	return newmaplen;
+}
+
+static uint32_t *create_new_imap(void *tree, const uint32_t *imap, int imaplen, int cell_len, int newmaplen, int vmpic_phandle, guest_t *guest)
+{
+	const uint32_t *prop, *addr, *intr;
+	int len, par_len, new_addr_cell, new_intr_cell;
+	int vmpic_addr_cell, vmpic_intr_cell, node;
+	uint32_t *imap_ptr, *tmp_imap_ptr;
+
+	if (newmaplen <= 0)
+		return NULL;
+	imap_ptr = alloc(newmaplen * CELL_SIZE, __alignof__(uint32_t));
+
+	if (imap_ptr == NULL)
+		return NULL;
+	tmp_imap_ptr = imap_ptr;
+
+	vmpic_addr_cell = VMPIC_ADDR_CELLS;
+	vmpic_intr_cell = VMPIC_INTR_CELLS;
+
+	while (newmaplen > (cell_len + 1) && imaplen > (cell_len + 1)) {
+		memcpy(tmp_imap_ptr, imap, cell_len * CELL_SIZE);
+		tmp_imap_ptr += cell_len;
+		newmaplen -= cell_len;
+		imap += cell_len;
+		imaplen -= cell_len;
+		node = fdt_node_offset_by_phandle(tree, *imap);
+		if (node < 0)
+			return NULL;
+		addr = fdt_getprop(tree, node, "#address-cells", &len);
+		intr = fdt_getprop(tree, node, "#interrupt-cells", &len);
+		if (addr == NULL || intr == NULL) {
+			printf("no address-cells and interrupt-cells property in  parent imap node error = %d \n", len);
+			return NULL;
+		}
+		new_addr_cell = *addr;
+		new_intr_cell = *intr;
+		par_len = new_addr_cell + new_intr_cell + 1;
+		prop = fdt_getprop(tree, node,
+					"fsl,hv-interrupt-controller", &len);
+		if (prop) {
+			*tmp_imap_ptr = vmpic_phandle;
+			printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG, "patched the interrupt controller in intr-map\n");
+			++tmp_imap_ptr;
+			++imap;
+			imap += new_addr_cell;
+			tmp_imap_ptr += vmpic_addr_cell;
+			newmaplen -= vmpic_addr_cell + 1;
+			imaplen -= new_addr_cell + 1;
+			int handle = vmpic_alloc_mpic_handle(guest, imap, new_intr_cell);
+			if (handle >= 0) {
+				printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG, "patched the interrupt value %d in intr-map with %d\n", *imap, handle);
+				/* Level, Sense information would take up one cell */
+				tmp_imap_ptr[0] = handle;
+				/* FIXME: support more than just MPIC */
+				if (new_intr_cell > 1)
+					tmp_imap_ptr[1] = imap[1];
+			} else {
+				printf("create_new_imap : unable to get a vmpic handle error %d\n", handle);
+				return NULL;
+			}
+			tmp_imap_ptr += vmpic_intr_cell;
+			newmaplen -= vmpic_intr_cell;
+			imap += new_intr_cell;
+			imaplen -= new_intr_cell;
+		} else {
+			memcpy(tmp_imap_ptr, imap, par_len * CELL_SIZE);
+			tmp_imap_ptr += par_len;
+			newmaplen -= par_len;
+			imap += par_len;
+			imaplen -= par_len;
+		}
+	}
+	if ((newmaplen != 0) || (imaplen != 0)) {
+		printf("create_new_imap : new interrupt-map corrupted new=%d,old=%d\n", newmaplen, imaplen);
+		return NULL;
+	}
+	return imap_ptr;
+}
+
+static void patch_interrupt_map(void *tree, int node, int vmpic_node, int vmpic_phandle, guest_t *guest)
+{
+	const uint32_t *addr, *intr, *imap;
+	uint32_t *map_ptr;
+	int newmaplen = 0, imaplen;
+	int ret, len, cell_len;
+
+	imap = fdt_getprop(tree, node, "interrupt-map", &imaplen);
+	if (imap == NULL)
+		return;
+	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG, "Found interrupt-map property in device tree node=%d\n", node);
+	/* check for address-cells and interrupt-cells property */
+	addr = fdt_getprop(tree, node, "#address-cells", &len);
+	intr = fdt_getprop(tree, node, "#interrupt-cells", &len);
+	if (addr == NULL || intr == NULL) {
+		printf("no address-cells and interrupt-cells property in imap node error = %d\n", len);
+		return;
+	}
+	cell_len = *addr + *intr;
+	imaplen /= CELL_SIZE;
+
+	addr = fdt_getprop(tree, vmpic_node, "#address-cells", &len);
+	intr = fdt_getprop(tree, vmpic_node, "#interrupt-cells", &len);
+	if (addr == NULL || intr == NULL) {
+		printf("no address-cells and interrupt-cells property in vmpic node error =%d\n", len);
+		return;
+	}
+	if ((*addr != VMPIC_ADDR_CELLS) || (*intr != VMPIC_INTR_CELLS)) {
+		printf("illegal value for vmpic address cells or interrupt cells\n");
+		return;
+	}
+	newmaplen = calc_new_imaplen(tree, imap, imaplen, cell_len);
+	if (newmaplen < 0) {
+		printf("Interrupt map not proper\n");
+		return;
+	}
+	if (newmaplen == 0) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG, "Interrupt map doesn't have fsl,hv-interrupt-controller\n");
+		return;
+	}
+
+	map_ptr = create_new_imap(tree, imap, imaplen, cell_len, newmaplen, vmpic_phandle, guest);
+	if (map_ptr == NULL) {
+		printf("New Interrupt map creation failed\n");
+		return;
+	}
+
+	ret = fdt_setprop(tree, node, "interrupt-map",
+				map_ptr, newmaplen * CELL_SIZE);
+	if (ret < 0)
+		printf("patch_interrupt_map: error %d setting interrupt-map\n", ret);
+}
+
 /**
  * @param[in] pointer to guest device tree
  *
@@ -124,19 +302,22 @@ void vmpic_partition_init(guest_t *guest)
 {
 	void *tree = guest->devtree;
 	int len, ret;
-	int node;
+	int node, vmpic_node;
 	int vmpic_phandle;
 
 	/* find the vmpic node */
-	node = fdt_node_offset_by_compatible(tree, -1, "fsl,hv-vmpic");
-	if (node >= 0) {
-		vmpic_phandle = fdt_get_phandle(tree, node);
+	vmpic_node = fdt_node_offset_by_compatible(tree, -1, "fsl,hv-vmpic");
+	if (vmpic_node >= 0) {
+		vmpic_phandle = fdt_get_phandle(tree, vmpic_node);
 	} else {
 		printf("ERROR: no vmpic node found\n");
 		return;
 	}
 
-	/* Identify all interrupt sources that have an interrupt
+	/* Identify all interrupt nexus nodes and subsequently patch the
+	 * interrupt-parent having the "fsl,hv-interrupt-controller"
+	 * property.
+	 * Identify all interrupt sources that have an interrupt
 	 * parent with a "fsl,hv-interrupt-controller" property.  
 	 * This indicates that the source is managed by the
 	 * vmpic and needs to have a handle allocated.
@@ -152,6 +333,8 @@ void vmpic_partition_init(guest_t *guest)
 		static char buf[1024];
 
 		fdt_get_path(guest->devtree, node, buf, sizeof(buf));
+
+		patch_interrupt_map(tree, node, vmpic_node, vmpic_phandle, guest);
 		
 		intspec = fdt_getprop_w(tree, node, "interrupts", &intlen);
 		if (!intspec) {
@@ -172,7 +355,7 @@ void vmpic_partition_init(guest_t *guest)
 		/* identify interrupt sources to transform */
 		if (!fdt_getprop(tree, domain, "fsl,hv-interrupt-controller", &len))
 			continue;
-		
+
 		for (i = 0; i < intlen / 8; i++) {
 			int handle;
 

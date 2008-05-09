@@ -1,0 +1,24 @@
+#
+# Script to run 8578/u-boot/ultravisor/linux on simulator
+#
+
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
+$use_uart1 = 1
+
+$guest_image[0]  = "vmlinux"
+$guest_addr[0]   = 0xef200000
+$initrd_image[0]  = "rootfs.ext2.gz"
+$initrd_addr[0]   = 0x02300000
+
+$kernel_image  = "uv.uImage"
+
+$dtb_image  = "hv-linux-intmap.dtb"
+
+add-directory "%script%/../common" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
+add-directory "%script%" -prepend
+
+run-command-file "hvsim.include"

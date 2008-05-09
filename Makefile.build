@@ -126,6 +126,9 @@ test-vmpic: bin/uv.uImage test/vmpic-test
 test-linux-1p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
 
+test-linux-intmap: bin/uv.uImage test/linux
+	$(SIMICS) test/linux/hv-linux-intmap.simics
+
 test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 

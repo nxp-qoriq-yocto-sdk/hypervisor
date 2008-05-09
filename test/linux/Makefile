@@ -10,9 +10,11 @@ include ../Makefile.inc
 
 .PHONY: dtbs mount umount vmlinux
 
-dtbs: bin/hv-linux-1p.dtb bin/hv-linux-2p.dtb
+dtbs: bin/hv-linux-1p.dtb bin/hv-linux-2p.dtb bin/hv-linux-intmap.dtb
 
 bin/hv-linux-1p.dtb: bin/linux-p1.dtb hv-linux-1p.dts
+
+bin/hv-linux-intmap.dtb: bin/linux-intmap.dtb hv-linux-intmap.dts
 
 bin/hv-linux-2p.dtb: bin/linux-p2.dtb bin/linux-p1.dtb hv-linux-2p.dts
 
