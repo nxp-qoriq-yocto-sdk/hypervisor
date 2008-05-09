@@ -4,6 +4,8 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/percpu.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
 extern void init(unsigned long);
@@ -11,11 +13,53 @@ volatile int extint_cnt;
 int *handle_p_int;
 extern void *fdt;
 
+/* reads data from shared memory region on interrupt */
+void rd_shm(void)
+{
+	int ret, off = -1;
+	phys_addr_t addr = 0;
+	void *vaddr;
+	int len;
+	char buf[20];
+	ret = fdt_node_offset_by_compatible(fdt, off, "fsl,share-mem-test");
+	if (ret == -FDT_ERR_NOTFOUND) {
+		printf("fdt_node_offset failed, NOT FOUND\n");
+		return;
+	}
+	if (ret < 0) {
+		printf("fdt_node_offset failed = %d\n", ret);
+		return;
+	}
+	off = ret;
+	const uint32_t *reg = fdt_getprop(fdt, off, "reg", &len);
+	if (!reg)
+		printf("get prop failed for reg in share =%d\n", len);
+	/* assuming address_cells = 2 and size_cells = 1 */
+	addr |= ((uint64_t) *reg) << 32;
+	reg++;
+	addr |= *reg;
+	printf("shared memory addr = %llx\n", addr);
+	vaddr = valloc(4 * 1024, 4 * 1024);
+	if (!vaddr) {
+		printf("valloc failed \n");
+		return;
+	}
+	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
+	memcpy(buf, vaddr, strlen("hello") + 1);
+	printf("read '%s' from shared memory on interrupt \n", buf);
+	printf("expected 'hello', got '%s'\n", buf);
+	if (!strcmp(buf, "hello"))
+		printf("Shared memory test ---- PASSED\n");
+	else
+		printf("Shared memory test ---- FAILED\n");
+}
+
 void ext_int_handler(trapframe_t *frameptr)
 {
 	extint_cnt++;
 	fh_vmpic_eoi(*handle_p_int);
-
+	printf("Got an external interrupt, reading shared memory now\n");
+	rd_shm();
 }
 
 void ext_doorbell_handler(trapframe_t *frameptr)

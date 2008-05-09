@@ -4,6 +4,8 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/percpu.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
 extern void init(unsigned long devtree_ptr);
@@ -26,6 +28,41 @@ void ext_doorbell_handler(trapframe_t *frameptr)
 void ext_critical_doorbell_handler(trapframe_t *frameptr)
 {
 	printf("Critical doorbell\n");
+}
+
+/* Writes data to shared memory region with partition 2 */
+void wr_shm(void)
+{
+	int ret, off = -1;
+	phys_addr_t addr = 0;
+	void *vaddr;
+	int len;
+	ret = fdt_node_offset_by_compatible(fdt, off, "fsl,share-mem-test");
+	if (ret == -FDT_ERR_NOTFOUND) {
+		printf("fdt_node_offset failed, NOT FOUND\n");
+		return;
+	}
+	if (ret < 0) {
+		printf("fdt_node_offset failed = %d\n", ret);
+		return;
+	}
+	off = ret;
+	const uint32_t *reg = fdt_getprop(fdt, off, "reg", &len);
+	if (!reg)
+		printf("get prop failed for reg in share =%d\n", len);
+	/* assuming address_cells = 2 and size_cells = 1 */
+	addr |= ((uint64_t) *reg) << 32;
+	reg++;
+	addr |= *reg;
+	printf("shared memory phys addr = %llx\n", addr);
+	vaddr = valloc(4 * 1024, 4 * 1024);
+	if (!vaddr) {
+		printf("valloc failed \n");
+		return;
+	}
+	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
+	memcpy(vaddr, "hello", strlen("hello") + 1);
+	printf("written '%s' to shared memory\n", (unsigned char *)vaddr);
 }
 
 int *get_handle(const char *dbell_type, const char *prop, void *fdt)
@@ -101,6 +138,7 @@ void start(unsigned long devtree_ptr)
 	printf("ipi_doorbell-p1 test\n");
 
 	dump_dev_tree();
+	wr_shm();
 
 	rc = test_init();
 	if (rc) {

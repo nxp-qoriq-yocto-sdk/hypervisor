@@ -62,6 +62,7 @@ void init(unsigned long devtree_ptr)
 	heap = (heap + 15) & ~15;
 
 	alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
+	valloc_init(1024 * 1024, PHYSBASE);
 	uart_offset = get_uart_offset();
 
 	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + uart_offset, 0, 0, 16));
