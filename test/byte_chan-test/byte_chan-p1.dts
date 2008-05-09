@@ -102,10 +102,18 @@
 		};
 	};
 
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
+
 	handles {
 		#address-cells = <1>;
 		#size-cells = <0>;
 		compatible = "fsl,hv-handles";
+		interrupt-parent = <&vmpic>;
 
 		byte-channelA {
 			compatible = "fsl,hv-byte-channel-handle";
