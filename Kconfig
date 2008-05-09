@@ -8,6 +8,11 @@ config HV_VERSION
 
 source "libos/Kconfig"
 
+config LIBOS_DEPS
+	bool
+	default y
+	select LIBOS_MALLOC
+
 config BYTE_CHAN
 	bool "Byte-channel support"
 	select LIBOS_QUEUE
