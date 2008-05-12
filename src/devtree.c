@@ -346,6 +346,8 @@ void create_ns16550(void)
 	int ncells;
 
 	while (1) {
+		interrupt_t *irq = NULL;
+
 		off = fdt_node_offset_by_compatible(fdt, off, "ns16550");
 		if (off < 0)
 			break;
@@ -358,8 +360,8 @@ void create_ns16550(void)
 
 		// FIXME: clock-frequency
 		ret = get_interrupt(fdt, off, 0, &prop, &ncells);
-		
-		interrupt_t *irq = get_mpic_irq(prop, ncells);
+		if (ret >= 0)
+			irq = get_mpic_irq(prop, ncells);
 		if (irq) {
 			ret = irq->ops->config_by_intspec(irq, prop, ncells);
 			if (ret < 0) {
