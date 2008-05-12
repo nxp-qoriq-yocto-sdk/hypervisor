@@ -701,7 +701,7 @@ static void start_guest_primary(void)
 	assert(guest->state == guest_starting);
 
 	ret = load_image(guest);
-	if (ret < 0) {
+	if (ret <= 0) {
 		guest->state = guest_stopped;
 
 		// TODO: send signal to manager

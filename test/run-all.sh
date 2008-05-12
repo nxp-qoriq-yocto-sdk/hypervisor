@@ -4,6 +4,7 @@ files="test/hello-test/hv-hello.simics \
 	test/vmpic-test/hv-vmpic.simics \
 	test/linux/hv-linux-1p.simics \
 	test/linux/hv-linux-intmap.simics \
+	test/linux/hv-partman.simics \
 	test/linux/hv-linux-2p.simics \
 	test/ipi_doorbell-test/hv-ipi.simics \
 	test/ipi_doorbell-test/hv-ipi-2p.simics \

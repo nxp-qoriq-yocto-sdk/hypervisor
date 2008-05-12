@@ -1,0 +1,26 @@
+#
+# Script to run 8578/u-boot/ultravisor/linux on simulator
+#
+
+# UART0 is the hypervisor
+# UART1 is byte-channel UART MUX
+# UART2 is Linux partition 1
+# UART3 is Linux partition 2
+$use_uart1 = 1
+$use_uart3 = 1
+
+$guest_image[0]  = "vmlinux"
+$guest_addr[0]   = 0xef100000
+$guest_image[1]  = "bin/rootfs2.ext2.gz"
+$guest_addr[1]   = 0xef800000
+
+$kernel_image  = "uv.uImage"
+
+$dtb_image  = "hv-partman.dtb"
+
+add-directory "%script%/../common" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
+add-directory "%script%" -prepend
+
+run-command-file "hvsim.include"                                                                 

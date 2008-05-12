@@ -176,7 +176,11 @@ if ($kernel_image != "") {
 }
 
 foreach $i in (range (list-length $guest_image)) {
-	flash1_space.load-file $guest_image[$i] $guest_addr[$i]
+	if ($guest_addr[$i] < 0xef800000) {
+		flash1_space.load-file $guest_image[$i] $guest_addr[$i]
+	} else {
+		flash0_space.load-file $guest_image[$i] $guest_addr[$i]
+	}	
 }
 
 if ($dtb_image != "") {

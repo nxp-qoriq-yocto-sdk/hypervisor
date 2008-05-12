@@ -131,6 +131,9 @@ test-linux-1p: bin/uv.uImage test/linux
 test-linux-intmap: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-intmap.simics
 
+test-partman: bin/uv.uImage test/linux
+	$(SIMICS) test/linux/hv-partman.simics
+
 test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 
@@ -152,8 +155,8 @@ test-whoami: bin/uv.uImage test/whoami-test
 test-hcalls: bin/uv.uImage test/hcalls-test
 	$(SIMICS) test/hcalls-test/hv-hcalls.simics
 
-demo: bin/uv.uImage test/demo
-	$(SIMICS) test/demo/hv-demo.simics -e c
+demo: bin/uv.uImage test/linux
+	$(SIMICS) test/linux/hv-demo.simics -e c
 
 .PHONY: FORCE test
 test/%: FORCE
