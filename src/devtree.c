@@ -394,16 +394,16 @@ int open_stdout_chardev(int node)
 	
 	cd = ptr_from_node(fdt, node, "chardev");
 	if (!cd)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	console_init(cd);
 
 	if (!cd->ops->set_tx_queue)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	queue_t *q = alloc_type(queue_t);
 	if (!q)
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 
 	ret = queue_init(q, 2048);
 	if (ret < 0)
@@ -425,11 +425,11 @@ int open_stdout_bytechan(int node)
 	
 	bc = ptr_from_node(fdt, node, "bc");
 	if (!bc)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	bc_console = byte_chan_claim(bc);
 	if (!bc_console)
-		return -ERR_BUSY;
+		return ERR_BUSY;
 
 	qconsole_init(bc_console->tx);
 	stdout = bc_console->tx;
@@ -457,11 +457,11 @@ int open_stdin_chardev(chardev_t *cd)
 	int ret;
 
 	if (!cd->ops->set_rx_queue)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	q = alloc_type(queue_t);
 	if (!q)
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 
 	ret = queue_init(q, 2048);
 	if (ret < 0)
@@ -613,7 +613,7 @@ static int get_int_cells(const void *tree, int domain)
 	if (!prop) {
 		if (len == -FDT_ERR_NOTFOUND) {
 			printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-			len = -ERR_BADTREE;
+			len = ERR_BADTREE;
 		}
 
 		return len;
@@ -674,7 +674,7 @@ int get_interrupt(const void *tree, int node, int intnum,
 		if (domain < 0) {
 			if (domain == -FDT_ERR_NOTFOUND) {
 				printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-				domain = -ERR_BADTREE;
+				domain = ERR_BADTREE;
 			}
 
 			return domain;
@@ -688,7 +688,7 @@ int get_interrupt(const void *tree, int node, int intnum,
 			*ncellsp = ncells;
 
 		if ((intnum + 1) * ncells * 4 > speclen)
-			return -ERR_BADTREE;
+			return ERR_BADTREE;
 
 		*intspec += ncells * intnum;
 
@@ -698,6 +698,6 @@ int get_interrupt(const void *tree, int node, int intnum,
 
 		/* FIXME: Translate interrupt here */
 		printf("get_interrupt: interrupt-map not yet supported\n");
-		return -ERR_BADTREE;
+		return ERR_BADTREE;
 	}
 }

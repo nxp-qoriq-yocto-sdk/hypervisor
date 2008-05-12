@@ -50,7 +50,7 @@ int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq)
 
 	vmirq = alloc_type(vmpic_interrupt_t);
 	if (!vmirq)
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 
 	vmirq->irq = irq;
 	irq->priv = vmirq;
@@ -86,7 +86,7 @@ int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
 
  	irq = get_mpic_irq(irqspec, ncells);
  	if (!irq)
- 		return -ERR_INVALID;
+ 		return ERR_INVALID;
 
 	saved = spin_lock_critsave(&vmpic_lock);
  	
