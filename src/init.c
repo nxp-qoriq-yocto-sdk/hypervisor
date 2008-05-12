@@ -56,10 +56,10 @@ void start(unsigned long devtree_ptr)
 	mem_end = find_end_of_mem();
 	core_init();
 
-	unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+	uintptr_t heap = (unsigned long)fdt + fdt_totalsize(fdt);
 	heap = (heap + 15) & ~15;
 
-	alloc_init(heap, mem_end + PHYSBASE);
+	malloc_init((void *)heap, mem_end - heap);
 	mpic_init((unsigned long)fdt);
 
 	enable_critint();
