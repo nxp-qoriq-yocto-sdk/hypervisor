@@ -15,5 +15,6 @@ files="test/hello-test/hv-hello.simics \
 
 for i in $files
 do
+	echo $i
 	simics $i -e c
 done
