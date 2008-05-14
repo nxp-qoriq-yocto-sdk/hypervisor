@@ -4,7 +4,7 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: dtbs bin/partman rootfs
+all: dtbs bin/partman
 
 include ../Makefile.inc
 
