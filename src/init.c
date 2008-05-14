@@ -44,22 +44,28 @@ void *fdt;
 static phys_addr_t mem_end;
 unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
+extern int _end;
 
 void start(unsigned long devtree_ptr)
 {
+	printf("=======================================\n");
+	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
+
 	valloc_init(1024 * 1024, PHYSBASE);
 	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
-	mem_end = find_end_of_mem();
+	mem_end = find_memory();
 	core_init();
 
 	uintptr_t heap = (unsigned long)fdt + fdt_totalsize(fdt);
 	heap = (heap + 15) & ~15;
 
-	malloc_init((void *)heap, mem_end - heap);
+	malloc_exclude_segment((void *)PHYSBASE, &_end);
+	malloc_init();
+
 	mpic_init((unsigned long)fdt);
 
 	enable_critint();
@@ -77,10 +83,6 @@ void start(unsigned long devtree_ptr)
 #endif
 
 	open_stdout();
-	printf("mem_end %llx\n", mem_end);
-
-	printf("=======================================\n");
-	printf("Freescale Ultravisor %s\n", CONFIG_HV_VERSION);
 
 	vmpic_global_init();
 

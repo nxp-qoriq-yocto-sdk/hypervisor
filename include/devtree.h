@@ -20,7 +20,7 @@ int get_interrupt(const void *tree, int node, int intnum,
                   const uint32_t **intspec, int *ncells);
 int get_num_interrupts(const void *tree, int node);
 
-phys_addr_t find_end_of_mem(void);
+phys_addr_t find_memory(void);
 
 int xlate_one(uint32_t *addr, const uint32_t *ranges,
               int rangelen, uint32_t naddr, uint32_t nsize,

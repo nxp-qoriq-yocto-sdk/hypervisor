@@ -496,58 +496,89 @@ void open_stdin(void)
 }
 #endif
 
-// FIXME: memory holes
-phys_addr_t find_end_of_mem(void)
+static void add_memory(phys_addr_t start, phys_addr_t size)
+{
+	printf("add_memory %llx %llx\n", start, size);
+
+	if (start + size < start) {
+		printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+		         "memory node contains invalid region 0x%llx->0x%llx\n",
+		         start, start + size - 1);
+
+		return;
+	}
+
+	start += PHYSBASE;
+
+	if (start > 0x100000000ULL)
+		return;
+
+	if (start + size + PHYSBASE > 0x100000000ULL)
+		size = 0x100000000ULL - start;
+
+	malloc_add_segment((void *)(unsigned long)start,
+	                   (void *)(unsigned long)(start + size - 1));
+}
+
+phys_addr_t find_memory(void)
 {
 	phys_addr_t mem_end = 0;
-	int memnode = fdt_subnode_offset(fdt, 0, "memory");
-	if (memnode < 0) {
-		printf("error %d (%s) opening /memory\n", memnode,
-		       fdt_strerror(memnode));
-
-		return 0;
-	}
-
+	int memnode = -1;
 	int len;
-	const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
-	if (!memreg) {
-		printf("error %d (%s) reading /memory/reg\n", memnode,
-		       fdt_strerror(memnode));
+	
+	while (1) {
+		memnode = fdt_node_offset_by_prop_value(fdt, memnode, "device_type",
+		                                        "memory", strlen("memory") + 1);
+		if (memnode < 0)
+			break;
 
-		return 0;
-	}
+		const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
+		if (!memreg) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "error %d (%s) reading memory reg\n", len,
+			         fdt_strerror(len));
 
-	uint32_t naddr, nsize;
-	int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
-	if (ret < 0) {
-		printf("error %d (%s) getting address format for /memory\n",
-		       ret, fdt_strerror(ret));
-
-		return 0;
-	}
-
-	if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
-		printf("bad address format %u/%u for /memory\n", naddr, nsize);
-		return 0;
-	}
-
-	const uint32_t *reg = memreg;
-	while (reg + naddr + nsize <= memreg + len / 4) {
-		phys_addr_t addr = *reg++;
-		if (naddr == 2) {
-			addr <<= 32;
-			addr |= *reg++;
+			continue;
 		}
 
-		phys_addr_t size = *reg++;
-		if (nsize == 2) {
-			size <<= 32;
-			size |= *reg++;
+		uint32_t naddr, nsize;
+		int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
+		if (ret < 0) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "error %d (%s) getting address format for memory node\n",
+			         ret, fdt_strerror(ret));
+
+			continue;
 		}
 
-		addr += size - 1;
-		if (addr > mem_end)
-			mem_end = addr;
+		if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "bad address format %u/%u for memory node\n",
+			         naddr, nsize);
+
+			continue;
+		}
+
+		const uint32_t *reg = memreg;
+		while (reg + naddr + nsize <= memreg + len / 4) {
+			phys_addr_t addr = *reg++;
+			if (naddr == 2) {
+				addr <<= 32;
+				addr |= *reg++;
+			}
+
+			phys_addr_t size = *reg++;
+			if (nsize == 2) {
+				size <<= 32;
+				size |= *reg++;
+			}
+
+			add_memory(addr, size);
+
+			addr += size - 1;
+			if (addr > mem_end)
+				mem_end = addr;
+		}
 	}
 	
 	return mem_end;
