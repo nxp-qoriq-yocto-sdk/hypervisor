@@ -106,7 +106,8 @@ void start(unsigned long devtree_ptr)
 	core_init();
 
 	exclude_memrsv();
-	malloc_exclude_segment((void *)PHYSBASE, &_end);
+	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
+	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
 	malloc_init();
 
 	mpic_init((unsigned long)fdt);
