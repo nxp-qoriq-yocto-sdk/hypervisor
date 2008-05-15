@@ -469,7 +469,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (!prop)
 		goto fail;
 	if (ret < 12) {
-		ret = -ERR_BADTREE;
+		ret = ERR_BADTREE;
 		goto fail;
 	}
 
@@ -868,7 +868,7 @@ int stop_guest(guest_t *guest)
 	spin_lock(&guest->lock);
 
 	if (guest->state != guest_running)
-		ret = -ERR_INVALID;
+		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
 
@@ -889,7 +889,7 @@ int start_guest(guest_t *guest)
 	spin_lock(&guest->lock);
 
 	if (guest->state != guest_stopped)
-		ret = -ERR_INVALID;
+		ret = ERR_INVALID;
 	else
 		guest->state = guest_starting;
 

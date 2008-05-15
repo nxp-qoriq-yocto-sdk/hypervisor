@@ -346,6 +346,8 @@ void create_ns16550(void)
 	int ncells;
 
 	while (1) {
+		interrupt_t *irq = NULL;
+
 		off = fdt_node_offset_by_compatible(fdt, off, "ns16550");
 		if (off < 0)
 			break;
@@ -358,8 +360,8 @@ void create_ns16550(void)
 
 		// FIXME: clock-frequency
 		ret = get_interrupt(fdt, off, 0, &prop, &ncells);
-		
-		interrupt_t *irq = get_mpic_irq(prop, ncells);
+		if (ret >= 0)
+			irq = get_mpic_irq(prop, ncells);
 		if (irq) {
 			ret = irq->ops->config_by_intspec(irq, prop, ncells);
 			if (ret < 0) {
@@ -394,16 +396,16 @@ int open_stdout_chardev(int node)
 	
 	cd = ptr_from_node(fdt, node, "chardev");
 	if (!cd)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	console_init(cd);
 
 	if (!cd->ops->set_tx_queue)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	queue_t *q = alloc_type(queue_t);
 	if (!q)
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 
 	ret = queue_init(q, 2048);
 	if (ret < 0)
@@ -425,11 +427,11 @@ int open_stdout_bytechan(int node)
 	
 	bc = ptr_from_node(fdt, node, "bc");
 	if (!bc)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	bc_console = byte_chan_claim(bc);
 	if (!bc_console)
-		return -ERR_BUSY;
+		return ERR_BUSY;
 
 	qconsole_init(bc_console->tx);
 	stdout = bc_console->tx;
@@ -457,11 +459,11 @@ int open_stdin_chardev(chardev_t *cd)
 	int ret;
 
 	if (!cd->ops->set_rx_queue)
-		return -ERR_INVALID;
+		return ERR_INVALID;
 
 	q = alloc_type(queue_t);
 	if (!q)
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 
 	ret = queue_init(q, 2048);
 	if (ret < 0)
@@ -494,58 +496,89 @@ void open_stdin(void)
 }
 #endif
 
-// FIXME: memory holes
-phys_addr_t find_end_of_mem(void)
+static void add_memory(phys_addr_t start, phys_addr_t size)
+{
+	printf("add_memory %llx %llx\n", start, size);
+
+	if (start + size < start) {
+		printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+		         "memory node contains invalid region 0x%llx->0x%llx\n",
+		         start, start + size - 1);
+
+		return;
+	}
+
+	start += PHYSBASE;
+
+	if (start > 0x100000000ULL)
+		return;
+
+	if (start + size + PHYSBASE > 0x100000000ULL)
+		size = 0x100000000ULL - start;
+
+	malloc_add_segment((void *)(unsigned long)start,
+	                   (void *)(unsigned long)(start + size - 1));
+}
+
+phys_addr_t find_memory(void)
 {
 	phys_addr_t mem_end = 0;
-	int memnode = fdt_subnode_offset(fdt, 0, "memory");
-	if (memnode < 0) {
-		printf("error %d (%s) opening /memory\n", memnode,
-		       fdt_strerror(memnode));
-
-		return 0;
-	}
-
+	int memnode = -1;
 	int len;
-	const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
-	if (!memreg) {
-		printf("error %d (%s) reading /memory/reg\n", memnode,
-		       fdt_strerror(memnode));
+	
+	while (1) {
+		memnode = fdt_node_offset_by_prop_value(fdt, memnode, "device_type",
+		                                        "memory", strlen("memory") + 1);
+		if (memnode < 0)
+			break;
 
-		return 0;
-	}
+		const uint32_t *memreg = fdt_getprop(fdt, memnode, "reg", &len);
+		if (!memreg) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "error %d (%s) reading memory reg\n", len,
+			         fdt_strerror(len));
 
-	uint32_t naddr, nsize;
-	int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
-	if (ret < 0) {
-		printf("error %d (%s) getting address format for /memory\n",
-		       ret, fdt_strerror(ret));
-
-		return 0;
-	}
-
-	if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
-		printf("bad address format %u/%u for /memory\n", naddr, nsize);
-		return 0;
-	}
-
-	const uint32_t *reg = memreg;
-	while (reg + naddr + nsize <= memreg + len / 4) {
-		phys_addr_t addr = *reg++;
-		if (naddr == 2) {
-			addr <<= 32;
-			addr |= *reg++;
+			continue;
 		}
 
-		phys_addr_t size = *reg++;
-		if (nsize == 2) {
-			size <<= 32;
-			size |= *reg++;
+		uint32_t naddr, nsize;
+		int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
+		if (ret < 0) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "error %d (%s) getting address format for memory node\n",
+			         ret, fdt_strerror(ret));
+
+			continue;
 		}
 
-		addr += size - 1;
-		if (addr > mem_end)
-			mem_end = addr;
+		if (naddr < 1 || naddr > 2 || nsize < 1 || nsize > 2) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "bad address format %u/%u for memory node\n",
+			         naddr, nsize);
+
+			continue;
+		}
+
+		const uint32_t *reg = memreg;
+		while (reg + naddr + nsize <= memreg + len / 4) {
+			phys_addr_t addr = *reg++;
+			if (naddr == 2) {
+				addr <<= 32;
+				addr |= *reg++;
+			}
+
+			phys_addr_t size = *reg++;
+			if (nsize == 2) {
+				size <<= 32;
+				size |= *reg++;
+			}
+
+			add_memory(addr, size);
+
+			addr += size - 1;
+			if (addr > mem_end)
+				mem_end = addr;
+		}
 	}
 	
 	return mem_end;
@@ -613,7 +646,7 @@ static int get_int_cells(const void *tree, int domain)
 	if (!prop) {
 		if (len == -FDT_ERR_NOTFOUND) {
 			printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-			len = -ERR_BADTREE;
+			len = ERR_BADTREE;
 		}
 
 		return len;
@@ -674,7 +707,7 @@ int get_interrupt(const void *tree, int node, int intnum,
 		if (domain < 0) {
 			if (domain == -FDT_ERR_NOTFOUND) {
 				printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-				domain = -ERR_BADTREE;
+				domain = ERR_BADTREE;
 			}
 
 			return domain;
@@ -688,7 +721,7 @@ int get_interrupt(const void *tree, int node, int intnum,
 			*ncellsp = ncells;
 
 		if ((intnum + 1) * ncells * 4 > speclen)
-			return -ERR_BADTREE;
+			return ERR_BADTREE;
 
 		*intspec += ncells * intnum;
 
@@ -698,6 +731,6 @@ int get_interrupt(const void *tree, int node, int intnum,
 
 		/* FIXME: Translate interrupt here */
 		printf("get_interrupt: interrupt-map not yet supported\n");
-		return -ERR_BADTREE;
+		return ERR_BADTREE;
 	}
 }

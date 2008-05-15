@@ -573,6 +573,10 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		mtspr(SPR_DEC, val);
 		break;
 
+	case SPR_DECAR:
+		mtspr(SPR_DECAR, val);
+		break;
+
 	case SPR_CSRR0:
 		gcpu->csrr0 = val;
 		break;

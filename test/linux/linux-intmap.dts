@@ -85,14 +85,14 @@
 	};
 
 	testintrnexus: testintrnexus {
-                     #address-cells = <1>;
-                     #interrupt-cells = <1>;
-                     interrupt-map-mask =  <F F>;
-                     interrupt-map =  <
-                       11d500 9 &mpic 1 25 2
-                       118000 8 &mpic 2 1e 2
-                      >;
-        };
+		#address-cells = <1>;
+		#interrupt-cells = <1>;
+		interrupt-map-mask = <F F>;
+		interrupt-map = <
+			11d500 9 &mpic 1 25 2
+			118000 8 &mpic 2 26 2
+		>;
+	};
 
 	vmpic:vmpic {
 		compatible = "fsl,hv-vmpic";

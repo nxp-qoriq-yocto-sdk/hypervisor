@@ -5,7 +5,6 @@
 
 struct guest;
 
-void *alloc(unsigned long size, unsigned long align);
 int start_guest(struct guest *guest);
 int stop_guest(struct guest *guest);
 

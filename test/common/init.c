@@ -58,10 +58,10 @@ void init(unsigned long devtree_ptr)
 	/* alloc the heap */
 	fdt = (void *)(devtree_ptr + PHYSBASE);
 
-	unsigned long heap = (unsigned long)fdt + fdt_totalsize(fdt);
+	uintptr_t heap = (unsigned long)fdt + fdt_totalsize(fdt);
 	heap = (heap + 15) & ~15;
 
-	alloc_init(heap, heap + (0x100000-1));  // FIXME: hardcoded 1MB heap
+	simple_alloc_init((void *)heap, 0x100000); // FIXME: hardcoded 1MB heap
 	valloc_init(1024 * 1024, PHYSBASE);
 	uart_offset = get_uart_offset();
 
