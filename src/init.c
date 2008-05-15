@@ -46,6 +46,51 @@ unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
 extern int _end;
 
+static void exclude_memrsv(void)
+{
+	int i, num = fdt_num_mem_rsv(fdt);
+	if (num < 0) {
+		printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+		         "exclude_memrsv: error %d getting number of entries\n", num);
+		return;
+	}
+
+	for (i = 0; i < num; i++) {
+		uint64_t addr, size;
+		int ret;
+		
+		ret = fdt_get_mem_rsv(fdt, i, &addr, &size);
+		if (ret < 0) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "exclude_memrsv: error %d getting entry %d\n", ret, i);
+			return;
+		}
+
+		printlog(LOGTYPE_MALLOC, LOGLEVEL_DEBUG,
+		         "memreserve 0x%llx->0x%llx\n",
+		         addr, addr + size - 1);
+
+		if (addr + size < addr) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "rsvmap %d contains invalid region 0x%llx->0x%llx\n",
+			         i, addr, addr + size - 1);
+
+			return;
+		}
+
+		addr += PHYSBASE;
+
+		if (addr > 0x100000000ULL)
+			return;
+
+		if (addr + size + PHYSBASE > 0x100000000ULL)
+			size = 0x100000000ULL - addr;
+
+		malloc_exclude_segment((void *)(unsigned long)addr,
+		                       (void *)(unsigned long)(addr + size - 1));
+	}
+}
+
 void start(unsigned long devtree_ptr)
 {
 	printf("=======================================\n");
@@ -60,9 +105,7 @@ void start(unsigned long devtree_ptr)
 	mem_end = find_memory();
 	core_init();
 
-	uintptr_t heap = (unsigned long)fdt + fdt_totalsize(fdt);
-	heap = (heap + 15) & ~15;
-
+	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end);
 	malloc_init();
 
