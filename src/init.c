@@ -44,7 +44,7 @@ void *fdt;
 static phys_addr_t mem_end;
 unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
-extern int _end;
+extern char _end;
 
 static void exclude_memrsv(void)
 {
@@ -105,8 +105,11 @@ void start(unsigned long devtree_ptr)
 	mem_end = find_memory();
 	core_init();
 
+	printf("fdt %p size %x\n", fdt, fdt_totalsize(fdt));
+
 	exclude_memrsv();
-	malloc_exclude_segment((void *)PHYSBASE, &_end);
+	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
+	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
 	malloc_init();
 
 	mpic_init((unsigned long)fdt);
