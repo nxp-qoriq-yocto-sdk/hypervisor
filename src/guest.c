@@ -706,20 +706,14 @@ static void start_guest_primary(void)
 
 		// TODO: send signal to manager
 		spin_unlock(&guest->lock);
+
+		/* No hypervisor-loadable image; wait for a manager to start us. */
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		         "Guest %s waiting for manager start\n", guest->name);
 		return;
 	}
 
 	spin_unlock(&guest->lock);
-
-	if (ret > 0)
-		start_guest_primary_nowait();
-	
-	if (ret == 0) {
-		/* No hypervisor-loadable image; wait for a manager to start us. */
-		printf("Guest %s waiting for manager start\n", guest->name);
-		return;
-	}
-	
 	start_guest_primary_nowait();
 }
 
