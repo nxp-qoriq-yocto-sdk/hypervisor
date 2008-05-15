@@ -498,8 +498,6 @@ void open_stdin(void)
 
 static void add_memory(phys_addr_t start, phys_addr_t size)
 {
-	printf("add_memory %llx %llx\n", start, size);
-
 	if (start + size < start) {
 		printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
 		         "memory node contains invalid region 0x%llx->0x%llx\n",
