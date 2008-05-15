@@ -11,9 +11,22 @@ Linux Guest Notes
       bank1   0xef000000
 
 
-2. Memory Map:  hv-linux-1p and hv-linux-2p
+2. Memory Map:  hv-linux-1p
 
-   a. partition #1 and #2: loaded by the
+   partition #1: loaded by the
+   hypervisor from flash
+
+     Guest       Guest
+    Physical    Physical      Image
+    (Flash)      (DDR)
+   ---------------------------------------
+    ef100000    00000000      vmlinux
+      n/a       01000000       DTB
+    ef600000    01300000    rootfs.ext2.gz
+
+3. Memory Map: hv-linux-2p
+
+   a. partition #1: loaded by the
       hypervisor from flash
 
      Guest       Guest
@@ -24,8 +37,19 @@ Linux Guest Notes
       n/a       01000000       DTB
     ef600000    01300000    rootfs.ext2.gz
 
+   b. partition #2: loaded by the
+      hypervisor from flash
+
+     Guest       Guest
+    Physical    Physical      Image
+    (Flash)      (DDR)
+   ---------------------------------------
+    ef800000    00000000      vmlinux
+      n/a       01000000       DTB
+    efd00000    01300000    rootfs.ext2.gz
+
     
-3. Memory Map: hv-linux-partman
+4. Memory Map: hv-linux-partman
 
    partition #1: loaded by the hypervisor from
    flash
@@ -36,7 +60,7 @@ Linux Guest Notes
    ---------------------------------------
     ef100000    00000000      vmlinux
       n/a       01000000       DTB
-    ef600000    01300000    rootfs.ext2.gz
+    ef800000    01300000    rootfs.ext2.gz
 
    partition #2: loaded by partition manager
    running in partition #1
