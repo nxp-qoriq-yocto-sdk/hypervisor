@@ -132,6 +132,7 @@ test-linux-intmap: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-intmap.simics
 
 test-partman: bin/uv.uImage test/linux
+	make -C test/linux rootfs
 	$(SIMICS) test/linux/hv-partman.simics
 
 test-linux-2p: bin/uv.uImage test/linux
