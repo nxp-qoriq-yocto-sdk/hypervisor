@@ -28,6 +28,7 @@
 #include <libos/readline.h>
 #include <devtree.h>
 #include <shell.h>
+#include <percpu.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -166,3 +167,21 @@ static command_t version = {
 	.shorthelp = "Print the hypervisor version",
 };
 shell_cmd(version);
+
+static void lp_fn(shell_t *shell, char *args)
+{
+	int i;
+	
+	printf("Partition   Name\n");
+	
+	for (i = 0; i < last_lpid; i++)
+		printf("%-11d %s\n", i, guests[i].name);
+}
+
+static command_t lp = {
+	.name = "list-partitions",
+	.aliases = (const char *[]){ "lp", NULL },
+	.action = lp_fn,
+	.shorthelp = "List partitions",
+};
+shell_cmd(lp);

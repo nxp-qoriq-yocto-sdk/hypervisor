@@ -84,6 +84,11 @@ typedef struct guest {
 	gstate_t state;
 } guest_t;
 
+#define MAX_PARTITIONS 8
+
+extern struct guest guests[MAX_PARTITIONS];
+extern unsigned long last_lpid;
+
 #define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
 #define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
