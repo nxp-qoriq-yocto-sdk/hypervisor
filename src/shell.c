@@ -117,6 +117,21 @@ void shell_init(void)
 	}
 }
 
+static void print_aliases(shell_t *shell, command_t *cmd)
+{
+	if (cmd->aliases) {
+		const char **a = cmd->aliases;
+		qprintf(shell->out, "  aliases: ");
+		
+		while (*a) {
+			qprintf(shell->out, "%s ", *a);
+			a++;
+		}
+		
+		qprintf(shell->out, "\n");
+	}
+}
+
 static void help_fn(shell_t *shell, char *args)
 {
 	command_t *cmd;
@@ -130,6 +145,7 @@ static void help_fn(shell_t *shell, char *args)
 		for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 			cmd = *i;
 			qprintf(shell->out, "%s - %s\n", cmd->name, cmd->shorthelp);
+			print_aliases(shell, cmd);
 		}
 		
 		return;
@@ -144,7 +160,8 @@ static void help_fn(shell_t *shell, char *args)
 	}
 	
 	qprintf(shell->out, "%s - %s\n", cmd->name, cmd->shorthelp);
-	
+	print_aliases(shell, cmd);
+
 	if (cmd->longhelp)
 		qprintf(shell->out, "\n%s\n", cmd->longhelp);
 }
