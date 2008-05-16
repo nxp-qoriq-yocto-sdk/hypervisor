@@ -9,8 +9,6 @@
 		stdin = &uart0;
 		serial0 = &uart0;
 		uartmux = &uartmux;
-		byte-channel0 = &bc0;
-		byte-channel1 = &bc1;
 	};
 
 	cpus {

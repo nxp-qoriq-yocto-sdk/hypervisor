@@ -300,6 +300,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	
 	if (mux->first_bc == NULL) {
 		mux->first_bc = cbc;
+		mux->current_rx_bc = mux->first_bc;
 	} else {
 		connected_bc_t *bc_chain = mux->first_bc;
 
