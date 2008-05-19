@@ -26,23 +26,41 @@
  */
 
 #include <libos/readline.h>
+
+#include <errors.h>
 #include <devtree.h>
 #include <shell.h>
 #include <percpu.h>
+
+#include <limits.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
 char *stripspace(const char *str)
 {
+	if (!str)
+		return NULL;
+
 	while (*str && *str == ' ')
 		str++;
+
+	if (!*str)
+		return NULL;
 
 	return (char *)str;
 }
 
 char *nextword(char **str)
 {
-	char *ret = stripspace(*str);
+	char *ret;
+
+	if (!*str)
+		return NULL;
+	
+	ret = stripspace(*str);
+	if (!ret)
+		return NULL;
+	
 	*str = strchr(ret, ' ');
 
 	if (*str) {
@@ -50,6 +68,132 @@ char *nextword(char **str)
 		(*str)++;
 	}
 	
+	return ret;
+}
+
+static int print_num_error(shell_t *shell, char *endp, const char *numstr)
+{
+	if (cpu->errno) {
+		if (cpu->errno == ERR_RANGE)
+			qprintf(shell->out, "Number exceeds range: %s\n", numstr);
+		else if (cpu->errno == ERR_INVALID)
+			qprintf(shell->out, "Unrecognized number format: %s\n", numstr);
+		else
+			qprintf(shell->out, "get_number: error %d: %s\n", cpu->errno, numstr);
+
+		return 1;
+	}
+
+	if (endp && *endp) {
+		qprintf(shell->out, "Trailing junk after number: %s\n", numstr);
+		cpu->errno = ERR_INVALID;
+		return 1;
+	}
+	
+	return 0;
+}
+
+static int get_base(shell_t *shell, const char *numstr, int *skip)
+{
+	*skip = 0;
+
+	if (numstr[0] == '0') {
+		if (numstr[1] == 0)
+			return 10;
+	
+		if (numstr[1] == 'x') {
+			*skip = 2;
+			return 16;
+		}
+
+		if (numstr[1] == 'b') {
+			*skip = 2;
+			return 2;
+		}
+		
+		if (numstr[1] >= '0' && numstr[1] <= '7') {
+			*skip = 1;
+			return 8;
+		}
+
+		qprintf(shell->out, "Unrecognized number format: %s\n", numstr);
+		cpu->errno = ERR_INVALID;
+		return 0;
+	}
+	
+	return 10;
+}
+
+uint64_t get_number64(shell_t *shell, const char *numstr)
+{
+	uint64_t ret;
+	char *endp;
+	int skip, base;
+
+	if (numstr[0] == '-') {
+		cpu->errno = ERR_RANGE;
+		qprintf(shell->out, "Number exceeds range: %s\n", numstr);
+		return 0;
+	}
+
+	base = get_base(shell, numstr, &skip);
+	if (!base)
+		return 0;
+
+	ret = strtoull(&numstr[skip], &endp, base);
+
+	if (print_num_error(shell, endp, numstr))
+		return 0;
+
+	return ret;
+}
+
+/* Only decimal numbers may be negative */
+int64_t get_snumber64(shell_t *shell, const char *numstr)
+{
+	int64_t ret;
+	char *endp;
+	int skip, base;
+	
+	base = get_base(shell, numstr, &skip);
+	if (!base)
+		return 0;
+
+	ret = strtoll(&numstr[skip], &endp, base);
+
+	if (print_num_error(shell, endp, numstr))
+		return 0;
+
+	return ret;
+}
+
+uint32_t get_number32(shell_t *shell, const char *numstr)
+{
+	uint64_t ret = get_number64(shell, numstr);
+	if (cpu->errno)
+		return 0;
+
+	if (ret >= 0x100000000ULL) {
+		cpu->errno = ERR_RANGE;
+		qprintf(shell->out, "Number exceeds range: %s\n", numstr);
+		ret = 0;
+	}
+
+	return ret;
+}
+
+int32_t get_snumber32(shell_t *shell, const char *numstr)
+{
+	int64_t ret = get_snumber64(shell, numstr);
+	if (cpu->errno)
+		return 0;
+
+	if (ret >= 0x80000000LL || ret < -0x80000000LL) {
+		cpu->errno = ERR_RANGE;
+		qprintf(shell->out, "Number exceeds range: %s\n", numstr);
+		ret = 0;
+	}
+
 	return ret;
 }
 
@@ -78,25 +222,18 @@ static command_t *find_command(const char *str)
 static int shell_action(void *user_ctx, char *buf)
 {
 	shell_t *shell = user_ctx;
-	char *args = "";
+	char *cmdname;
 	command_t *cmd;
-	char *space;
 
-	buf = stripspace(buf);
-	if (strlen(buf) == 0)
+	cmdname = nextword(&buf);
+	if (!cmdname)
 		return 0;
-	
-	space = strchr(buf, ' ');
-	if (space) {
-		args = space + 1;
-		*space = 0;
-	}
-	
-	cmd = find_command(buf);
+
+	cmd = find_command(cmdname);
 	if (cmd)
-		cmd->action(shell, args);
+		cmd->action(shell, buf);
 	else
-		qprintf(shell->out, "Unknown command '%s'.\n", buf);
+		qprintf(shell->out, "Unknown command '%s'.\n", cmdname);
 
 	return 0;
 }
@@ -135,9 +272,9 @@ static void print_aliases(shell_t *shell, command_t *cmd)
 static void help_fn(shell_t *shell, char *args)
 {
 	command_t *cmd;
-	const char *cmdname;
+	const char *cmdname = nextword(&args);
 
-	if (strlen(args) == 0) {
+	if (!cmdname) {
 		command_t **i, *cmd;
 
 		qprintf(shell->out, "Commands:\n");
@@ -151,7 +288,6 @@ static void help_fn(shell_t *shell, char *args)
 		return;
 	}
 	
-	cmdname = nextword(&args);
 	cmd = find_command(cmdname);
 
 	if (!cmd) {
@@ -189,10 +325,10 @@ static void lp_fn(shell_t *shell, char *args)
 {
 	int i;
 	
-	printf("Partition   Name\n");
+	qprintf(shell->out, "Partition   Name\n");
 	
 	for (i = 0; i < last_lpid; i++)
-		printf("%-11d %s\n", i, guests[i].name);
+		qprintf(shell->out, "%-11d %s\n", i, guests[i].name);
 }
 
 static command_t lp = {
@@ -202,3 +338,40 @@ static command_t lp = {
 	.shorthelp = "List partitions",
 };
 shell_cmd(lp);
+
+static void pi_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_number32(shell, numstr);
+	if (cpu->errno)
+		return;
+
+	if (num >= last_lpid) {
+		qprintf(shell->out, "Partition %u does not exist.\n", num);
+		return;
+	}
+
+	guest = &guests[num];
+	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
+}
+
+static command_t pi = {
+	.name = "partition-info",
+	.aliases = (const char *[]){ "pi", NULL },
+	.action = pi_fn,
+	.shorthelp = "Display information about a partition",
+	.longhelp = "  Usage: partition-info <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(pi);
