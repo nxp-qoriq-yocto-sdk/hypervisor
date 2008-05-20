@@ -45,10 +45,8 @@
 #include <events.h>
 #include <doorbell.h>
 
-#define MAX_PARTITIONS 8
-
 guest_t guests[MAX_PARTITIONS];
-static unsigned long last_lpid;
+unsigned long last_lpid;
 
 static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 {
