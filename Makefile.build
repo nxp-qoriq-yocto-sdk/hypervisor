@@ -113,17 +113,17 @@ bin/uv.map: bin/uv
 
 .PHONY: test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
 
-test-gdb: bin/uv.uImage test/gdb-test
-	$(SIMICS) test/gdb-test/hv-gdb.simics
+test-gdb: bin/uv.uImage test/gdb
+	$(SIMICS) test/gdb/hv-gdb.simics
 
-test-hello: bin/uv.uImage test/hello-test
-	$(SIMICS) test/hello-test/hv-hello.simics
+test-hello: bin/uv.uImage test/hello
+	$(SIMICS) test/hello/hv-hello.simics
 
-test-msgsnd: bin/uv.uImage test/msgsnd-test
-	$(SIMICS) test/msgsnd-test/hv-msgsnd.simics
+test-msgsnd: bin/uv.uImage test/msgsnd
+	$(SIMICS) test/msgsnd/hv-msgsnd.simics
 
-test-vmpic: bin/uv.uImage test/vmpic-test
-	$(SIMICS) test/vmpic-test/hv-vmpic.simics
+test-vmpic: bin/uv.uImage test/vmpic
+	$(SIMICS) test/vmpic/hv-vmpic.simics
 
 test-linux-1p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
@@ -138,23 +138,23 @@ test-partman: bin/uv.uImage test/linux
 test-linux-2p: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 
-test-ipi-doorbell-1p: bin/uv.uImage test/ipi_doorbell-test
-	$(SIMICS) test/ipi_doorbell-test/hv-ipi.simics
+test-ipi-1p: bin/uv.uImage test/ipi
+	$(SIMICS) test/ipi/hv-ipi.simics
 
-test-ipi-doorbell-2p: bin/uv.uImage test/ipi_doorbell-test
-	$(SIMICS) test/ipi_doorbell-test/hv-ipi-2p.simics
+test-ipi-2p: bin/uv.uImage test/ipi
+	$(SIMICS) test/ipi/hv-ipi-2p.simics
 
-test-fit: bin/uv.uImage test/fit-test
-	$(SIMICS) test/fit-test/hv-fit.simics
+test-fit: bin/uv.uImage test/fit
+	$(SIMICS) test/fit/hv-fit.simics
 
-test-byte-chan-test: bin/uv.uImage test/byte_chan-test
-	$(SIMICS) test/byte_chan-test/hv-byte_chan.simics
+test-byte-chan: bin/uv.uImage test/byte-chan
+	$(SIMICS) test/byte-chan/hv-byte_chan.simics
 
-test-whoami: bin/uv.uImage test/whoami-test
-	$(SIMICS) test/whoami-test/hv-whoami.simics
+test-whoami: bin/uv.uImage test/whoami
+	$(SIMICS) test/whoami/hv-whoami.simics
 
-test-hcalls: bin/uv.uImage test/hcalls-test
-	$(SIMICS) test/hcalls-test/hv-hcalls.simics
+test-hcalls: bin/uv.uImage test/hcalls
+	$(SIMICS) test/hcalls/hv-hcalls.simics
 
 demo: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-demo.simics -e c

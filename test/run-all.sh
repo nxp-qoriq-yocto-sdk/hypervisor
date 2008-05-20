@@ -1,17 +1,17 @@
 
-files="test/hello-test/hv-hello.simics \
-	test/msgsnd-test/hv-msgsnd.simics \
-	test/vmpic-test/hv-vmpic.simics \
+files="test/hello/hv-hello.simics \
+	test/msgsnd/hv-msgsnd.simics \
+	test/vmpic/hv-vmpic.simics \
 	test/linux/hv-linux-1p.simics \
 	test/linux/hv-linux-intmap.simics \
 	test/linux/hv-partman.simics \
 	test/linux/hv-linux-2p.simics \
-	test/ipi_doorbell-test/hv-ipi.simics \
-	test/ipi_doorbell-test/hv-ipi-2p.simics \
-	test/whoami-test/hv-whoami.simics \
-	test/hcalls-test/hv-hcalls.simics \
-	test/byte_chan-test/hv-byte_chan.simics \
-	test/fit-test/hv-fit.simics"
+	test/ipi/hv-ipi.simics \
+	test/ipi/hv-ipi-2p.simics \
+	test/whoami/hv-whoami.simics \
+	test/hcalls/hv-hcalls.simics \
+	test/byte-chan/hv-byte_chan.simics \
+	test/fit/hv-fit.simics"
 
 for i in $files
 do
