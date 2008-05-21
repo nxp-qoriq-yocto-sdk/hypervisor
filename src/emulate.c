@@ -501,6 +501,10 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		ret = gcpu->mcar >> 32;
 		break;
 
+	case SPR_MMUCSR0:
+		ret = 0;
+		break;
+
 	case SPR_MMUCFG:
 		ret = mfspr(SPR_MMUCFG);
 		break;
