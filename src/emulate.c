@@ -501,6 +501,10 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		ret = gcpu->mcar >> 32;
 		break;
 
+	case SPR_MMUCFG:
+		ret = mfspr(SPR_MMUCFG);
+		break;
+
 	default:
 		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
@@ -595,6 +599,14 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 
 	case SPR_MCSR:
 		gcpu->mcsr &= ~val;
+		break;
+
+	case SPR_MMUCSR0:
+		if (val & MMUCSR_L2TLB0_FI)
+			mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
+		if (val & MMUCSR_L2TLB1_FI)
+			guest_inv_tlb1(0);
+		
 		break;
 
 	default:
