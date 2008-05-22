@@ -273,6 +273,8 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
 	                     (mas3 >> MAS3_RPN_SHIFT);
 
+	gcpu->stats[stat_emu_tlbwe]++;
+
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
 		return 1;
@@ -647,6 +649,8 @@ void hvpriv(trapframe_t *regs)
 	uint32_t insn, major, minor;
 	int fault = 1;
 	int ret;
+
+	get_gcpu()->stats[stat_emu_total]++;
 
 	guestmem_set_insn(regs);
 	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,

@@ -99,6 +99,12 @@ extern unsigned long last_lpid;
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
+enum gcpu_stats {
+	stat_emu_total, /**< Total emulated instructions. */
+	stat_emu_tlbwe, /**< Emulated tlbwe instructions. */
+	num_gcpu_stats
+};
+	
 typedef struct gcpu {
 	kstack_t uvstack;
 	guest_t *guest;
@@ -120,6 +126,8 @@ typedef struct gcpu {
 	register_t ivpr;
 	register_t ivor[38];
 	uint32_t timer_flags;
+	
+	unsigned int stats[num_gcpu_stats];
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)

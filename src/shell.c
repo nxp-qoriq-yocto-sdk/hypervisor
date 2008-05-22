@@ -339,6 +339,18 @@ static command_t lp = {
 };
 shell_cmd(lp);
 
+static void print_stat(shell_t *shell, guest_t *guest,
+                       int stat, const char *str)
+{
+	int i;
+	unsigned int total = 0;
+	
+	for (i = 0; i < guest->cpucnt; i++)
+		total += guest->gcpus[i]->stats[stat];
+
+	qprintf(shell->out, "%s %-10u\n", str, total);
+}
+
 static void pi_fn(shell_t *shell, char *args)
 {
 	char *numstr;
@@ -364,6 +376,10 @@ static void pi_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
+	print_stat(shell, guest, stat_emu_total,
+	           "Total emulated instructions: ");
+	print_stat(shell, guest, stat_emu_tlbwe,
+	           "Total emulated TLB writes:   ");
 }
 
 static command_t pi = {
