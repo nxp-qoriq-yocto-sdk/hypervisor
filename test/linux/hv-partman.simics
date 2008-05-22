@@ -7,7 +7,7 @@
 # UART2 is Linux partition 1
 # UART3 is Linux partition 2
 $use_uart1 = 1
-$use_uart3 = 1
+$use_uart3 = 0
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0xef100000

@@ -34,14 +34,14 @@ void start(void)
 
 	init();
 
-	printf("msgsnd test\n\n");
+	printf("msgsnd test\n");
 
 	disable_extint();
 	disable_critint();
 	sync();
 
         // Normal doorbell
-	printf("msgsnd while interrupts enabled: ");
+	printf(" > msgsnd while interrupts enabled: ");
 
 	doorbell = 0;
 	sync();
@@ -51,12 +51,12 @@ void start(void)
 	timeout = 10000;
 	while (--timeout && !doorbell);
 	if (timeout)
-		printf("passed (timeout=%u)\n", timeout);
+		printf("PASSED\n");
 	else
-		printf("failed\n");
+		printf("FAILED\n");
 
 	// Delayed doorbell
-	printf("msgsnd while interrupts disabled: ");
+	printf(" > msgsnd while interrupts disabled: ");
 
 	disable_extint();
 	sync();
@@ -75,14 +75,14 @@ void start(void)
 		timeout = 10000;
 		while (--timeout && !doorbell);
 		if (timeout)
-			printf("passed (timeout=%u)\n", timeout);
+			printf("PASSED\n");
 		else
-			printf("failed\n");
+			printf("FAILED\n");
 	}
 	disable_extint();
 
 	// Critical doorbell
-	printf("critical msgsnd while interrupts enabled: ");
+	printf(" > critical msgsnd while interrupts enabled: ");
 
 	critical_doorbell = 0;
 	sync();
@@ -93,12 +93,12 @@ void start(void)
 	timeout = 10000;
 	while (--timeout && !doorbell);
 	if (timeout)
-		printf("passed (timeout=%u)\n", timeout);
+		printf("PASSED\n");
 	else
-		printf("failed\n");
+		printf("FAILED\n");
 
 	// Delayed critical doorbell
-	printf("critical msgsnd while interrupts disabled: ");
+	printf(" > critical msgsnd while interrupts disabled: ");
 
 	disable_critint();
 	sync();
@@ -109,7 +109,7 @@ void start(void)
 	timeout = 10000;
 	while (--timeout && !critical_doorbell);
 	if (timeout)
-		printf("failed (timeout=%u)\n", timeout);
+		printf("FAILED (timeout=%u)\n", timeout);
 	else {
 		critical_doorbell = 0;
 		sync();
@@ -117,14 +117,14 @@ void start(void)
 		timeout = 10000;
 		while (--timeout && !critical_doorbell);
 		if (timeout)
-			printf("passed (timeout=%u)\n", timeout);
+			printf("PASSED\n");
 		else
-			printf("failed\n");
+			printf("FAILED\n");
 	}
 	disable_critint();
 
 	// Normal doorbell msgclr
-	printf("msgclr test: ");
+	printf(" > msgclr test: ");
 
 	disable_extint();
 	sync();
@@ -140,14 +140,14 @@ void start(void)
 	timeout = 10000;
 	while (--timeout && !doorbell);
 	if (timeout)
-		printf("failed (timeout=%u)\n", timeout);
+		printf("FAILED (timeout=%u)\n", timeout);
 	else {
-		printf("passed\n");
+		printf("PASSED\n");
 	}
 	disable_extint();
 
 	// Normal doorbell msgclr
-	printf("critical msgclr test: ");
+	printf(" > critical msgclr test: ");
 
 	disable_critint();
 	sync();
@@ -163,9 +163,9 @@ void start(void)
 	timeout = 10000;
 	while (--timeout && !critical_doorbell);
 	if (timeout)
-		printf("failed (timeout=%u)\n", timeout);
+		printf("FAILED (timeout=%u)\n", timeout);
 	else {
-		printf("passed\n");
+		printf("PASSED\n");
 	}
 	disable_critint();
 

@@ -8,6 +8,8 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
+#undef DEBUG
+
 extern void init(unsigned long devtree_ptr);
 int extint_cnt;
 int *handle_p_int;
@@ -54,7 +56,9 @@ void wr_shm(void)
 	addr |= ((uint64_t) *reg) << 32;
 	reg++;
 	addr |= *reg;
+#ifdef DEBUG
 	printf("shared memory phys addr = %llx\n", addr);
+#endif
 	vaddr = valloc(4 * 1024, 4 * 1024);
 	if (!vaddr) {
 		printf("valloc failed \n");
@@ -62,7 +66,9 @@ void wr_shm(void)
 	}
 	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
 	memcpy(vaddr, "hello", strlen("hello") + 1);
+#ifdef DEBUG
 	printf("written '%s' to shared memory\n", (unsigned char *)vaddr);
+#endif
 }
 
 int *get_handle(const char *dbell_type, const char *prop, void *fdt)
@@ -117,6 +123,7 @@ int test_init(void)
 
 void dump_dev_tree(void)
 {
+#ifdef DEBUG
 	int node = -1;
 	const char *s;
 	int len;
@@ -127,6 +134,7 @@ void dump_dev_tree(void)
 		printf("   node = %s\n", s);
 	}
 	printf("------\n");
+#endif
 }
 
 void start(unsigned long devtree_ptr)
@@ -135,10 +143,13 @@ void start(unsigned long devtree_ptr)
 
 	init(devtree_ptr);
 
-	printf("ipi_doorbell-p1 test\n");
+	printf("inter-partition doorbell test #1\n");
 
 	dump_dev_tree();
+
 	wr_shm();
+
+	printf(" > sending doorbell to self...");
 
 	rc = test_init();
 	if (rc) {
@@ -147,11 +158,10 @@ void start(unsigned long devtree_ptr)
 
 	while (1) {
 		if (extint_cnt) {
-			printf("external interrupt\n");
+			printf("got external interrupt: PASSED\n");
 			break;
 		}
 	}
 
-	printf("done\n");
-
+	printf("Test Complete\n");
 }

@@ -5,7 +5,7 @@
 # UART0 is the hypervisor
 # UART1 is Linux byte channel console
 # UART2 is Linux serial console
-$use_uart1 = 1
+$use_uart1 = 0
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0xef100000

@@ -19,6 +19,8 @@ extern int start_secondary_spin_table(struct boot_spin_table *table, int num,
 
 void *temp_mapping[2];
 
+unsigned long devtree;
+
 void ext_int_handler(trapframe_t *frameptr)
 {
 }
@@ -94,7 +96,7 @@ static void release_secondary_cores(void)
 			goto fail_one;
 		}
 
-		printf("starting cpu %u, table %llx\n", *reg, *table);
+		printf(" > started cpu %u, table %llx PASSED\n", *reg, *table);
 
 		tlb1_set_entry(1, (unsigned long)temp_mapping[0],
 			       (*table) & ~(PAGE_SIZE - 1),
@@ -141,6 +143,7 @@ static void release_secondary_cores(void)
 }
 void dump_dev_tree(void)
 {
+#ifdef DEBUG
 	int node = -1;
 	const char *s;
 	int len;
@@ -151,14 +154,41 @@ void dump_dev_tree(void)
 		printf("   node = %s\n", s);
 	}
 	printf("------\n");
+#endif
 }
 
-void start(unsigned long devtree_ptr)
+#define CPUCNT 4
+int cpus_complete[CPUCNT];
+
+void secondary_entry(void)
 {
 	uint32_t cpu_index;
 	uint32_t pir = mfspr(SPR_PIR);
 
-	init(devtree_ptr);
+	fh_cpu_whoami(&cpu_index);
+	printf(" > secondary cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
+	if (cpu_index == pir) {
+		cpus_complete[pir] = 1;
+		printf("PASSED\n");
+	} else {
+		printf("FAILED\n");
+	}
+}
+
+extern void (*secondary_startp)(void);
+
+void start(unsigned long devtree_ptr)
+{
+	int i;
+	int done = 0;
+	uint32_t cpu_index;
+	uint32_t pir = mfspr(SPR_PIR);
+
+	devtree = devtree_ptr;
+
+	secondary_startp = secondary_entry;
+
+	init(devtree);
 
 	dump_dev_tree();
 
@@ -169,10 +199,21 @@ void start(unsigned long devtree_ptr)
 	printf("whoami test\n");
 	release_secondary_cores();
 	fh_cpu_whoami(&cpu_index);
-	printf("in start, FH_CPU_WHOAMI=%d", cpu_index);
-	if (cpu_index == pir)
-		printf(" ----- PASS\n");
-	else
-		printf(" ----- FAIL\n");
+	printf(" > boot cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
+	if (cpu_index == pir) {
+		cpus_complete[pir] = 1;
+		printf("PASSED\n");
+	} else {
+		printf("FAILED\n");
+	}
+
+	while (done != CPUCNT) {
+		done = 0;
+		for (i=0; i < CPUCNT; i++) {
+			done += cpus_complete[i];
+		}
+	}
+
+	printf("Test Complete\n");
 
 }
