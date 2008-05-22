@@ -100,8 +100,10 @@ extern unsigned long last_lpid;
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
 enum gcpu_stats {
-	stat_emu_total, /**< Total emulated instructions. */
-	stat_emu_tlbwe, /**< Emulated tlbwe instructions. */
+	stat_emu_total, /**< Total emulated instructions */
+	stat_emu_tlbwe, /**< Emulated tlbwe instructions */
+	stat_emu_spr,   /**< Emulated SPR accesses */
+	stat_decr,      /**< Decrementer interrupts */
 	num_gcpu_stats
 };
 	

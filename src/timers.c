@@ -38,13 +38,16 @@
 
 void decrementer(trapframe_t *regs)
 {
+	gcpu_t *gcpu = get_gcpu();
+	gcpu->stats[stat_decr]++;
+
 	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
 		reflect_trap(regs);
 		return;
 	}
 
 	/* The guest has interrupts disabled, so defer it. */
-	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_DECR);
+	atomic_or(&gcpu->gdbell_pending, GCPU_PEND_DECR);
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 
 	send_local_guest_doorbell();

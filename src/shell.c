@@ -383,7 +383,11 @@ static void pi_fn(shell_t *shell, char *args)
 	print_stat(shell, guest, stat_emu_total,
 	           "Total emulated instructions: ");
 	print_stat(shell, guest, stat_emu_tlbwe,
-	           "Total emulated TLB writes:   ");
+	           "Emulated TLB writes:         ");
+	print_stat(shell, guest, stat_emu_spr,
+	           "Emulated SPR accesses:       ");
+	print_stat(shell, guest, stat_decr,
+	           "Decrementer interrupts:      ");
 }
 
 static command_t pi = {

@@ -444,6 +444,8 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	uint32_t ret;
+
+	gcpu->stats[stat_emu_spr]++;
 	
 	switch (spr) {
 	case SPR_TLB1CFG:
@@ -527,6 +529,8 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
+
+	gcpu->stats[stat_emu_spr]++;
 
 	switch (spr) {
 	case SPR_IVPR:
