@@ -75,18 +75,14 @@ static void core_init(void)
 	tlb1_init();
 }
 
+void (*secondary_startp)(void) = NULL;
+
 void secondary_init(void)
 {
-	uint32_t cpu_index;
-	uint32_t pir = mfspr(SPR_PIR);
-
 	core_init();
-	fh_cpu_whoami(&cpu_index);
-	printf("in secondary_init, on processor (FH_CPU_WHOAMI)=%d\n", cpu_index);
-	if (cpu_index == pir)
-		printf(" ----- PASS\n");
-	else
-		printf(" ----- FAIL\n");
+	if (secondary_startp) {
+		secondary_startp();
+	}
 }
 
 

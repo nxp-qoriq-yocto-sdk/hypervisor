@@ -8,25 +8,19 @@
 
 extern void init(unsigned long devtree_ptr);
 
+#define debug(X...)
+//#define debug(X...) printf(X)
+
 int *irq1, *irq2;
 uint32_t handle[2];
 extern void *fdt;
 
-#define BYTE_CHAN_SEND 0
-#define BYTE_CHAN_RCV 1
-#define BYTE_CHAN_POLL 2
+#define BC_INT_Q_SIZE 256
 
-int process_status(int status, int func)
+int process_status(int status)
 {
-	if (func == BYTE_CHAN_SEND)
-		printf("byte_chan_send status ...");
-	if (func == BYTE_CHAN_RCV)
-		printf("byte_chan_rcv status ...");
-	if (func == BYTE_CHAN_POLL)
-		printf("byte_chan_poll status ...");
 	switch (status) {
 	case 0 :
-		printf("success\n");
 		return 0;
 	case -1 :
 		printf("Invalid handle number\n");
@@ -44,6 +38,8 @@ int process_status(int status, int func)
 	return 0;
 }
 
+volatile int rx_intr_state= 0;
+
 void process_rx_intr(uint32_t handle_num)
 {
 	uint32_t status;
@@ -52,38 +48,42 @@ void process_rx_intr(uint32_t handle_num)
 	int i, ret;
 	char buf[512];
 	unsigned int cnt, count = 0;
+
+
 	status = fh_byte_channel_poll(handle_num, &rxavail, &txavail);
-	ret = process_status(status, BYTE_CHAN_POLL);
+	ret = process_status(status);
 	if (ret < 0)
 		return;
 	if (rxavail > 0) {
 		while (1) {
 			cnt = 16;
 			status = fh_byte_channel_receive(handle_num, &cnt, &buf[count]);
-			ret = process_status(status, BYTE_CHAN_RCV);
+			ret = process_status(status);
 			if (ret < 0)
 				return;
 			if (cnt == 0) {
-				printf
-				    ("Received %d bytes, byte channel status = empty\n",
-				     count);
+				debug("Received %d bytes, byte channel status = empty\n", count);
 				if (count == rxavail)
-					printf("Expected bytes =%d, received bytes =%d --PASSED\n", rxavail, count);
+					printf(" > Expected bytes =%d, received bytes =%d: PASSED\n", rxavail, count);
 				else
 					printf("Expected bytes =%d, received bytes =%d--FAILED\n", rxavail, count);
 				break;
 			}
 			count += cnt;
 		}
+#ifdef DEBUG
 		printf("---Receive data start---\n");
 		for (i = 0; i < count; i++) {
 			printf("%c", buf[i]);
 		}
 		printf("\n");
 		printf("---Receive data end---\n");
+#endif
 	} else {
 		printf("no data to read in byte channel rx intr \n");
 	}
+
+	rx_intr_state++;
 }
 
 void ext_int_handler(trapframe_t *frameptr)
@@ -95,30 +95,30 @@ void ext_int_handler(trapframe_t *frameptr)
 	int ret;
 
 	fh_vmpic_iack(&vector);
-	printf("external interrupt ... vector  %d\n", vector);
+	debug("external interrupt ... vector  %d\n", vector);
 	if (vector == irq1[0]) {
-		printf("byte channel 1 rx interrupt\n");
+		debug("byte channel 1 rx interrupt\n");
 		process_rx_intr(handle[0]);
-		printf("\n");
+		debug("\n");
 	} else if (vector == irq1[2]) {
-		printf("byte channel 1 tx interrupt\n");
+		debug("byte channel 1 tx interrupt\n");
 		status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
-		ret = process_status(status, BYTE_CHAN_POLL);
+		ret = process_status(status);
 		if (ret < 0)
 			return;
-		printf("tx avail =%d\n", txavail);
-		printf("\n");
+		debug("tx avail =%d\n", txavail);
+		debug("\n");
 	} else if (vector == irq2[0]) {
-		printf("byte channel 2 rx interrupt\n");
+		debug("byte channel 2 rx interrupt\n");
 		process_rx_intr(handle[1]);
-		printf("\n");
+		debug("\n");
 	} else if (vector == irq2[2]) {
-		printf("byte channel 2 tx interrupt\n");
+		debug("byte channel 2 tx interrupt\n");
 		status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
-		ret = process_status(status, BYTE_CHAN_POLL);
+		ret = process_status(status);
 		if (ret < 0)
 			return;
-		printf("tx avail =%d\n", txavail);
+		debug("tx avail =%d\n", txavail);
 		printf("\n");
 	}
 	fh_vmpic_eoi(vector);
@@ -144,6 +144,7 @@ int get_prop(const char *byte_channel, const char *prop, int **ptr)
 
 void dump_dev_tree(void)
 {
+#ifdef DEBUG
 	int node = -1;
 	const char *s;
 	int len;
@@ -154,6 +155,7 @@ void dump_dev_tree(void)
 		printf("node = %s\n", s);
 	}
 	printf("------\n");
+#endif
 }
 
 void start(unsigned long devtree_ptr)
@@ -229,8 +231,9 @@ void start(unsigned long devtree_ptr)
 		printf("device tree error\n");
 		return;
 	}
-	printf("byte-channel 1 irqs = %d %d\n", irq1[0], irq1[2]);
-	printf("byte-channel 2 irqs = %d %d\n", irq2[0], irq2[2]);
+
+	debug("byte-channel 1 irqs = %d %d\n", irq1[0], irq1[2]);
+	debug("byte-channel 2 irqs = %d %d\n", irq2[0], irq2[2]);
 
 	/* set int config for byte channel 1 */
 	if ((status = fh_vmpic_set_int_config(irq1[0], 0, 0, 0x00000001))) {/* set int to cpu 0 */
@@ -253,133 +256,106 @@ void start(unsigned long devtree_ptr)
 
 	str = "byte-channel:-A!";	/* 16 chars*/
 	status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
-	if (txavail == 255) {
-		printf("Byte channel 1 tx space available = 255 before send start ---> PASSED\n");
+	if (txavail == BC_INT_Q_SIZE-1) {
+		printf(" > Polled byte channel A...expected and got %d: PASSED\n",txavail);
 	} else {
-		printf("Byte channel 1 txavail != 255 before send start ---> FAILED\n");
+		printf("Byte channel A txavail != 255 before send start ---> FAILED\n");
 		goto bad;
 	}
-	printf("\n");
 	avail = txavail / 16;
 	bal = txavail % 16;
 	while (1) {
 		if (avail > 0) {
 			status = fh_byte_channel_send(handle[0], 16, str);
 			--avail;
-		} else {
+		} else
 			status = fh_byte_channel_send(handle[0], bal, str);
-		}
-		ret = process_status(status, BYTE_CHAN_SEND);
-		if (ret < 0)
-			goto bad;
-		if (status == -3) {
-			save_status = status;
-			printf("Check if transmitted %d bytes on byte channel 1\n",
-			       txavail);
-			status =
-			    fh_byte_channel_poll(handle[0], &rxavail, &txavail);
-			ret = process_status(status, BYTE_CHAN_POLL);
-			if (ret < 0)
-				goto bad;
-			if (txavail == 0)
-				printf("Expected txavail = 0 & rc =-3 byte channel full --->PASSED\n");
-			else
-				printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
-			status = save_status;
-			break;
-		}
 
+		if (status == -3) 
+			break;
 	}
-	if (status != -3) {
-		status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
-		ret = process_status(status, BYTE_CHAN_POLL);
-		if (ret < 0)
-			goto bad;
-		printf("Byte channel 1");
-		if (txavail != 0)
-			printf("Failed to transmit 255 bytes, transmitted %d bytes\n", 255 - txavail);
-		else
-			printf("Didn't receive FULL status, txavail = 0\n");
-		goto bad;
-	}
-	printf("enabling byte channel 1 tx intr and byte channel 2 rx intr\n");
-	if ((status = fh_vmpic_set_mask(irq1[2], 0))) {/* enable byte channel 1 txintr */
+
+	if (avail == 0)
+		printf(" > Completed send: PASSED\n");
+	else
+		printf(" > Error avail != 0: FAILED\n");
+
+	status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
+
+	if (txavail == 0)
+		printf(" > Polling. Expected txavail = 0 & rc =-3 byte channel full: PASSED\n");
+	else
+		printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
+
+	debug("enabling byte channel 1 tx intr and byte channel 2 rx intr\n");
+
+	if ((status = fh_vmpic_set_mask(irq1[2], 0))) {/* enable byte channel A txintr */
 		printf("fh_vmpic_set_mask failed for byte channel 1 txint\n");
 		disable_extint();
 		goto bad;
 	}
-	if ((status = fh_vmpic_set_mask(irq2[0], 0))) {/* enable byte channel 2 rxintr */
+
+	if ((status = fh_vmpic_set_mask(irq2[0], 0))) {/* enable byte channel B rxintr */
 		printf("fh_vmpic_set_mask failed for byte channel 2 rxint\n");
 		disable_extint();
 		goto bad;
 	}
-	printf("\n");
+
 	str = "byte-channel:-B!";	/*16 chars*/
 	status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
-	ret = process_status(status, BYTE_CHAN_POLL);
-	if (ret < 0)
-		goto bad;
-	if (txavail == 255) {
-		printf("Byte channel 2 tx space available = 255 before send start ---> PASSED\n");
+
+	if (txavail == BC_INT_Q_SIZE-1) {
+		printf(" > Polled byte channel B...expected and got tx %d: PASSED\n",txavail);
 	} else {
-		printf("Byte channel 2 txavail != 255 before send start ---> FAILED\n");
+		printf("Byte channel B txavail != 255 before send start ---> FAILED\n");
 		goto bad;
 	}
-	printf("\n");
+
+
 	avail = txavail / 16;
 	bal = txavail % 16;
 	while (1) {
 		if (avail > 0) {
 			status = fh_byte_channel_send(handle[1], 16, str);
 			--avail;
-		} else {
+		} else
 			status = fh_byte_channel_send(handle[1], bal, str);
-		}
-		ret = process_status(status, BYTE_CHAN_SEND);
-		if (ret < 0)
-			goto bad;
-		if (status == -3) {
-			save_status = status;
-			printf("Check if transmitted %d bytes on byte channel 2\n",
-			       txavail);
-			status =
-			    fh_byte_channel_poll(handle[1], &rxavail, &txavail);
-			ret = process_status(status, BYTE_CHAN_POLL);
-			if (ret < 0)
-				goto bad;
-			if (txavail == 0)
-				printf("Expected txavail = 0 & rc =-3 byte channel full --->PASSED\n");
-			else
-				printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
-			status = save_status;
+
+		if (status == -3) 
 			break;
-		}
 	}
-	if (status != -3) {
-		status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
-		ret = process_status(status, BYTE_CHAN_POLL);
-		if (ret < 0)
-			goto bad;
-		printf("Byte channel 2");
-		if (txavail != 0)
-			printf("Failed to transmit 255 bytes, transmitted %d bytes\n", 255 - txavail);
-		else
-			printf("Didn't receive FULL status, txavail = 0\n");
-		goto bad;
-	}
-	printf("enabling byte channel 2 tx intr and byte channel 1 rx intr\n");
+
+	if (avail == 0)
+		printf(" > Completed send: PASSED\n");
+	else
+		printf(" > Error avail != 0: FAILED\n");
+
+	status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
+
+	if (txavail == 0)
+		printf(" > Polling. Expected txavail = 0 & rc =-3 byte channel full: PASSED\n");
+	else
+		printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
+
+	debug("enabling byte channel 2 tx intr and byte channel 1 rx intr\n");
 	if ((status = fh_vmpic_set_mask(irq2[2], 0))) {/* enable byte channel 2 txintr */
 		printf("fh_vmpic_set_mask failed for byte channel 2 txint\n");
 		disable_extint();
 		goto bad;
 	}
-	printf("\n");
+	debug("\n");
 	if ((status = fh_vmpic_set_mask(irq1[0], 0))) {/* enable byte channel 1 rxintr */
 		printf("fh_vmpic_set_mask failed for byte channel 1 rxint\n");
 		disable_extint();
 		goto bad;
 	}
+
+	while (rx_intr_state < 2);
+
+	printf("Test Complete\n");
+
 	return;
+
 bad :
 	printf("Fatal error, can't continue test failed status = %d\n", status);
 }

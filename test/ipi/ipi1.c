@@ -8,6 +8,8 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
+#undef DEBUG
+
 extern void init(unsigned long);
 volatile int extint_cnt;
 int *handle_p_int;
@@ -38,7 +40,9 @@ void rd_shm(void)
 	addr |= ((uint64_t) *reg) << 32;
 	reg++;
 	addr |= *reg;
+#ifdef DEBUG
 	printf("shared memory addr = %llx\n", addr);
+#endif
 	vaddr = valloc(4 * 1024, 4 * 1024);
 	if (!vaddr) {
 		printf("valloc failed \n");
@@ -46,19 +50,21 @@ void rd_shm(void)
 	}
 	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
 	memcpy(buf, vaddr, strlen("hello") + 1);
+#ifdef DEBUG
 	printf("read '%s' from shared memory on interrupt \n", buf);
 	printf("expected 'hello', got '%s'\n", buf);
+#endif
 	if (!strcmp(buf, "hello"))
-		printf("Shared memory test ---- PASSED\n");
+		printf(" > received expected value in shared memory: PASSED\n");
 	else
-		printf("Shared memory test ---- FAILED\n");
+		printf(" > got wrong value in sh mem: FAILED\n");
 }
 
 void ext_int_handler(trapframe_t *frameptr)
 {
 	extint_cnt++;
 	fh_vmpic_eoi(*handle_p_int);
-	printf("Got an external interrupt, reading shared memory now\n");
+	printf(" > got an external interrupt: PASSED\n");
 	rd_shm();
 }
 
@@ -99,6 +105,7 @@ int test_init(void)
 
 void dump_dev_tree(void)
 {
+#ifdef DEBUG
 	int node = -1;
 	const char *s;
 	int len;
@@ -109,6 +116,7 @@ void dump_dev_tree(void)
 		printf("   node = %s\n", s);
 	}
 	printf("------\n");
+#endif
 }
 
 void start(unsigned long devtree_ptr)
@@ -117,7 +125,7 @@ void start(unsigned long devtree_ptr)
 
 	init(devtree_ptr);
 
-	printf("ipi_doorbell-p2 test\n");
+	printf("inter-partition doorbell test #2\n");
 
 	dump_dev_tree();
 
@@ -128,10 +136,9 @@ void start(unsigned long devtree_ptr)
 
 	while (1) {
 		if (extint_cnt) {
-			printf("external interrupt\n");
 			break;
 		}
 	}
 
-	printf("done\n");
+	printf("Test Complete\n");
 }

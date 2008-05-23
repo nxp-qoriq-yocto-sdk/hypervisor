@@ -18,6 +18,8 @@ $want_magic_inst = 1
 #$use_uart2 = 0
 #$use_uart2_net = 1
 
+$use_uart1 = 0
+
 add-directory "%script%/../common" -prepend
 add-directory "%script%/../../bin" -prepend
 add-directory "%script%/bin" -prepend
