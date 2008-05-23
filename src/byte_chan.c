@@ -53,9 +53,9 @@ byte_chan_t *byte_chan_alloc(void)
 
 	// FIXME: free() on failure
 	if (queue_init(&ret->q[0], QUEUE_SIZE))
-		return NULL;
+		goto err_bc;
 	if (queue_init(&ret->q[1], QUEUE_SIZE))
-		return NULL;
+		goto err_q0;
 
 	ret->handles[0].tx = &ret->q[0];
 	ret->handles[0].rx = &ret->q[1];
@@ -63,6 +63,12 @@ byte_chan_t *byte_chan_alloc(void)
 	ret->handles[1].rx = &ret->q[0];
 
 	return ret;
+
+err_q0:
+	queue_destroy(&ret->q[0]);
+err_bc:
+	free(ret);
+	return NULL;
 }
 
 static uint32_t bchan_lock;
