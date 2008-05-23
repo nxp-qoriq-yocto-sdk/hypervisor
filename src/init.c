@@ -93,6 +93,8 @@ static void exclude_memrsv(void)
 
 void start(unsigned long devtree_ptr)
 {
+	phys_addr_t lowest_guest_addr;
+
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 
@@ -102,7 +104,12 @@ void start(unsigned long devtree_ptr)
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
+
 	mem_end = find_memory();
+	lowest_guest_addr = find_lowest_guest_phys();
+	if (mem_end > lowest_guest_addr - 1)
+		mem_end = lowest_guest_addr - 1;
+	
 	core_init();
 
 	printf("fdt %p size %x\n", fdt, fdt_totalsize(fdt));
@@ -110,6 +117,10 @@ void start(unsigned long devtree_ptr)
 	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
 	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
+	
+	if (mem_end <= ULONG_MAX)
+		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
+		                       (void *)ULONG_MAX);
 	malloc_init();
 
 	mpic_init((unsigned long)fdt);
