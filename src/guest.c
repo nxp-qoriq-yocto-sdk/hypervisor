@@ -508,6 +508,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		ret = ERR_NOMEM;
 		goto fail;
 	}
+
 	ret = create_guest_spin_table(guest);
 	if (ret < 0)
 		goto fail;
