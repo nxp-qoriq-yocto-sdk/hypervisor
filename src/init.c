@@ -235,7 +235,7 @@ static void release_secondary_cores(void)
 		char *table_va = temp_mapping[0];
 		table_va += *table & (PAGE_SIZE - 1);
 
-		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
+		cpu_t *cpu = alloc_type(cpu_t);
 		if (!cpu)
 			goto nomem;
 
@@ -245,7 +245,7 @@ static void release_secondary_cores(void)
 
 		cpu->kstack += KSTACK_SIZE - FRAMELEN;
 
-		cpu->client.gcpu = alloc(sizeof(gcpu_t), __alignof__(gcpu_t));
+		cpu->client.gcpu = alloc_type(gcpu_t);
 		if (!cpu->client.gcpu)
 			goto nomem;
 

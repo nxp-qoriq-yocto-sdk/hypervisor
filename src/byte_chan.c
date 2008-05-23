@@ -47,7 +47,7 @@
 /* Allocate a byte channel. */
 byte_chan_t *byte_chan_alloc(void)
 {
-	byte_chan_t *ret = alloc(sizeof(byte_chan_t), __alignof__(byte_chan_t));
+	byte_chan_t *ret = alloc_type(byte_chan_t);
 	if (!ret)
 		return NULL;
 
