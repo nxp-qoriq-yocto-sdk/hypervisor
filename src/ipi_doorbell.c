@@ -58,8 +58,10 @@ void create_doorbells(void)
 		off = ret;
 		ret = fdt_setprop(fdt, off, "fsl,hv-internal-doorbell-ptr",
 		                  &dbell, sizeof(dbell));
-		if (ret < 0)
+		if (ret < 0) {
+			free(dbell);
 			break;
+		}
 	}
 
 	if (ret == -FDT_ERR_NOTFOUND)
@@ -78,8 +80,10 @@ static int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
 	db_handle->dbell = dbell;
 
 	int ghandle = alloc_guest_handle(guest, &db_handle->user);
-	if (ghandle < 0)
+	if (ghandle < 0) {
+		free(db_handle);
 		return ERR_NOMEM;
+	}
 
 	return ghandle;
 }
@@ -172,8 +176,21 @@ void recv_dbell_partition_init(guest_t *guest)
 			return;
 
 		virq = vpic_alloc_irq(guest);
+		if (!virq) {
+			free(dbell_node);
+			return;
+		}
+		
 		irq[0] = vmpic_alloc_handle(guest, &virq->irq);
 		irq[1] = 0;
+
+		ret = fdt_setprop(guest->devtree, off, "interrupts",
+		                  irq, sizeof(irq));
+		if (ret < 0) {
+			/* FIXME: destroy virq */
+			free(dbell_node);
+			break;
+		}
 
 		dbell_node->guest_vint = virq;
 
@@ -181,10 +198,5 @@ void recv_dbell_partition_init(guest_t *guest)
 		dbell_node->next = dbell->recv_head;
 		dbell->recv_head = dbell_node;
 		spin_unlock_critsave(&dbell->dbell_lock, saved);
-
-		ret = fdt_setprop(guest->devtree, off, "interrupts",
-		                  irq, sizeof(irq));
-		if (ret < 0)
-			break;
 	}
 }

@@ -467,14 +467,21 @@ int open_stdin_chardev(chardev_t *cd)
 
 	ret = queue_init(q, 2048);
 	if (ret < 0)
-		return ret;
+		goto err_queue;
 
 	ret = cd->ops->set_rx_queue(cd, q);
 	if (ret < 0)
-		return ret;
+		goto err_queue_buf;
 		
 	stdin = q;
 	return 0;
+
+err_queue_buf:
+	queue_destroy(q);
+err_queue:
+	free(q);
+	
+	return ret;
 }
 
 #ifdef CONFIG_BYTE_CHAN
