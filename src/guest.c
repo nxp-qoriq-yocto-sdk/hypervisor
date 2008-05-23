@@ -453,6 +453,13 @@ static int load_image(guest_t *guest)
 	return 1;
 }
 		
+static const uint32_t hv_version[4] = {
+	CONFIG_HV_MAJOR_VERSION,
+	CONFIG_HV_MINOR_VERSION,
+	FH_API_VERSION,
+	FH_API_COMPAT_VERSION
+};
+
 static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
@@ -490,13 +497,17 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 
+	ret = fdt_setprop(guest->devtree, 0, "fsl,hv-version",
+	                  hv_version, 16);
+	if (ret < 0)
+		goto fail;
+
 	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	if (!guest->gphys || !guest->gphys_rev) {
 		ret = ERR_NOMEM;
 		goto fail;
 	}
-
 	ret = create_guest_spin_table(guest);
 	if (ret < 0)
 		goto fail;

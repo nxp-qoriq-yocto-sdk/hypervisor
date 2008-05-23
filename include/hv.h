@@ -3,6 +3,9 @@
 
 #include <libos/libos.h>
 
+#define FH_API_VERSION 1
+#define FH_API_COMPAT_VERSION 1
+
 struct guest;
 
 int start_guest(struct guest *guest);
