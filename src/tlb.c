@@ -180,10 +180,29 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	}
 }
 
-void guest_reset_tlb(void)
+void guest_inv_tlb1(int inv_iprot)
 {
+	gcpu_t *gcpu = get_gcpu();
 	int i;
 
+	for (i = 0; i < TLB1_GSIZE; i++)
+		if (inv_iprot || !(gcpu->gtlb1[i].mas1 & MAS1_IPROT))
+			free_tlb1(i);
+
+	for (i = 0; i < tlb1_reserved; i++) {
+		register_t mas1;
+
+		mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
+		asm volatile("tlbre" : : : "memory");
+		
+		mas1 = mfspr(SPR_MAS1);
+		
+		assert((!inv_iprot && (mas1 & MAS1_IPROT)) || !(mas1 & MAS1_VALID));
+	}
+}
+
+void guest_reset_tlb(void)
+{
 	/* Invalidate TLB0.  Note that there seems to be no way
 	 * to partition a whole-array TLB invalidation, but it's
 	 * unlikely to be a performance issue given the rarity of
@@ -192,14 +211,7 @@ void guest_reset_tlb(void)
 	asm volatile("tlbivax 0, %0" : : "r" (4) : "memory");
 	tlbsync();
 
-	for (i = 0; i < TLB1_GSIZE; i++)
-		free_tlb1(i);
-
-	for (i = 0; i < tlb1_reserved; i++) {
-		mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
-		asm volatile("tlbre" : : : "memory");
-		assert(!(mfspr(SPR_MAS1) & MAS1_VALID));
-	}
+	guest_inv_tlb1(1);
 }
 
 /** Return the index of a conflicting guest TLB1 entry, or -1 if none.

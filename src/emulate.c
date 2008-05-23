@@ -273,6 +273,8 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
 	                     (mas3 >> MAS3_RPN_SHIFT);
 
+	gcpu->stats[stat_emu_tlbwe]++;
+
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
 		return 1;
@@ -442,6 +444,8 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	uint32_t ret;
+
+	gcpu->stats[stat_emu_spr]++;
 	
 	switch (spr) {
 	case SPR_TLB1CFG:
@@ -501,6 +505,14 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 		ret = gcpu->mcar >> 32;
 		break;
 
+	case SPR_MMUCSR0:
+		ret = 0;
+		break;
+
+	case SPR_MMUCFG:
+		ret = mfspr(SPR_MMUCFG);
+		break;
+
 	default:
 		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
@@ -517,6 +529,8 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
+
+	gcpu->stats[stat_emu_spr]++;
 
 	switch (spr) {
 	case SPR_IVPR:
@@ -597,6 +611,14 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 		gcpu->mcsr &= ~val;
 		break;
 
+	case SPR_MMUCSR0:
+		if (val & MMUCSR_L2TLB0_FI)
+			mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
+		if (val & MMUCSR_L2TLB1_FI)
+			guest_inv_tlb1(0);
+		
+		break;
+
 	default:
 		printf("mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
 		       regs->srr0, spr, val);
@@ -631,6 +653,8 @@ void hvpriv(trapframe_t *regs)
 	uint32_t insn, major, minor;
 	int fault = 1;
 	int ret;
+
+	get_gcpu()->stats[stat_emu_total]++;
 
 	guestmem_set_insn(regs);
 	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,

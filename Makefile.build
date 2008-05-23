@@ -156,6 +156,9 @@ test-whoami: bin/uv.uImage test/whoami
 test-hcalls: bin/uv.uImage test/hcalls
 	$(SIMICS) test/hcalls/hv-hcalls.simics
 
+test-mmu: bin/uv.uImage test/mmu
+	$(SIMICS) test/mmu/mmu.simics
+
 demo: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-demo.simics -e c
 
