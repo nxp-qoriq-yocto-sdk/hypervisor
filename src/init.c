@@ -93,6 +93,8 @@ static void exclude_memrsv(void)
 
 void start(unsigned long devtree_ptr)
 {
+	phys_addr_t lowest_guest_addr;
+
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 
@@ -102,7 +104,12 @@ void start(unsigned long devtree_ptr)
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
+
 	mem_end = find_memory();
+	lowest_guest_addr = find_lowest_guest_phys();
+	if (mem_end > lowest_guest_addr - 1)
+		mem_end = lowest_guest_addr - 1;
+	
 	core_init();
 
 	printf("fdt %p size %x\n", fdt, fdt_totalsize(fdt));
@@ -110,6 +117,10 @@ void start(unsigned long devtree_ptr)
 	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
 	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
+	
+	if (mem_end <= ULONG_MAX)
+		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
+		                       (void *)ULONG_MAX);
 	malloc_init();
 
 	mpic_init((unsigned long)fdt);
@@ -235,7 +246,7 @@ static void release_secondary_cores(void)
 		char *table_va = temp_mapping[0];
 		table_va += *table & (PAGE_SIZE - 1);
 
-		cpu_t *cpu = alloc(sizeof(cpu_t), __alignof__(cpu_t));
+		cpu_t *cpu = alloc_type(cpu_t);
 		if (!cpu)
 			goto nomem;
 
@@ -245,7 +256,7 @@ static void release_secondary_cores(void)
 
 		cpu->kstack += KSTACK_SIZE - FRAMELEN;
 
-		cpu->client.gcpu = alloc(sizeof(gcpu_t), __alignof__(gcpu_t));
+		cpu->client.gcpu = alloc_type(gcpu_t);
 		if (!cpu->client.gcpu)
 			goto nomem;
 

@@ -453,6 +453,13 @@ static int load_image(guest_t *guest)
 	return 1;
 }
 		
+static const uint32_t hv_version[4] = {
+	CONFIG_HV_MAJOR_VERSION,
+	CONFIG_HV_MINOR_VERSION,
+	FH_API_VERSION,
+	FH_API_COMPAT_VERSION
+};
+
 static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
@@ -487,6 +494,11 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	}
 
 	ret = fdt_open_into(guest_origtree, guest->devtree, gfdt_size);
+	if (ret < 0)
+		goto fail;
+
+	ret = fdt_setprop(guest->devtree, 0, "fsl,hv-version",
+	                  hv_version, 16);
 	if (ret < 0)
 		goto fail;
 
@@ -967,7 +979,7 @@ __attribute__((noreturn)) void init_guest(void)
 		/* Boot CPU */
 		/* count number of cpus for this partition and alloc data struct */
 		guest->cpucnt = count_cpus(cpus, len);
-		guest->gcpus = alloc(sizeof(long) * guest->cpucnt, __alignof__(long));
+		guest->gcpus = malloc(sizeof(long) * guest->cpucnt);
 		if (!guest->gcpus)
 			goto nomem;
 
@@ -1207,4 +1219,65 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 	}
 
 	return ret;
+}
+
+/* This is a hack to find an upper bound of the hypervisor's memory.
+ * It assumes that the main memory segment of each partition will
+ * be listed in its physaddr map, and that no shared memory region
+ * appears below the lowest private guest memory.
+ *
+ * Once we have explicit coherency domains, we could perhaps include
+ * one labelled for hypervisor use, and maybe one designated for dynamic
+ * memory allocation.
+ */
+phys_addr_t find_lowest_guest_phys(void)
+{
+	int off = -1, ret;
+	phys_addr_t low = (phys_addr_t)-1;
+	const uint32_t *prop;
+	const void *gtree;
+	uint32_t naddr, nsize;
+
+	ret = get_addr_format(fdt, 0, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	while (1) {
+		uint32_t gnaddr, gnsize;
+		int entry_len;
+		int i = 0;
+	
+		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
+		if (off < 0)
+			return low;
+
+		gtree = fdt_getprop(fdt, off, "fsl,dtb", &ret);
+		if (!gtree)
+			continue;
+
+		ret = get_addr_format(gtree, 0, &gnaddr, &gnsize);
+		if (ret < 0)
+			continue;
+
+		prop = fdt_getprop(fdt, off, "fsl,hv-physaddr-map", &ret);
+		if (!prop)
+			continue;
+		
+		entry_len = gnaddr + naddr + gnsize;
+		while (i + entry_len <= ret / 4) {
+			phys_addr_t real;
+			
+			real = prop[i + gnaddr];
+			
+			if (gnaddr == 2 && sizeof(phys_addr_t) > 4) {
+				real <<= 32;
+				real += prop[i + gnaddr + 1];
+			}
+			
+			if (real < low)
+				low = real;
+
+			i += entry_len;
+		}
+	}
 }

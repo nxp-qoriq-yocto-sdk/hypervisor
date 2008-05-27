@@ -167,10 +167,11 @@ static uint32_t *create_new_imap(void *tree, const uint32_t *imap, int imaplen, 
 
 	if (newmaplen <= 0)
 		return NULL;
-	imap_ptr = alloc(newmaplen * CELL_SIZE, __alignof__(uint32_t));
 
+	imap_ptr = malloc(newmaplen * CELL_SIZE);
 	if (imap_ptr == NULL)
 		return NULL;
+
 	tmp_imap_ptr = imap_ptr;
 
 	vmpic_addr_cell = VMPIC_ADDR_CELLS;

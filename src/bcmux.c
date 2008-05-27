@@ -257,8 +257,7 @@ static mux_complex_t *mux_complex_init(byte_chan_t *bc)
 	if (!handle)
 		return NULL;
 
-	mux_complex_t *mux = alloc(sizeof(mux_complex_t),
-	                           __alignof__(mux_complex_t));
+	mux_complex_t *mux = alloc_type(mux_complex_t);
 	if (!mux)
 		return NULL;
 
@@ -289,7 +288,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 		return ERR_BUSY;
 
 	connected_bc_t *cbc;
-	cbc = alloc(sizeof(connected_bc_t), __alignof__(connected_bc_t));
+	cbc = alloc_type(connected_bc_t);
 	if (!cbc)
 		return ERR_NOMEM;
 	

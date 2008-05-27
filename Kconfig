@@ -2,9 +2,25 @@ config PROJECTVERSION
 	string
 	option env="PROJECTVERSION"
 
+config MAJORVERSION
+	int
+	option env="VERSION"
+
+config SUBVERSION
+	int
+	option env="SUBVERSION"
+
 config HV_VERSION
 	string
 	default PROJECTVERSION
+
+config HV_MAJOR_VERSION
+	int
+	default MAJORVERSION
+
+config HV_MINOR_VERSION
+	int
+	default SUBVERSION
 
 source "libos/Kconfig"
 
