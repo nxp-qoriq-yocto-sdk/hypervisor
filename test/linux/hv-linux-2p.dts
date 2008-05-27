@@ -191,13 +191,13 @@
 		bc0: byte-channel0 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <30>;
+			fsl,mux-channel = <0>;
 		};
 
 		bc1: byte-channel1 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <31>;
+			fsl,mux-channel = <1>;
 		};
 	};
 

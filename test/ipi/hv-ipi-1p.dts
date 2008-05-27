@@ -190,19 +190,19 @@
 		bc0: byte-channel0 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux &uartmux>;
-			fsl,mux-channel = <30 31>;
+			fsl,mux-channel = <0 1>;
 		};
 
 		bc1: byte-channel1 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <32>;
+			fsl,mux-channel = <2>;
 		};
 
 		bc2: byte-channel2 {
 			compatible = "fsl,hv-byte-channel";
 			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <33>;
+			fsl,mux-channel = <3>;
 		};
 	};
 

@@ -63,6 +63,10 @@ static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 	return NULL;
 }
 
+
+#define CHAN0_MUX_CHAR 0x10  /* ASCII 0x10 is switch to channel 0 */
+#define CH_SWITCH_ESCAPE 0x7F
+
 /** Demultiplex incoming data
  *
  * This function reads data from multiplexed channel and writes it
@@ -87,20 +91,20 @@ static void mux_get_data(queue_t *q)
 
 		if (mux->rx_flag_state == 1) {
 			mux->rx_flag_state = 0;
-			/* If not B it means that it is an escape */
-			if (ch != 'B') {
+			/* If not an escape it means that it is an channel switch */
+			if (ch != CH_SWITCH_ESCAPE) {
 				if (notify) {
 					queue_notify_consumer(notify);
 					notify = NULL;
 				}
 				
-				mux->current_rx_bc = channel_find(mux, ch);
+				mux->current_rx_bc = channel_find(mux, ch-CHAN0_MUX_CHAR);
 				debug("mux_get_data: switched to channel '%c' (%p)\n",
 				       ch, mux->current_rx_bc);
 
 				continue;
 			}
-		} else if (ch == 'B') {
+		} else if (ch == CH_SWITCH_ESCAPE) {
 			mux->rx_flag_state = 1;
 			continue;
 		}
@@ -136,8 +140,8 @@ static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 	debug("mux_tx_switch: switched to channel '%c' (%p)\n",
 	       cbc->num, cbc);
 
-	assert(queue_writechar(mux->byte_chan->tx, 'B') == 0);
-	assert(queue_writechar(mux->byte_chan->tx, cbc->num) == 0);
+	assert(queue_writechar(mux->byte_chan->tx, CH_SWITCH_ESCAPE) == 0);
+	assert(queue_writechar(mux->byte_chan->tx, cbc->num+CHAN0_MUX_CHAR) == 0);
 	mux->current_tx_bc = cbc;
 	return 2;
 }
@@ -160,9 +164,12 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 
 		debug("mux send '%c'\n", c);
 
-		if (c == 'B') {
-			ret = queue_write(mux->byte_chan->tx, (const uint8_t *)"BB", 2);
-			assert(ret == 2);
+		if (c == CH_SWITCH_ESCAPE) {
+			/* write the escape char twice */
+			ret = queue_writechar(mux->byte_chan->tx, c);
+			assert(ret >= 0);
+			ret = queue_writechar(mux->byte_chan->tx, c);
+			assert(ret >= 0);
 			sent += 2;
 		} else {
 			ret = queue_writechar(mux->byte_chan->tx, c);
