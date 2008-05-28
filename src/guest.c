@@ -979,7 +979,7 @@ __attribute__((noreturn)) void init_guest(void)
 		/* Boot CPU */
 		/* count number of cpus for this partition and alloc data struct */
 		guest->cpucnt = count_cpus(cpus, len);
-		guest->gcpus = malloc(sizeof(long) * guest->cpucnt);
+		guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
 		if (!guest->gcpus)
 			goto nomem;
 
