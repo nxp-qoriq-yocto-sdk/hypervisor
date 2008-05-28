@@ -911,20 +911,20 @@ int start_guest(guest_t *guest)
  */
 static void partition_config(guest_t *guest)
 {
-	int chosen = fdt_subnode_offset(fdt, 0, "chosen");
+	int chosen;
+	
+	chosen = fdt_subnode_offset(guest->devtree, 0, "chosen");
+	if (chosen < 0)
+		chosen = fdt_add_subnode(guest->devtree, 0, "chosen");
 	if (chosen < 0) {
-		/* set defaults */
-		guest->coreint = 1;
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "Couldn't create chosen node: %d\n", chosen);
 		return;
 	}
 
-	int len;
-	const uint32_t *coreint = fdt_getprop(fdt, chosen, "fsl,hv-pic-coreint", &len);
-	if (coreint) {
-		guest->coreint = *coreint;
-	} else {
-		guest->coreint = 1;
-	}
+	if (mpic_coreint)
+		fdt_setprop(guest->devtree, chosen, "fsl,hv-pic-coreint",
+		            NULL, 0);
 }
 
 __attribute__((noreturn)) void init_guest(void)

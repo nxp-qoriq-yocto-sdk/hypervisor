@@ -19,7 +19,8 @@ IPI1_OBJS := $(basename $(IPI1_SRCS))
 IPI1_OBJS := $(IPI1_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 IPI1_OBJS := $(IPI1_OBJS:%=bin/%)
 
-ipi_all: bin/ipi.bin bin/ipi.map bin/hv-ipi-1p.dtb bin/hv-ipi-2p.dtb bin/ipi1.bin bin/ipi1.map
+ipi_all: bin/ipi.bin bin/ipi.map bin/hv-ipi-1p.dtb bin/hv-ipi-2p.dtb \
+         bin/ipi1.bin bin/ipi1.map bin/hv-ipi-coreint.dtb
 
 bin/ipi.bin: bin/ipi
 	$(CROSS_COMPILE)objcopy -O binary $< $@
@@ -44,6 +45,8 @@ bin/ipi1.map: bin/ipi1
 bin/hv-ipi-1p.dtb: hv-ipi-1p.dts bin/ipi-p1.dtb
 
 bin/hv-ipi-2p.dtb: hv-ipi-2p.dts bin/ipi-p1.dtb bin/ipi-p2.dtb
+
+bin/hv-ipi-coreint.dtb: hv-ipi-coreint.dts bin/ipi-p1.dtb bin/ipi-p2.dtb
 
 bin/ipi-p1.dtb: ipi-p1.dts
 

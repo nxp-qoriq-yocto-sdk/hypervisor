@@ -14,6 +14,8 @@ extern void init(unsigned long);
 volatile int extint_cnt;
 int *handle_p_int;
 extern void *fdt;
+extern int coreint;
+ 
 
 /* reads data from shared memory region on interrupt */
 void rd_shm(void)
@@ -62,10 +64,22 @@ void rd_shm(void)
 
 void ext_int_handler(trapframe_t *frameptr)
 {
-	extint_cnt++;
-	fh_vmpic_eoi(*handle_p_int);
-	printf(" > got an external interrupt: PASSED\n");
-	rd_shm();
+	unsigned int irq;
+
+	if (coreint)
+		irq = mfspr(SPR_EPR);
+	else
+		fh_vmpic_iack(&irq);
+	
+	if (irq != *handle_p_int) {
+		printf("Unknown extirq %d\n", irq);
+	} else {
+		extint_cnt++;
+		printf(" > got an external interrupt: PASSED\n");
+		rd_shm();
+	}
+
+	fh_vmpic_eoi(irq);
 }
 
 void ext_doorbell_handler(trapframe_t *frameptr)

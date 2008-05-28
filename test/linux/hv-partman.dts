@@ -235,6 +235,5 @@
 	};
 
 	chosen {
-		fsl,hv-pic-coreint = <0>;
 	};
 };

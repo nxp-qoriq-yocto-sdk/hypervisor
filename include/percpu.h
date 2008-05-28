@@ -61,8 +61,6 @@ typedef enum {
 
 typedef struct guest {
 	vpic_t vpic;
-	/**  config option whether we are in coreint mode */
-	int coreint:1;
 	struct pte *gphys;      /**< guest phys to real phys mapping */
 	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
 	char *name;

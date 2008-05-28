@@ -28,6 +28,7 @@ static void  core_init(void);
 int get_uart_offset(void);
 
 void *fdt;
+int coreint;
 
 int get_uart_offset()
 {
@@ -52,7 +53,8 @@ int get_uart_offset()
 
 void init(unsigned long devtree_ptr)
 {
-	int uart_offset;
+	int node, len;
+	const uint32_t *prop;
 	core_init();
 
 	/* alloc the heap */
@@ -63,11 +65,17 @@ void init(unsigned long devtree_ptr)
 
 	simple_alloc_init((void *)heap, 0x100000); // FIXME: hardcoded 1MB heap
 	valloc_init(1024 * 1024, PHYSBASE);
-	uart_offset = get_uart_offset();
+	node = get_uart_offset();
 
-	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + uart_offset, 0, 0, 16));
+	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + node, 0, 0, 16));
+
+	node = fdt_subnode_offset(fdt, 0, "chosen");
+	if (node >= 0) {
+		prop = fdt_getprop(fdt, node, "fsl,hv-pic-coreint", &len);
+		if (prop)
+			coreint = 1;
+	}
 }
-
 
 static void core_init(void)
 {

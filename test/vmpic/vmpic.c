@@ -10,6 +10,7 @@
 
 extern void init(unsigned long devtree_ptr);
 extern void *fdt;
+extern int coreint;
 
 int *handle_p;
 
@@ -20,11 +21,17 @@ void ext_int_handler(trapframe_t *frameptr)
 	unsigned int vector;
 	uint8_t c;
 
-	fh_vmpic_iack(&vector);
+	if (coreint)
+		vector = mfspr(SPR_EPR);
+	else
+		fh_vmpic_iack(&vector);
 
-	extint_cnt++;
-
-	fh_vmpic_set_mask(*handle_p, 1);
+	if (vector == *handle_p) {
+		extint_cnt++;
+		fh_vmpic_set_mask(*handle_p, 1);
+	} else {
+		printf("Unexpected extint %u\n", vector);
+	}
 
 //	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
 

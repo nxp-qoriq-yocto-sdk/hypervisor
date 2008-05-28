@@ -91,6 +91,24 @@ static void exclude_memrsv(void)
 	}
 }
 
+static void pic_init(void)
+{
+	int coreint = 0;
+	int chosen;
+	
+	chosen = fdt_subnode_offset(fdt, 0, "chosen");
+	if (chosen >= 0) {
+		int len;
+		const uint32_t *prop = fdt_getprop(fdt, chosen,
+		                                   "fsl,hv-pic-coreint", &len);
+		if (prop)
+			coreint = 1;
+	}
+
+	printf("coreint is %d\n", coreint);
+	mpic_init((unsigned long)fdt, coreint);
+}
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t lowest_guest_addr;
@@ -123,8 +141,7 @@ void start(unsigned long devtree_ptr)
 		                       (void *)ULONG_MAX);
 	malloc_init();
 
-	mpic_init((unsigned long)fdt);
-
+	pic_init();
 	enable_critint();
 
 #ifdef CONFIG_LIBOS_NS16550

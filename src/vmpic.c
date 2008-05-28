@@ -556,6 +556,8 @@ void fh_vmpic_iack(trapframe_t *regs)
 {
 	uint16_t vector;
 
+	printf("IACK\n");
+
 	vector = mpic_iack();
 	if (vector == 0xFFFF) {  /* spurious */
 		interrupt_t *irq = vpic_iack();
