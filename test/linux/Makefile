@@ -6,6 +6,7 @@
 
 all: dtbs bin/partman
 
+NO_LIBOS=y
 include ../Makefile.inc
 
 .PHONY: dtbs mount umount rootfs

@@ -39,7 +39,8 @@ CC_OPTS_C= -Wall \
   -fomit-frame-pointer \
   -Wno-unused \
   -Werror
-CC_OPTS_ASM=-D_ASM -Ibin
+CC_OPTS_ASM=-D_ASM -Ibin/src -include $(LIBOS_BIN)/assym.s
+
 LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 GENASSYM=$(LIBOS_DIR)/tools/genassym.sh
@@ -76,7 +77,10 @@ bin/%.dtb : %.dts
 	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
 
 # include the dependecy files
--include bin/genassym.d
+ifeq ($(NO_LIBOS),)
+	-include bin/libos/libos_assym.d
+endif
+-include $(shell find bin -name '*.d')
 
 bin/example.map: bin/example
 	nm -n bin/example > $@

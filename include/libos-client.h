@@ -1,8 +1,6 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
-#include <config/autoconf.h>
-
 #define BASE_TLB_ENTRY 61 /**< TLB entry used for initial mapping */
 #define PHYSBASE 0x40000000 /**< Virtual base of physical address space */
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
