@@ -56,7 +56,6 @@ config GDB_STUB
 
 config IPI_DOORBELL
 	bool "Inter Partition Interrupt support"
-	select LIBOS_QUEUE
 	help
 		Provides support for inter partition signalling.
 
