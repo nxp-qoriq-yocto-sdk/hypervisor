@@ -38,6 +38,7 @@
 #include <timers.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <pamu.h>
 #include <ipi_doorbell.h>
 #include <devtree.h>
 #include <errors.h>
@@ -1008,6 +1009,7 @@ __attribute__((noreturn)) void init_guest(void)
 #endif
 
 		vmpic_partition_init(guest);
+		pamu_partition_init(guest);
 		start_guest_primary();
 	} else {
 		gpir = register_gcpu_with_guest(guest, cpus, len);

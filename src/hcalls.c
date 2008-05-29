@@ -6,6 +6,7 @@
 #include <percpu.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <pamu.h>
 #include <ipi_doorbell.h>
 #include <paging.h>
 #include <events.h>
@@ -195,6 +196,39 @@ static void fh_partition_memcpy(trapframe_t *regs)
 
 	regs->gpregs[3] = 0;
 }
+
+#ifdef CONFIG_PAMU
+static void fh_dma_enable(trapframe_t *regs)
+{
+	unsigned int liodn = regs->gpregs[3];
+	int ret;
+
+	ret = pamu_enable_liodn(liodn);
+	if (ret < 0) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		return;
+	}
+
+	regs->gpregs[3] = 0;
+}
+
+static void fh_dma_disable(trapframe_t *regs)
+{
+	unsigned int liodn = regs->gpregs[3];
+	int ret;
+
+	ret = pamu_disable_liodn(liodn);
+	if (ret < 0) {
+		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		return;
+	}
+
+	regs->gpregs[3] = 0;
+}
+#else
+#define fh_dma_enable unimplemented
+#define fh_dma_disable unimplemented
+#endif
 
 #ifdef CONFIG_BYTE_CHAN
 /*
@@ -399,8 +433,8 @@ static hcallfp_t hcall_table[] = {
 	fh_partition_memcpy,
 	fh_vmpic_set_int_config,
 	fh_vmpic_get_int_config,
-	unimplemented,                     /* 12 */
-	unimplemented,
+	fh_dma_enable,                     /* 12 */
+	fh_dma_disable,
 	fh_vmpic_set_mask,
 	fh_vmpic_get_mask,
 	fh_vmpic_get_activity,             /* 16 */

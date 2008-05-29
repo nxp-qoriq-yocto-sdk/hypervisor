@@ -12,6 +12,7 @@
 #include <paging.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <pamu.h>
 #include <bcmux.h>
 #include <devtree.h>
 #include <gdb-stub.h>
@@ -172,7 +173,9 @@ void start(unsigned long devtree_ptr)
 	gdb_stub_init();
 #endif
 
-	// FIXME pamu init
+#ifdef CONFIG_PAMU
+	pamu_global_init(fdt);
+#endif
 
 	/* Main device tree must be const after this point. */
 	release_secondary_cores();

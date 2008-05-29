@@ -31,6 +31,11 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
                   phys_addr_t *size);
 
+int dt_get_reg(const void *tree, int node, int res,
+               phys_addr_t *addr, phys_addr_t *size);
+
+void copy_val(uint32_t *dest, const uint32_t *src, int naddr);
+
 static inline void val_from_int(uint32_t *dest, phys_addr_t src)
 {
 	dest[0] = 0;
