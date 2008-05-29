@@ -33,6 +33,7 @@
 #include <libos/trap_booke.h>
 #include <paging.h>
 #include <timers.h>
+#include <gspr.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -443,85 +444,11 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
-	uint32_t ret;
+	register_t ret;
 
 	gcpu->stats[stat_emu_spr]++;
-	
-	switch (spr) {
-	case SPR_TLB1CFG:
-		ret = mfspr(SPR_TLB1CFG) & ~TLBCFG_NENTRY_MASK;
-		ret |= TLB1_GSIZE;
-		break;
 
-	case SPR_IVPR:
-		ret = gcpu->ivpr;
-		break;
-
-	case SPR_IVOR0...SPR_IVOR15:
-		ret = gcpu->ivor[spr - SPR_IVOR0];
-		break;
-
-	case SPR_IVOR32...SPR_IVOR37:
-		ret = gcpu->ivor[spr - SPR_IVOR32 + 32];
-		break;
-
-	case SPR_TSR:
-		ret = get_tsr();
-		break;
-
-	case SPR_TCR:
-		ret = get_tcr();
-		break;
-
-	case SPR_DEC:
-		ret = mfspr(SPR_DEC);
-		break;
-
-	case SPR_CSRR0:
-		ret = gcpu->csrr0;
-		break;
-
-	case SPR_CSRR1:
-		ret = gcpu->csrr1;
-		break;
-
-	case SPR_MCSRR0:
-		ret = gcpu->mcsrr0;
-		break;
-
-	case SPR_MCSRR1:
-		ret = gcpu->mcsrr1;
-		break;
-
-	case SPR_MCSR:
-		ret = gcpu->mcsr;
-		break;
-
-	case SPR_MCAR:
-		ret = gcpu->mcar;
-		break;
-
-	case SPR_MCARU:
-		ret = gcpu->mcar >> 32;
-		break;
-
-	case SPR_CDCSR0:
-		ret = mfspr(SPR_CDCSR0);
-		break;
-
-	case SPR_MMUCSR0:
-		ret = 0;
-		break;
-
-	case SPR_BUCSR:
-		ret = mfspr(SPR_BUCSR);
-		break;
-
-	case SPR_MMUCFG:
-		ret = mfspr(SPR_MMUCFG);
-		break;
-
-	default:
+	if (read_gspr(regs, spr, &ret)) {
 		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
 //FIXME		return 1;
@@ -540,99 +467,12 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 
 	gcpu->stats[stat_emu_spr]++;
 
-	switch (spr) {
-	case SPR_IVPR:
-		val &= IVPR_MASK;
-		mtspr(SPR_GIVPR, val);
-		gcpu->ivpr = val;
-		break;
-	
-	case SPR_IVOR2:
-		mtspr(SPR_GIVOR2, val);
-		goto low_ivor;
-		
-	case SPR_IVOR3:
-		mtspr(SPR_GIVOR3, val);
-		goto low_ivor;
-		
-	case SPR_IVOR4:
-		mtspr(SPR_GIVOR4, val);
-		goto low_ivor;
-		
-	case SPR_IVOR8:
-		mtspr(SPR_GIVOR8, val);
-		goto low_ivor;
-		
-	case SPR_IVOR13:
-		mtspr(SPR_GIVOR13, val);
-		goto low_ivor;
-		
-	case SPR_IVOR14:
-		mtspr(SPR_GIVOR14, val);
-		goto low_ivor;
-		
-	case SPR_IVOR0...SPR_IVOR1:
-	case SPR_IVOR5...SPR_IVOR7:
-	case SPR_IVOR9...SPR_IVOR12:
-	case SPR_IVOR15:
-	low_ivor:
-		gcpu->ivor[spr - SPR_IVOR0] = val & IVOR_MASK;
-		break;
-
-	case SPR_IVOR32...SPR_IVOR37:
-		gcpu->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
-		break;
-
-	case SPR_TSR:
-		set_tsr(val);
-		break;
-
-	case SPR_TCR:
-		set_tcr(val);
-		break;
-
-	case SPR_DEC:
-		mtspr(SPR_DEC, val);
-		break;
-
-	case SPR_DECAR:
-		mtspr(SPR_DECAR, val);
-		break;
-
-	case SPR_CSRR0:
-		gcpu->csrr0 = val;
-		break;
-
-	case SPR_CSRR1:
-		gcpu->csrr1 = val;
-		break;
-
-	case SPR_MCSRR0:
-		gcpu->mcsrr0 = val;
-		break;
-
-	case SPR_MCSRR1:
-		gcpu->mcsrr1 = val;
-		break;
-
-	case SPR_MCSR:
-		gcpu->mcsr &= ~val;
-		break;
-
-	case SPR_MMUCSR0:
-		if (val & MMUCSR_L2TLB0_FI)
-			mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
-		if (val & MMUCSR_L2TLB1_FI)
-			guest_inv_tlb1(0);
-		
-		break;
-
-	default:
+	if (write_gspr(regs, spr, val)) {
 		printf("mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
 		       regs->srr0, spr, val);
 //FIXME		return 1;
 	}
-	
+
 	return 0;
 }
 
