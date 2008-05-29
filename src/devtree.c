@@ -392,7 +392,6 @@ queue_t *stdout, *stdin;
 int open_stdout_chardev(int node)
 {
 	chardev_t *cd;
-	int ret;
 	
 	cd = ptr_from_node(fdt, node, "chardev");
 	if (!cd)
@@ -400,22 +399,25 @@ int open_stdout_chardev(int node)
 
 	console_init(cd);
 
-	if (!cd->ops->set_tx_queue)
-		return ERR_INVALID;
+#ifdef CONFIG_LIBOS_QUEUE
+	if (cd->ops->set_tx_queue) {
+		int ret;
+		queue_t *q = alloc_type(queue_t);
+		if (!q)
+			return ERR_NOMEM;
 
-	queue_t *q = alloc_type(queue_t);
-	if (!q)
-		return ERR_NOMEM;
+		ret = queue_init(q, 2048);
+		if (ret < 0)
+			return ret;
 
-	ret = queue_init(q, 2048);
-	if (ret < 0)
-		return ret;
-
-	ret = cd->ops->set_tx_queue(cd, q);
-	if (ret < 0)
-		return ret;
+		ret = cd->ops->set_tx_queue(cd, q);
+		if (ret < 0)
+			return ret;
 		
-	stdout = q;
+		stdout = q;
+	}
+#endif
+
 	cd_console = cd;
 	return 0;
 }
