@@ -907,23 +907,23 @@ int start_guest(guest_t *guest)
 }
 
 /* Process configuration options in the hypervisor's
- * chosen node.
+ * chosen and hypervisor nodes.
  */
 static void partition_config(guest_t *guest)
 {
-	int chosen;
+	int hv;
 	
-	chosen = fdt_subnode_offset(guest->devtree, 0, "chosen");
-	if (chosen < 0)
-		chosen = fdt_add_subnode(guest->devtree, 0, "chosen");
-	if (chosen < 0) {
+	hv = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
+	if (hv < 0)
+		hv = fdt_add_subnode(guest->devtree, 0, "hypervisor");
+	if (hv < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "Couldn't create chosen node: %d\n", chosen);
+		         "Couldn't create hypervisor node: %d\n", hv);
 		return;
 	}
 
 	if (mpic_coreint)
-		fdt_setprop(guest->devtree, chosen, "fsl,hv-pic-coreint",
+		fdt_setprop(guest->devtree, hv, "fsl,hv-pic-coreint",
 		            NULL, 0);
 }
 

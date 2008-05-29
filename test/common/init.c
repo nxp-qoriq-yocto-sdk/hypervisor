@@ -69,7 +69,7 @@ void init(unsigned long devtree_ptr)
 
 	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + node, 0, 0, 16));
 
-	node = fdt_subnode_offset(fdt, 0, "chosen");
+	node = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (node >= 0) {
 		prop = fdt_getprop(fdt, node, "fsl,hv-pic-coreint", &len);
 		if (prop)
