@@ -133,8 +133,9 @@ $(obj)/conf: $(conf-objs:%=$(obj)/%)
 	$(HOSTCC) $^ -o $@
 
 mconf-objs	:= mconf.o zconf.tab.o $(lxdialog)
-$(obj)/mconf: $(mconf-objs:%=$(obj)/%)
-	$(HOSTCC) $^ $(HOST_LOADLIBES) -o $@
+mconf-objs	:= $(mconf-objs:%=$(obj)/%)
+$(obj)/mconf: $(obj)/dochecklxdialog $(mconf-objs)
+	$(HOSTCC) $(mconf-objs) $(HOST_LOADLIBES) -o $@
 
 kxgettext-objs	:= kxgettext.o zconf.tab.o
 $(obj)/kxgettext: $(kxgettext-objs:%=$(obj)/%)
@@ -169,11 +170,8 @@ clean-files     += config.pot linux.pot
 
 # Check that we have the required ncurses stuff installed for lxdialog (menuconfig)
 PHONY += $(obj)/dochecklxdialog
-$(addprefix $(obj)/,$(lxdialog)): $(obj)/dochecklxdialog
 $(obj)/dochecklxdialog:
 	$(Q)$(CONFIG_SHELL) $(check-lxdialog) -check $(HOSTCC) $(HOST_EXTRACFLAGS) $(HOST_LOADLIBES)
-
-always := dochecklxdialog
 
 # generated files seem to need this to find local include files
 $(obj)/lex.zconf.o: $(obj)/lex.zconf.c
@@ -323,3 +321,5 @@ else
 $(obj)/%:: $(src)/%_shipped
 	cp -af $< $@
 endif
+
+.PHONY: $(PHONY)
