@@ -66,3 +66,9 @@ config SHELL
 	help
 		A command-line shell with various debugging and
 		configuration commands.
+
+config PAMU
+	bool "PAMU/IOMMU support"
+	select LIBOS_PAMU
+	help
+		Provides support for Peripheral Access Management Unit.

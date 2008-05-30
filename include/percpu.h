@@ -42,6 +42,7 @@ typedef struct handle {
 	struct byte_chan_handle *bc;
 	struct vmpic_interrupt *intr;
 	struct ipi_doorbell_handle *db;
+	struct pamu_handle *pamu;
 	struct guest *guest;
 } handle_t;
 

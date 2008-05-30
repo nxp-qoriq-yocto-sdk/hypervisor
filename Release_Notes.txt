@@ -1,0 +1,131 @@
+
+-------------------------------------------------------
+Topaz Hypervisor Release Notes
+
+Topaz Version: 0.2
+Revsion: 0.2-rc1
+Date: 5/29/2008
+
+-------------------------------------------------------
+Contents
+
+1. Introduction
+2. Compatibility/Dependencies
+3. Detailed List of Changes
+4. Limitations
+
+-------------------------------------------------------
+1.  Introduction
+
+   This document identifies changes between Topaz 
+   releases and a list of limitations.
+
+-------------------------------------------------------
+2.  Compatibility/Dependencies
+
+   -Topaz 0.2-rc1
+      -is compatible with Simics 8578 3.2.27
+      -requires device tree compiler (DTC) SHA tag
+       fc9769ac2bae8a32d5d277007d22414c4516b02 with the 
+       libfdt patch applied as described in the Topaz
+       README.txt
+
+-------------------------------------------------------
+3.  Detailed List of Changes
+
+
+-------------------------------------------------------
+4.  Limitations
+
+
+ A. CPU Feature Limitations
+
+   -MMU
+      -invalid MMU mappings are permitted to be written into
+       the TLB, and a machine check will occur on access to
+       the mapping--  this is not implemented for TLB1.  Access
+       to invalid TLB1 mappings will result in another TLB miss
+
+   -physical addresses greater than 32 bits are not supported
+
+   -HID0
+      -the HID0 register is not implemented-- writes to it 
+       are ignored
+
+   -CPU core performance monitor support
+      -support for the CPU performance monitor instructions,
+       registers, and interrupts is not implemented
+
+   -CPU core Debug support
+      -CPU debug support is not implemented including all debug
+       registers and interrupts
+      -writes to debug SPRs are ignored
+
+   -L1 cache control
+      -the L1 cache control registers are not implemented
+         L1CSR0
+         L1CSR1
+         L1CSR2
+
+   -L2 cache control
+      -the L2 cache control registers are not implemented
+         L2CAPTDATAHI
+         L2CAPTDATALO
+         L2CAPTECC
+         L2CSR0
+         L2CSR1
+         L2ERRADDR
+         L2ERRATTR
+         L2ERRCTL
+         L2ERRDET
+         L2ERRDIS
+         L2ERREADDR
+         L2ERRINJCTL
+         L2ERRINJHI
+         L2ERRINJLO
+         L2ERRINTEN
+
+   -Power management
+      -support for the MSR[WE] power management bit is not
+       implemented
+
+   -"Guest debug mode" as defined by the Topaz spec is not
+    implemented
+
+   -"Guest cache lock mode" as defined by the Topaz spec is not
+    implemented
+
+
+ B. Platform Feature Limitations
+
+   -Coherence subdomains
+      -support for coherence subdomains is not implemented
+
+   -L3 / Platform Cache configuration is not implemented
+
+   -platform error interrupts
+      -in the platform MPIC multiple error interrupts are multiplexed
+       to interrupt 0.  De-multiplexing and routing of platform
+       error interrupts to partitions is not implemented.
+
+ C. Hypervisor Services Limitations
+
+   -Partition Management
+      -partition management interrupts (as specified in the
+       Topaz spec) are not implemented:
+         -partition state change 
+         -watchdog expiration
+         -restart request
+
+   -GPIO services-- GPIO services as specified in the Topaz
+    spec are not implemented
+
+   -Debug console
+      -the hypervisor debug console is partially implemented
+       and input is not supported
+
+   -gdb stub
+      -the gdb stub is not implemented
+      -the gdb stub does not support hardware breakpoints or
+       hardware watchpoints
+

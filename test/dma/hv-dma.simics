@@ -25,3 +25,6 @@ add-directory "%script%/bin" -prepend
 
 #run-command-file "%script%/../common/hvsim.include"
 run-command-file "hvsim.include"
+
+@i=SIM_get_port_interface(conf.pamu4, 'signal', 'bypass')
+@i.signal_lower(conf.pamu4)

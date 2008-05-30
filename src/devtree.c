@@ -66,7 +66,7 @@ int get_addr_format(const void *tree, int node,
 	return 0;
 }
 
-static void copy_val(uint32_t *dest, const uint32_t *src, int naddr)
+void copy_val(uint32_t *dest, const uint32_t *src, int naddr)
 {
 	int pad = MAX_ADDR_CELLS - naddr;
 

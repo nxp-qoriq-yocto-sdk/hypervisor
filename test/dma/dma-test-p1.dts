@@ -80,7 +80,20 @@
 			compatible = "fsl,mpc8578-dma";
 			cell-index = <0>;
 			reg = <100000 180>; 
+			dma-ranges = <0 0 10000000>;
+			fsl,liodn = <0>;
+			fsl,liodn-reg = <&dma1>;
+		};
 
+		global-utilities@e0000 {
+			compatible = "fsl,mpc8578-guts";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 e0000 10000>;
+			dma1: dma1-liodnr@580 {
+				compatible = "fsl,liodnr";
+				reg = <580 4>;	// DMA1LIODNR
+			};
 		};
 	};
 
