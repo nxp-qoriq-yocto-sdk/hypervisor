@@ -44,9 +44,11 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	switch (spr) {
 	case SPR_LR:
+		*val = regs->lr;
 		break;
 
 	case SPR_CTR:
+		*val = regs->ctr;
 		break;
 
 	case SPR_DEC:
@@ -256,9 +258,11 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 
 	switch (spr) {
 	case SPR_LR:
+		regs->lr = val;
 		break;
 
 	case SPR_CTR:
+		regs->ctr = val;
 		break;
 
 	case SPR_DEC:
