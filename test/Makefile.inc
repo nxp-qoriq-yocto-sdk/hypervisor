@@ -78,9 +78,8 @@ bin/%.dtb : %.dts
 
 # include the dependecy files
 ifeq ($(NO_LIBOS),)
-	-include bin/libos/libos_assym.d
+-include bin/libos/libos_assym.d
 endif
--include $(shell find bin -name '*.d')
 
 bin/example.map: bin/example
 	nm -n bin/example > $@
