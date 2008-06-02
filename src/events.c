@@ -11,11 +11,6 @@
 
 static eventfp_t event_table[] = {
 	&critdbell_to_gdbell_glue,		/* EV_ASSERT_VINT */
-#ifdef CONFIG_GDB_STUB
-	&gdb_stub_event_handler,		/* EV_GDB */
-#else
-	NULL,					/* EV_GDB */
-#endif
 	&critdbell_to_gdbell_glue,    /* EV_ASSERT_VINT */
 };
 
@@ -27,6 +22,11 @@ static eventfp_t gevent_table[] = {
 	&start_core,                  /* GEV_START */
 	&restart_core,                /* GEV_RESTART */
 	&start_wait_core,             /* GEV_START_WAIT */
+#ifdef CONFIG_GDB_STUB
+	&gdb_stub_event_handler,      /* GEV_GDB */
+#else
+	NULL,			      /* GEV_GDB */
+#endif
 };
 
 void setevent(gcpu_t *gcpu, int event)
