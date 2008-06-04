@@ -594,5 +594,6 @@ fault:
 	         "unhandled hvpriv trap from 0x%lx, insn 0x%08x\n",
 	         regs->srr0, insn);
 	regs->exc = EXC_PROGRAM;
+	mtspr(SPR_GESR, ESR_PIL);
 	reflect_trap(regs);
 }
