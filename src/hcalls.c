@@ -1,6 +1,7 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libos/libos.h>
+#include <libos/trap_booke.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -458,8 +459,17 @@ static hcallfp_t hcall_table[] = {
 
 void hcall(trapframe_t *regs)
 {
-	unsigned int token = regs->gpregs[11];   /* hcall token is in r11 */
+	unsigned int token;
 
+	if (unlikely(regs->srr1 & MSR_PR)) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+		         "guest hcall from 0x%lx\n", regs->srr0);
+		regs->exc = EXC_PROGRAM;
+		mtspr(SPR_GESR, ESR_PPR);
+		reflect_trap(regs);
+	}
+
+	token = regs->gpregs[11];   /* hcall token is in r11 */
 	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
 		regs->gpregs[3] = FH_ERR_INVALID_PARM;
 		return;
