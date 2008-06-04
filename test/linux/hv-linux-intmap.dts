@@ -192,7 +192,7 @@
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";
-			fsl,cpus = <0 1 2 1>;
+			fsl,hv-cpus = <0 1 2 1>;
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,dtb = /incbin/("bin/linux-intmap.dtb");

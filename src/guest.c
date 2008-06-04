@@ -944,10 +944,10 @@ __attribute__((noreturn)) void init_guest(void)
 		if (off < 0)
 			goto wait;
 
-		cpus = fdt_getprop(fdt, off, "fsl,cpus", &len);
+		cpus = fdt_getprop(fdt, off, "fsl,hv-cpus", &len);
 		if (!cpus) {
 			ret = fdt_get_path(fdt, off, buf, sizeof(buf));
-			printf("No fsl,cpus in guest %s\n", buf);
+			printf("No fsl,hv-cpus in guest %s\n", buf);
 			continue;
 		}
 

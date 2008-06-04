@@ -214,7 +214,7 @@
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";
-			fsl,cpus = <0 1 2 3>;
+			fsl,hv-cpus = <0 1 2 3>;
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
