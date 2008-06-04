@@ -201,6 +201,7 @@ interrupt_t *vpic_iack(void)
 	vpic_interrupt_t *virq;
 
 	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	atomic_and(&gcpu->gdbell_pending, ~(GCPU_PEND_VIRQ));
 	virq = __vpic_iack();
 	spin_unlock_critsave(&guest->vpic.lock, save);
 
