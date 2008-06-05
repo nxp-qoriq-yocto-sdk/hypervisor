@@ -1,0 +1,42 @@
+#
+# Copyright 2008 Freescale Semiconductor, Inc
+#
+# Description:
+# emit_td uses the register information in GDB_REG_DEFS_H to generate
+# E500MC_DATA_H. e500mc-xml-dump emits out the XML target description.
+
+HEADERS_DIR = include
+GEN_HEADERS_DIR = bin/include
+GEN_FILES_DIR = bin
+
+GDB_REG_DEFS_H := $(HEADERS_DIR)/gdb-register-defs.h
+E500MC_DATA_H := $(GEN_HEADERS_DIR)/e500mc-data.h
+
+EMIT_TD_C := $(TDGEN_DIR)/emit_td.c
+EMIT_TD := $(GEN_FILES_DIR)/emit_td
+
+E500MC_XML_DUMP_C := $(TDGEN_DIR)/e500mc-xml-dump.c
+E500MC_XML_DUMP := $(GEN_FILES_DIR)/e500mc-xml-dump
+
+POWER_CORE_XML := $(GEN_FILES_DIR)/power-core.xml
+POWER_FPU_XML := $(GEN_FILES_DIR)/power-fpu.xml
+POWERPC_E500MC_XML := $(GEN_FILES_DIR)/powerpc-e500mc.xml
+
+$(EMIT_TD) : $(EMIT_TD_C) $(GDB_REG_DEFS_H)
+	$(HOSTCC) $(HOSTCC_OPTS) $(HOSTCC_OPTS_C) -o $@ $<
+
+$(E500MC_DATA_H) : $(EMIT_TD) $(GDB_REG_DEFS_H)
+	mkdir -p $(GEN_HEADERS_DIR)
+	$(EMIT_TD) > $@
+
+$(E500MC_XML_DUMP) : $(E500MC_XML_DUMP_C) $(E500MC_DATA_H)
+	$(HOSTCC) $(HOSTCC_OPTS) $(HOSTCC_OPTS_C) -o $@ $<
+
+$(POWER_CORE_XML) : $(E500MC_XML_DUMP)
+	$(E500MC_XML_DUMP) core > $@
+
+$(POWER_FPU_XML) : $(E500MC_XML_DUMP)
+	$(E500MC_XML_DUMP) fpu > $@
+
+$(POWERPC_E500MC_XML) : $(E500MC_XML_DUMP)
+	$(E500MC_XML_DUMP) e500mc > $@

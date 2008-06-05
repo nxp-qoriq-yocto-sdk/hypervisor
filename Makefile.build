@@ -17,7 +17,7 @@ CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
 GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
+        -Iinclude -Ibin/include -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
         -std=gnu99  -include $(LIBOS_CLIENT_H)
 
 CC_OPTS_NODEP := -include config/autoconf.h
@@ -44,6 +44,19 @@ LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 MKDIR=mkdir -p
 KCONFIG=y
+
+TDGEN_DIR := tools/tdgen
+include $(TDGEN_DIR)/Makefile.tdgen
+
+HOSTCC=gcc
+HOSTCC_OPTS=-g -std=gnu99
+HOSTCC_OPTS_C= -Wall \
+  -Wundef \
+  -Wstrict-prototypes \
+  -Wno-trigraphs \
+  -O2 \
+  -I $(HEADERS_DIR) \
+  -I $(GEN_HEADERS_DIR)
 
 -include include/config/auto.conf
 
@@ -91,6 +104,8 @@ bin/uv.bin: bin/uv
 
 bin/uv: include/config/auto.conf $(OBJS)
 	$(CC) $(LD_OPTS) -Wl,-Tuv.lds -o $@ $(OBJS) -lgcc
+
+bin/gdb-stub.d : src/gdb-stub.c bin/include/e500mc-data.h
 
 # compile and gen dependecy file
 .PRECIOUS: bin/%.d

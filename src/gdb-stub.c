@@ -33,6 +33,8 @@
 #include <byte_chan.h>
 #include <gdb-stub.h>
 
+#include "e500mc-data.h"
+
 /* TODO:
  * 0. Add descriptive comment per function/data-structure.
  * 1. Do not use globals, used alloc() instead to carve out
@@ -234,31 +236,6 @@ static void put_debug_char(uint8_t c)
 	TRACE();
 	byte_chan_send(byte_channel_handle, buf, len);
 }
-
-#define NUMGPRS  32
-#define NUMFPRS  32
-#define NUMNIA   1
-#define NUMMSR   1
-#define NUMCR    1
-#define NUMLR    1
-#define NUMCTR   1
-#define NUMXER   1
-#define NUMFPSCR 1
-
-#define NUM_32_BIT_REGS NUMGPRS +                                            \
-                        NUMNIA  + NUMMSR + NUMCR + NUMLR + NUMCTR + NUMXER + \
-                        NUMFPSCR
-
-#define NUM_64_BIT_REGS NUMFPRS
-
-/* Number of bytes of registers.  */
-#define NUMREGBYTES (NUM_32_BIT_REGS * 4) + (NUM_64_BIT_REGS * 8)
-
-/* BUFMAX defines the maximum number of characters in inbound/outbound buffers;
- * at least NUMREGBYTES*2 are needed for register packets
- */
-#define BUFMAX      4096
-#define BUFMAX_HEX "1000"
 
 /* TODO: Where do we call this? */
 static inline int bufsize_sanity_check(void)
