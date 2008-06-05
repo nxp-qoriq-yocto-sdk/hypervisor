@@ -145,7 +145,7 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 
 	if (txirq) {
 		txirq->guest = guest;
-		handle->tx->producer = rxirq;
+		handle->tx->producer = txirq;
 		handle->tx->space_avail = vpic_assert_vint_txq;
 	}
 
