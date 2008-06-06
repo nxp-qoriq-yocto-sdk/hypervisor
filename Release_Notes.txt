@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc1
-Date: 5/29/2008
+Revsion: 0.2-rc2
+Date: 6/4/2008
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc1
+   -Topaz 0.2-rc2
       -is compatible with Simics 8578 3.2.27
       -requires device tree compiler (DTC) SHA tag
        fc9769ac2bae8a32d5d277007d22414c4516b02 with the 
@@ -33,12 +33,23 @@ Contents
 -------------------------------------------------------
 3.  Detailed List of Changes
 
+   -Topaz 0.2-rc2
+      -removed CROSS_COMPILE from Makefiles
+      -bug 1494 fixed - update fsl,hv-cpus property name
+      -bug 1504 fixed - byte-channel TX interrupts hooked up to RX ints
+      -bug 1500 fixed - set GESR[PIL] when reflecting illegal instruction
+      -raise privileged instrution exception when guest user mode hcall is
+       performed
+      -unset GCPU_PEND_VIRQ when iacking a virq
+      -cleaned up gdb stub is committed
+      -build infrastructure for gdb stub
 
 -------------------------------------------------------
 4.  Limitations
 
+ A. Open Bugs
 
- A. CPU Feature Limitations
+ B. CPU Feature Limitations
 
    -MMU
       -invalid MMU mappings are permitted to be written into
@@ -96,7 +107,7 @@ Contents
     implemented
 
 
- B. Platform Feature Limitations
+ C. Platform Feature Limitations
 
    -Coherence subdomains
       -support for coherence subdomains is not implemented
@@ -108,7 +119,7 @@ Contents
        to interrupt 0.  De-multiplexing and routing of platform
        error interrupts to partitions is not implemented.
 
- C. Hypervisor Services Limitations
+ D. Hypervisor Services Limitations
 
    -Partition Management
       -partition management interrupts (as specified in the
