@@ -7,7 +7,6 @@
 #
 
 SIMICS=simics
-CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 DTC_DIR := ../dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_INC := ../libos/include

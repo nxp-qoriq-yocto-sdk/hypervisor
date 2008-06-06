@@ -25,7 +25,7 @@ bin/hv-demo.dtb: bin/demo-p2.dtb bin/demo-p1.dtb hv-demo.dts
 
 bin/partman: partman.c
 	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
-	powerpc-e500mc-linux-gnu-strip $@
+	$(CROSS_COMPILE)strip $@
 
 bin/rootfs2.ext2.gz: rootfs.ext2.gz
 	cp rootfs.ext2.gz bin/rootfs2.ext2.gz

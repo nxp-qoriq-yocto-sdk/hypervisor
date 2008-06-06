@@ -6,7 +6,6 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 DTC_DIR := ../../../dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../../libos/lib
