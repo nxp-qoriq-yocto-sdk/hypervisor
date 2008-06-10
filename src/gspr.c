@@ -30,7 +30,7 @@
 #include <libos/trapframe.h>
 #include <libos/spr.h>
 #include <percpu.h>
-#include <gspr.h>
+#include <greg.h>
 #include <timers.h>
 #include <paging.h>
 

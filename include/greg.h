@@ -31,7 +31,6 @@
 
 #include <hv.h>
 #include <libos/trapframe.h>
-#include <gspr.h>
 
 int read_gspr(trapframe_t *regs, int spr, register_t *val);
 int write_gspr(trapframe_t *regs, int spr, register_t val);
