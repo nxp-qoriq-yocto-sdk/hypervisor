@@ -29,6 +29,10 @@
 #include <libos/spr.h>
 #include <libos/trapframe.h>
 
+/* The relevent guestmem_set() call must be made prior
+ * to executing any guestmem_in() calls.  It is not
+ * required for guestmem_out().
+ */
 static inline void guestmem_set_data(trapframe_t *regs)
 {
 	uint32_t tmp;
@@ -59,12 +63,54 @@ static inline int guestmem_in32(uint32_t *ptr, uint32_t *val)
 {
 	register int stat asm("r3") = 0;
 
-	asm("1: lwepx %0, 0, %2;"
+	asm("1: lwepx %0, %y2;"
 	    "2:"
 	    ".section .extable,\"a\";"
 	    ".long 1b;"
 	    ".long 2b;"
-	    ".previous;" : "=r" (*val), "+r" (stat) : "r" (ptr));
+	    ".previous;" : "=r" (*val), "+r" (stat) : "Z" (*ptr));
+
+	return stat;
+}
+
+static inline int guestmem_in8(uint8_t *ptr, uint8_t *val)
+{
+	register int stat asm("r3") = 0;
+
+	asm("1: lbepx %0, %y2;"
+	    "2:"
+	    ".section .extable,\"a\";"
+	    ".long 1b;"
+	    ".long 2b;"
+	    ".previous;" : "=r" (*val), "+r" (stat) : "Z" (*ptr));
+
+	return stat;
+}
+
+static inline int guestmem_out32(uint32_t *ptr, uint32_t val)
+{
+	register int stat asm("r3") = 0;
+
+	asm("1: stwepx %2, %y1;"
+	    "2:"
+	    ".section .extable,\"a\";"
+	    ".long 1b;"
+	    ".long 2b;"
+	    ".previous;" : "+r" (stat), "=Z" (*ptr) : "r" (val));
+
+	return stat;
+}
+
+static inline int guestmem_out8(uint8_t *ptr, uint8_t val)
+{
+	register int stat asm("r3") = 0;
+
+	asm("1: stbepx %2, %y1;"
+	    "2:"
+	    ".section .extable,\"a\";"
+	    ".long 1b;"
+	    ".long 2b;"
+	    ".previous;" : "+r" (stat), "=Z" (*ptr) : "r" (val));
 
 	return stat;
 }
