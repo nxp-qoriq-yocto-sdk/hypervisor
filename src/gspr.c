@@ -28,7 +28,7 @@
 
 #include <hv.h>
 #include <libos/trapframe.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <percpu.h>
 #include <greg.h>
 #include <timers.h>

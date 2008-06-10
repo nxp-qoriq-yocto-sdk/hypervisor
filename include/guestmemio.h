@@ -26,7 +26,7 @@
  */
 
 #include <stdint.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/trapframe.h>
 
 static inline void guestmem_set_data(trapframe_t *regs)

@@ -33,7 +33,7 @@
 #include <libos/trap_booke.h>
 #include <percpu.h>
 #include <libos/console.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <doorbell.h>
 
 void decrementer(trapframe_t *regs)
