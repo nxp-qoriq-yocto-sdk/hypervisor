@@ -1,5 +1,5 @@
 /** @file
- * Guest SPR access
+ * Guest register access
  */
 
 /*
@@ -26,13 +26,68 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GSPR_H
-#define GSPR_H
+#ifndef GREG_H
+#define GREG_H
 
 #include <hv.h>
 #include <libos/trapframe.h>
 
+#define MINGPR 0
+#define MAXGPR 31
+
 int read_gspr(trapframe_t *regs, int spr, register_t *val);
 int write_gspr(trapframe_t *regs, int spr, register_t val);
+
+static inline int read_ggpr(trapframe_t *regs, int gpr, register_t *val)
+{
+	if (gpr >= MINGPR && gpr <= MAXGPR) {
+		*val = regs->gpregs[gpr];
+		return 0;
+	} else
+		return 1;
+}
+
+static inline int write_ggpr(trapframe_t *regs, int gpr, register_t val)
+{
+	if (gpr >= MINGPR && gpr <= MAXGPR) {
+		regs->gpregs[gpr] = val;
+		return 0;
+	} else
+		return 1;
+}
+
+static inline int read_gfpr(trapframe_t *regs, int gpr, register_t *val)
+{
+	return 1;
+}
+
+static inline int write_gfpr(trapframe_t *regs, int gpr, register_t val)
+{
+	return 1;
+}
+
+static inline int read_gmsr(trapframe_t *regs, register_t *val)
+{
+	*val = regs->srr1;
+	return 0;
+}
+
+static inline int write_gmsr(trapframe_t *regs, register_t val)
+{
+	regs->srr1 = val;
+	return 0;
+}
+
+static inline int read_gcr(trapframe_t *regs, register_t *val)
+{
+	*val = regs->cr;
+	return 0;
+}
+
+static inline int write_gcr(trapframe_t *regs, register_t val)
+{
+	regs->cr = val;
+	return 0;
+}
 
 #endif
