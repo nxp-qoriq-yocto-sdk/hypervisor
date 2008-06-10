@@ -8,7 +8,6 @@
 		stdout = &uart0;
 		stdin = &uart0;
 		serial0 = &uart0;
-		byte-channel0 = &bc0;
 	};
 
 	cpus {
@@ -179,13 +178,6 @@
 			compatible = "fsl,mpc8572-guts";
 			reg = <e0000 1000>;
 			fsl,has-rstcr;
-		};
-	};
-
-	byte-channels {
-		bc0: byte-channel0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uart1>;
 		};
 	};
 
