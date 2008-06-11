@@ -406,7 +406,7 @@ static void fh_partition_start(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[3] = start_guest(guest) ? FH_ERR_FAILED : 0;
+	regs->gpregs[3] = start_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
 
@@ -418,7 +418,7 @@ static void fh_partition_stop(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_FAILED : 0;
+	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
 static hcallfp_t hcall_table[] = {
