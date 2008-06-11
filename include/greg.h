@@ -35,6 +35,9 @@
 #define MINGPR 0
 #define MAXGPR 31
 
+#define MINFPR 0
+#define MAXFPR 31
+
 int read_gspr(trapframe_t *regs, int spr, register_t *val);
 int write_gspr(trapframe_t *regs, int spr, register_t val);
 
@@ -56,14 +59,182 @@ static inline int write_ggpr(trapframe_t *regs, int gpr, register_t val)
 		return 1;
 }
 
-static inline int read_gfpr(trapframe_t *regs, int gpr, register_t *val)
+static inline int read_gfpr_const(trapframe_t *regs, int fpr, uint64_t *val)
 {
+	register_t msr;
+
+	if (fpr < MINFPR || fpr > MAXFPR)
+		return 0;
+
+	msr = mfmsr();
+	mtmsr(msr | MSR_FP);
+	asm volatile("stfd%U0%X0 %1, %0" : "=m" (*val) : "i" (fpr));
+	mtmsr(msr);
 	return 1;
 }
 
-static inline int write_gfpr(trapframe_t *regs, int gpr, register_t val)
+static inline int read_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
 {
+	if (__builtin_constant_p(fpr))
+		return read_gfpr_const(regs, fpr, val);
+
+	switch (fpr) {
+	case 0:
+		return read_gfpr_const(regs, 0, val);
+	case 1:
+		return read_gfpr_const(regs, 1, val);
+	case 2:
+		return read_gfpr_const(regs, 2, val);
+	case 3:
+		return read_gfpr_const(regs, 3, val);
+	case 4:
+		return read_gfpr_const(regs, 4, val);
+	case 5:
+		return read_gfpr_const(regs, 5, val);
+	case 6:
+		return read_gfpr_const(regs, 6, val);
+	case 7:
+		return read_gfpr_const(regs, 7, val);
+	case 8:
+		return read_gfpr_const(regs, 8, val);
+	case 9:
+		return read_gfpr_const(regs, 9, val);
+	case 10:
+		return read_gfpr_const(regs, 10, val);
+	case 11:
+		return read_gfpr_const(regs, 11, val);
+	case 12:
+		return read_gfpr_const(regs, 12, val);
+	case 13:
+		return read_gfpr_const(regs, 13, val);
+	case 14:
+		return read_gfpr_const(regs, 14, val);
+	case 15:
+		return read_gfpr_const(regs, 15, val);
+	case 16:
+		return read_gfpr_const(regs, 16, val);
+	case 17:
+		return read_gfpr_const(regs, 17, val);
+	case 18:
+		return read_gfpr_const(regs, 18, val);
+	case 19:
+		return read_gfpr_const(regs, 19, val);
+	case 20:
+		return read_gfpr_const(regs, 20, val);
+	case 21:
+		return read_gfpr_const(regs, 21, val);
+	case 22:
+		return read_gfpr_const(regs, 22, val);
+	case 23:
+		return read_gfpr_const(regs, 23, val);
+	case 24:
+		return read_gfpr_const(regs, 24, val);
+	case 25:
+		return read_gfpr_const(regs, 25, val);
+	case 26:
+		return read_gfpr_const(regs, 26, val);
+	case 27:
+		return read_gfpr_const(regs, 27, val);
+	case 28:
+		return read_gfpr_const(regs, 28, val);
+	case 29:
+		return read_gfpr_const(regs, 29, val);
+	case 30:
+		return read_gfpr_const(regs, 30, val);
+	case 31:
+		return read_gfpr_const(regs, 31, val);
+	default:
+		return 0;
+	};
+}
+
+static inline int write_gfpr_const(trapframe_t *regs, int fpr, uint64_t *val)
+{
+	register_t msr;
+
+	if (fpr < MINFPR || fpr > MAXFPR)
+		return 0;
+
+	msr = mfmsr();
+	mtmsr(msr | MSR_FP);
+	asm volatile("lfd%U0%X0 %1, %0" : : "m" (*val), "i" (fpr));
+	mtmsr(msr);
 	return 1;
+}
+
+static inline int write_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
+{
+	if (__builtin_constant_p(fpr))
+		return write_gfpr_const(regs, fpr, val);
+
+	switch (fpr) {
+	case 0:
+		return write_gfpr_const(regs, 0, val);
+	case 1:
+		return write_gfpr_const(regs, 1, val);
+	case 2:
+		return write_gfpr_const(regs, 2, val);
+	case 3:
+		return write_gfpr_const(regs, 3, val);
+	case 4:
+		return write_gfpr_const(regs, 4, val);
+	case 5:
+		return write_gfpr_const(regs, 5, val);
+	case 6:
+		return write_gfpr_const(regs, 6, val);
+	case 7:
+		return write_gfpr_const(regs, 7, val);
+	case 8:
+		return write_gfpr_const(regs, 8, val);
+	case 9:
+		return write_gfpr_const(regs, 9, val);
+	case 10:
+		return write_gfpr_const(regs, 10, val);
+	case 11:
+		return write_gfpr_const(regs, 11, val);
+	case 12:
+		return write_gfpr_const(regs, 12, val);
+	case 13:
+		return write_gfpr_const(regs, 13, val);
+	case 14:
+		return write_gfpr_const(regs, 14, val);
+	case 15:
+		return write_gfpr_const(regs, 15, val);
+	case 16:
+		return write_gfpr_const(regs, 16, val);
+	case 17:
+		return write_gfpr_const(regs, 17, val);
+	case 18:
+		return write_gfpr_const(regs, 18, val);
+	case 19:
+		return write_gfpr_const(regs, 19, val);
+	case 20:
+		return write_gfpr_const(regs, 20, val);
+	case 21:
+		return write_gfpr_const(regs, 21, val);
+	case 22:
+		return write_gfpr_const(regs, 22, val);
+	case 23:
+		return write_gfpr_const(regs, 23, val);
+	case 24:
+		return write_gfpr_const(regs, 24, val);
+	case 25:
+		return write_gfpr_const(regs, 25, val);
+	case 26:
+		return write_gfpr_const(regs, 26, val);
+	case 27:
+		return write_gfpr_const(regs, 27, val);
+	case 28:
+		return write_gfpr_const(regs, 28, val);
+	case 29:
+		return write_gfpr_const(regs, 29, val);
+	case 30:
+		return write_gfpr_const(regs, 30, val);
+	case 31:
+		return write_gfpr_const(regs, 31, val);
+	default:
+		return 0;
+	};
 }
 
 static inline int read_gmsr(trapframe_t *regs, register_t *val)
