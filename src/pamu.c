@@ -317,8 +317,8 @@ void pamu_global_init(void *fdt)
 	/* find the pamu node */
 	pamu_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,mpc8578-pamu");
 	if (pamu_node < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"ERROR : no pamu node found\n");
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			"warning: no pamu node found\n");
 		return;
 	}
 

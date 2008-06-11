@@ -29,7 +29,7 @@
 #include <libos/trapframe.h>
 #include <libos/trap_booke.h>
 #include <libos/console.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/mpic.h>
 
 #include <hv.h>

@@ -33,7 +33,7 @@
 #include <libos/trap_booke.h>
 #include <paging.h>
 #include <timers.h>
-#include <gspr.h>
+#include <greg.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {

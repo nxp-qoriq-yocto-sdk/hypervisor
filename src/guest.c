@@ -28,7 +28,7 @@
 
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/io.h>
 #include <libos/bitops.h>
 #include <libos/mpic.h>
@@ -484,7 +484,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	guest->dtb_gphys = ((uint64_t)prop[0] << 32) | prop[1];
 	gfdt_size = prop[2];
 
-	guest_origtree = fdt_getprop(fdt, partition, "fsl,dtb", &ret);
+	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
 	if (!guest_origtree)
 		goto fail;
 	
@@ -1256,7 +1256,7 @@ phys_addr_t find_lowest_guest_phys(void)
 		if (off < 0)
 			return low;
 
-		gtree = fdt_getprop(fdt, off, "fsl,dtb", &ret);
+		gtree = fdt_getprop(fdt, off, "fsl,hv-dtb", &ret);
 		if (!gtree)
 			continue;
 

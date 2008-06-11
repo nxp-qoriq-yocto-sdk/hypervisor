@@ -331,9 +331,6 @@ void vmpic_partition_init(guest_t *guest)
 	while ((node = fdt_next_node(tree, node, NULL)) >= 0) {
 		int i, intlen, domain;
 		uint32_t *intspec;
-		static char buf[1024];
-
-		fdt_get_path(guest->devtree, node, buf, sizeof(buf));
 
 		patch_interrupt_map(tree, node, vmpic_node, vmpic_phandle, guest);
 		

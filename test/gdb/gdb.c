@@ -1,7 +1,7 @@
 
 #include <libos/libos.h>
 #include <libos/hcalls.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libfdt.h>

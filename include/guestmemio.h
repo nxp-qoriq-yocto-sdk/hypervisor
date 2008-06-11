@@ -26,7 +26,7 @@
  */
 
 #include <stdint.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/trapframe.h>
 
 /* The relevent guestmem_set() call must be made prior

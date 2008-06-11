@@ -8,7 +8,7 @@
 #define DOORBELL_H
 
 #include <libos/percpu.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 
 #define MSG_DBELL      0x00000000
 #define MSG_DBELL_CRIT 0x08000000

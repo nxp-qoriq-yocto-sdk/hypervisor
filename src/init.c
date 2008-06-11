@@ -1,5 +1,5 @@
 #include <libos/console.h>
-#include <libos/spr.h>
+#include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/uart.h>
 #include <libos/mpic.h>
