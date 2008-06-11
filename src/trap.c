@@ -181,10 +181,9 @@ extern extable extable_begin, extable_end;
 
 static void abort_guest_access(trapframe_t *regs, int stat)
 {
-	regs->gpregs[3] = stat;
-
 	for (extable *ex = &extable_begin; ex < &extable_end; ex++) {
 		if (ex->addr == regs->srr0) {
+			regs->gpregs[3] = stat;
 			regs->srr0 = ex->handler;
 			return;
 		}
