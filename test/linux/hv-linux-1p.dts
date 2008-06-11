@@ -187,7 +187,7 @@
 			fsl,hv-cpus = <0 1 2 1>;
 			fsl,entry = <0>;
 			fsl,privileged;
-			fsl,dtb = /incbin/("bin/linux-p1.dtb");
+			fsl,hv-dtb = /incbin/("bin/linux-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
 			                 0 17000000 0 20000000 1000000>;
 			fsl,hv-load-image-table = <0 ef100000 0 0 0
