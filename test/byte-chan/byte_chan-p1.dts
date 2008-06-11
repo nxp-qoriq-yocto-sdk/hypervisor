@@ -50,47 +50,6 @@
 		device_type = "soc";
 		ranges = <0 0 fe000000 400000>;
 
-		i2c0: i2c@118000 {
-			device_type = "i2c";
-			compatible = "fsl,mpc8578-i2c",
-			             "fsl,i2c", "fsl-i2c";
-			reg = <118000 100>;
-//			interrupts = <1e 2>;
-//			interrupt-parent = <&mpic>;
-			dfsrr;
-		};
-
-		mdio@31c520 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "mdio";
-			compatible = "fsl,mpc8578-gianfar-mdio",
-			             "fsl,gianfar-mdio",
-			             "gianfar";
-			reg = <31c520 20>;
-			phy0: ethernet-phy@0 {
-//				interrupt-parent = <&mpic>;
-				interrupts = <a 1>;
-				reg = <0>;
-			};
-		};
-
-		ethernet@31c000 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			device_type = "network";
-			model = "eTSEC";
-			compatible = "fsl,mpc8578-gianfar",
-			             "fsl,gianfar",
-			             "gianfar";
-			reg = <31c000 1000>;
-			local-mac-address = [ 00 00 00 00 00 00 ];
-//			interrupts = <1d 2 1e 2 22 2>;
-//			interrupt-parent = <&mpic>;
-			phy-handle = <&phy0>;
-			phy-connection-type = "rgmii-id";
-		};
-
 		serial@11d500 {
 			device_type = "serial";
 			compatible = "fsl,mpc8578-uart",
