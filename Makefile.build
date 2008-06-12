@@ -56,7 +56,8 @@ HOSTCC_OPTS_C= -Wall \
   -Wno-trigraphs \
   -O2 \
   -I $(HEADERS_DIR) \
-  -I $(GEN_HEADERS_DIR)
+  -I $(GEN_HEADERS_DIR) \
+  -I $(LIBOS_INC)
 
 -include include/config/auto.conf
 

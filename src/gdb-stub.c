@@ -32,8 +32,8 @@
 #include <events.h>
 #include <byte_chan.h>
 #include <gdb-stub.h>
-
-#include "e500mc-data.h"
+#include <greg.h>
+#include <e500mc-data.h>
 
 /* TODO:
  * 0. Add descriptive comment per function/data-structure.
@@ -290,6 +290,7 @@ typedef enum token
 	return_current_thread_id,
 	get_section_offsets,
 	supported_features,
+	qxfer
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -312,6 +313,7 @@ static lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "qC", return_current_thread_id },
 	{ "qOffsets", get_section_offsets },
 	{ "qSupported", supported_features },
+	{ "qXfer", qxfer },
 };
 
 /* Aux */
@@ -330,6 +332,7 @@ static inline void pkt_write_byte(pkt_t *pkt, uint8_t c);
 static inline void pkt_update_cur(pkt_t *pkt);
 static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
 static inline void pkt_cat_string(pkt_t *pkt, char *s);
+static inline void pkt_cat_stringn(pkt_t *pkt, char *s, unsigned int n);
 static inline uint8_t pkt_read_byte(pkt_t *pkt, unsigned int i);
 static inline int pkt_full(pkt_t *pkt);
 static inline void pkt_reset(pkt_t *pkt);
@@ -438,7 +441,13 @@ static inline int pkt_space(pkt_t *pkt)
 static inline void pkt_write_byte(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
-	if (pkt->cur < (pkt->buf + pkt->len))
+	if (c == '#' || c == '$' || c == '}' || c == '*') {
+		if (pkt->cur < (pkt->buf + pkt->len))
+			*(pkt->cur) = '}';
+		pkt_update_cur(pkt);
+		if (pkt->cur < (pkt->buf + pkt->len))
+			*(pkt->cur) = c ^ 0x20;
+	} else if (pkt->cur < (pkt->buf + pkt->len))
 		*(pkt->cur) = c;
 	return;
 }
@@ -454,8 +463,8 @@ static inline void pkt_update_cur(pkt_t *pkt)
 static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
-	if (pkt->cur < (pkt->buf + pkt->len))
-		*(pkt->cur)++ = c;
+	pkt_write_byte(pkt, c);
+	pkt_update_cur(pkt);
 	return;
 }
 
@@ -469,6 +478,18 @@ static inline void pkt_cat_string(pkt_t *pkt, char *s)
 	}
 	pkt_write_byte(pkt, 0);
 	return;
+}
+
+static inline void pkt_cat_stringn(pkt_t *pkt, char *s, unsigned int n)
+{
+        char *p;
+        TRACE();
+        p = s;
+        while (*p && (p - s) < n) {
+                pkt_write_byte_update_cur(pkt, *p++);
+        }
+        pkt_write_byte(pkt, 0);
+        return;
 }
 
 static inline uint8_t pkt_read_byte(pkt_t *pkt, unsigned int i)
@@ -604,9 +625,27 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length)
 
 /* RSP Engine.
  */
+
+static inline void set_reg_value(char *value, uint64_t reg_value,
+                                 unsigned int byte_length)
+{
+	int i, offset;
+	offset = (byte_length == 4 ? 4 : 0);
+	for (i = 0; i < byte_length; i++) {
+		value[2*i] = hex(upper_nibble((int)
+				(((char *) &reg_value)[offset + i])));
+		value[2*i+1] = hex(lower_nibble((int)
+				(((char *) &reg_value)[offset + i])));
+	}
+	value[2*byte_length] = '\0';
+}
+
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
-	uint8_t *q;
+	uint8_t *q, *r;
+	unsigned int offset, length;
+	char *td; /* td: target description */
+
 	TRACE("In RSP Engine, main loop.");
 
 	stub_start: {
@@ -647,8 +686,70 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 
 		case read_registers:
 			TRACE("Got 'g' packet.");
-			pkt_hex_copy(rsp, (uint8_t *) (trap_frame -> gpregs),
-			        32 * sizeof (register_t));
+			{
+				char value[17];
+				unsigned int i;
+				int byte_length = 0;
+				register_t reg_value;
+				uint64_t fp_reg_value;
+				char c;
+				for (i = 0; i < NUMREGS; i++) {
+					c = 0;
+					byte_length = e500mc_reg_table[i].bitsize/8;
+					switch(e500mc_reg_table[i].cat) {
+					case reg_cat_spr:
+						if ((c = read_gspr(trap_frame,
+						    e500mc_reg_table[i].e500mc_num,
+						    &reg_value)) == 0)
+							set_reg_value(value,
+							              (uint64_t) reg_value,
+							              byte_length);
+						break;
+					case reg_cat_gpr:
+						if ((c = read_ggpr(trap_frame,
+						    e500mc_reg_table[i].e500mc_num,
+						    &reg_value)) == 0)
+							set_reg_value(value,
+							              (uint64_t) reg_value,
+							              byte_length);
+						break;
+					case reg_cat_fpr:
+						if ((c = read_gfpr(trap_frame,
+						    e500mc_reg_table[i].e500mc_num,
+						    &fp_reg_value)) == 0)
+							set_reg_value(value,
+						                      fp_reg_value,
+							              byte_length);
+						break;
+					case reg_cat_msr:
+						read_gmsr(trap_frame,
+							  &reg_value);
+						set_reg_value(value,
+						              (uint64_t) reg_value,
+						              byte_length);
+						break;
+					case reg_cat_cr:
+						read_gcr(trap_frame,
+						         &reg_value);
+						set_reg_value(value,
+						              (uint64_t) reg_value,
+						              byte_length);
+						break;
+					case reg_cat_unk:
+					case reg_cat_pmr:
+						c = 1;
+						break;
+					default: TRACE("Illegal register category.");
+					}
+					/* For now, set it to 0xdeadbeef */
+					if (c == 1)
+						set_reg_value(value,
+						              (uint64_t) 0xdeadbeef,
+					                      byte_length);
+					TRACE("Register: %d, value: %s", i, value);
+					pkt_cat_string(rsp, value);
+				}
+			}
 			break;
 
 		case set_thread:
@@ -719,12 +820,84 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			TRACE("Got 'qSupported' packet.");
 			pkt_cat_string(rsp, "PacketSize=" BUFMAX_HEX ";");
 			pkt_cat_string(rsp, "qXfer:auxv:read-;"
-			            "qXfer:features:read-;"
+			            "qXfer:features:read+;"
 			            "qXfer:libraries:read-;"
 			            "qXfer:memory-map:read-;"
 			            "qXfer:spu:read-;"
 			            "qXfer:spu:write-;"
 			            "QPassSignals-;");
+			break;
+
+		case qxfer:
+			TRACE("Got 'qXfer' packet.");
+			q = content(cmd);
+			q += 5;
+			if (strncmp(":features:read:", (char *) q, 15) == 0) {
+				q += 15;
+				r = q;
+				TRACE ("Got :features:read:");
+				TRACE ("Retreiving annex.");
+				while (*q && *q != ':') q++;
+				if (*q) {
+					td = NULL;
+					if (strncmp("target.xml",
+						    (char *) r,
+					            q - r) == 0) {
+						TRACE("Using "
+						      "td: "
+						      "e500mc_description");
+						td = e500mc_description;
+					}
+					else if (strncmp ("power-core.xml",
+						          (char *) r,
+					                  q - r) == 0) {
+						TRACE("Using "
+						      "td: "
+						      "power_core_description");
+						td = power_core_description;
+					}
+					else if (strncmp ("power-fpu.xml",
+							  (char *) r,
+					                  q - r) == 0) {
+						TRACE("Using "
+						      "td: "
+						      "power_fpu_description");
+						td = power_fpu_description;
+					}
+					if (td) {
+						q++;
+						r = q;
+						while (*q && *q != ',') q++;
+						if (*q) {
+							*q = '\0';
+							offset = htoi (r);
+							q++;
+							r = q;
+							while (*q) q++;
+							length = htoi (r);
+							TRACE ("td-len: %d, "
+							       "offset: %d, "
+							       "length: %d",
+							       strlen (td),
+							       offset, length);
+							if (offset < strlen
+							             (td)) {
+								pkt_cat_string(rsp, "m");
+								pkt_cat_stringn(rsp, td
+								        + offset, length);
+							} else {
+								pkt_cat_string(rsp, "l");
+							}
+						} else {
+							pkt_cat_string(rsp, "E00");
+						}
+					} else {
+						pkt_cat_string(rsp, "E00");
+					}
+				} else {
+					pkt_cat_string(rsp, "E00");
+				}
+			}
 			break;
 
 		case reason_halted:
