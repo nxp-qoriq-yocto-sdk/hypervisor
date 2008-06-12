@@ -571,6 +571,8 @@ int conf_split_config(void)
 
 	res = 0;
 	for_all_symbols(i, sym) {
+		int trunc = O_TRUNC;
+	
 		sym_calc_value(sym);
 		if ((sym->flags & SYMBOL_AUTO) || !sym->name)
 			continue;
@@ -606,7 +608,7 @@ int conf_split_config(void)
 				case S_BOOLEAN:
 				case S_TRISTATE:
 					if (sym_get_tristate_value(sym) == no)
-						continue;
+						trunc = 0;
 					break;
 				default:
 					break;
@@ -614,7 +616,8 @@ int conf_split_config(void)
 			}
 		} else if (!(sym->flags & SYMBOL_DEF_AUTO))
 			/* There is neither an old nor a new value. */
-			continue;
+			trunc = 0;
+
 		/* else
 		 *	There is an old value, but no new value ('no' (unset)
 		 *	isn't saved in auto.conf, so the old value is always
@@ -631,7 +634,7 @@ int conf_split_config(void)
 		strcpy(d, ".h");
 
 		/* Assume directory path already exists. */
-		fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		fd = open(path, O_WRONLY | O_CREAT | trunc, 0644);
 		if (fd == -1) {
 			if (errno != ENOENT) {
 				res = 1;
