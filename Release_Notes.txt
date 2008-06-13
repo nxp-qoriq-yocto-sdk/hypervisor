@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc2
-Date: 6/4/2008
+Revsion: 0.2-rc3
+Date: 6/13/2008
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc2
+   -Topaz 0.2-rc3
       -is compatible with Simics 8578 3.2.27
       -requires device tree compiler (DTC) SHA tag
        fc9769ac2bae8a32d5d277007d22414c4516b02 with the 
@@ -33,12 +33,22 @@ Contents
 -------------------------------------------------------
 3.  Detailed List of Changes
 
+   -Topaz 0.2-rc3
+      -bug 1498 fixed
+      -return invalid state rather than failed for start/stop hcalls. Fixes
+       bugs 1522, 1523, 1524, 1526
+      -don't set r3 in abort_guest_access unless an extable match is found.
+      -gdb stub now has the ability to read some registers
+       (registers with the value 0xdeadbeef are unimplemented)
+      -the fsl,entry-cpu property is removed from the Topaz 0.78 spec 
+       (resolves bugs 1495, 1496, 1497)
+
    -Topaz 0.2-rc2
       -removed CROSS_COMPILE from Makefiles
       -bug 1494 fixed - update fsl,hv-cpus property name
       -bug 1504 fixed - byte-channel TX interrupts hooked up to RX ints
       -bug 1500 fixed - set GESR[PIL] when reflecting illegal instruction
-      -raise privileged instrution exception when guest user mode hcall is
+      -raise privileged instruction exception when guest user mode hcall is
        performed
       -unset GCPU_PEND_VIRQ when iacking a virq
       -cleaned up gdb stub is committed
@@ -128,15 +138,24 @@ Contents
          -watchdog expiration
          -restart request
 
-   -GPIO services-- GPIO services as specified in the Topaz
-    spec are not implemented
-
    -Debug console
       -the hypervisor debug console is partially implemented
        and input is not supported
 
    -gdb stub
-      -the gdb stub is not implemented
+      -the gdb stub does not support the following:
+         -writing registers
+         -reading/writing memory
+         -breakpoints
+         -single step
       -the gdb stub does not support hardware breakpoints or
-       hardware watchpoints
+       hardware watchpoints (not planne
 
+ E. ePAPR Related Notes
+
+    -The v0.2-rc3 hypervisor does not comply with the ePAPR 
+     ELF loading requirements with respect to the physical
+     load address of the image.  The ET_EXEC and ET_DYN
+     flags are ignored and the image is loaded at the specified
+     address address (fsl,hv-load-image-table property or 
+     partman utility)
