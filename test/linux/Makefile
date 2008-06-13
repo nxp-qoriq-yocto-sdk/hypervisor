@@ -27,11 +27,9 @@ bin/partman: partman.c
 	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
 	$(CROSS_COMPILE)strip $@
 
-bin/rootfs2.ext2.gz: rootfs.ext2.gz
-	cp rootfs.ext2.gz bin/rootfs2.ext2.gz
-
 # Mount rootfs2.ext.gz into the bin directory
-mount2: bin/rootfs2.ext2.gz
+mount2:
+	cp rootfs.ext2.gz bin/rootfs2.ext2.gz
 	gunzip bin/rootfs2.ext2.gz
 	mkdir -p bin/rootfs
 	sudo mount -t ext2 -o rw,loop bin/rootfs2.ext2 bin/rootfs
@@ -43,7 +41,7 @@ umount2:
 	gzip bin/rootfs2.ext2
 
 # Mount rootfs.ext.gz into the bin directory
-mount: bin/rootfs2.ext2.gz
+mount:
 	gunzip rootfs.ext2.gz
 	mkdir -p bin/rootfs
 	sudo mount -t ext2 -o rw,loop rootfs.ext2 bin/rootfs

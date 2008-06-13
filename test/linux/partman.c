@@ -110,7 +110,12 @@ static void usage(void)
 }
 
 /**
- * Call the hypervisor management driver
+ * Call the hypervisor management driver.
+ *
+ * Return code:
+ * 0: success
+ * <0: ioctl error condition
+ * >0: Hypervisor error condition
  */
 static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 {
@@ -126,7 +131,8 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 	if (ioctl(f, cmd, p) == -1) {
 		ret = errno;
 		perror(__func__);
-	}
+	} else
+		ret = p->ret;
 
 	close(f);
 
@@ -432,8 +438,10 @@ static int cmd_status(void)
 
 			sprintf(filename, "%s/reg", dp->d_name);
 			reg = read_property(filename, &size);
-			if (!reg)
+			if (!reg) {
+				printf("%s: 'reg' property missing\n", __func__);
 				goto exit;
+			}
 			if (size != sizeof(uint32_t)) {
 				printf("%s: 'reg' property is wrong size\n", __func__);
 				goto exit;
