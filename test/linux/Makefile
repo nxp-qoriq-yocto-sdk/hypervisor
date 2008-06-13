@@ -4,7 +4,7 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: dtbs bin/partman
+all: dtbs
 
 NO_LIBOS=y
 include ../Makefile.inc
@@ -23,9 +23,8 @@ bin/hv-partman.dtb: bin/partman-p2.dtb bin/partman-p1.dtb hv-partman.dts
 
 bin/hv-demo.dtb: bin/demo-p2.dtb bin/demo-p1.dtb hv-demo.dts
 
-bin/partman: partman.c
-	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
-	$(CROSS_COMPILE)strip $@
+../../tools/partman/bin/partman:
+	make -C ../../tools/partman
 
 # Mount rootfs2.ext.gz into the bin directory
 mount2:
@@ -53,9 +52,9 @@ umount:
 	gzip rootfs.ext2
 
 # Add vmlinux and partman to the rootfs
-rootfs: vmlinux bin/partman
+rootfs: vmlinux ../../tools/partman/bin/partman
 	make mount2
-	sudo cp -u bin/partman bin/rootfs/bin/
+	sudo cp -u ../../tools/partman/bin/partman bin/rootfs/bin
 	sudo cp -u vmlinux bin/rootfs/
 	sudo cp -u rootfs.ext2.gz bin/rootfs/
 	make umount2
