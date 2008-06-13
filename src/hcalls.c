@@ -58,7 +58,7 @@ static inline guest_t *handle_to_guest(int handle)
 static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
-	regs->gpregs[3] = FH_ERR_INVALID_PARM;
+	regs->gpregs[3] = FH_ERR_UNIMPLEMENTED;
 }
 
 static void fh_partition_restart(trapframe_t *regs)
@@ -70,7 +70,7 @@ static void fh_partition_restart(trapframe_t *regs)
 	
 	guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 	
@@ -104,7 +104,7 @@ static void fh_partition_get_status(trapframe_t *regs)
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 
 	if (!guest) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -153,7 +153,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 	static uint32_t sg_lock;
 
 	if (!source || !target) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -167,7 +167,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 		   memory. */
 		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
 				    bytes_to_copy) != bytes_to_copy) {
-			regs->gpregs[3] = FH_ERR_INVALID_PARM;
+			regs->gpregs[3] = EINVAL;
 			spin_unlock(&sg_lock);
 			return;
 		}
@@ -182,7 +182,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 				sg_list[i].size);
 
 			if (size != sg_list[i].size) {
-				regs->gpregs[3] = FH_ERR_INVALID_PARM;
+				regs->gpregs[3] = EINVAL;
 				spin_unlock(&sg_lock);
 				return;
 			}
@@ -206,7 +206,7 @@ static void fh_dma_enable(trapframe_t *regs)
 
 	ret = pamu_enable_liodn(liodn);
 	if (ret < 0) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -220,7 +220,7 @@ static void fh_dma_disable(trapframe_t *regs)
 
 	ret = pamu_disable_liodn(liodn);
 	if (ret < 0) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -256,26 +256,26 @@ static void fh_byte_channel_send(trapframe_t *regs)
 #endif
 
 	if (len > 16) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	register_t saved = spin_lock_critsave(&bc->tx_lock);
 
 	if (len > queue_get_space(bc->tx))
-		regs->gpregs[3] = FH_ERR_NO_SPACE;
+		regs->gpregs[3] = EAGAIN;
 	else {
 		/* put chars into bytechannel queue here */
 		int ret = byte_chan_send(bc, buf, len);
@@ -295,19 +295,19 @@ static void fh_byte_channel_receive(trapframe_t *regs)
 	register_t saved;
 
 	if (max_receive > 16) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -327,13 +327,13 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -366,13 +366,13 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 
 	/* FIXME: race against handle closure */
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	db_handle = guest->handles[handle]->db;
 	if (!db_handle) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -402,7 +402,7 @@ static void fh_partition_start(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -414,7 +414,7 @@ static void fh_partition_stop(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -471,7 +471,7 @@ void hcall(trapframe_t *regs)
 
 	token = regs->gpregs[11];   /* hcall token is in r11 */
 	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = FH_ERR_UNIMPLEMENTED;
 		return;
 	}
 

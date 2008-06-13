@@ -7,10 +7,14 @@
 
 #include <libos/errors.h>
 
-#define FH_ERR_FAILED          (-1) /**< An error (non-specific) occurred during the hcall */
-#define FH_ERR_INVALID_PARM    (-2) /**< An parameter supplied to the hcall was out of range or invalid */
-#define FH_ERR_NO_SPACE        (-3) /**< The operation had insufficient resources to complete. */
-#define FH_ERR_CONFIG          (-4) /**< There was a configuration error detected */
-#define FH_ERR_INVALID_STATE   (-5) /**< The state of the object being operated on was not valid */
+#define EAGAIN		11	/**< The operation had insufficient resources to complete and should be retried later. */
+#define ENOMEM		12	/**< There was insufficient memory to complete the operation */
+#define EFAULT		16	/**< Bad guest address */
+#define EINVAL		22	/**< An argument supplied to the hcall was out of range or invalid */
+
+#define FH_ERR_INTERNAL         1024    /**< An internal error occured */
+#define FH_ERR_CONFIG           1025    /**< A configuration error was detected */
+#define FH_ERR_INVALID_STATE    1026    /**< The object is in an invalid state */
+#define FH_ERR_UNIMPLEMENTED    1027    /**< Unimplemented hypercall */
 
 #endif

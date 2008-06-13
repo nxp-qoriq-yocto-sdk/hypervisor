@@ -399,19 +399,19 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	/* mask must have a valid bit set */
 	if (!(lcpu_mask & ((1 << guest->cpucnt) - 1))) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -442,13 +442,13 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -487,13 +487,13 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 	
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -514,13 +514,13 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -535,13 +535,13 @@ void fh_vmpic_eoi(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
@@ -575,13 +575,13 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = FH_ERR_INVALID_PARM;
+		regs->gpregs[3] = EINVAL;
 		return;
 	}
 
