@@ -691,10 +691,9 @@ static void start_guest_primary_nowait(void)
 	// Also, the IMA needs to be put into r7.
 
 	r3 = guest->dtb_gphys;
-	asm volatile("mfmsr %%r8; oris %%r8, %%r8, 0x1000;"
-	             "li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
-	             "mtsrr0 %0; mtsrr1 %%r8; rfi" : :
-	             "r" (guest->entry), "r" (r3) :
+	asm volatile("li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
+	             "mtsrr0 %0; mtsrr1 %2; rfi" : :
+	             "r" (guest->entry), "r" (r3), "r" (MSR_GS) :
 	             "r4", "r5", "r6", "r7", "r8");
 
 	BUG();
@@ -736,7 +735,6 @@ static void start_guest_secondary(void)
 	register register_t r4 asm("r4");
 	register register_t r6 asm("r6");
 	register register_t r7 asm("r7");
-	register_t msr;
 
 	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
@@ -750,8 +748,6 @@ static void start_guest_secondary(void)
 
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
 	         "cpu %d/%d spinning on table...\n", pir, gpir);
-
-	msr = mfmsr() | MSR_GS;
 
 	while (guest->spintbl[gpir].addr_lo & 1) {
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
@@ -789,7 +785,7 @@ static void start_guest_secondary(void)
 
 	cpu->traplevel = 0;
 	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
-	             "r" (guest->spintbl[gpir].addr_lo), "r" (msr),
+	             "r" (guest->spintbl[gpir].addr_lo), "r" (MSR_GS),
 	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
 
 	BUG();
