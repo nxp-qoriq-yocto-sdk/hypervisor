@@ -417,8 +417,8 @@ static int cmd_status(void)
 	}
 
 	printf("Partition\n"
-	       "handle              Status\n"
-	       "---------------------------------\n");
+	       "Name             Handle        Status\n"
+	       "----------------------------------------\n");
 
 	while ((dp = readdir(dir)))
 		if ((dp->d_type == DT_DIR) && (dp->d_name[0] != '.')) {
@@ -447,7 +447,7 @@ static int cmd_status(void)
 				goto exit;
 			}
 
-			printf("  %2u                ", *reg);
+			printf("%-15s  %-12u  ", dp->d_name, *reg);
 
 			status.partition = *reg;
 			ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
