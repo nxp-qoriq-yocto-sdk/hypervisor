@@ -630,6 +630,7 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 static void start_guest_primary_nowait(void)
 {
 	register register_t r3 asm("r3");
+	register register_t r7 asm("r7");
 	guest_t *guest = get_gcpu()->guest; 
 	int i;
 	
@@ -688,13 +689,14 @@ static void start_guest_primary_nowait(void)
 	// address.  Also, we pass the guest physical address even though it
 	// should be a guest virtual address, but since we program the TLBs
 	// such that guest virtual == guest physical at boot time, this works. 
-	// Also, the IMA needs to be put into r7.
 
 	r3 = guest->dtb_gphys;
-	asm volatile("li %%r4, 0; li %%r5, 0; li %%r6, 0; li %%r7, 0;"
+	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+
+	asm volatile("li %%r4, 0; li %%r5, 0; li %%r6, 0;"
 	             "mtsrr0 %0; mtsrr1 %2; rfi" : :
-	             "r" (guest->entry), "r" (r3), "r" (MSR_GS) :
-	             "r4", "r5", "r6", "r7", "r8");
+	             "r" (guest->entry), "r" (r3), "r" (MSR_GS), "r" (r7) :
+	             "r4", "r5", "r6", "r8");
 
 	BUG();
 }
@@ -781,7 +783,7 @@ static void start_guest_secondary(void)
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
 	r6 = 0;
-	// FIXME: set r7 to IMA size
+	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
 
 	cpu->traplevel = 0;
 	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
