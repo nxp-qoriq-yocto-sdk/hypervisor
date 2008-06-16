@@ -122,10 +122,11 @@ typedef struct gcpu {
 	 * insert new fields before gdbell_pending.
 	 */
 	unsigned long gdbell_pending;
-	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr;
+	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;
 	register_t ivpr;
 	register_t ivor[38];
+	register_t sprg[6]; /* Guest SPRG4-9 */
 	uint32_t timer_flags;
 	
 	unsigned int stats[num_gcpu_stats];

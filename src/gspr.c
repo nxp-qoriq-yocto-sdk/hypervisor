@@ -29,6 +29,7 @@
 #include <hv.h>
 #include <libos/trapframe.h>
 #include <libos/core-regs.h>
+#include <libos/fsl-booke-tlb.h>
 #include <percpu.h>
 #include <greg.h>
 #include <timers.h>
@@ -43,6 +44,10 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 	gcpu_t *gcpu = get_gcpu();
 
 	switch (spr) {
+	case SPR_XER:
+		*val = regs->xer;
+		break;
+	
 	case SPR_LR:
 		*val = regs->lr;
 		break;
@@ -56,15 +61,15 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_SRR0:
+		*val = mfspr(SPR_GSRR0);
 		break;
 
 	case SPR_SRR1:
+		*val = mfspr(SPR_GSRR1);
 		break;
 
 	case SPR_PID:
-		break;
-
-	case SPR_DECAR:
+		*val = mfspr(SPR_PID);
 		break;
 
 	case SPR_CSRR0:
@@ -76,9 +81,11 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_DEAR:
+		*val = mfspr(SPR_GDEAR);
 		break;
 
 	case SPR_ESR:
+		*val = mfspr(SPR_GESR);
 		break;
 
 	case SPR_IVPR:
@@ -86,62 +93,73 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_TBL:
+		*val = mfspr(SPR_TBL);
 		break;
 
 	case SPR_TBU:
+		*val = mfspr(SPR_TBU);
+		break;
+
+	case SPR_USPRG0:
+		*val = mfspr(SPR_USPRG0);
+		break;
+
+	case SPR_USPRG4 ... SPR_USPRG7:
+		*val = gcpu->sprg[spr - SPR_USPRG4];
 		break;
 
 	case SPR_SPRG0:
+		*val = mfspr(SPR_GSPRG0);
 		break;
 
 	case SPR_SPRG1:
+		*val = mfspr(SPR_GSPRG1);
 		break;
 
 	case SPR_SPRG2:
+		*val = mfspr(SPR_GSPRG2);
 		break;
 
+	case SPR_USPRG3:
 	case SPR_SPRG3:
+		*val = mfspr(SPR_GSPRG3);
 		break;
 
-	case SPR_SPRG4:
+	case SPR_SPRG4 ... SPR_SPRG7:
+		*val = gcpu->sprg[spr - SPR_SPRG4];
 		break;
 
-	case SPR_SPRG5:
-		break;
-
-	case SPR_SPRG6:
-		break;
-
-	case SPR_SPRG7:
-		break;
-
-	case SPR_TBWL:
-		break;
-
-	case SPR_TBWU:
+	case SPR_SPRG8 ... SPR_SPRG9:
+		*val = gcpu->sprg[spr - SPR_SPRG8 + 4];
 		break;
 
 	case SPR_PIR:
+		*val = mfspr(SPR_GPIR);
 		break;
 
-	case SPR_DBSRWR:
+	case SPR_PVR:
+		*val = mfspr(SPR_PVR);
 		break;
 
 	case SPR_EHCSR:
-		break;
-
-	case SPR_MSRP:
+		/* no-op on 32-bit */
+		*val = 0;
 		break;
 
 	case SPR_TSR:
 		*val = get_tsr();
 		break;
 
-	case SPR_LPIDR:
-		break;
-
 	case SPR_TCR:
 		*val = get_tcr();
+		break;
+
+	case SPR_ATBL:
+		*val = mfspr(SPR_ATBL);
+		break;
+
+	case SPR_ATBU:
+		*val = mfspr(SPR_ATBU);
 		break;
 
 	case SPR_IVOR0...SPR_IVOR15:
@@ -150,18 +168,6 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	case SPR_IVOR32...SPR_IVOR37:
 		*val = gcpu->ivor[spr - SPR_IVOR32 + 32];
-		break;
-
-	case SPR_IVOR38:
-		break;
-
-	case SPR_IVOR39:
-		break;
-
-	case SPR_IVOR40:
-		break;
-
-	case SPR_IVOR41:
 		break;
 
 	case SPR_MCARU:
@@ -185,21 +191,43 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_DSRR0:
+		*val = gcpu->dsrr0;
 		break;
 
 	case SPR_DSRR1:
+		*val = gcpu->dsrr1;
 		break;
 
-	case SPR_DDAM:
+	case SPR_MAS0:
+		*val = mfspr(SPR_MAS0);
 		break;
 
-	case SPR_SPRG8:
+	case SPR_MAS1:
+		*val = mfspr(SPR_MAS1);
 		break;
 
-	case SPR_SPRG9:
+	case SPR_MAS2:
+		*val = mfspr(SPR_MAS2);
+		break;
+
+	case SPR_MAS3:
+		*val = mfspr(SPR_MAS3);
+		break;
+
+	case SPR_MAS4:
+		*val = mfspr(SPR_MAS4);
+		break;
+
+	case SPR_MAS6:
+		*val = mfspr(SPR_MAS6);
+		break;
+
+	case SPR_MAS7:
+		*val = mfspr(SPR_MAS7);
 		break;
 
 	case SPR_TLB0CFG:
+		*val = mfspr(SPR_TLB0CFG);
 		break;
 
 	case SPR_TLB1CFG:
@@ -211,19 +239,28 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_CDCSR0);
 		break;
 
+	case SPR_EPR:
+		*val = mfspr(SPR_GEPR);
+		break;
+
 	case SPR_EPLC:
+		*val = regs->eplc & ~(EPC_ELPID | EPC_EGS);
 		break;
 
 	case SPR_EPSC:
+		*val = regs->epsc & ~(EPC_ELPID | EPC_EGS);
 		break;
 
 	case SPR_HID0:
+		*val = mfspr(SPR_HID0);
 		break;
 
 	case SPR_L1CSR0:
+		*val = mfspr(SPR_L1CSR0);
 		break;
 
 	case SPR_L1CSR1:
+		*val = mfspr(SPR_L1CSR1);
 		break;
 
 	case SPR_MMUCSR0:
@@ -235,10 +272,11 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_MMUCFG:
-		*val = mfspr(SPR_MMUCFG);
+		*val = mfspr(SPR_MMUCFG) & ~MMUCFG_LPIDSIZE;
 		break;
 
 	case SPR_SVR:
+		*val = mfspr(SPR_SVR);
 		break;
 
 	default:
@@ -257,6 +295,10 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 	gcpu_t *gcpu = get_gcpu();
 
 	switch (spr) {
+	case SPR_XER:
+		regs->xer = val;
+		break;
+	
 	case SPR_LR:
 		regs->lr = val;
 		break;
@@ -270,12 +312,15 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_SRR0:
+		mtspr(SPR_GSRR0, val);
 		break;
 
 	case SPR_SRR1:
+		mtspr(SPR_GSRR1, val);
 		break;
 
 	case SPR_PID:
+		mtspr(SPR_PID, val);
 		break;
 
 	case SPR_DECAR:
@@ -291,9 +336,11 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_DEAR:
+		mtspr(SPR_GDEAR, val);
 		break;
 
 	case SPR_ESR:
+		mtspr(SPR_GESR, val);
 		break;
 
 	case SPR_IVPR:
@@ -302,59 +349,45 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		gcpu->ivpr = val;
 		break;
 
-	case SPR_TBL:
-		break;
-
-	case SPR_TBU:
+	case SPR_USPRG0:
+		mtspr(SPR_USPRG0, val);
 		break;
 
 	case SPR_SPRG0:
+		mtspr(SPR_GSPRG0, val);
 		break;
 
 	case SPR_SPRG1:
+		mtspr(SPR_GSPRG1, val);
 		break;
 
 	case SPR_SPRG2:
+		mtspr(SPR_GSPRG2, val);
 		break;
 
 	case SPR_SPRG3:
+		mtspr(SPR_GSPRG3, val);
 		break;
 
-	case SPR_SPRG4:
+	case SPR_SPRG4 ... SPR_SPRG7:
+		gcpu->sprg[spr - SPR_SPRG4] = val;
 		break;
 
-	case SPR_SPRG5:
-		break;
-
-	case SPR_SPRG6:
-		break;
-
-	case SPR_SPRG7:
-		break;
-
-	case SPR_TBWL:
-		break;
-
-	case SPR_TBWU:
+	case SPR_SPRG8 ... SPR_SPRG9:
+		gcpu->sprg[spr - SPR_SPRG8 + 4] = val;
 		break;
 
 	case SPR_PIR:
-		break;
-
-	case SPR_DBSRWR:
-		break;
+		printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+		         "mtspr@0x%08lx: unsupported write to PIR\n", regs->srr0);
+		return 1;
 
 	case SPR_EHCSR:
-		break;
-
-	case SPR_MSRP:
+		/* no-op on 32-bit */
 		break;
 
 	case SPR_TSR:
 		set_tsr(val);
-		break;
-
-	case SPR_LPIDR:
 		break;
 
 	case SPR_TCR:
@@ -398,15 +431,6 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		gcpu->ivor[spr - SPR_IVOR32 + 32] = val & IVOR_MASK;
 		break;
 
-	case SPR_IVOR40:
-		break;
-
-	case SPR_IVOR41:
-		break;
-
-	case SPR_MCARU:
-		break;
-
 	case SPR_MCSRR0:
 		gcpu->mcsrr0 = val;
 		break;
@@ -419,52 +443,91 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		gcpu->mcsr &= ~val;
 		break;
 
-	case SPR_MCAR:
-		break;
-
 	case SPR_DSRR0:
+		gcpu->dsrr0 = val;
 		break;
 
 	case SPR_DSRR1:
+		gcpu->dsrr1 = val;
 		break;
 
 	case SPR_DDAM:
+		mtspr(SPR_DDAM, val);
 		break;
 
-	case SPR_SPRG8:
+	case SPR_MAS0:
+		mtspr(SPR_MAS0, val);
 		break;
 
-	case SPR_SPRG9:
+	case SPR_MAS1:
+		mtspr(SPR_MAS1, val);
 		break;
 
-	case SPR_PID1:
+	case SPR_MAS2:
+		mtspr(SPR_MAS2, val);
 		break;
 
-	case SPR_PID2:
+	case SPR_MAS3:
+		mtspr(SPR_MAS3, val);
 		break;
 
-	case SPR_TLB0CFG:
+	case SPR_MAS4:
+		mtspr(SPR_MAS4, val);
 		break;
 
-	case SPR_TLB1CFG:
+	case SPR_MAS6:
+		mtspr(SPR_MAS6, val);
+		break;
+
+	case SPR_MAS7:
+		mtspr(SPR_MAS7, val);
 		break;
 
 	case SPR_CDCSR0:
+		/* no-op */
+		break;
+
+	case SPR_EPR:
+		mtspr(SPR_GEPR, val);
 		break;
 
 	case SPR_EPLC:
+		regs->eplc = (val & ~EPC_ELPID) | EPC_EGS |
+		             (gcpu->guest->lpid << EPC_ELPID_SHIFT);
 		break;
 
 	case SPR_EPSC:
+		regs->epsc = (val & ~EPC_ELPID) | EPC_EGS |
+		             (gcpu->guest->lpid << EPC_ELPID_SHIFT);
 		break;
 
 	case SPR_HID0:
+		val &= ~(HID0_EMCP | HID0_TBEN | HID0_SEL_TBCLK);
+		val |= mfspr(SPR_HID0) & (HID0_EMCP | HID0_TBEN | HID0_NOPTI);
+		
+		if (!(val & HID0_ENMAS7)) {
+			static int warned_enmas7 = 0;
+			
+			if (!warned_enmas7) {
+				/* FIXME: save/restore ENMAS7 when doing hv TLB reads/searches */
+				warned_enmas7 = 1;
+				printlog(LOGTYPE_EMU, LOGLEVEL_NORMAL,
+				         "mtspr@0x%08lx: HID0[ENMAS7] cleared, problems possible\n",
+				         regs->srr0);
+			}
+		}
+		
+		mtspr(SPR_HID0, val);
 		break;
 
 	case SPR_L1CSR0:
+		val &= L1CSR0_DCBZ32;
+		val |= mfspr(SPR_L1CSR0) & ~L1CSR0_DCBZ32;
+		mtspr(SPR_L1CSR0, val);
 		break;
 
 	case SPR_L1CSR1:
+		/* no-op */
 		break;
 
 	case SPR_MMUCSR0:
@@ -475,12 +538,7 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_BUCSR:
-		break;
-
-	case SPR_MMUCFG:
-		break;
-
-	case SPR_SVR:
+		/* no-op */
 		break;
 
 	default:
