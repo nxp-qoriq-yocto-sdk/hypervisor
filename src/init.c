@@ -339,4 +339,8 @@ static void core_init(void)
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
 
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_TBEN | HID0_ENMAS7);
+
+ 	isync();
+ 	mtspr(SPR_MSRP, mfspr(SPR_MSRP) & ~MSR_PMM);
+ 	isync();
 }

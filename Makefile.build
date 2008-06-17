@@ -204,6 +204,9 @@ test-hcalls: bin/uv.uImage test/hcalls
 test-mmu: bin/uv.uImage test/mmu
 	$(SIMICS) test/mmu/mmu.simics
 
+test-pmr: bin/uv.uImage test/pmr
+	$(SIMICS) test/pmr/hv-pmr.simics
+
 demo: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-demo.simics -e c
 
