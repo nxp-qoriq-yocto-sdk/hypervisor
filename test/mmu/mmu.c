@@ -4,7 +4,9 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
 
+void release_secondary_cores(void);
 void init(unsigned long devtree_ptr);
+extern void (*secondary_startp)(void);
 extern void *fdt;
 int fail;
 
@@ -13,7 +15,7 @@ void dtlb_handler(trapframe_t *frameptr)
 	if (frameptr->gpregs[0] != 0xdead0000) {
 		dump_regs(frameptr);
 
-		printf("FAILED\n");
+		printf("BROKEN\n");
 		fh_partition_stop(-1);
  		BUG();
 	}
@@ -22,239 +24,363 @@ void dtlb_handler(trapframe_t *frameptr)
 	frameptr->srr0 += 4;
 }
 
-static void mmucsr_test(void)
+#define NUM_CORES 4
+
+static int core_state[NUM_CORES];
+
+static void sync_cores(int secondary)
 {
-	char *mem = alloc(65536 + 4096, 65536);
-	char *tlb0 = valloc(4096, 4096);
-	char *tlb1 = valloc(65536, 65536);
-	char val;
-	int r0;
+	sync();
+	isync();
 
-	phys_addr_t memphys = (phys_addr_t)(unsigned long)mem - PHYSBASE;
+	if (!secondary) {
+		static int next_state;
+		int i;
+
+		next_state++;
+
+		for (i = 1; i < NUM_CORES; i++)
+			while (core_state[i] != next_state)
+				sync();
+			
+		core_state[0] = next_state;
+	} else {
+		int pir = mfspr(SPR_PIR);
+		core_state[pir]++;
+		
+		while (core_state[0] != core_state[pir])
+			sync();
+	}
+
+	sync();
+	isync();
+}
+
+static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa, int tsize)
+{
+	mtspr(SPR_MAS0, MAS0_TLBSEL(tlb) | MAS0_ESEL(entry));
+	mtspr(SPR_MAS1, MAS1_VALID | (tsize << MAS1_TSIZE_SHIFT));
+	mtspr(SPR_MAS2, (register_t)va);
+	mtspr(SPR_MAS3, (uint32_t)pa | MAS3_SR | MAS3_SW);
+	mtspr(SPR_MAS7, (uint32_t)(pa >> 32));
+
+	asm volatile("isync; tlbwe; msync; isync" : : : "memory");
+}
+
+static void expect(const char *name, int pass, int num,
+                   int **addrs, int *vals, int *faults)
+{
+	int i;
+
+	for (i = 0; i < num; i++) {
+		int r0, val;
+
+		asm volatile("lis %%r0, 0xdead;"
+		             "lwz%U0%X0 %0, %2;"
+		             "mr %1, %%r0;"
+		             "li %%r0, 0" :
+		             "=&r" (val), "=&r" (r0) : "m" (*addrs[i]) : "r0");
+
+		if (faults[i]) {
+			if (r0 != 1) {
+				printf("%s, %lu: pass %d, val %d: expected fault but got val %x\n",
+				       name, mfspr(SPR_PIR), pass, i, val);
+				fail = 1;
+			}
+		} else {
+			if (r0 == 1) {
+				printf("%s, %lu: pass %d, val %d: expected val %x but got fault\n",
+				       name, mfspr(SPR_PIR), pass, i, vals[i]);
+				fail = 1;
+			} else if (val != vals[i]) {
+				printf("%s, %lu: pass %d, val %d: expected val %x but got %x\n",
+				       name, mfspr(SPR_PIR), pass, i, vals[i], val);
+				fail = 1;
+			}
+		}
+	}
+}
+
+int *test_mem, *test_map;
+
+#define PRIMARY 0
+#define SECONDARY_NOINVAL 1
+#define SECONDARY_INVAL 2
+
+
+static void inv_all_test(const char *name, void (*inv)(int tlbmask),
+                         int secondary)
+{
+	int *tlb0 = test_map + 65536/4;
+	int *tlb1 = test_map;
+
+	int *addrs[3] = { tlb0, tlb1, tlb1 + 4096/4 };
+	int vals[3] = { 0xee, 0xcc, 0xdd };
+
+	phys_addr_t memphys = (phys_addr_t)(unsigned long)test_mem - PHYSBASE;
+
+	int fault = 1;
+
+	if (!secondary) {	
+		test_mem[0] = 0xcc;
+		test_mem[4096/4] = 0xdd;
+		test_mem[65536/4] = 0xee;
+	}
+
+	if (secondary == SECONDARY_NOINVAL)
+		fault = 0;
+
+	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
+
+	sync_cores(secondary);
+	expect(name, 1, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(0);
+
+	sync_cores(secondary);
+	expect(name, 2, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary) {
+		tlb1[0] = 0x22;
+		tlb1[4096/4] = 0x33;
+		tlb0[0] = 0x44;
+	}
+
+	vals[1] = 0x22;
+	vals[2] = 0x33;
+	vals[0] = 0x44;
+
+	sync_cores(secondary);
+	expect(name, 3, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(1);
+
+	sync_cores(secondary);
+	expect(name, 4, 3, addrs, vals, (int[]){fault, 0, 0});
+
+	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
+	expect(name, 5, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(2);
+
+	sync_cores(secondary);
+	expect(name, 6, 3, addrs, vals, (int[]){0, fault, fault});
+
+	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	expect(name, 7, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(3);
+
+	sync_cores(secondary);
+	expect(name, 8, 3, addrs, vals, (int[]){fault, fault, fault});
+
+	if (secondary == SECONDARY_NOINVAL)
+		inv(3);
+
+	sync_cores(secondary);
+}
+
+static void mmucsr_inv(int tlb_mask)
+{
+	int val = 0;
 	
-	mem[0] = 0xcc;
-	mem[4096] = 0xdd;
-	mem[65536] = 0xee;
+	if (tlb_mask & 1)
+		val |= MMUCSR_L2TLB0_FI;
+	if (tlb_mask & 2)
+		val |= MMUCSR_L2TLB1_FI;
 
-	/* Can't use tlb1_set_entry because it sets IPROT unconditionally. */
-	mtspr(SPR_MAS0, MAS0_TLBSEL(1) | MAS0_ESEL(3));
-	mtspr(SPR_MAS1, MAS1_VALID | (TLB_TSIZE_64K << MAS1_TSIZE_SHIFT));
-	mtspr(SPR_MAS2, (register_t)tlb1);
-	mtspr(SPR_MAS3, (uint32_t)memphys | MAS3_SR | MAS3_SW);
-	mtspr(SPR_MAS7, (uint32_t)(memphys >> 32));
+	mtspr(SPR_MMUCSR0, val);
+	sync();
+	isync();
+}
 
-	asm volatile("isync; tlbwe; isync" : : : "memory");
+static void mmucsr_test(int secondary)
+{
+	inv_all_test("mmucsr", mmucsr_inv, secondary);
+}
 
-	mtspr(SPR_MAS0, 0);
-	mtspr(SPR_MAS1, MAS1_VALID | (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT));
-	mtspr(SPR_MAS2, (register_t)tlb0);
-	mtspr(SPR_MAS3, (uint32_t)(memphys + 65536) | MAS3_SR | MAS3_SW);
-	mtspr(SPR_MAS7, (uint32_t)((memphys + 65536) >> 32));
-
-	asm volatile("isync; tlbwe; isync" : : : "memory");
+static void tlbivax_inv_all(int tlb_mask)
+{
+	int val = 0;
 	
-	if (tlb0[0] != 0xee) {
-		printf("mmucsr: pass 1: tlb0 contains %x, expected 0xee\n",
-		       tlb0[0]);
-		fail = 1;
+	if (tlb_mask & 1)
+		asm volatile("tlbivax 0, %0; tlbsync" : :
+		             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
+		             "memory");
+	if (tlb_mask & 2)
+		asm volatile("tlbivax 0, %0; tlbsync" : :
+		             "r" (TLBIVAX_TLB1 | TLBIVAX_INV_ALL) :
+		             "memory");
+
+	asm volatile("tlbsync" : : : "memory");
+	sync();
+}
+
+static void tlbivax_inv(void *addr, int tlb_mask)
+{
+	register_t ea = ((register_t)addr) & ~4095;
+	int val = 0;
+	
+	if (tlb_mask & 1)
+		asm volatile("tlbivax 0, %0; tlbsync" : :
+		             "r" (TLBIVAX_TLB0 | ea) :
+		             "memory");
+	if (tlb_mask & 2)
+		asm volatile("tlbivax 0, %0; tlbsync" : :
+		             "r" (TLBIVAX_TLB1 | ea) :
+		             "memory");
+
+	asm volatile("tlbsync" : : : "memory");
+	sync();
+}
+
+static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
+                     int secondary)
+{
+	int *tlb0 = test_map + 65536/4;
+	int *tlb1 = test_map;
+
+	int *addrs[3] = { tlb0, tlb1, tlb1 + 4096/4 };
+	int vals[3] = { 0xee, 0xcc, 0xdd };
+	
+	int fault = 1;
+
+	phys_addr_t memphys = (phys_addr_t)(unsigned long)test_mem - PHYSBASE;
+
+	if (!secondary) {
+		test_mem[0] = 0xcc;
+		test_mem[4096/4] = 0xdd;
+		test_mem[65536/4] = 0xee;
 	}
 
-	if (tlb1[0] != 0xcc) {
-		printf("mmucsr: pass 1: tlb1[0] contains %x, expected 0xcc\n",
-		       tlb1[0]);
-		fail = 1;
+	if (secondary == SECONDARY_NOINVAL)
+		fault = 0;
+
+	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
+
+	sync_cores(secondary);
+	expect(name, 1, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(inv_test, 3);
+
+	sync_cores(secondary);
+	expect(name, 2, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb0, 2);
+
+	sync_cores(secondary);
+	expect(name, 5, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb1, 1);
+
+	sync_cores(secondary);
+	expect(name, 6, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary) {
+		tlb1[0] = 0x22;
+		tlb1[4096/4] = 0x33;
+		tlb0[0] = 0x44;
+	}
+	
+	vals[1] = 0x22;
+	vals[2] = 0x33;
+	vals[0] = 0x44;
+
+	sync_cores(secondary);
+	expect(name, 7, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb0, 1);
+
+	sync_cores(secondary);
+	expect(name, 8, 3, addrs, vals, (int[]){fault, 0, 0});
+
+	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
+	expect(name, 9, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb1, 2);
+
+	sync_cores(secondary);
+	expect(name, 10, 3, addrs, vals, (int[]){0, fault, fault});
+
+	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	expect(name, 11, 3, addrs, vals, (int[]){0, 0, 0});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb1 + 4096/4, 2);
+
+	sync_cores(secondary);
+	expect(name, 12, 3, addrs, vals, (int[]){0, fault, fault});
+	sync_cores(secondary);
+
+	if (!secondary)
+		inv(tlb0, 1);
+
+	sync_cores(secondary);
+	expect(name, 12, 3, addrs, vals, (int[]){fault, fault, fault});
+
+	if (secondary == SECONDARY_NOINVAL) {
+		inv(tlb0, 1);
+		inv(tlb1, 2);
 	}
 
-	if (tlb1[4096] != 0xdd) {
-		printf("mmucsr: pass 1: tlb1[4096] contains %x, expected 0xdd\n",
-		       tlb1[0]);
-		fail = 1;
-	}
+	sync_cores(secondary);
+}
 
-	mtspr(SPR_MMUCSR0, 0);
-	isync();
+static void tlbivax_test(int secondary)
+{
+	inv_all_test("tlbivax.all", tlbivax_inv_all, secondary);
+	inv_test("tlbivax.ea", tlbivax_inv, secondary);
+}
 
-	if (tlb0[0] != 0xee) {
-		printf("mmucsr: pass 2: tlb0 contains %x, expected 0xee\n",
-		       tlb0[0]);
-		fail = 1;
-	}
-
-	if (tlb1[0] != 0xcc) {
-		printf("mmucsr: pass 2: tlb1[0] contains %x, expected 0xcc\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	if (tlb1[4096] != 0xdd) {
-		printf("mmucsr: pass 2: tlb1[4096] contains %x, expected 0xdd\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	tlb1[0] = 0x22;
-	tlb1[4096] = 0x33;
-	tlb0[0] = 0x44;
-
-	if (tlb0[0] != 0x44) {
-		printf("mmucsr: pass 2: tlb0 contains %x, expected 0x44\n",
-		       tlb0[0]);
-		fail = 1;
-	}
-
-	if (tlb1[0] != 0x22) {
-		printf("mmucsr: pass 2: tlb1[0] contains %x, expected 0x22\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	if (tlb1[4096] != 0x33) {
-		printf("mmucsr: pass 2: tlb1[4096] contains %x, expected 0x33\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
-	isync();
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb0[0]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 3: tlb0 should have faulted but didn't\n");
-		fail = 1;
-	}
-
-	if (tlb1[0] != 0x22) {
-		printf("mmucsr: pass 3: tlb1[0] contains %x, expected 0x22\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	if (tlb1[4096] != 0x33) {
-		printf("mmucsr: pass 3: tlb1[4096] contains %x, expected 0x33\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	mtspr(SPR_MAS0, 0);
-	mtspr(SPR_MAS1, MAS1_VALID | (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT));
-	mtspr(SPR_MAS2, (register_t)tlb0);
-	mtspr(SPR_MAS3, (uint32_t)(memphys + 65536) | MAS3_SR | MAS3_SW);
-	mtspr(SPR_MAS7, (uint32_t)((memphys + 65536) >> 32));
-
-	asm volatile("isync; tlbwe; isync" : : : "memory");
-
-	if (tlb0[0] != 0x44) {
-		printf("mmucsr: pass 4: tlb0 contains %x, expected 0x44\n",
-		       tlb0[0]);
-		fail = 1;
-	}
-
-	if (tlb1[0] != 0x22) {
-		printf("mmucsr: pass 4: tlb1[0] contains %x, expected 0x22\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	if (tlb1[4096] != 0x33) {
-		printf("mmucsr: pass 4: tlb1[4096] contains %x, expected 0x33\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	mtspr(SPR_MMUCSR0, MMUCSR_L2TLB1_FI);
-	isync();
-
-	if (tlb0[0] != 0x44) {
-		printf("mmucsr: pass 5: tlb0 contains %x, expected 0x44\n",
-		       tlb0[0]);
-		fail = 1;
-	}
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb1[0]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 5: tlb1[0] should have faulted but didn't\n");
-		fail = 1;
-	}
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb1[4096]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 5: tlb1[4096] should have faulted but didn't\n");
-		fail = 1;
-	}
-
-	/* Can't use tlb1_set_entry because it sets IPROT unconditionally. */
-	mtspr(SPR_MAS0, MAS0_TLBSEL(1) | MAS0_ESEL(3));
-	mtspr(SPR_MAS1, MAS1_VALID | (TLB_TSIZE_64K << MAS1_TSIZE_SHIFT));
-	mtspr(SPR_MAS2, (register_t)tlb1);
-	mtspr(SPR_MAS3, (uint32_t)memphys | MAS3_SR | MAS3_SW);
-	mtspr(SPR_MAS7, (uint32_t)(memphys >> 32));
-
-	asm volatile("isync; tlbwe; isync" : : : "memory");
-
-	if (tlb0[0] != 0x44) {
-		printf("mmucsr: pass 6: tlb0 contains %x, expected 0x44\n",
-		       tlb0[0]);
-		fail = 1;
-	}
-
-	if (tlb1[0] != 0x22) {
-		printf("mmucsr: pass 6: tlb1[0] contains %x, expected 0x22\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	if (tlb1[4096] != 0x33) {
-		printf("mmucsr: pass 6: tlb1[4096] contains %x, expected 0x33\n",
-		       tlb1[0]);
-		fail = 1;
-	}
-
-	mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI | MMUCSR_L2TLB1_FI);
-	isync();
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb0[0]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 7: tlb0[0] should have faulted but didn't\n");
-		fail = 1;
-	}
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb1[0]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 7: tlb1[0] should have faulted but didn't\n");
-		fail = 1;
-	}
-
-	asm volatile("lis %%r0, 0xdead; lwz %0, %2; mr %1, %%r0" :
-	             "=r" (val), "=r" (r0) : "m" (tlb1[4096]) : "r0");
-
-	if (r0 != 1) {
-		printf("mmucsr: pass 7: tlb1[4096] should have faulted but didn't\n");
-		fail = 1;
-	}
+static void secondary_entry(void)
+{
+	mmucsr_test(SECONDARY_NOINVAL);
+	tlbivax_test(SECONDARY_INVAL);
 }
 
 void start(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
+	test_mem = alloc(65536 + 4096, 65536);
+	test_map = valloc(65536 + 4096, 4096);
+
+	secondary_startp = secondary_entry;
+	release_secondary_cores();
+
 	printf("MMU test:\n");
 
-	mmucsr_test();
+	mmucsr_test(PRIMARY);
+	tlbivax_test(PRIMARY);
 	
 	if (fail)
 		printf("FAILED\n");
 	else
 		printf("PASSED\n");
 
+	printf("Test Complete\n");
 	fh_partition_stop(-1);
- 	BUG();
+	BUG();
 }

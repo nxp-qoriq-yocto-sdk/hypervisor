@@ -91,7 +91,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long mas2flags, unsigned long mas3flags);
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
 int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
-void guest_inv_tlb1(int inv_iprot);
+void guest_inv_tlb1(register_t ivax, int inv_iprot);
 void guest_reset_tlb(void);
 void tlbsync(void);
 

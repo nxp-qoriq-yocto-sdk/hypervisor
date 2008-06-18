@@ -70,15 +70,21 @@ typedef struct guest {
 	handle_t *handles[MAX_HANDLES];
 	/** Used as a reference count when stopping a partition. */
 	unsigned long active_cpus;
-	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
-	uint32_t lpid;
 	phys_addr_t entry;      /**< Guest physical addr of the OS entry point */
 	phys_addr_t dtb_gphys;  /**< Guest physical addr of DTB image */
+	register_t tlbivax_addr;/**< Used for tlbivax shootdown IPIs */
+
+	/** Countdown to wait for all cores to invalidate */
+	register_t tlbivax_count;
+
+	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
+	uint32_t lpid;
 
 	/** Offset to partition node in main device tree. */
 	int partition;
+
 	uint32_t lock;
 	gstate_t state;
 } guest_t;
@@ -127,6 +133,7 @@ typedef struct gcpu {
 	register_t ivpr;
 	register_t ivor[38];
 	register_t sprg[6]; /* Guest SPRG4-9 */
+	register_t mas0, mas1, mas2, mas3, mas6, mas7;
 	uint32_t timer_flags;
 	
 	unsigned int stats[num_gcpu_stats];

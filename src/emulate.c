@@ -34,6 +34,7 @@
 #include <paging.h>
 #include <timers.h>
 #include <greg.h>
+#include <events.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -155,18 +156,73 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
-/* FIXME: if the address hits a TLB1 entry, invalidate all pieces. */
+static void save_mas(gcpu_t *gcpu)
+{
+	gcpu->mas0 = mfspr(SPR_MAS0);
+	gcpu->mas1 = mfspr(SPR_MAS1);
+	gcpu->mas2 = mfspr(SPR_MAS2);
+	gcpu->mas3 = mfspr(SPR_MAS3);
+	gcpu->mas6 = mfspr(SPR_MAS6);
+	gcpu->mas7 = mfspr(SPR_MAS7);
+}
+
+static void restore_mas(gcpu_t *gcpu)
+{
+	mtspr(SPR_MAS0, gcpu->mas0);
+	mtspr(SPR_MAS1, gcpu->mas1);
+	mtspr(SPR_MAS2, gcpu->mas2);
+	mtspr(SPR_MAS3, gcpu->mas3);
+	mtspr(SPR_MAS6, gcpu->mas6);
+	mtspr(SPR_MAS7, gcpu->mas7);
+}
+
+void tlbivax_ipi(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	save_mas(gcpu);
+	guest_inv_tlb1(guest->tlbivax_addr, 0);
+	restore_mas(gcpu);
+	
+	atomic_add(&guest->tlbivax_count, -1);
+}
+
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	register_t saved;
+	int i;
 	
 	if (va & TLBIVAX_RESERVED) {
-		printf("tlbivax@0x%08lx: reserved bits in EA: 0x%08lx\n", regs->srr0, va);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbivax@0x%08lx: reserved bits in EA: 0x%08lx\n",
+		         regs->srr0, va);
 		return 1;
 	}
+ 
+	if (((va & TLBIVAX_TLB_NUM) >> TLBIVAX_TLB_NUM_SHIFT) == 1) {
+		saved = spin_lock_critsave(&guest->lock);
+		guest->tlbivax_addr = va;
+		guest->tlbivax_count = guest->cpucnt;
+	 
+		for (i = 0; i < guest->cpucnt; i++)
+			if (i != gcpu->gcpu_num)
+				setevent(guest->gcpus[i], EV_TLBIVAX);
 
-	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
-	asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
+		tlbivax_ipi(regs);
+		
+		while (guest->tlbivax_count != 0)
+			barrier();
+
+		spin_unlock_critsave(&guest->lock, saved);
+	} else {
+		mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
+		asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
+	}
+
 	return 0;
 }
 
@@ -210,9 +266,14 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
 	uint32_t va = get_ea_indexed(regs, insn);
-	unsigned long mas1 = (1 << MAS1_TSIZE_SHIFT) |
-	                     ((mfspr(SPR_MAS6) & MAS6_SAS) << MAS1_TS_SHIFT) |
-	                     (mfspr(SPR_MAS6) & MAS6_SPID_MASK);
+	register_t mas1, mas6;
+
+	disable_critint();
+	
+	mas6 = mfspr(SPR_MAS6);
+	mas1 = (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT) |
+	       ((mas6 & MAS6_SAS) << MAS1_TS_SHIFT) |
+	       (mas6 & MAS6_SPID_MASK);
 
 	int tlb1 = guest_find_tlb1(-1, mas1, mfspr(SPR_MAS2) >> PAGE_SHIFT);
 	if (tlb1 >= 0) {
@@ -236,6 +297,8 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	uint32_t mas0 = mfspr(SPR_MAS0);
 	unsigned int entry, tlb;
 	
+	disable_critint();
+
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		printf("tlbre@0x%08lx: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
 		return 1;
@@ -266,38 +329,59 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	unsigned long mas0 = mfspr(SPR_MAS0);
-	unsigned long mas1 = mfspr(SPR_MAS1);
-	unsigned long mas2 = mfspr(SPR_MAS2);
-	unsigned long mas3 = mfspr(SPR_MAS3);
-	unsigned long mas7 = mfspr(SPR_MAS7);
-	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
-	                     (mas3 >> MAS3_RPN_SHIFT);
+	unsigned long grpn, mas0, mas1, mas2, mas3, mas7;
+
+	disable_critint();
+	save_mas(gcpu);
+	
+	mas0 = gcpu->mas0;
+	mas1 = gcpu->mas1;
+	mas2 = gcpu->mas2;
+	mas3 = gcpu->mas3;
+	mas7 = gcpu->mas7;
+
+	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
+	       (mas3 >> MAS3_RPN_SHIFT);
 
 	gcpu->stats[stat_emu_tlbwe]++;
 
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
-		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n", regs->srr0, mas0);
+		restore_mas(gcpu);
+		enable_critint();
+		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n",
+		       regs->srr0, mas0);
 		return 1;
 	}
 
-	if (mas1 & MAS1_RESERVED) {
-		printf("tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n", regs->srr0, mas0);
+	if (gcpu->mas1 & MAS1_RESERVED) {
+		restore_mas(gcpu);
+		enable_critint();
+		printf("tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n",
+		       regs->srr0, mas0);
 		return 1;
 	}
 
-	if (mas2 & MAS2_RESERVED) {
-		printf("tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n", regs->srr0, mas0);
+	if (gcpu->mas2 & MAS2_RESERVED) {
+		restore_mas(gcpu);
+		enable_critint();
+		printf("tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n",
+		       regs->srr0, mas0);
 		return 1;
 	}
 
-	if (mas3 & MAS3_RESERVED) {
-		printf("tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n", regs->srr0, mas0);
+	if (gcpu->mas3 & MAS3_RESERVED) {
+		restore_mas(gcpu);
+		enable_critint();
+		printf("tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n",
+		       regs->srr0, mas0);
 		return 1;
 	}
 
-	if (mas7 & MAS7_RESERVED) {
-		printf("tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n", regs->srr0, mas0);
+	if (gcpu->mas7 & MAS7_RESERVED) {
+		restore_mas(gcpu);
+		enable_critint();
+		printf("tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n",
+		       regs->srr0, mas0);
 		return 1;
 	}
 
@@ -326,11 +410,15 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 		int dup = guest_find_tlb1(tlb1esel, mas1, epn);
 		if (dup >= 0) {
+			restore_mas(gcpu);
+			enable_critint();
+
 			printf("tlbwe@%d,0x%lx: duplicate TLB1 entry\n",
 			       cpu->coreid, regs->srr0);
 			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
 			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, mas0, mas1, mas2, mas3, mas7);
+			       cpu->coreid, regs->srr0, mas0, mas1,
+			       mas2, mas3, mas7);
 			printf("tlbwe@%d,0x%lx: dup: entry = %d, mas1 = 0x%lx,\n"
 			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			       cpu->coreid, regs->srr0, dup,
@@ -362,11 +450,15 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 				continue;
 			}
 
+			restore_mas(gcpu);
+			enable_critint();
+
 			printf("tlbwe@%d,0x%lx: duplicate TLB0 entry\n",
 			       cpu->coreid, regs->srr0);
 			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
 			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, mas0, mas1, mas2, mas3, mas7);
+			       cpu->coreid, regs->srr0, mas0, mas1,
+			       mas2, mas3, mas7);
 			printf("tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
 			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			       cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
@@ -382,6 +474,9 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		int entry = MAS0_GET_TLB1ESEL(mas0);
 
 		if (entry >= TLB1_GSIZE) {
+			restore_mas(gcpu);
+			enable_critint();
+
 			printf("tlbwe@0x%lx: attempt to write TLB1 entry %d (max %d)\n",
 			       regs->srr0, entry, TLB1_GSIZE);
 			return 1;
@@ -389,47 +484,33 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
-	} else {
+	} else if (likely(mas1 & MAS1_VALID)) {
 		unsigned long mas8 = guest->lpid | MAS8_GTS;
-	
+		unsigned long attr;
+		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
+		                                &attr, PTE_PHYS_LEVELS);
+
+		/* If there's no valid mapping, request a virtualization
+		 * fault, so a machine check can be reflected upon use.
+		 */
+		if (unlikely(!(attr & PTE_VALID))) {
+			mas8 |= MAS8_VF;
+		} else {
+			mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
+			mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
+		}
+
 		mtspr(SPR_MAS0, mas0);
 		mtspr(SPR_MAS1, mas1);
 		mtspr(SPR_MAS2, mas2);
-		mtspr(SPR_MAS3, mas3);
-		mtspr(SPR_MAS7, mas7);
-
-		if (likely(mas1 & MAS1_VALID)) {
-			unsigned long attr;
-			unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
-			                                &attr, PTE_PHYS_LEVELS);
-
-			/* If there's no valid mapping, request a virtualization
-			 * fault, so a machine check can be reflected upon use.
-			 */
-			if (unlikely(!(attr & PTE_VALID))) {
-#if 0
-				printf("tlbwe@0x%lx: Invalid gphys %llx for va %lx\n",
-				       regs->srr0,
-				       ((uint64_t)grpn) << PAGE_SHIFT,
-				       mas2 & MAS2_EPN);
-#endif
-				mas8 |= MAS8_VF;
-			} else {
-				mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
-				mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
-			}
-
-			mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-			mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3);
-		} else {
-			mtspr(SPR_MAS3, mas3);
-			mtspr(SPR_MAS7, mas7);
-		}
-
+		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3);
 		mtspr(SPR_MAS8, mas8);
 		asm volatile("tlbwe" : : : "memory");
 	}
 
+	restore_mas(gcpu);
+	enable_critint();
 	return 0;
 }
 

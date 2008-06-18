@@ -10,7 +10,7 @@ all: whoami_all
 
 include ../Makefile.inc
 
-WHOAMI_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) whoami.c $(LIBOS_MP:%=libos/%)
+WHOAMI_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) whoami.c 
 WHOAMI_OBJS := $(basename $(WHOAMI_SRCS))
 WHOAMI_OBJS := $(WHOAMI_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 WHOAMI_OBJS := $(WHOAMI_OBJS:%=bin/%)

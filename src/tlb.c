@@ -180,38 +180,41 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	}
 }
 
-void guest_inv_tlb1(int inv_iprot)
+void guest_inv_tlb1(register_t ivax, int inv_iprot)
 {
 	gcpu_t *gcpu = get_gcpu();
+	int global = ivax & TLBIVAX_INV_ALL;
+	register_t va = ivax & TLBIVAX_VA;
 	int i;
 
-	for (i = 0; i < TLB1_GSIZE; i++)
-		if (inv_iprot || !(gcpu->gtlb1[i].mas1 & MAS1_IPROT))
-			free_tlb1(i);
-
-	for (i = 0; i < tlb1_reserved; i++) {
-		register_t mas1;
-
-		mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
-		asm volatile("tlbre" : : : "memory");
+	for (i = 0; i < TLB1_GSIZE; i++) {
+		tlb_entry_t *tlbe = &gcpu->gtlb1[i];
 		
-		mas1 = mfspr(SPR_MAS1);
+		if (!(tlbe->mas1 & MAS1_VALID))
+			continue;
 		
-		assert((!inv_iprot && (mas1 & MAS1_IPROT)) || !(mas1 & MAS1_VALID));
+		if (inv_iprot || !(tlbe->mas1 & MAS1_IPROT)) {
+			register_t begin = tlbe->mas2 & MAS2_EPN;
+			register_t end = begin;
+			
+			end += (tsize_to_pages(MAS1_GETTSIZE(tlbe->mas1)) - 1) * PAGE_SIZE;
+		
+			if (global || (va >= begin && va <= end))
+				free_tlb1(i);
+		}
 	}
 }
 
 void guest_reset_tlb(void)
 {
-	/* Invalidate TLB0.  Note that there seems to be no way
-	 * to partition a whole-array TLB invalidation, but it's
-	 * unlikely to be a performance issue given the rarity of
-	 * reboots.
+	/* Invalidate TLB0.  Note that there's to be no way to partition a
+	 * whole-array TLB invalidation, but it's unlikely to be a performance
+	 * issue given the rarity of reboots.
 	 */	
-	asm volatile("tlbivax 0, %0" : : "r" (4) : "memory");
+	asm volatile("tlbivax 0, %0" : : "r" (TLBIVAX_INV_ALL) : "memory");
 	tlbsync();
 
-	guest_inv_tlb1(1);
+	guest_inv_tlb1(TLBIVAX_INV_ALL, 1);
 }
 
 /** Return the index of a conflicting guest TLB1 entry, or -1 if none.

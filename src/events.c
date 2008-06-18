@@ -10,8 +10,8 @@
 #include <percpu.h>
 
 static eventfp_t event_table[] = {
-	&critdbell_to_gdbell_glue,		/* EV_ASSERT_VINT */
-	&critdbell_to_gdbell_glue,    /* EV_ASSERT_VINT */
+	&critdbell_to_gdbell_glue,  /* EV_ASSERT_VINT */
+	&tlbivax_ipi,               /* EV_TLBIVAX */
 };
 
 /* Guest events are processed when returning to the guest, but
@@ -25,7 +25,7 @@ static eventfp_t gevent_table[] = {
 #ifdef CONFIG_GDB_STUB
 	&gdb_stub_event_handler,      /* GEV_GDB */
 #else
-	NULL,			      /* GEV_GDB */
+	NULL,                         /* GEV_GDB */
 #endif
 };
 

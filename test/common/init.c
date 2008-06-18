@@ -129,3 +129,122 @@ void ext_int_handler(trapframe_t *frameptr)
 //	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
 }
 #endif
+
+#define PAGE_SIZE 4096
+
+extern int start_secondary_spin_table(struct boot_spin_table *table, int num,
+				      cpu_t *cpu);
+
+void release_secondary_cores(void)
+{
+	int node = fdt_subnode_offset(fdt, 0, "cpus");
+	int depth = 0;
+	void *map = valloc(PAGE_SIZE, PAGE_SIZE);
+
+	if (node < 0) {
+		printf("BROKEN: Missing /cpus node\n");
+		goto fail;
+	}
+
+	while ((node = fdt_next_node(fdt, node, &depth)) >= 0) {
+		int len;
+		const char *status;
+
+		if (node < 0)
+			break;
+		if (depth > 1)
+			continue;
+		if (depth < 1)
+			return;
+
+		status = fdt_getprop(fdt, node, "status", &len);
+		if (!status) {
+			if (len == -FDT_ERR_NOTFOUND)
+				continue;
+
+			node = len;
+			goto fail_one;
+		}
+
+		if (len != strlen("disabled") + 1 || strcmp(status, "disabled"))
+			continue;
+
+		const char *enable =
+		    fdt_getprop(fdt, node, "enable-method", &len);
+		if (!status) {
+			printf("BROKEN: Missing enable-method on disabled cpu node\n");
+			node = len;
+			goto fail_one;
+		}
+
+		if (len != strlen("spin-table") + 1
+		    || strcmp(enable, "spin-table")) {
+			printf("BROKEN: Unknown enable-method \"%s\"; not enabling\n",
+			       enable);
+			continue;
+		}
+
+		const uint32_t *reg = fdt_getprop(fdt, node, "reg", &len);
+		if (!reg) {
+			printf("BROKEN: Missing reg property in cpu node\n");
+			node = len;
+			goto fail_one;
+		}
+
+		if (len != 4) {
+			printf("BROKEN: Bad length %d for cpu reg property; core not released\n",
+			       len);
+			return;
+		}
+
+		const uint64_t *table =
+		    fdt_getprop(fdt, node, "cpu-release-addr", &len);
+		if (!table) {
+			printf("BROKEN: Missing cpu-release-addr property in cpu node\n");
+			node = len;
+			goto fail_one;
+		}
+
+		tlb1_set_entry(1, (unsigned long)map,
+			       (*table) & ~(PAGE_SIZE - 1),
+			       TLB_TSIZE_4K, TLB_MAS2_IO,
+			       TLB_MAS3_KERN, 0, 0, 0);
+
+		char *table_va = map;
+		table_va += *table & (PAGE_SIZE - 1);
+		cpu_t *cpu = alloc_type(cpu_t);
+		if (!cpu)
+			goto nomem;
+
+		cpu->kstack = alloc(KSTACK_SIZE, 16);
+		if (!cpu->kstack)
+			goto nomem;
+
+		cpu->kstack += KSTACK_SIZE - FRAMELEN;
+
+		if (start_secondary_spin_table((void *)table_va, *reg, cpu))
+			printf("BROKEN: couldn't spin up CPU%u\n", *reg);
+
+next_core:
+		;
+	}
+
+fail:
+	printf("BROKEN: error %d (%s) reading CPU nodes, "
+	       "secondary cores may not be released.\n",
+	       node, fdt_strerror(node));
+
+	return;
+
+nomem:
+	printf("BROKEN: out of memory reading CPU nodes, "
+	       "secondary cores may not be released.\n");
+
+	return;
+
+fail_one:
+	printf("BROKEN: error %d (%s) reading CPU node, "
+	       "this core may not be released.\n", node, fdt_strerror(node));
+
+	goto next_core;
+}

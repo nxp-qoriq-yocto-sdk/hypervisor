@@ -534,7 +534,7 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		if (val & MMUCSR_L2TLB0_FI)
 			mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
 		if (val & MMUCSR_L2TLB1_FI)
-			guest_inv_tlb1(0);
+			guest_inv_tlb1(TLBIVAX_INV_ALL, 0);
 		break;
 
 	case SPR_BUCSR:

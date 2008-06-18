@@ -22,6 +22,45 @@
 			bus-frequency = <d#66666666>;
 			clock-frequency = <d#66666666>;
 		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <1>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <2>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc", "fsl,e500";
+			reg = <3>;
+			d-cache-line-size = <20>;
+			i-cache-line-size = <20>;
+			d-cache-size = <8000>;
+			i-cache-size = <8000>;
+			timebase-frequency = <d#8333333>;
+			bus-frequency = <d#66666666>;
+			clock-frequency = <d#66666666>;
+		};
 	};
 	
 	memory {
