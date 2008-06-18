@@ -288,6 +288,8 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
+
+	enable_critint();
 	return 0;
 }
 
@@ -297,8 +299,6 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	uint32_t mas0 = mfspr(SPR_MAS0);
 	unsigned int entry, tlb;
 	
-	disable_critint();
-
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		printf("tlbre@0x%08lx: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
 		return 1;
@@ -306,8 +306,10 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 	tlb = MAS0_GET_TLBSEL(mas0);
 	if (tlb == 0) {
+		disable_critint();
 		asm volatile("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
+		enable_critint();
 		return 0;
 	}
 
