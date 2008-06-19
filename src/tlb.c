@@ -98,6 +98,8 @@ static void free_tlb1(unsigned int entry)
 		i++;
 		idx += LONG_BITS;
 	} while (idx < TLB1_SIZE);
+
+	gcpu->gtlb1[entry].mas1 &= ~MAS1_VALID;
 }
 
 void guest_set_tlb1(unsigned int entry, unsigned long mas1,
