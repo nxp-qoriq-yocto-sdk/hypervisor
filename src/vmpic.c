@@ -18,10 +18,9 @@
 
 static uint32_t vmpic_lock;
 
-static void vmpic_reset(handle_t *h)
+static void vmpic_reset(interrupt_t *irq)
 {
 	guest_t *guest = get_gcpu()->guest;
-	interrupt_t *irq = h->intr->irq;
 
 	irq->ops->disable(irq);
 
@@ -40,8 +39,13 @@ static void vmpic_reset(handle_t *h)
 		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
 
+static void vmpic_reset_handle(handle_t *h)
+{
+	vmpic_reset(h->intr->irq);
+}
+
 handle_ops_t vmpic_handle_ops = {
-	.reset = vmpic_reset,
+	.reset = vmpic_reset_handle,
 };
 
 int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq)
@@ -88,18 +92,25 @@ int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
  	if (!irq)
  		return ERR_INVALID;
 
+	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
+	         "vmpic: %p is MPIC %d\n",
+	         irq, irqspec[0]);
+
 	saved = spin_lock_critsave(&vmpic_lock);
  	
  	handle = mpic_irq_get_vector(irq);
 	if (handle < MAX_HANDLES && guest->handles[handle]) {
 		vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 		if (vmirq && vmirq->irq == irq) {
+			spin_unlock_critsave(&vmpic_lock, saved);
 			printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
 			         "vmpic reusing shared ghandle %d\n", handle);
 			return handle;
 		}
 	}
 
+	vmpic_reset(irq);
+	
 	spin_unlock_critsave(&vmpic_lock, saved);
 
 	handle = vmpic_alloc_handle(guest, irq);
@@ -497,8 +508,8 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 		return;
 	}
 
-	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic unmask: %p %u\n",
-	         vmirq->irq, handle);
+	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic %smask: %p %u\n",
+	         mask ? "" : "un", vmirq->irq, handle);
 
 	if (mask)
 		vmirq->irq->ops->disable(vmirq->irq);
@@ -552,6 +563,7 @@ void fh_vmpic_eoi(trapframe_t *regs)
 void fh_vmpic_iack(trapframe_t *regs)
 {
 	uint16_t vector;
+	int v = 0;
 
 	vector = mpic_iack();
 	if (vector == 0xFFFF) {  /* spurious */
@@ -559,11 +571,12 @@ void fh_vmpic_iack(trapframe_t *regs)
 		if (irq) {
 			vmpic_interrupt_t *vmirq = irq->priv;
 			vector = vmirq->handle;
+			v = 1;
 		}
 	}
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
-	         "cpu%d: iack %x\n", cpu->coreid, vector);
+	         "cpu%d: iack %x %s\n", cpu->coreid, vector, v ? "HW" : "Virt");
 	regs->gpregs[4] = vector;
 	regs->gpregs[3] = 0;  /* success */
 }
