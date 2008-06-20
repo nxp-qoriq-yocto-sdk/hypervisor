@@ -22,13 +22,10 @@ int process_status(int status)
 	switch (status) {
 	case 0 :
 		return 0;
-	case -1 :
-		printf("Invalid handle number\n");
-		return -1;
-	case -2 :
+	case EINVAL :
 		printf("Invalid parameter\n");
 		return -1;
-	case -3 :
+	case EAGAIN :
 		printf("byte channel buffer full\n");
 		return 0;
 	default :
@@ -271,7 +268,7 @@ void start(unsigned long devtree_ptr)
 		} else
 			status = fh_byte_channel_send(handle[0], bal, str);
 
-		if (status == -3) 
+		if (status == EAGAIN) 
 			break;
 	}
 
@@ -283,9 +280,9 @@ void start(unsigned long devtree_ptr)
 	status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
 
 	if (txavail == 0)
-		printf(" > Polling. Expected txavail = 0 & rc =-3 byte channel full: PASSED\n");
+		printf(" > Polling. Expected txavail = 0 & rc = EAGAIN, byte channel full: PASSED\n");
 	else
-		printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
+		printf("Txavail = %d != 0 but rc = EAGAIN incorrect --->FAILED\n", txavail);
 
 	debug("enabling byte channel 1 tx intr and byte channel 2 rx intr\n");
 
@@ -321,7 +318,7 @@ void start(unsigned long devtree_ptr)
 		} else
 			status = fh_byte_channel_send(handle[1], bal, str);
 
-		if (status == -3) 
+		if (status == EAGAIN) 
 			break;
 	}
 
@@ -333,9 +330,9 @@ void start(unsigned long devtree_ptr)
 	status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
 
 	if (txavail == 0)
-		printf(" > Polling. Expected txavail = 0 & rc =-3 byte channel full: PASSED\n");
+		printf(" > Polling. Expected txavail = 0 & rc = EAGAIN, byte channel full: PASSED\n");
 	else
-		printf("Txavail = %d != 0 but rc = -3 incorrect --->FAILED\n", txavail);
+		printf("Txavail = %d != 0 but rc = EAGAIN incorrect --->FAILED\n", txavail);
 
 	debug("enabling byte channel 2 tx intr and byte channel 1 rx intr\n");
 	if ((status = fh_vmpic_set_mask(irq2[2], 0))) {/* enable byte channel 2 txintr */
