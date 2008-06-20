@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc3
-Date: 6/13/2008
+Revsion: 0.2-rc4
+Date: 6/20/2008
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc3
+   -Topaz 0.2-rc4
       -is compatible with Simics 8578 3.2.27
       -requires device tree compiler (DTC) SHA tag
        fc9769ac2bae8a32d5d277007d22414c4516b02 with the 
@@ -32,6 +32,18 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc4 bug fixes and changes
+      -r7 is now set to the size of the IMA (fixes bug 1543)
+      -tlbivax functionality updates (bug 1527)
+      -implement guest spr accesses for gdb stub (bug 1535)
+      -MSR[CE] is set on secondary core (bug 1545) 
+      -enble PMR access
+      -"partman -s" now displays the partition name
+      -Invalidate TLB1 entries in the guest array, not just
+       the real one.
+      -Reset VMPIC interrupts when a guest allocates them
+      -tlbivax: invalidate TLB1 entries
 
    -Topaz 0.2-rc3
       -bug 1498 fixed
