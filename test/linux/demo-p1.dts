@@ -1,5 +1,5 @@
 / {
-	compatible = "fsl,hv-platform-mpc8578",
+	compatible = "fsl,hv-platform-p4080",
                      "fsl,hv-platform",
                      "fsl,MPC8578SIM";
 	model = "fsl,hv-demo-linux-p1";

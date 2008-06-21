@@ -1,5 +1,5 @@
 / {
-	compatible = "fsl,hv-platform-mpc8578",
+	compatible = "fsl,hv-platform-p4080",
 	             "fsl,hv-platform";
 	model = "fsl,hv-test-mmu";
 	epapr-version = "ePAPR-1.0";
