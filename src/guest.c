@@ -630,7 +630,12 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 static void start_guest_primary_nowait(void)
 {
 	register register_t r3 asm("r3");
+	register register_t r4 asm("r4");
+	register register_t r5 asm("r5");
+	register register_t r6 asm("r6");
 	register register_t r7 asm("r7");
+	register register_t r8 asm("r8");
+	register register_t r9 asm("r9");
 	guest_t *guest = get_gcpu()->guest; 
 	int i;
 	
@@ -691,12 +696,18 @@ static void start_guest_primary_nowait(void)
 	// such that guest virtual == guest physical at boot time, this works. 
 
 	r3 = guest->dtb_gphys;
+	r4 = 0;
+	r5 = 0;
+	r6 = 0x45504150; // ePAPR Magic for Book-E
 	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+	r8 = 0;
+	r9 = 0;
 
-	asm volatile("li %%r4, 0; li %%r5, 0; li %%r6, 0;"
-	             "mtsrr0 %0; mtsrr1 %2; rfi" : :
-	             "r" (guest->entry), "r" (r3), "r" (MSR_GS), "r" (r7) :
-	             "r4", "r5", "r6", "r8");
+	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
+		     "r" (guest->entry), "r" (MSR_GS),
+		     "r" (r3), "r" (r4), "r" (r5), "r" (r6), "r" (r7),
+		     "r" (r8), "r" (r9)
+		     : "memory");
 
 	BUG();
 }
@@ -735,8 +746,11 @@ static void start_guest_secondary(void)
 {
 	register register_t r3 asm("r3");
 	register register_t r4 asm("r4");
+	register register_t r5 asm("r5");
 	register register_t r6 asm("r6");
 	register register_t r7 asm("r7");
+	register register_t r8 asm("r8");
+	register register_t r9 asm("r9");
 
 	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
@@ -782,13 +796,19 @@ static void start_guest_secondary(void)
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
+	r4 = 0;
+	r5 = 0;
 	r6 = 0;
 	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+	r8 = 0;
+	r9 = 0;
 
 	cpu->traplevel = 0;
-	asm volatile("mtsrr0 %0; mtsrr1 %1; li %%r5, 0; rfi" : :
+	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
 	             "r" (guest->spintbl[gpir].addr_lo), "r" (MSR_GS),
-	             "r" (r3), "r" (r4), "r" (r6), "r" (r7) : "r5", "memory");
+	             "r" (r3), "r" (r4), "r" (r5), "r" (r6), "r" (r7),
+		     "r" (r8), "r" (r9)
+	             : "memory");
 
 	BUG();
 }
