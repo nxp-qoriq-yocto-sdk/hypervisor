@@ -114,7 +114,7 @@
 			
 			byte-channel@0 {
 				compatible = "fsl,hv-byte-channel-handle";
-				fsl,endpoint = "/byte-channels/byte-channel0";
+				fsl,endpoint = "/byte-channels/byte-channel1";
 				interrupt-parent = <&vmpic>;
 			};
 	
