@@ -4,7 +4,7 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: dtbs rootfs
+all: dtbs
 
 NO_LIBOS=y
 include ../Makefile.inc
