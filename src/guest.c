@@ -49,8 +49,6 @@
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
 
-extern void data_path_partition_init(guest_t *guest, const uint32_t *cpus, int len);
-
 static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 {
 	int i;
@@ -1030,7 +1028,6 @@ __attribute__((noreturn)) void init_guest(void)
 
 		vmpic_partition_init(guest);
 		pamu_partition_init(guest);
- 		data_path_partition_init(guest, cpus, len);
 		start_guest_primary();
 	} else {
 		gpir = register_gcpu_with_guest(guest, cpus, len);

@@ -77,7 +77,7 @@ LIBOS_SRC := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
              $(LIBOS_MPIC) $(libos-src-y)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
-            timers.c paging.c hcalls.c devtree.c elf.c vmpic.c gspr.c data_path.c misc.S
+            timers.c paging.c hcalls.c devtree.c elf.c vmpic.c gspr.c misc.S
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
