@@ -36,5 +36,6 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define LOGTYPE_EMU          (CLIENT_BASE_LOGTYPE + 1)
 #define LOGTYPE_PARTITION    (CLIENT_BASE_LOGTYPE + 2)
 #define LOGTYPE_GDB_STUB     (CLIENT_BASE_LOGTYPE + 3)
+#define LOGTYPE_BYTE_CHAN    (CLIENT_BASE_LOGTYPE + 3)
 
 #endif
