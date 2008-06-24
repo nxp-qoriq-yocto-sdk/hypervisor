@@ -31,6 +31,7 @@
 
 #include <hv.h>
 #include <libos/trapframe.h>
+#include <errors.h>
 
 #define MINGPR 0
 #define MAXGPR 31
@@ -47,7 +48,7 @@ static inline int read_ggpr(trapframe_t *regs, int gpr, register_t *val)
 		*val = regs->gpregs[gpr];
 		return 0;
 	} else
-		return 1;
+		return ERR_INVALID;
 }
 
 static inline int write_ggpr(trapframe_t *regs, int gpr, register_t val)
@@ -56,7 +57,7 @@ static inline int write_ggpr(trapframe_t *regs, int gpr, register_t val)
 		regs->gpregs[gpr] = val;
 		return 0;
 	} else
-		return 1;
+		return ERR_INVALID;
 }
 
 static inline int read_gfpr_const(trapframe_t *regs, int fpr, uint64_t *val)
@@ -64,13 +65,13 @@ static inline int read_gfpr_const(trapframe_t *regs, int fpr, uint64_t *val)
 	register_t msr;
 
 	if (fpr < MINFPR || fpr > MAXFPR)
-		return 0;
+		return ERR_INVALID;
 
 	msr = mfmsr();
 	mtmsr(msr | MSR_FP);
 	asm volatile("stfd%U0%X0 %1, %0" : "=m" (*val) : "i" (fpr));
 	mtmsr(msr);
-	return 1;
+	return 0;
 }
 
 static inline int read_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
@@ -144,7 +145,7 @@ static inline int read_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
 	case 31:
 		return read_gfpr_const(regs, 31, val);
 	default:
-		return 0;
+		return ERR_INVALID;
 	};
 }
 
@@ -153,13 +154,13 @@ static inline int write_gfpr_const(trapframe_t *regs, int fpr, uint64_t *val)
 	register_t msr;
 
 	if (fpr < MINFPR || fpr > MAXFPR)
-		return 0;
+		return ERR_INVALID;
 
 	msr = mfmsr();
 	mtmsr(msr | MSR_FP);
 	asm volatile("lfd%U0%X0 %1, %0" : : "m" (*val), "i" (fpr));
 	mtmsr(msr);
-	return 1;
+	return 0;
 }
 
 static inline int write_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
@@ -233,7 +234,7 @@ static inline int write_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
 	case 31:
 		return write_gfpr_const(regs, 31, val);
 	default:
-		return 0;
+		return ERR_INVALID;
 	};
 }
 
