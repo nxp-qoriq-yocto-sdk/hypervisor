@@ -283,6 +283,11 @@ static mux_complex_t *mux_complex_init(byte_chan_t *bc)
 int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
                     char multiplexing_id)
 {
+	if (mux->num_of_channels == MAX_MUX_CHANNELS) {
+		printf("Byte channel multiplexer : all channels allocated\n");
+		return ERR_RANGE;
+	}
+
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!handle)
 		return ERR_BUSY;

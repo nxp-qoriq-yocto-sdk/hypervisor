@@ -20,6 +20,8 @@
 
 #include <byte_chan.h>
 
+#define MAX_MUX_CHANNELS 32
+
 typedef struct mux_complex {
 	byte_chan_handle_t *byte_chan;
 	struct connected_bc *current_tx_bc;
