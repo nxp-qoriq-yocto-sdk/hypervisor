@@ -284,7 +284,8 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
                     char multiplexing_id)
 {
 	if (mux->num_of_channels == MAX_MUX_CHANNELS) {
-		printf("Byte channel multiplexer : all channels allocated\n");
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "Byte channel multiplexer: all channels allocated\n");
 		return ERR_RANGE;
 	}
 
