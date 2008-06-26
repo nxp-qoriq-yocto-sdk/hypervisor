@@ -113,6 +113,9 @@ static void pic_init(void)
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t lowest_guest_addr;
+	int fdt_size;
+	void *new_fdt;
+	int ret;
 
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
@@ -131,8 +134,6 @@ void start(unsigned long devtree_ptr)
 	
 	core_init();
 
-	printf("fdt %p size %x\n", fdt, fdt_totalsize(fdt));
-
 	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
 	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
@@ -141,6 +142,17 @@ void start(unsigned long devtree_ptr)
 		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
 		                       (void *)ULONG_MAX);
 	malloc_init();
+	
+	fdt_size = fdt_totalsize(fdt) + 4096;
+	new_fdt = malloc(fdt_size);
+	
+	if (new_fdt && (ret = fdt_open_into(fdt, new_fdt, fdt_size)) == 0) {
+		fdt = new_fdt;
+	} else {
+		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		         "Couldn't allocate %d bytes for fdt_open_into().\n",
+		         fdt_size);
+	}
 
 	pic_init();
 	enable_critint();
