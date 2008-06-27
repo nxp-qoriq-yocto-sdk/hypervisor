@@ -23,15 +23,31 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc4
-      -is compatible with Simics 8578 3.2.27
-      -requires device tree compiler (DTC) SHA tag
-       fc9769ac2bae8a32d5d277007d22414c4516b02 with the 
-       libfdt patch applied as described in the Topaz
-       README.txt
+   -Topaz 0.2-rc5
+      -is compatible with Simics 8578 3.2.27-3.2.30
+       (and newer versions with a u-boot update).
+      -requires version 1.2.0-rc1 or newer of the
+       device tree compiler (DTC).
+      -requires libos commit ab27553f5ea7b138c5784dc8b11c9adf78ee8364
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc5 bug fixes and changes
+      -Platform name in device tree changed from 8578 to p4080.
+      -Improved ePAPR compliance
+      -partman device tree fixes
+      -The rootfs is no longer automatically updated with
+       partman when building the Linux test, as this requires
+       root access and has problems with root-squashed NFS.
+      -Byte channel mux channels are range-checked.
+      -Data path initialization is removed.
+      -Fixed inverted return codes in guest register accessor.
+      -POSIX error codes are used where appropriate.
+      -Added FH_DMA_LIODN_GET hcall.
+      -Added doxygen comments to hcalls.h.
+      -Fixed a bug in strncpy() and strncat() that would
+       call memset() with a length of -1.
 
    -Topaz 0.2-rc4 bug fixes and changes
       -r7 is now set to the size of the IMA (fixes bug 1543)
@@ -78,30 +94,23 @@ Contents
        the TLB, and a machine check will occur on access to
        the mapping--  this is not implemented for TLB1.  Access
        to invalid TLB1 mappings will result in another TLB miss
+      -If the guest-to-real address mapping is sufficiently
+       misaligned, TLB1 entries can be depleted, causing
+       a hypervisor panic.
 
    -physical addresses greater than 32 bits are not supported
 
-   -HID0
-      -the HID0 register is not implemented-- writes to it 
-       are ignored
-
    -CPU core performance monitor support
-      -support for the CPU performance monitor instructions,
-       registers, and interrupts is not implemented
+      -support for the CPU performance interrupt is not implemented
 
    -CPU core Debug support
       -CPU debug support is not implemented including all debug
        registers and interrupts
       -writes to debug SPRs are ignored
 
-   -L1 cache control
-      -the L1 cache control registers are not implemented
-         L1CSR0
-         L1CSR1
+   -Cache control
+      -the following cache control registers are not implemented
          L1CSR2
-
-   -L2 cache control
-      -the L2 cache control registers are not implemented
          L2CAPTDATAHI
          L2CAPTDATALO
          L2CAPTECC
@@ -165,7 +174,7 @@ Contents
 
  E. ePAPR Related Notes
 
-    -The v0.2-rc3 hypervisor does not comply with the ePAPR 
+    -The hypervisor does not currently comply with the ePAPR 
      ELF loading requirements with respect to the physical
      load address of the image.  The ET_EXEC and ET_DYN
      flags are ignored and the image is loaded at the specified
