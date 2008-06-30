@@ -298,16 +298,23 @@ void byte_chan_partition_init(guest_t *guest)
 		off = ret;
 
 		endpoint = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
-		if (!endpoint)
-			break;
+		if (!endpoint) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: no endpoint property\n");
+			continue;
+		}
 
 		ret = lookup_alias(fdt, endpoint);
-		if (ret < 0)
-			break;
+		if (ret < 0) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: no endpoint\n");
+			continue;
+		}
 
 		bc = ptr_from_node(fdt, ret, "bc");
 		if (!bc) {
-			printf("byte_chan_partition_init: no pointer\n");
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: no pointer\n");
 			continue;
 		}
 
@@ -315,7 +322,8 @@ void byte_chan_partition_init(guest_t *guest)
 		virq[1] = vpic_alloc_irq(guest);
 
 		if (!virq[0] || !virq[1]) {
-			printf("byte_chan_partition_init: can't alloc vpic irqs\n");
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: can't alloc vpic irqs\n");
 			return;
 		}
 		
@@ -325,14 +333,16 @@ void byte_chan_partition_init(guest_t *guest)
 		irq[3] = 0;
 		
 		if (irq[0] < 0 || irq[2] < 0) {
-			printf("byte_chan_partition_init: can't alloc vmpic irqs\n");
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: can't alloc vmpic irqs\n");
 			return;
 		} 
 
 		int32_t ghandle = byte_chan_attach_guest(bc, guest, virq[0], virq[1]);
 		if (ghandle < 0) {
-			printf("byte_chan_partition_init: cannot attach\n");
-			return;
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "byte_chan_partition_init: cannot attach\n");
+			continue;
 		}
 
 		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, 4);
@@ -344,8 +354,9 @@ void byte_chan_partition_init(guest_t *guest)
 			break;
 	}
 
-	printf("byte_chan_partition_init: libfdt error %d (%s).\n",
-	       ret, fdt_strerror(ret));
+	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+	         "byte_chan_partition_init: error %d (%s).\n",
+	         ret, ret >= -FDT_ERR_MAX ? fdt_strerror(ret) : "");
 }
 
 /** Send data through a byte channel

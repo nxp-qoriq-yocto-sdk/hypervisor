@@ -157,32 +157,49 @@ void recv_dbell_partition_init(guest_t *guest)
 
 		endpoint = fdt_getprop(guest->devtree, off,
 		                       "fsl,endpoint", &ret);
-		if (!endpoint)
-			break;
+		if (!endpoint) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			         "recv_dbell_partition_init: no endpoint property\n");
+			continue;
+		}
 
 		ret = lookup_alias(fdt, endpoint);
-		if (ret < 0)
-			break;
+		if (ret < 0) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			         "recv_dbell_partition_init: no endpoint\n");
+			continue;
+		}
 
 		/* Get the pointer corresponding to hv-internal-doorbell-ptr */
 		dbell = ptr_from_node(fdt, ret, "doorbell");
 		if (!dbell) {
-			printf("recv_doorbell_partition_init: no pointer\n");
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			         "recv_dbell_partition_init: no pointer\n");
 			continue;
 		}
 
 		dbell_node = alloc_type(guest_recv_dbell_list_t);
-		if (!dbell_node)
-			return;
+		if (!dbell_node) {
+			ret = ERR_NOMEM;
+			break;
+		}
 
 		virq = vpic_alloc_irq(guest);
 		if (!virq) {
 			free(dbell_node);
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			         "recv_dbell_partition_init: out of virqs.\n");
 			return;
 		}
 		
-		irq[0] = vmpic_alloc_handle(guest, &virq->irq);
+		irq[0] = ret = vmpic_alloc_handle(guest, &virq->irq);
 		irq[1] = 0;
+
+		if (ret < 0) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			         "recv_dbell_partition_init: can't alloc vmpic irqs\n");
+			break;
+		} 
 
 		ret = fdt_setprop(guest->devtree, off, "interrupts",
 		                  irq, sizeof(irq));
@@ -199,4 +216,8 @@ void recv_dbell_partition_init(guest_t *guest)
 		dbell->recv_head = dbell_node;
 		spin_unlock_critsave(&dbell->dbell_lock, saved);
 	}
+
+	printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+	         "recv_dbell_partition_init: error %d (%s).\n",
+	         ret, ret >= -FDT_ERR_MAX ? fdt_strerror(ret) : "");
 }
