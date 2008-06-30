@@ -1,11 +1,3 @@
-#
-# Copyright © 2007 Freescale Semiconductor, Inc
-# Copyright © 1999 Paul D. Smith
-#
-#
-# The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
-#
-
 all: whoami_all
 
 include ../Makefile.inc

@@ -1,11 +1,3 @@
-#
-# Copyright © 2007 Freescale Semiconductor, Inc
-# Copyright © 1999 Paul D. Smith
-#
-#
-# The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
-#
-
 CROSS_COMPILE=powerpc-e500mc-linux-gnu-
 LIBFDT_DIR := ../../dtc/libfdt
 LIBOS_DIR := ../lib
