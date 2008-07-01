@@ -31,6 +31,8 @@
 #include <libos/trapframe.h>
 #include <events.h>
 #include <byte_chan.h>
+#include <guestmemio.h>
+#include <devtree.h>
 #include <gdb-stub.h>
 #include <greg.h>
 #include <e500mc-data.h>
@@ -59,9 +61,9 @@ extern void *fdt;
 
 /**
  * Enumerate the various events that we are interested in. The external world in
- * the hypervisor only knows that a "GDB event" occurred. However, within the 
- * stub, we need to have a finer view of things, as captured in the following 
- * enum 'event_type'. The global variable 'event_type', is used to record the 
+ * the hypervisor only knows that a "GDB event" occurred. However, within the
+ * stub, we need to have a finer view of things, as captured in the following
+ * enum 'event_type'. The global variable 'event_type', is used to record the
  * current event.
  */
 
@@ -78,7 +80,7 @@ enum event_type event_type;
  * The byte channel for the GDB stub. All communication in and out of the GDB
  * stub flows through this byte channel.
  *
- * TODO: There's more than one guest; thus, there can be more than one GDB 
+ * TODO: There's more than one guest; thus, there can be more than one GDB
  *       stub active.
  */
 
@@ -90,7 +92,7 @@ static byte_chan_handle_t *byte_channel_handle = NULL;
  */
 static const byte_chan_t *find_gdb_stub_byte_channel(void)
 {
-	int start_offset = -1; 
+	int start_offset = -1;
 	int prop_length = 0;
 	int node_offset = 0;
 	const uint32_t *fsl_ep = NULL;
@@ -100,13 +102,13 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 
 	TRACE();
 
-	/* Search flat device tree for gdb-stub node. 
+	/* Search flat device tree for gdb-stub node.
 	 */
-	node_offset = fdt_node_offset_by_compatible(fdt, start_offset, 
+	node_offset = fdt_node_offset_by_compatible(fdt, start_offset,
 	                                            "fsl,hv-gdb-stub");
 	if (node_offset == -FDT_ERR_NOTFOUND) {
-		/* This is not an error - it just means that no GDB stubs were 
-		 * configured. We should return silently. 
+		/* This is not an error - it just means that no GDB stubs were
+		 * configured. We should return silently.
 		 */
 		return NULL;
 	}
@@ -119,11 +121,14 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	/* Get value of fsl,endpoint (a phandle), which gives you the offset of
 	 * the byte-channel in the device tree.
 	 */
+	/* TODO: Use ptr_from_node() (But, this call does not work).
+	 * fsl_ep = ptr_from_node(fdt, node_offset, "fsl,endpoint");
+	 */
 	fsl_ep = fdt_getprop(fdt, node_offset, "fsl,endpoint", &prop_length);
 	if (fsl_ep == NULL) {
 		if (prop_length == -FDT_ERR_NOTFOUND) {
 			TRACE("%s: %s: Did not find fsl,endpoint in gdb-stub "
-			       "node in the device tree.\n", CTXT_EMSG, 
+			       "node in the device tree.\n", CTXT_EMSG,
 			       __func__);
 			return NULL;
 		}
@@ -142,7 +147,8 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	 * The value is a pointer to the byte-channel as obtained upon a
 	 * byte_chan_alloc()
 	 */
-	bc_ptr = fdt_getprop(fdt, bc_offset, "fsl,hv-internal-bc-ptr", 
+	/* TODO: Use ptr_from_node() */
+	bc_ptr = fdt_getprop(fdt, bc_offset, "fsl,hv-internal-bc-ptr",
 		             &prop_length);
 	TRACE("bc_ptr: 0x%x, *bc_ptr: 0x%x\n",
 		(unsigned int) bc_ptr,
@@ -168,17 +174,17 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 }
 
 /** Callback for RX interrupt.
- * 
- */ 
+ *
+ */
 static void rx(queue_t *q)
 {
 	TRACE();
 	/* Record the event type and setevent GEV_GDB on the current CPU. */
 	event_type = received_data;
 	setgevent(get_gcpu(), GEV_GDB);
-	/* TODO: What if there were some other event in progress?  It'll be 
-	 * lost. The GDB event handler should check whether the input queue 
-	 * is empty, rather than rely on a "received data" flag. 
+	/* TODO: What if there were some other event in progress?  It'll be
+	 * lost. The GDB event handler should check whether the input queue
+	 * is empty, rather than rely on a "received data" flag.
 	 */
 }
 
@@ -186,7 +192,7 @@ static int register_callbacks(void)
 {
 	TRACE();
 	if (byte_channel != NULL) {
-		byte_channel_handle = byte_chan_claim((byte_chan_t *) 
+		byte_channel_handle = byte_chan_claim((byte_chan_t *)
 		                                      byte_channel);
 		if (byte_channel_handle == NULL) {
 			TRACE("%s: %s: gdb-stub failed to claim gdb-stub"
@@ -194,7 +200,7 @@ static int register_callbacks(void)
 			return GDB_STUB_INIT_FAILURE;
 		}
 
-		/* No callback on a TX, since we're polling. 
+		/* No callback on a TX, since we're polling.
 		 * Register RX callback.
 		 */
 		byte_channel_handle->rx->data_avail = rx;
@@ -246,7 +252,7 @@ static inline int bufsize_sanity_check(void)
 #define ACK '+'
 #define NAK '-'
 
-static char hexit[] =
+static uint8_t hexit[] =
 {
 	'0', '1', '2', '3',
 	'4', '5', '6', '7',
@@ -283,14 +289,17 @@ typedef enum token
 	unknown_command,
 	reason_halted,
 	continue_execution,
+	read_register,
 	read_registers,
+	write_register,
+	write_registers,
 	set_thread,
 	read_memory,
-	read_register,
+	write_memory,
 	return_current_thread_id,
 	get_section_offsets,
 	supported_features,
-	qxfer
+	qxfer,
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -306,10 +315,13 @@ static lexeme_token_pair_t lexeme_token_pairs[] =
 {
 	{ "?", reason_halted },
 	{ "c", continue_execution },
+	{ "p", read_register },
 	{ "g", read_registers },
+	{ "P", write_register },
+	{ "G", write_registers },
 	{ "H", set_thread },
 	{ "m", read_memory },
-	{ "p", read_register },
+	{ "M", write_memory },
 	{ "qC", return_current_thread_id },
 	{ "qOffsets", get_section_offsets },
 	{ "qSupported", supported_features },
@@ -331,8 +343,9 @@ static inline int pkt_space(pkt_t *pkt);
 static inline void pkt_write_byte(pkt_t *pkt, uint8_t c);
 static inline void pkt_update_cur(pkt_t *pkt);
 static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
+static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c);
 static inline void pkt_cat_string(pkt_t *pkt, char *s);
-static inline void pkt_cat_stringn(pkt_t *pkt, char *s, unsigned int n);
+static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, unsigned int n);
 static inline uint8_t pkt_read_byte(pkt_t *pkt, unsigned int i);
 static inline int pkt_full(pkt_t *pkt);
 static inline void pkt_reset(pkt_t *pkt);
@@ -346,6 +359,11 @@ static void transmit_response(pkt_t *rsp);
 static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length);
 
 /* RSP */
+static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, unsigned int byte_length);
+static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, unsigned int reg_num);
+static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, unsigned int reg_num);
+static inline uint8_t *scan_till(uint8_t *q, char c);
+static inline unsigned int scan_num(uint8_t **buffer, char c);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 
 /* Auxiliary routines required by the RSP Engine.
@@ -468,6 +486,14 @@ static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 	return;
 }
 
+static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
+{
+	TRACE();
+	pkt_write_byte_update_cur(rsp, hex(upper_nibble(c)));
+	pkt_write_byte_update_cur(rsp, hex(lower_nibble(c)));
+	return;
+}
+
 static inline void pkt_cat_string(pkt_t *pkt, char *s)
 {
 	char *p;
@@ -480,9 +506,9 @@ static inline void pkt_cat_string(pkt_t *pkt, char *s)
 	return;
 }
 
-static inline void pkt_cat_stringn(pkt_t *pkt, char *s, unsigned int n)
+static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, unsigned int n)
 {
-        char *p;
+        uint8_t *p;
         TRACE();
         p = s;
         while (*p && (p - s) < n) {
@@ -548,7 +574,8 @@ static inline int got_ack(void)
  */
 static void receive_command(pkt_t *cmd)
 {
-	uint8_t c, i;
+	uint8_t c;
+	uint32_t i = 0;
 	uint8_t ccs[3] = {};
 
 	TRACE();
@@ -557,12 +584,13 @@ static void receive_command(pkt_t *cmd)
 			TRACE("Skipping '%c'. (Expecting '$').", c);
 		}
 
+		TRACE("Begin Looping:");
 		while ((c = get_debug_char()) != '#') {
-			pkt_write_byte(cmd, c);
-			pkt_update_cur(cmd);
+			TRACE("(Looping) Iteration: %d, got character: %c", i++, c);
+			pkt_write_byte_update_cur(cmd, c);
 		}
-		pkt_write_byte(cmd, '\0');
-		pkt_update_cur(cmd);
+		TRACE("Done Looping...");
+		pkt_write_byte_update_cur(cmd, '\0');
 		TRACE("Received command: %s", content(cmd));
 
 		for (i = 0; i < 2; i++) {
@@ -614,8 +642,7 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length)
 
 	TRACE();
 	for (i = 0; i < length; i++, p++) {
-		pkt_write_byte_update_cur(pkt, hex(upper_nibble(p[i])));
-		pkt_write_byte_update_cur(pkt, hex(lower_nibble(p[i])));
+		pkt_write_hex_byte_update_cur(pkt, p[i]);
 	}
 	pkt_write_byte(pkt, '\0');
 	return;
@@ -626,24 +653,141 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length)
 /* RSP Engine.
  */
 
-static inline void set_reg_value(char *value, uint64_t reg_value,
-                                 unsigned int byte_length)
+static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value,
+                                       unsigned int byte_length)
 {
 	int i, offset;
 	offset = (byte_length == 4 ? 4 : 0);
 	for (i = 0; i < byte_length; i++) {
 		value[2*i] = hex(upper_nibble((int)
-				(((char *) &reg_value)[offset + i])));
+				(((uint8_t *) &reg_value)[offset + i])));
 		value[2*i+1] = hex(lower_nibble((int)
-				(((char *) &reg_value)[offset + i])));
+				(((uint8_t *) &reg_value)[offset + i])));
 	}
 	value[2*byte_length] = '\0';
 }
 
+static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
+                           unsigned int reg_num)
+{
+	unsigned int byte_length = 0;
+	register_t reg_value = 0xdeadbeef;
+	uint64_t fp_reg_value = 0xdeadbeef;
+	unsigned int e500mc_reg_num;
+	uint8_t c;
+	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
+	byte_length = e500mc_reg_table[reg_num].bitsize/8;
+	switch(e500mc_reg_table[reg_num].cat) {
+	case reg_cat_spr:
+		c = read_gspr(trap_frame, e500mc_reg_num, &reg_value);
+		break;
+	case reg_cat_gpr:
+		c = read_ggpr(trap_frame, e500mc_reg_num, &reg_value);
+		break;
+	case reg_cat_msr:
+		c = read_gmsr(trap_frame, &reg_value);
+		break;
+	case reg_cat_cr:
+		c = read_gcr(trap_frame, &reg_value);
+		break;
+	case reg_cat_unk:
+	case reg_cat_pmr:
+		c = 1;
+		break;
+	case reg_cat_fpr:
+		c = read_gfpr(trap_frame, e500mc_reg_num, &fp_reg_value);
+		stringize_reg_value(value, fp_reg_value, byte_length);
+		return c;
+	default: TRACE("Illegal register category.");
+		c = 1;
+		break;
+	}
+	stringize_reg_value(value, reg_value, byte_length);
+	return c;
+}
+
+static inline int write_reg(trapframe_t *trap_frame, uint8_t *value,
+                            unsigned int reg_num)
+{
+	uint64_t reg_value;
+	unsigned int e500mc_reg_num;
+	uint8_t c;
+	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
+	reg_value = htoi((uint8_t *) value);
+	switch(e500mc_reg_table[reg_num].cat) {
+	case reg_cat_spr:
+		c = write_gspr(trap_frame, e500mc_reg_num, reg_value);
+		break;
+	case reg_cat_gpr:
+		c = write_ggpr(trap_frame, e500mc_reg_num, reg_value);
+		break;
+	case reg_cat_fpr:
+		c = write_gfpr(trap_frame, e500mc_reg_num, &reg_value);
+		break;
+	case reg_cat_msr:
+		c = write_gmsr(trap_frame, reg_value);
+		break;
+	case reg_cat_cr:
+		c = write_gcr(trap_frame, reg_value);
+		break;
+	case reg_cat_unk:
+	case reg_cat_pmr:
+		c = 1;
+		break;
+	default: TRACE("Illegal register category.");
+		c = 1;
+		break;
+	}
+	return c;
+}
+
+/* Scan forward until a 'c' is found or a '\0' is hit,
+ * whichever happens earlier.
+ */
+static inline uint8_t *scan_till(uint8_t *q, char c)
+{
+	while (*q && *q != c)
+		q++;
+	return q;
+}
+
+/* Extract out number in char-buffer, assuming that the
+ * number is punctuated by character c. The position
+ * in the buffer is advanced to point to the last
+ * character read (i.e. c or '\0' - whichever occurs
+ * earlier).
+ */
+static inline unsigned int scan_num(uint8_t **buffer, char c)
+{
+	uint8_t t, *sav_pos;
+	unsigned int n;
+
+	/* Important assumption: The data of interest
+	 * starts /after/ the first character.
+	 */
+	sav_pos = ++(*buffer);
+	*buffer = scan_till(*buffer, c);
+	t = **buffer;
+	**buffer = '\0';
+	n = htoi(sav_pos);
+	**buffer = t;
+	return n;
+}
+
+#define BREAK_IF_END(cur_pos)               \
+	if (!*(cur_pos)) {                  \
+		pkt_cat_string(rsp, "E00"); \
+		break;                      \
+	}
+
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
-	uint8_t *q, *r;
+	uint8_t *cur_pos, *sav_pos, *data;
 	unsigned int offset, length;
+	uint8_t err_flag = 0;
+	uint32_t *addr;
+	uint8_t value[17];
+	unsigned int reg_num, i;
 	char *td; /* td: target description */
 
 	TRACE("In RSP Engine, main loop.");
@@ -671,7 +815,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 * of the gdb_stub_event_handler where you
 			 * disable interrupts.
 			 */
-				TRACE("Got 'c' packet.");
+			TRACE("Got 'c' packet.");
 			disable_critint();
 			byte_channel_handle->rx->data_avail = rx;
 			if (queue_empty(byte_channel_handle->rx)) {
@@ -684,125 +828,128 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			}
 			break;
 
+		case read_register:
+			TRACE("Got 'p' packet.");
+			cur_pos = content(cmd);
+			reg_num = scan_num(&cur_pos, '\0');
+			read_reg(trap_frame, value, reg_num);
+			TRACE("Register: %d, read-value: %s", reg_num, value);
+			pkt_cat_string(rsp, (char *)value);
+			break;
+
 		case read_registers:
 			TRACE("Got 'g' packet.");
-			{
-				char value[17];
-				unsigned int i;
-				int byte_length = 0;
-				register_t reg_value;
-				uint64_t fp_reg_value;
-				char c;
-				for (i = 0; i < NUMREGS; i++) {
-					c = 0;
-					byte_length = e500mc_reg_table[i].bitsize/8;
-					switch(e500mc_reg_table[i].cat) {
-					case reg_cat_spr:
-						if ((c = read_gspr(trap_frame,
-						    e500mc_reg_table[i].e500mc_num,
-						    &reg_value)) == 0)
-							set_reg_value(value,
-							              (uint64_t) reg_value,
-							              byte_length);
-						break;
-					case reg_cat_gpr:
-						if ((c = read_ggpr(trap_frame,
-						    e500mc_reg_table[i].e500mc_num,
-						    &reg_value)) == 0)
-							set_reg_value(value,
-							              (uint64_t) reg_value,
-							              byte_length);
-						break;
-					case reg_cat_fpr:
-						if ((c = read_gfpr(trap_frame,
-						    e500mc_reg_table[i].e500mc_num,
-						    &fp_reg_value)) == 0)
-							set_reg_value(value,
-						                      fp_reg_value,
-							              byte_length);
-						break;
-					case reg_cat_msr:
-						read_gmsr(trap_frame,
-							  &reg_value);
-						set_reg_value(value,
-						              (uint64_t) reg_value,
-						              byte_length);
-						break;
-					case reg_cat_cr:
-						read_gcr(trap_frame,
-						         &reg_value);
-						set_reg_value(value,
-						              (uint64_t) reg_value,
-						              byte_length);
-						break;
-					case reg_cat_unk:
-					case reg_cat_pmr:
-						c = 1;
-						break;
-					default: TRACE("Illegal register category.");
-					}
-					/* For now, set it to 0xdeadbeef */
-					if (c == 1)
-						set_reg_value(value,
-						              (uint64_t) 0xdeadbeef,
-					                      byte_length);
-					TRACE("Register: %d, value: %s", i, value);
-					pkt_cat_string(rsp, value);
-				}
+			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
+				read_reg(trap_frame, value, reg_num);
+				TRACE("Register: %d, read-value: %s", reg_num, value);
+				pkt_cat_string(rsp, (char *)value);
 			}
+			break;
+
+		case write_register:
+			TRACE("Got 'P' packet.");
+			err_flag = 0;
+			cur_pos = content(cmd);
+			reg_num = scan_num(&cur_pos, '=');
+			BREAK_IF_END(cur_pos);
+			data = ++cur_pos;
+			TRACE("Register: %d, write-value: %s (decimal: %d)", reg_num, data, htoi(data));
+			err_flag = write_reg(trap_frame, data, reg_num);
+			pkt_cat_string(rsp, err_flag == 0 ? "OK" : "E00");
+			break;
+
+		case write_registers:
+			TRACE("Got 'G' packet.");
+			cur_pos = content(cmd);
+			data = ++cur_pos;
+			BREAK_IF_END(data);
+			TRACE("Got data (register values): %s", data);
+			err_flag = 0;
+			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
+				int32_t byte_length = 0;
+				byte_length = e500mc_reg_table[reg_num].bitsize / 8;
+				TRACE("PRE strncpy");
+				strncpy((char *)value, (const char *)data, 2 * byte_length);
+				TRACE("POST strncpy");
+				value[2 * byte_length] = '\0';
+				err_flag = write_reg(trap_frame, value, reg_num);
+				data += 2 * byte_length;
+			}
+			TRACE("Done writing registers, sending: OK");
+			pkt_cat_string(rsp, "OK");
 			break;
 
 		case set_thread:
 			TRACE("Got packet: 'H'");
-			q = content(cmd);
-			q++;
-			switch(*q) {
+			cur_pos = content(cmd);
+			cur_pos++;
+			switch(*cur_pos) {
 
-				case 'c':
-					TRACE("Got 'c' for step and"
-					       " continue operations.");
-					break;
+			case 'c':
+				TRACE("Got 'c' for step and"
+				       " continue operations.");
+				break;
 
-				case 'g':
-					TRACE("Got 'g' for other operations.");
-					break;
+			case 'g':
+				TRACE("Got 'g' for other operations.");
+				break;
 
-				default:
-					TRACE("Unhandled case '%c' in 'H' packet.", *q);
-					break;
+			default:
+				TRACE("Unhandled case '%c' in 'H' packet.", *cur_pos);
+				break;
 			}
-			q++;
-			if (strcmp((char *) q, "0") == 0) {
+			cur_pos++;
+			if (strcmp((char *) cur_pos, "0") == 0) {
 				TRACE("Pick up any thread.");
-			} else if (strcmp((char *) q, "-1") == 0) {
+			} else if (strcmp((char *) cur_pos, "-1") == 0) {
 				TRACE("All the threads.");
 			} else {
-				TRACE("Thread: %s", q);
+				TRACE("Thread: %s", cur_pos);
 			}
 			pkt_cat_string(rsp, "OK");
 			break;
 
 		case read_memory:
-			TRACE("Returning '0' as memory reads are not yet supported.");
-			pkt_cat_string(rsp, "E0");
+			TRACE("Got 'm' packet.");
+			cur_pos = content(cmd);
+			addr = (uint32_t *)scan_num(&cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			length = scan_num(&cur_pos, '\0');
+			TRACE("addr: 0x%p, length: %d\n", addr, length);
+			guestmem_set_data(trap_frame);
+			for (i = 0; i < length; i++) {
+				guestmem_in8((uint8_t *) addr + i, ((uint8_t *) value));
+				if (value[0] == '\0')
+					TRACE("guestmem_in8 set value[0] to: 0");
+				else
+					TRACE("guestmem_in8 set value[0] to: %c", value[0]);
+				pkt_write_hex_byte_update_cur(rsp, value[0]);
+				TRACE("byte address: 0x%p, upper nibble value: %c",
+				      (uint8_t *) addr + i, hex(upper_nibble(value[0])));
+				TRACE("byte address: 0x%p, lower nibble value: %c",
+				      (uint8_t *) addr + i, hex(lower_nibble(value[0])));
+			}
 			break;
 
-		case read_register:
-			TRACE("Got 'p' packet.");
-			q = content(cmd);
-			q++;
-			if (strncmp("40", (char *) q, 2) == 0) {
-				TRACE("Returning $pc.");
-				// trapframe_t
-				pkt_hex_copy(rsp, (uint8_t *) &(trap_frame -> srr0),
-				       sizeof (register_t));
-				TRACE();
+		case write_memory:
+			TRACE("Got 'M' packet.");
+			cur_pos = content(cmd);
+			addr = (uint32_t *) scan_num(&cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			length = scan_num(&cur_pos, ':');
+			BREAK_IF_END(cur_pos);
+			cur_pos++;
+			data = cur_pos;
+			TRACE("addr: 0x%p, length: %d, data: %s\n", addr, length, data);
+			err_flag = 0;
+			for (i = 0; i < length; i++) {
+				value[0] = data[2*i];
+				value[1] = data[2*i+1];
+				value[2] = 0;
+				if (guestmem_out8((uint8_t *) addr + i, htoi((uint8_t *) value)) != 0)
+					err_flag = 1;
 			}
-			else {
-				TRACE("Returning '0' as registers other than $pc "
-				       "is not yet supported.");
-				pkt_hex_copy(rsp, (uint8_t *) "0", 1);
-			}
+			pkt_cat_string(rsp, err_flag == 0 ? "OK" : "E00");
 			break;
 
 		case return_current_thread_id:
@@ -820,82 +967,54 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			TRACE("Got 'qSupported' packet.");
 			pkt_cat_string(rsp, "PacketSize=" BUFMAX_HEX ";");
 			pkt_cat_string(rsp, "qXfer:auxv:read-;"
-			            "qXfer:features:read+;"
-			            "qXfer:libraries:read-;"
-			            "qXfer:memory-map:read-;"
-			            "qXfer:spu:read-;"
-			            "qXfer:spu:write-;"
-			            "QPassSignals-;");
+			                    "qXfer:features:read+;"
+			                    "qXfer:libraries:read-;"
+			                    "qXfer:memory-map:read-;"
+			                    "qXfer:spu:read-;"
+			                    "qXfer:spu:write-;"
+			                    "QPassSignals-;");
 			break;
 
 		case qxfer:
 			TRACE("Got 'qXfer' packet.");
-			q = content(cmd);
-			q += 5;
-			if (strncmp(":features:read:", (char *) q, 15) == 0) {
-				q += 15;
-				r = q;
+			cur_pos = content(cmd);
+			cur_pos += 5;
+			if (strncmp(":features:read:", (char *) cur_pos, 15) == 0) {
 				TRACE ("Got :features:read:");
 				TRACE ("Retreiving annex.");
-				while (*q && *q != ':') q++;
-				if (*q) {
-					td = NULL;
-					if (strncmp("target.xml",
-						    (char *) r,
-					            q - r) == 0) {
-						TRACE("Using "
-						      "td: "
-						      "e500mc_description");
-						td = e500mc_description;
-					}
-					else if (strncmp ("power-core.xml",
-						          (char *) r,
-					                  q - r) == 0) {
-						TRACE("Using "
-						      "td: "
-						      "power_core_description");
-						td = power_core_description;
-					}
-					else if (strncmp ("power-fpu.xml",
-							  (char *) r,
-					                  q - r) == 0) {
-						TRACE("Using "
-						      "td: "
-						      "power_fpu_description");
-						td = power_fpu_description;
-					}
-					if (td) {
-						q++;
-						r = q;
-						while (*q && *q != ',') q++;
-						if (*q) {
-							*q = '\0';
-							offset = htoi (r);
-							q++;
-							r = q;
-							while (*q) q++;
-							length = htoi (r);
-							TRACE ("td-len: %d, "
-							       "offset: %d, "
-							       "length: %d",
-							       strlen (td),
-							       offset, length);
-							if (offset < strlen
-							             (td)) {
-								pkt_cat_string(rsp, "m");
-								pkt_cat_stringn(rsp, td
-								        + offset, length);
-							} else {
-								pkt_cat_string(rsp, "l");
-							}
-						} else {
-							pkt_cat_string(rsp, "E00");
-						}
-					} else {
-						pkt_cat_string(rsp, "E00");
-					}
+				cur_pos += 15;
+				sav_pos = cur_pos;
+				cur_pos = scan_till(cur_pos, ':');
+				BREAK_IF_END(cur_pos);
+				td = "";
+				if (strncmp("target.xml", (char *) sav_pos, cur_pos - sav_pos) == 0) {
+					TRACE("Using "
+					      "td: "
+					      "e500mc_description");
+					td = e500mc_description;
+				}
+				else if (strncmp ("power-core.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
+					TRACE("Using "
+					      "td: "
+					      "power_core_description");
+					td = power_core_description;
+				}
+				else if (strncmp ("power-fpu.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
+					TRACE("Using "
+					      "td: "
+					      "power_fpu_description");
+					td = power_fpu_description;
+				}
+				BREAK_IF_END(td);
+				offset = scan_num (&cur_pos, ',');
+				BREAK_IF_END(cur_pos);
+				length = scan_num (&cur_pos, '\0');
+				TRACE ("td-len: %d, offset: %d, length: %d", strlen (td), offset, length);
+				if (offset < strlen (td)) {
+					pkt_cat_string(rsp, "m");
+					pkt_cat_stringn(rsp, (uint8_t *)(td + offset), length);
 				} else {
-					pkt_cat_string(rsp, "E00");
+					pkt_cat_string(rsp, "l");
 				}
 			}
 			break;

@@ -42,7 +42,16 @@
 #include <vmpic.h>
 
 /* Must be a power of two. */
-#define QUEUE_SIZE 256
+#define QUEUE_SIZE 4096
+/* PS: Change QUEUE_SIZE back to 256 once we get to real hardware where the
+ *     serial port is running at a reasonable speed with respect to the
+ *     cores - 4096 bytes shouldn't be needed anymore. We increased this to
+ *     4096 bytes now as we have 256 registers that in all ammount to 1156
+ *     bytes. Given that in the Remote Serial Protocol, two bytes are
+ *     transmitted per byte (upper and lower nibble); we need to be able to
+ *     receive at least 2312 bytes using byte_channel_receive() for the G
+ *     packet's (i.e. write registers) payload.
+ */
 
 /* Allocate a byte channel. */
 byte_chan_t *byte_chan_alloc(void)

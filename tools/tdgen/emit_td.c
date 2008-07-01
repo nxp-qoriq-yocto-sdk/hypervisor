@@ -185,14 +185,29 @@ void emit_buf_macros(void)
 	 */
 	int num_reg_bytes = 0;
 	int num_regs = REG_COUNT;
+	/* buffer_ammount: Add a little extra padding, as the G packet utilizes
+	 * 2 * num_reg_bytes bytes and the G prefixed to that means that we drop
+	 * a byte if we define BUFMAX to be exactly 2 * num_reg_bytes.
+	 * In general, we need:
+	 * BUFMAX >= max({length(name(<command>))+length(payload(<command>))
+	 *                for <command> in RSP-commands})
+	 * For now, 8 seems like a good upper bound on the maximum length an
+	 * alternative name can go upto even if G were to be renamed.
+	 * PS: We do not have an instance of a larger packet that is
+	 * transmitted over the serial line using the RSP.
+	 */
+	const int buffer_ammount = 8;
+	int bufmax;
 	int i;
+
 	for (i = 0; i < num_regs; i++) {
 		num_reg_bytes += atoi(e500mc_registers[i].bitsize)/8;
 	}
 	printf("#define NUMREGS %d\n", num_regs);
 	printf("#define NUMREGBYTES %d\n", num_reg_bytes);
-	printf("#define BUFMAX %d\n", num_reg_bytes*2);
-	printf("#define BUFMAX_HEX \"%x\"\n", num_reg_bytes*2);
+	bufmax = 2 * num_reg_bytes + buffer_ammount;
+	printf("#define BUFMAX %d\n", bufmax);
+	printf("#define BUFMAX_HEX \"%x\"\n", bufmax);
 }
 
 void emit_e500mc_reg_table(void)
