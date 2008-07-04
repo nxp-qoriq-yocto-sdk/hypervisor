@@ -35,21 +35,28 @@
 
 extern void init(unsigned long devtree_ptr);
 extern void *fdt;
-extern int coreint;
 
 int *handle_p;
 
-volatile int extint_cnt = 0;;
+volatile int extint_cnt = 0;
+extern int coreint;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
 	unsigned int vector;
 	uint8_t c;
+	int rc;
 
-	if (coreint)
+	rc = fh_vmpic_iack(&vector);
+
+	if (coreint) {
+		if (rc != FH_ERR_INVALID_STATE)
+	        	printf("iack had bad rc: FAILED\n");
 		vector = mfspr(SPR_EPR);
-	else
-		fh_vmpic_iack(&vector);
+	} else {
+		if (rc != 0)
+	        	printf("iack had bad rc: FAILED\n");
+	}
 
 	if (vector == *handle_p) {
 		extint_cnt++;
@@ -58,39 +65,8 @@ void ext_int_handler(trapframe_t *frameptr)
 		printf("Unexpected extint %u\n", vector);
 	}
 
-//	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
-
 	fh_vmpic_eoi(vector);
 }
-
-#if 0
-int test_init(void)
-{
-	int ret;
-	int node;
-	int *handle_p;
-	const char *s;
-	const char *path;
-	int len;
-	int i;
-
-	ret = fdt_check_header(fdt);
-	if (ret)
-		return -1;
-
-	/* look up the stdout alias */
-
-        ret = fdt_subnode_offset(fdt, 0, "aliases");
-        if (ret < 0)
-                return ret;
-        path = fdt_getprop(fdt, ret, "stdout", &ret);
-        if (!path)
-                return -1;
-
-
-	return 0;
-}
-#endif
 
 void dump_dev_tree(void)
 {
@@ -113,24 +89,29 @@ void start(unsigned long devtree_ptr)
 	int ret;
 	int node;
 	const char *path;
+	const struct fdt_property *p;
 	int len;
 
 	init(devtree_ptr);
 
-	printf("vmpic test\n");
+	printf("vmpic test ");
+	if (coreint)
+		printf("- coreint mode\n");
+	else
+		printf("\n");
 
 	dump_dev_tree();
 
 	/* look up the stdout alias */
-        ret = fdt_subnode_offset(fdt, 0, "aliases");
-        if (ret < 0)
-                printf("no aliases node: FAILED\n");
-        path = fdt_getprop(fdt, ret, "stdout", &ret);
-        if (!path)
-                printf("no stdout alias: FAILED\n");
+	ret = fdt_subnode_offset(fdt, 0, "aliases");
+	if (ret < 0)
+	        printf("no aliases node: FAILED\n");
+	path = fdt_getprop(fdt, ret, "stdout", &ret);
+	if (!path)
+	        printf("no stdout alias: FAILED\n");
 
 	/* get the interrupt handle for the serial device */
-        node = fdt_path_offset(fdt, path);
+	node = fdt_path_offset(fdt, path);
 	handle_p = (int *)fdt_getprop(fdt, node, "interrupts", &len);
 
 	fh_vmpic_set_mask(*handle_p, 0);

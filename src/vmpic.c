@@ -588,6 +588,11 @@ void fh_vmpic_iack(trapframe_t *regs)
 	uint16_t vector;
 	int v = 0;
 
+	if (mpic_coreint) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
 	vector = mpic_iack();
 	if (vector == 0xFFFF) {  /* spurious */
 		interrupt_t *irq = vpic_iack();
