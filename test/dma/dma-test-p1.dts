@@ -51,7 +51,7 @@
 
 		i2c0: i2c@118000 {
 			device_type = "i2c";
-			compatible = "fsl,mpc8578-i2c",
+			compatible = "fsl,p4080-i2c",
 			             "fsl,i2c", "fsl-i2c";
 			reg = <118000 100>;
 //			interrupts = <1e 2>;
@@ -61,7 +61,7 @@
 
 		serial@11d500 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart",
+			compatible = "fsl,p4080-uart",
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
@@ -70,14 +70,14 @@
 		};
 
 		dma@20000 {
-			compatible = "fsl,mpc8578-pamu";
+			compatible = "fsl,p4080-pamu";
 			reg = <20000 1000>; 
 		};
 	
 		dma@100000 {
 			#address-cells = <1>;
 			#size-cells = <1>;
-			compatible = "fsl,mpc8578-dma";
+			compatible = "fsl,p4080-dma";
 			cell-index = <0>;
 			reg = <100000 180>; 
 			dma-ranges = <0 0 10000000>;
@@ -86,7 +86,7 @@
 		};
 
 		global-utilities@e0000 {
-			compatible = "fsl,mpc8578-guts";
+			compatible = "fsl,p4080-guts";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges = <0 e0000 10000>;

@@ -77,7 +77,7 @@
 
  		serial@11d500 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart",
+			compatible = "fsl,p4080-uart",
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;

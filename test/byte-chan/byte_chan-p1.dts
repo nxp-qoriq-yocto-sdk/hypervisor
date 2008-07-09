@@ -1,8 +1,8 @@
 / {
-	compatible = "fsl,hv-MPC8578SIM",
+	compatible = "fsl,hv-P4080SIM",
 	             "fsl,hv-e500mc-partition",
 	             "fsl,hv-partition",
-	             "fsl,MPC8578SIM";
+	             "fsl,P4080SIM";
 
 	#address-cells = <2>;
 	#size-cells = <1>;
@@ -52,7 +52,7 @@
 
 		serial@11d500 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart",
+			compatible = "fsl,p4080-uart",
 			             "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;

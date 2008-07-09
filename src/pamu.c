@@ -28,7 +28,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <libos/8578.h>
+#include <libos/p4080.h>
 #include <libos/pamu.h>
 #include <libos/bitops.h>
 #include <libos/percpu.h>
@@ -315,7 +315,7 @@ void pamu_global_init(void *fdt)
 	 */
 
 	/* find the pamu node */
-	pamu_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,mpc8578-pamu");
+	pamu_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,p4080-pamu");
 	if (pamu_node < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			"warning: no pamu node found\n");

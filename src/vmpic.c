@@ -24,7 +24,7 @@
  */
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
-#include <libos/8578.h>
+#include <libos/p4080.h>
 #include <libos/mpic.h>
 #include <libos/interrupts.h>
 

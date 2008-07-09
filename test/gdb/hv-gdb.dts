@@ -1,6 +1,6 @@
 / {
-	model = "fsl,MPC8578SIM";
-	compatible = "fsl,MPC8578SIM";
+	model = "fsl,P4080SIM";
+	compatible = "fsl,P4080SIM";
 	#address-cells = <2>;
 	#size-cells = <1>;
 
@@ -130,7 +130,7 @@
 	ccsr@fe000000 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "fsl,mpc8578-ccsr", "simple-bus";
+		compatible = "fsl,p4080-ccsr", "simple-bus";
 		ranges = <0 0 fe000000 400000>;
 
 		mpic: pic@40000 {
@@ -139,7 +139,7 @@
 			#address-cells = <0>;
 			#interrupt-cells = <2>;
 			reg = <40000 40000>;
-			compatible = "fsl,mpc8578-mpic", "fsl,mpic",
+			compatible = "fsl,p4080-mpic", "fsl,mpic",
 			             "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
@@ -147,7 +147,7 @@
 
 		uart0: serial@11c500 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			reg = <11c500 100>;
 			clock-frequency = <0>;
 			interrupts = <24 2>;
@@ -156,7 +156,7 @@
 
 		uart1: serial@11c600 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			reg = <11c600 100>;
 			clock-frequency = <0>;
 			interrupts = <24 2>;
@@ -165,7 +165,7 @@
 
 		uart3: serial@11d600 {
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart", "fsl,ns16550", "ns16550";
+			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			reg = <11d600 100>;
 			clock-frequency = <0>;
 			interrupts = <25 2>;

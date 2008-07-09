@@ -1,7 +1,7 @@
 / {
 	compatible = "fsl,hv-platform-p4080",
                      "fsl,hv-platform",
-                     "fsl,MPC8578SIM";
+                     "fsl,P4080SIM";
 	model = "fsl,hv-partman-p1";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
@@ -52,7 +52,7 @@
 
 		i2c0: i2c@118000 {
 			device_type = "i2c";
-			compatible = "fsl,mpc8578-i2c",
+			compatible = "fsl,p4080-i2c",
 			             "fsl,i2c", "fsl-i2c";
 			reg = <118000 100>;
 			interrupts = <26 2>;
@@ -62,7 +62,7 @@
 
 		serial@11d500 {		// UART2
 			device_type = "serial";
-			compatible = "fsl,mpc8578-uart",
+			compatible = "fsl,p4080-uart",
 				     "fsl,ns16550", "ns16550";
 			reg = <11d500 100>;
 			clock-frequency = <0>;
@@ -76,7 +76,7 @@
 			#address-cells = <0>;
 			#interrupt-cells = <2>;
 			reg = <40000 40000>;
-			compatible = "fsl,mpc8578-mpic", "fsl,mpic",
+			compatible = "fsl,p4080-mpic", "fsl,mpic",
 			             "chrp,open-pic";
 			device_type = "open-pic";
 			big-endian;
