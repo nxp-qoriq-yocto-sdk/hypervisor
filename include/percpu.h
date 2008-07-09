@@ -95,7 +95,8 @@ typedef struct guest {
 	unsigned long active_cpus;
 	struct gcpu **gcpus;
 	struct boot_spin_table *spintbl;
-	phys_addr_t entry;      /**< Guest physical addr of the OS entry point */
+	/** Guest physical/virtual addr of the OS entry point. */
+	register_t entry;       
 	phys_addr_t dtb_gphys;  /**< Guest physical addr of DTB image */
 	register_t tlbivax_addr;/**< Used for tlbivax shootdown IPIs */
 

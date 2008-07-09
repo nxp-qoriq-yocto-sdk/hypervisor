@@ -99,7 +99,7 @@ int is_elf(void *image)
  * ignored.
  */
 int load_elf(guest_t *guest, void *image, unsigned long length,
-	phys_addr_t target, phys_addr_t *entry)
+             phys_addr_t target, register_t *entry)
 {
 	struct elf_header *hdr = (struct elf_header *) image;
 	struct program_header *phdr = (struct program_header *) (image + hdr->phoff);
@@ -167,7 +167,7 @@ int load_elf(guest_t *guest, void *image, unsigned long length,
 
 	/* Return the entry point for the image if requested */
 	if (entry)
-		*entry = target + base - hdr->entry;
+		*entry = target - base + hdr->entry;
 
 	return 0;
 }
