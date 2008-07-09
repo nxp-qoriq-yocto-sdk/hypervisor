@@ -1,6 +1,7 @@
+/dts-v1/;
+
 / {
-	compatible = "fsl,hv-platform-p4080",
-                     "fsl,hv-platform";
+	compatible = "fsl,hv-platform-p4080", "fsl,hv-platform";
 	model = "fsl,hv-test-dma-test-p1";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
@@ -12,33 +13,33 @@
 
 		cpu@0 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc-vcpu";
 			reg = <0>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@1 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc-vcpu";
 			reg = <1>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 	};
 	
 	memory {
-		reg = <0 0 17000000 0 17000000 1000000>;
+		reg = <0 0 0x17000000 0 0x17000000 0x1000000>;
 		device_type = "memory";
 	};
 	
@@ -47,14 +48,14 @@
 		#size-cells = <1>;
 		compatible = "simple-bus";
 		device_type = "soc";
-		ranges = <0 0 fe000000 400000>;
+		ranges = <0 0 0xfe000000 0x400000>;
 
 		i2c0: i2c@118000 {
 			device_type = "i2c";
 			compatible = "fsl,p4080-i2c",
 			             "fsl,i2c", "fsl-i2c";
-			reg = <118000 100>;
-//			interrupts = <1e 2>;
+			reg = <0x118000 0x100>;
+//			interrupts = <38 2>;
 //			interrupt-parent = <&mpic>;
 			dfsrr;
 		};
@@ -63,15 +64,15 @@
 			device_type = "serial";
 			compatible = "fsl,p4080-uart",
 			             "fsl,ns16550", "ns16550";
-			reg = <11d500 100>;
+			reg = <0x11d500 0x100>;
 			clock-frequency = <0>;
-//			interrupts = <1d 2>;
+//			interrupts = <37 2>;
 //			interrupt-parent = <&mpic>;
 		};
 
 		dma@20000 {
 			compatible = "fsl,p4080-pamu";
-			reg = <20000 1000>; 
+			reg = <0x20000 0x1000>; 
 		};
 	
 		dma@100000 {
@@ -79,8 +80,8 @@
 			#size-cells = <1>;
 			compatible = "fsl,p4080-dma";
 			cell-index = <0>;
-			reg = <100000 180>; 
-			dma-ranges = <0 0 10000000>;
+			reg = <0x100000 0x180>; 
+			dma-ranges = <0 0 0x10000000>;
 			fsl,liodn = <0>;
 			fsl,liodn-reg = <&dma1>;
 		};
@@ -89,10 +90,10 @@
 			compatible = "fsl,p4080-guts";
 			#address-cells = <1>;
 			#size-cells = <1>;
-			ranges = <0 e0000 10000>;
+			ranges = <0 0xe0000 0x10000>;
 			dma1: dma1-liodnr@580 {
 				compatible = "fsl,liodnr";
-				reg = <580 4>;	// DMA1LIODNR
+				reg = <0x580 4>;	// DMA1LIODNR
 			};
 		};
 	};
@@ -126,8 +127,8 @@
 	chosen {
 		linux,stdout-path = "/ccsr/serial@11d500";
 		bootargs = "console=ttyS0,115200";
-		linux,initrd-start = <01300000>;
-		linux,initrd-end = <013ca000>;
+		linux,initrd-start = <0x01300000>;
+		linux,initrd-end = <0x013ca000>;
 	};
 
 	aliases {

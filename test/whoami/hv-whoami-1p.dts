@@ -1,3 +1,5 @@
+/dts-v1/;
+
 / {
 	model = "fsl,P4080SIM";
 	compatible = "fsl,P4080SIM";
@@ -21,111 +23,111 @@
 
 		cpu@0 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <0>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@1 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <1>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@2 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <2>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@3 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <3>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@4 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <4>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@5 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <5>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@6 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <6>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 
 		cpu@7 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <7>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 		};
 	};
 
 	memory {
-		reg = <0 0 100000>;
+		reg = <0 0 0x100000>;
 		device_type = "memory";
 	};
 
@@ -133,14 +135,14 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "fsl,p4080-ccsr", "simple-bus";
-		ranges = <0 0 fe000000 400000>;
+		ranges = <0 0 0xfe000000 0x400000>;
 
 		mpic: pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
 			#address-cells = <0>;
 			#interrupt-cells = <2>;
-			reg = <40000 40000>;
+			reg = <0x40000 0x40000>;
 			compatible = "fsl,p4080-mpic", "fsl,mpic",
 			             "chrp,open-pic";
 			device_type = "open-pic";
@@ -150,33 +152,33 @@
 		uart0: serial@11c500 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <11c500 100>;
+			reg = <0x11c500 0x100>;
 			clock-frequency = <0>;
-			interrupts = <24 2>;
+			interrupts = <36 2>;
 			interrupt-parent = <&mpic>;
 		};
 
 		uart1: serial@11c600 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <11c600 100>;
+			reg = <0x11c600 0x100>;
 			clock-frequency = <0>;
-			interrupts = <24 2>;
+			interrupts = <36 2>;
 			interrupt-parent = <&mpic>;
 		};
 
 		uart3: serial@11d600 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <11d600 100>;
+			reg = <0x11d600 0x100>;
 			clock-frequency = <0>;
-			interrupts = <25 2>;
+			interrupts = <37 2>;
 			interrupt-parent = <&mpic>;
 		};
 
 		global-utilities@e0000 {	//global utilities block
 			compatible = "fsl,mpc8572-guts";
-			reg = <e0000 1000>;
+			reg = <0xe0000 0x1000>;
 			fsl,has-rstcr;
 		};
 	};
@@ -187,7 +189,7 @@
 	};
 
 	byte-channels {
-                /* bc0 here is a weird case for testing purposes.
+		/* bc0 here is a weird case for testing purposes.
 		 * It sets up a loopback in the mux, so that
 		 * data coming in channel 0 goes out channel 1.
 		 * bc0 is _not_ usable by a guest.
@@ -217,11 +219,11 @@
 			fsl,hv-cpus = <0 1 2 3>;
 			fsl,entry = <0>;
 			fsl,privileged;
-			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
-			                 0 17000000 0 20000000 1000000>;
+			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
+			                       0 0x17000000 0 0x20000000 0x1000000>;
 			fsl,hv-dtb = /incbin/("bin/whoami-p1.dtb");
-			fsl,hv-load-image-table = <0 ef200000 0 0 0>;
-			fsl,hv-dtb-window = <0 01000000 10000>;
+			fsl,hv-load-image-table = <0 0xef200000 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 	};
 

@@ -1,3 +1,5 @@
+/dts-v1/;
+
 / {
 	model = "fsl,P4080SIM";
 	compatible = "fsl,P4080SIM";
@@ -17,125 +19,125 @@
 
 		cpu@0 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <0>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "okay";
 		};
 		cpu@1 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <1>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@2 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <2>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@3 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <3>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@4 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <4>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@5 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <5>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@6 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <6>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 
 		cpu@7 {
 			device_type = "cpu";
-			compatible = "fsl,e500mc", "fsl,e500";
+			compatible = "fsl,e500mc";
 			reg = <7>;
-			d-cache-line-size = <20>;
-			i-cache-line-size = <20>;
-			d-cache-size = <8000>;
-			i-cache-size = <8000>;
-			timebase-frequency = <d#8333333>;
-			bus-frequency = <d#66666666>;
-			clock-frequency = <d#66666666>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
 			status = "disabled";
 			enable-method = "spin-table";
 		};
 	};
 
 	memory {
-		reg = <0 0 100000>;
+		reg = <0 0 0x100000>;
 		device_type = "memory";
 	};
 
@@ -143,14 +145,14 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "fsl,p4080-ccsr", "simple-bus";
-		ranges = <0 0 fe000000 400000>;
+		ranges = <0 0 0xfe000000 0x400000>;
 
 		mpic: pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
 			#address-cells = <0>;
 			#interrupt-cells = <2>;
-			reg = <40000 40000>;
+			reg = <0x40000 0x40000>;
 			compatible = "fsl,p4080-mpic", "fsl,mpic",
 			             "chrp,open-pic";
 			device_type = "open-pic";
@@ -160,24 +162,24 @@
 		uart0: serial@11c500 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			interrupts = <24 2>;
+			interrupts = <36 2>;
 			interrupt-parent = <&mpic>;
-			reg = <11c500 100>;
+			reg = <0x11c500 0x100>;
 			clock-frequency = <0>;
 		};
 
 		uart1: serial@11c600 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			interrupts = <24 2>;
+			interrupts = <36 2>;
 			interrupt-parent = <&mpic>;
-			reg = <11c600 100>;
+			reg = <0x11c600 0x100>;
 			clock-frequency = <0>;
 		};
 
 		global-utilities@e0000 {	//global utilities block
 			compatible = "fsl,mpc8572-guts";
-			reg = <e0000 1000>;
+			reg = <0xe0000 0x1000>;
 			fsl,has-rstcr;
 		};
 	};
@@ -208,15 +210,15 @@
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,hv-dtb = /incbin/("bin/linux-p1.dtb");
-			fsl,hv-physaddr-map = <0 0 0 1000000 17000000
-			                 0 17000000 0 20000000 1000000
-			                 0 fe040000 0 fe040000 20000
-			                 0 fe060000 0 fe060000 1000
-			                 0 fe061000 0 fe062000 1000
-			                 0 fe062000 ffffffff ffffffff 1e000>;
-			fsl,hv-load-image-table = <0 ef100000 0 0 0
-			                           0 ef600000 0 01300000 00100000>;
-			fsl,hv-dtb-window = <0 01000000 10000>;
+			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
+			                       0 0x17000000 0 0x20000000 0x1000000
+			                       0 0xfe040000 0 0xfe040000 0x20000
+			                       0 0xfe060000 0 0xfe060000 0x1000
+			                       0 0xfe061000 0 0xfe062000 0x1000
+			                       0 0xfe062000 0xffffffff 0xffffffff 0x1e000>;
+			fsl,hv-load-image-table = <0 0xef100000 0 0 0x0
+			                           0 0xef600000 0 0x01300000 0x00100000>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 
 		part2 {
@@ -224,15 +226,15 @@
 			fsl,hv-cpus = <5 2 1 1 3 1>;
 			fsl,entry = <0>;
 			fsl,hv-dtb = /incbin/("bin/linux-p2.dtb");
-			fsl,hv-physaddr-map = <0 0 0 21000000 04000000
-			                 0 fe040000 0 fe040000 20000
-			                 0 fe060000 0 fe065000 2000
-			                 0 fe062000 0 fe061000 1000
-			                 0 fe063000 0 fe063000 1000
-			                 0 fe064000 ffffffff ffffffff 1c000>;
-			fsl,hv-load-image-table = <0 ef800000 0 0 0
-			                           0 efd00000 0 01300000 00100000>;
-			fsl,hv-dtb-window = <0 01000000 10000>;
+			fsl,hv-physaddr-map = <0 0 0 0x21000000 0x04000000
+			                 0 0xfe040000 0 0xfe040000 0x20000
+			                 0 0xfe060000 0 0xfe065000 0x2000
+			                 0 0xfe062000 0 0xfe061000 0x1000
+			                 0 0xfe063000 0 0xfe063000 0x1000
+			                 0 0xfe064000 0xffffffff 0xffffffff 0x1c000>;
+			fsl,hv-load-image-table = <0 0xef800000 0 0 0x0
+			                           0 0xefd00000 0 0x01300000 0x00100000>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 	};
 
