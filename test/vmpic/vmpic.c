@@ -28,7 +28,6 @@
 #include <libos/libos.h>
 #include <libos/hcalls.h>
 #include <libos/mpic.h>
-#include <libos/p4080.h>
 #include <libos/io.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>

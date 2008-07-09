@@ -28,7 +28,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <libos/p4080.h>
 #include <libos/pamu.h>
 #include <libos/bitops.h>
 #include <libos/percpu.h>

@@ -27,7 +27,6 @@
 #include <libos/trapframe.h>
 #include <libos/uart.h>
 #include <libos/mpic.h>
-#include <libos/p4080.h>   // FIXME-- remove when UART is moved
 #include <libos/ns16550.h>
 #include <libos/interrupts.h>
  

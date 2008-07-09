@@ -31,7 +31,6 @@
 #include <libos/console.h>
 #include <libos/io.h>
 #include <libos/core-regs.h>
-#include <libos/p4080.h>
 #include <libos/bitops.h>
 #include <vpic.h>
 #include <vmpic.h>
