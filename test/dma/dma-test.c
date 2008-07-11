@@ -109,7 +109,7 @@ void start(unsigned long devtree_ptr)
 
 	printf("DMA test code for guest memcpy\n");
 
-	ret = fdt_node_offset_by_compatible(fdt, node, "fsl,mpc8578-dma");
+	ret = fdt_node_offset_by_compatible(fdt, node, "fsl,p4080-dma");
 	if (ret == -FDT_ERR_NOTFOUND) {
 		printf("fdt_node_offset failed, NOT FOUND\n");
 		return;
