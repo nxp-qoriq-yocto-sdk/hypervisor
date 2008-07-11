@@ -223,8 +223,11 @@ test-mmu: bin/uv.uImage test/mmu
 test-pmr: bin/uv.uImage test/pmr
 	$(SIMICS) test/pmr/hv-pmr.simics
 
+test-dma: bin/uv.uImage test/dma
+	$(SIMICS) test/dma/hv-dma.simics
+
 demo: bin/uv.uImage test/linux
-	$(SIMICS) test/linux/hv-demo.simics -e c
+	$(SIMICS) test/linux/hv-demo.simics
 
 .PHONY: FORCE test
 test/%: FORCE
