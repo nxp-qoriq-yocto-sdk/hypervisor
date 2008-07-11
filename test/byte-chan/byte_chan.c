@@ -41,7 +41,7 @@ int *irq1, *irq2;
 uint32_t handle[2];
 extern void *fdt;
 
-#define BC_INT_Q_SIZE 256
+#define BC_INT_Q_SIZE 4096
 
 int process_status(int status)
 {
@@ -69,7 +69,7 @@ void process_rx_intr(uint32_t handle_num)
 	uint32_t rxavail;
 	uint32_t txavail;
 	int i, ret;
-	char buf[512];
+	char buf[BC_INT_Q_SIZE*2];
 	unsigned int cnt, count = 0;
 
 
@@ -282,7 +282,7 @@ void start(unsigned long devtree_ptr)
 	if (txavail == BC_INT_Q_SIZE-1) {
 		printf(" > Polled byte channel A...expected and got %d: PASSED\n",txavail);
 	} else {
-		printf("Byte channel A txavail != 255 before send start ---> FAILED\n");
+		printf("Byte channel A txavail not empty before send start ---> FAILED\n");
 		goto bad;
 	}
 	avail = txavail / 16;
@@ -330,7 +330,7 @@ void start(unsigned long devtree_ptr)
 	if (txavail == BC_INT_Q_SIZE-1) {
 		printf(" > Polled byte channel B...expected and got tx %d: PASSED\n",txavail);
 	} else {
-		printf("Byte channel B txavail != 255 before send start ---> FAILED\n");
+		printf("Byte channel B txavail not empty before send start ---> FAILED\n");
 		goto bad;
 	}
 
