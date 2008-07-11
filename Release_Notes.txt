@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc4
-Date: 6/20/2008
+Revsion: 0.2-rc6
+Date: 7/11/2008
 
 -------------------------------------------------------
 Contents
@@ -23,15 +23,29 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc5
-      -is compatible with Simics 8578 3.2.27-3.2.30
-       (and newer versions with a u-boot update).
+   -Topaz 0.2-rc6
+      -is compatible with Simics 8578 3.2.31 - 3.2.33
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos commit ab27553f5ea7b138c5784dc8b11c9adf78ee8364
+      -requires libos tag v0.2-rc6
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc6 bug fixes and changes
+      -treat missing endpoints (byte-channels, doorbells)
+       as fatal only for the current node
+      -cleanup copyright header in source files
+      -implement gdb G,m,M,p,P packets in the gdb stub
+      -image updates for new u-boot
+      -all references in hypervisor source, libos, and device
+       trees to 8578 are renamed to p4080
+      -ELF entry point handling (bug 1544) is fixed
+      -convert DTS files to v1 (bug 1319) is fixed
+      -bug 1574 is fixed-- coreint returns error on iack
+      -misc unit test cleanup
+      -bugs 1636, 1635, 1638, 1639 are Topaz spec issues and
+       are fixed in 0.791 of the Topaz spec
 
    -Topaz 0.2-rc5 bug fixes and changes
       -Platform name in device tree changed from 8578 to p4080.
@@ -165,8 +179,6 @@ Contents
 
    -gdb stub
       -the gdb stub does not support the following:
-         -writing registers
-         -reading/writing memory
          -breakpoints
          -single step
       -the gdb stub does not support hardware breakpoints or
