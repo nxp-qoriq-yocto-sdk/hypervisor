@@ -217,7 +217,7 @@
 
 	doorbells {
 		doorbell@0 {
-			 0xcompatible = "fsl,hv-doorbell";
+			 compatible = "fsl,hv-doorbell";
 		};
 	};
 
