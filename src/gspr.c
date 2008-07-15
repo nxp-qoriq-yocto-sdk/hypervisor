@@ -502,8 +502,8 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_HID0:
-		val &= ~(HID0_EMCP | HID0_TBEN | HID0_SEL_TBCLK);
-		val |= mfspr(SPR_HID0) & (HID0_EMCP | HID0_TBEN | HID0_NOPTI);
+		val &= ~(HID0_EMCP);
+		val |= mfspr(SPR_HID0) & (HID0_EMCP | HID0_NOPTI);
 		
 		if (!(val & HID0_ENMAS7)) {
 			static int warned_enmas7 = 0;
