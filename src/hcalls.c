@@ -250,9 +250,25 @@ static void fh_dma_disable(trapframe_t *regs)
 
 	regs->gpregs[3] = 0;
 }
+
+static void fh_dma_map_ppid_liodn(trapframe_t *regs)
+{
+	unsigned int ppid_handle = regs->gpregs[3];
+	unsigned int liodn_handle;
+
+	liodn_handle = pamu_map_ppid_liodn(ppid_handle);
+	if (liodn_handle < 0) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+
+	regs->gpregs[4] = liodn_handle;
+	regs->gpregs[3] = 0;
+}
 #else
 #define fh_dma_enable unimplemented
 #define fh_dma_disable unimplemented
+#define fh_dma_map_ppid_liodn unimplemented
 #endif
 
 #ifdef CONFIG_BYTE_CHAN
@@ -449,7 +465,7 @@ static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	fh_whoami,
 	unimplemented,
-	unimplemented,
+	fh_dma_map_ppid_liodn,
 	unimplemented,                     /* 4 */
 	fh_partition_restart,
 	fh_partition_get_status,

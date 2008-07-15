@@ -209,7 +209,7 @@ void start(unsigned long devtree_ptr)
 #endif
 
 #ifdef CONFIG_PAMU
-	pamu_global_init(fdt);
+	pamu_global_init();
 #endif
 
 	/* Main device tree must be const after this point. */

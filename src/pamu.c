@@ -39,7 +39,9 @@
 #include <devtree.h>
 #include <paging.h>
 
-static unsigned long current_liodn = -1;
+extern void *fdt;
+
+#define DEBUG
 
 static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 {
@@ -144,8 +146,6 @@ int pamu_enable_liodn(unsigned int handle)
 
 	liodn = pamu_handle->assigned_liodn;
 
-	assert(current_liodn != (unsigned long) -1 || liodn <= current_liodn);
-
 	current_ppaace = get_ppaace(liodn);
 	current_ppaace->v = 1;
 
@@ -171,8 +171,6 @@ int pamu_disable_liodn(unsigned int handle)
 
 	liodn = pamu_handle->assigned_liodn;
 
-	assert(current_liodn != (unsigned long) -1 || liodn <= current_liodn);
-
 	current_ppaace = get_ppaace(liodn);
 	current_ppaace->v = 0;
 
@@ -185,9 +183,27 @@ int pamu_disable_liodn(unsigned int handle)
 	return 0;
 }
 
-void pamu_partition_init(guest_t *guest)
+unsigned int pamu_map_ppid_liodn(unsigned int handle)
 {
-	int node = -1, liodnr_node = -1, len, ret;
+	guest_t *guest = get_gcpu()->guest;
+	ppid_handle_t *ppid_handle;
+
+	// FIXME: race against handle closure
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		return -1;
+	}
+
+	ppid_handle = guest->handles[handle]->ppid;
+	if (!ppid_handle) {
+		return -1;
+	}
+
+	return ppid_handle->liodn_handle;
+}
+
+void pamu_process_standard_liodns(guest_t *guest)
+{
+	int len, ret;
 	const uint32_t *dma_ranges;
 	uint32_t cas_addrbuf[MAX_ADDR_CELLS];	/* child address space */
 	uint32_t pas_addrbuf[MAX_ADDR_CELLS];	/* parent address space */
@@ -195,114 +211,273 @@ void pamu_partition_init(guest_t *guest)
 	uint32_t  c_naddr, c_nsize, p_naddr, p_nsize;
 	int parent;
 	const uint32_t *liodnrp;
-	unsigned long next_assigned_liodn;
+	int liodnrp_len, offset, offset_in_gdt;
+	char pathbuf[256];
+	unsigned long assigned_liodn;
 	pamu_handle_t *pamu_handle;
 	int ghandle;
-	phys_addr_t liodnr_addr;
-#ifdef DEBUG
-	uint32_t naddr, nsize;
-	const char *s;
-#endif
+	uint32_t propval = 0;
 
-	while ((node = fdt_next_node(guest->devtree, node, NULL)) >= 0) {
-		liodnrp = fdt_getprop(guest->devtree, node, "fsl,liodn-reg",
-						 &len);
+	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,liodn",
+					       &propval, sizeof(uint32_t));
+	while (offset != -FDT_ERR_NOTFOUND) {
+
+		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
+
+#ifdef DEBUG
+		printf("pathbuf for liodn = %s\n", pathbuf);
+#endif
+		offset_in_gdt = fdt_path_offset(fdt, pathbuf);
+
+		liodnrp = fdt_getprop(fdt, offset_in_gdt,
+				"fsl,liodn", &liodnrp_len);
+
 		if (!liodnrp)
-			continue;
-		if (len == 0)
-			continue;
+			goto check_next_node;
+		if (liodnrp_len < 0)
+			goto check_next_node;
 
-		liodnr_node = fdt_node_offset_by_phandle(guest->devtree,
-						*liodnrp);
-		if (liodnr_node < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"pamu_partition_init: invalid phandle\n");
-			continue;
-		}
-
-#ifdef DEBUG
-		s = fdt_get_name(guest->devtree, liodnr_node, &len);
-		printf("liodn node = %s\n", s);
-		parent = fdt_parent_offset(guest->devtree, liodnr_node);
-		s = fdt_get_name(guest->devtree, parent, &len);
-		printf("liodn parent node = %s\n", s);
-		ret = get_addr_format(guest->devtree, parent, &naddr, &nsize);
-		printf("naddr = %d, nsize = %d\n", naddr, nsize);
-#endif
-
-		ret = dt_get_reg(guest->devtree, liodnr_node, 0, &liodnr_addr,
-						 NULL);
-		if (ret < 0) {
-			printf("pamu failed to get reg: %d\n", ret);
-			continue;
-		}
-
-		dma_ranges = fdt_getprop(guest->devtree, node, "dma-ranges",
-						 &len);
+		dma_ranges = fdt_getprop(guest->devtree, offset,
+				"dma-ranges", &len);
 		if (!dma_ranges) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"pamu_partition_init: error getting dma-ranges property\n");
-			continue;
+				"pamu_partition_init: error getting dma-ranges property, error_code = %d\n", len);
+			goto check_next_node;
 		}
 		if (len == 0)
-			continue;
+			goto check_next_node;
 
-		ret = get_addr_format(guest->devtree, node, &c_naddr, &c_nsize);
+		ret = get_addr_format(guest->devtree, offset,
+				&c_naddr, &c_nsize);
 		if (ret < 0)
-			continue;
+			goto check_next_node;
 
 		copy_val(cas_addrbuf, dma_ranges, c_naddr);
 
 		dma_ranges += c_naddr;
 
-		parent = fdt_parent_offset(guest->devtree, node);
+		parent = fdt_parent_offset(guest->devtree, offset);
 		if (parent == -FDT_ERR_NOTFOUND)
-			continue;
+			goto check_next_node;
 
 		ret = get_addr_format(guest->devtree, parent, &p_naddr,
 						&p_nsize);
 		if (ret < 0)
-			continue;
+			goto check_next_node;
 
 		copy_val(pas_addrbuf, dma_ranges, p_naddr);
 
 		/*
-		 * Current assumption is that child dma address space is
-		 * directly mapped to parent dma address space
-		 */
+		* Current assumption is that child dma address space is
+		* directly mapped to parent dma address space
+		*/
 
 		dma_ranges += p_naddr;
 
 		copy_val(cas_sizebuf, dma_ranges, c_nsize);
 
-		next_assigned_liodn = atomic_add(&current_liodn, 1);
+		assigned_liodn = *liodnrp;
 
-		ret = pamu_config_assigned_liodn(guest, next_assigned_liodn,
+#ifdef DEBUG
+		printf("assigned liodn = %ld\n", assigned_liodn);
+#endif
+
+		ret = pamu_config_assigned_liodn(guest,
+				assigned_liodn,
 				cas_addrbuf, cas_sizebuf);
 		if (ret < 0)
-			continue;
+			goto check_next_node;
 
 		pamu_handle = alloc_type(pamu_handle_t);
 		pamu_handle->user.pamu = pamu_handle;
-		pamu_handle->assigned_liodn = next_assigned_liodn;
+		pamu_handle->assigned_liodn = assigned_liodn;
 
 		ghandle = alloc_guest_handle(guest, &pamu_handle->user);
 		if (ghandle < 0)
-			 continue;
+			 goto check_next_node;
 
-		ret = fdt_setprop(guest->devtree, node, "fsl,liodn",
-					 &ghandle, 4);
+		ret = fdt_setprop(guest->devtree, offset,
+				"fsl,liodn-handle", &ghandle, 4);
+
 		if (ret < 0)
-			continue;
+			goto check_next_node;
 
-		out32((uint32_t *)(unsigned long)
-			(CCSRBAR_VA + (liodnr_addr - CCSRBAR_PA)),
-			 next_assigned_liodn);
+		/*
+		 * Pass-thru "fsl,liodn" to the guest device tree
+		 */
+		ret = fdt_setprop(guest->devtree, offset,
+				"fsl,liodn", &assigned_liodn, 4);
+
+check_next_node:
+		offset = fdt_node_offset_by_prop_value(guest->devtree,
+				offset, "fsl,liodn",
+				&propval, sizeof(uint32_t));
 	}
-
 }
 
-void pamu_global_init(void *fdt)
+
+void pamu_process_ppid_liodns(guest_t *guest)
+{
+	int len, ret;
+	const uint32_t *dma_ranges;
+	uint32_t cas_addrbuf[MAX_ADDR_CELLS];	/* child address space */
+	uint32_t pas_addrbuf[MAX_ADDR_CELLS];	/* parent address space */
+	uint32_t cas_sizebuf[MAX_SIZE_CELLS];
+	uint32_t  c_naddr, c_nsize, p_naddr, p_nsize;
+	int parent;
+	const uint32_t *ppidp;
+	const uint32_t *ppid_to_liodn = NULL;
+	int ppidp_len, offset, offset_in_gdt, off_ppid_liodn, ppid_liodn_len;
+	char pathbuf[256];
+	unsigned int assigned_liodn;
+	pamu_handle_t *pamu_handle;
+	ppid_handle_t *ppid_handle;
+	int ghandle;
+	uint32_t propval = 0;
+
+	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,ppid",
+						&propval, sizeof(uint32_t));
+	while (offset != -FDT_ERR_NOTFOUND) {
+
+		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
+
+#ifdef DEBUG
+		printf("pathbuf for ppid = %s\n", pathbuf);
+#endif
+		offset_in_gdt = fdt_path_offset(fdt, pathbuf);
+
+		ppidp = fdt_getprop(fdt, offset_in_gdt,
+				"fsl,ppid", &ppidp_len);
+
+		if (!ppidp)
+			goto check_next_node;
+		if (ppidp_len < 0)
+			goto check_next_node;
+
+		/*
+		 * Current assumption is that FMAN, Crypto, PME will all
+		 * express the same LIODN for a given PPID, hence we simply
+		 * need to lookup fsl,ppid-to-liodn property in hypervisor
+		 * device tree.
+		 */
+
+
+		for (off_ppid_liodn = fdt_next_node(fdt, -1, NULL);
+		     off_ppid_liodn >= 0;
+		     off_ppid_liodn = fdt_next_node(fdt, off_ppid_liodn, NULL)){
+
+			ppid_to_liodn = fdt_getprop(fdt, off_ppid_liodn,
+					"fsl,ppid-to-liodn", &ppid_liodn_len);
+
+			if (ppid_to_liodn && ppid_liodn_len)
+				break;
+		}
+
+		if (!ppid_to_liodn)
+			goto check_next_node;
+
+		assigned_liodn = ppid_to_liodn[*ppidp];
+
+#ifdef DEBUG
+		printf("ppid %d mapped to liodn %d\n", *ppidp, assigned_liodn);
+#endif
+
+		dma_ranges = fdt_getprop(guest->devtree, offset,
+				"dma-ranges", &len);
+		if (!dma_ranges) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"pamu_partition_init: error getting dma-ranges property, error_code = %d\n", len);
+			goto check_next_node;
+		}
+		if (len == 0)
+			goto check_next_node;
+
+		ret = get_addr_format(guest->devtree, offset,
+				&c_naddr, &c_nsize);
+		if (ret < 0)
+			goto check_next_node;
+
+		copy_val(cas_addrbuf, dma_ranges, c_naddr);
+
+		dma_ranges += c_naddr;
+
+		parent = fdt_parent_offset(guest->devtree, offset);
+		if (parent == -FDT_ERR_NOTFOUND)
+			goto check_next_node;
+
+		ret = get_addr_format(guest->devtree, parent, &p_naddr,
+						&p_nsize);
+		if (ret < 0)
+			goto check_next_node;
+
+		copy_val(pas_addrbuf, dma_ranges, p_naddr);
+
+		/*
+		* Current assumption is that child dma address space is
+		* directly mapped to parent dma address space
+		*/
+
+		dma_ranges += p_naddr;
+
+		copy_val(cas_sizebuf, dma_ranges, c_nsize);
+
+		ret = pamu_config_assigned_liodn(guest,
+				assigned_liodn,
+				cas_addrbuf, cas_sizebuf);
+		if (ret < 0)
+			goto check_next_node;
+
+		pamu_handle = alloc_type(pamu_handle_t);
+		pamu_handle->user.pamu = pamu_handle;
+		pamu_handle->assigned_liodn = assigned_liodn;
+
+		ghandle = alloc_guest_handle(guest, &pamu_handle->user);
+		if (ghandle < 0)
+			 goto check_next_node;
+
+		ppid_handle = alloc_type(ppid_handle_t);
+		ppid_handle->user.ppid = ppid_handle;
+		ppid_handle->liodn_handle = ghandle;
+
+		ghandle = alloc_guest_handle(guest, &ppid_handle->user);
+		if (ghandle < 0)
+			 continue;
+
+		ret = fdt_setprop(guest->devtree, offset,
+				"fsl,ppid-handle", &ghandle, 4);
+
+		if (ret < 0)
+			goto check_next_node;
+
+		/*
+		 * Pass-thru "fsl,ppid" & "fsl,ppid-to-liodn" to
+		 * the guest device tree
+		 */
+		ret = fdt_setprop(guest->devtree, offset,
+				"fsl,ppid", ppidp, 4);
+
+		if (ret < 0)
+			goto check_next_node;
+
+		ret = fdt_setprop(guest->devtree, off_ppid_liodn,
+				"fsl,ppid-to-liodn",
+				ppid_to_liodn, ppid_liodn_len);
+
+check_next_node:
+		offset = fdt_node_offset_by_prop_value(guest->devtree,
+				offset, "fsl,ppid",
+				&propval, sizeof(uint32_t));
+	}
+}
+
+void pamu_partition_init(guest_t *guest)
+{
+	pamu_process_standard_liodns(guest);
+
+	pamu_process_ppid_liodns(guest);
+}
+
+void pamu_global_init(void)
 {
 	int pamu_node, ret;
 	phys_addr_t addr, size;

@@ -66,6 +66,7 @@ typedef struct handle {
 	struct vmpic_interrupt *intr;
 	struct ipi_doorbell_handle *db;
 	struct pamu_handle *pamu;
+	struct ppid_handle *ppid;
 	struct guest *guest;
 } handle_t;
 

@@ -83,7 +83,12 @@
 			reg = <0x100000 0x180>; 
 			dma-ranges = <0 0 0x10000000>;
 			fsl,liodn = <0>;
-			fsl,liodn-reg = <&dma1>;
+		};
+
+		qman-portal0@318000 {
+			compatible = "fsl,p4080-qman-portal";
+			dma-ranges = <0 0 0x10000000>;
+			fsl,ppid = <0>;
 		};
 
 		global-utilities@e0000 {
@@ -91,10 +96,6 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges = <0 0xe0000 0x10000>;
-			dma1: dma1-liodnr@580 {
-				compatible = "fsl,liodnr";
-				reg = <0x580 4>;	// DMA1LIODNR
-			};
 		};
 	};
 
