@@ -93,7 +93,8 @@ void init(unsigned long devtree_ptr)
 	valloc_init(1024 * 1024, PHYSBASE);
 	node = get_uart_offset();
 
-	console_init(ns16550_init((uint8_t *)CCSRBAR_VA + node, 0, 0, 16));
+	if (node >= 0)
+		console_init(ns16550_init((uint8_t *)CCSRBAR_VA + node, 0, 0, 16));
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (node >= 0) {

@@ -12,9 +12,6 @@
 		serial0 = &uart0;
 		serial1 = &uart1;
 		uartmux = &uartmux;
-		byte-channel0 = &bc0;
-		byte-channel1 = &bc1;
-		byte-channel2 = &bc2;
 	};
 
 	cpus {
@@ -189,34 +186,19 @@
 	};
 
 	byte-channels {
-		/* bc0 here is a weird case for testing purposes.
-		 * It sets up a loopback in the mux, so that
-		 * data coming in channel 0 goes out channel 1.
-		 * bc0 is _not_ usable by a guest.
-		 */
+
 		bc0: byte-channel0 {
 			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux &uartmux>;
-			fsl,mux-channel = <0 1>;
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <0>;
 		};
 
-		bc1: byte-channel1 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <2>;
-		};
-
-		bc2: byte-channel2 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <3>;
-		};
 	};
 
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <0 1 2 1>;
+			fsl,hv-cpus = <0 1>;
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000

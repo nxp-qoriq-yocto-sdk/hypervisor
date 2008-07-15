@@ -2,6 +2,7 @@
 # Script to run 8578/u-boot/ultravisor/simple-guest on simulator
 #
 
+$use_uart2 = 0
 $use_uart1 = 1
 
 # simple guest
