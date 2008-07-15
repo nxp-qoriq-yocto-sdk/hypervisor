@@ -1,0 +1,230 @@
+/dts-v1/;
+
+/ {
+	model = "fsl,P4080SIM";
+	compatible = "fsl,P4080SIM";
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	aliases {
+		stdout = &uart0;
+		stdin = &uart0;
+		serial0 = &uart0;
+		uartmux = &uartmux;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <0>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "okay";
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <1>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <2>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <3>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@4 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <4>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@5 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <5>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@6 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <6>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+
+		cpu@7 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc";
+			reg = <7>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
+		};
+	};
+
+	memory {
+		reg = <0 0 0x100000>;
+		device_type = "memory";
+	};
+
+	ccsr@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,p4080-ccsr", "simple-bus";
+		ranges = <0 0 0xfe000000 0x400000>;
+
+		mpic: pic@40000 {
+			clock-frequency = <0>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			reg = <0x40000 0x40000>;
+			compatible = "fsl,p4080-mpic", "fsl,mpic",
+			             "chrp,open-pic";
+			device_type = "open-pic";
+			big-endian;
+		};
+
+		uart0: serial@11c500 {
+			device_type = "serial";
+			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
+			interrupts = <36 2>;
+			interrupt-parent = <&mpic>;
+			reg = <0x11c500 0x100>;
+			clock-frequency = <0>;
+		};
+
+		uart1: serial@11c600 {
+			device_type = "serial";
+			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
+			interrupts = <36 2>;
+			interrupt-parent = <&mpic>;
+			reg = <0x11c600 0x100>;
+			clock-frequency = <0>;
+		};
+
+		global-utilities@e0000 {	//global utilities block
+			compatible = "fsl,mpc8572-guts";
+			reg = <0xe0000 0x1000>;
+			fsl,has-rstcr;
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "fsl,hv-byte-channel-mux";
+		fsl,phys-dev = <&uart1>;
+	};
+
+	byte-channels {
+		bc0: byte-channel0 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <0>;
+		};
+	};
+
+	partitions {
+		part1 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <0 1 2 1>;
+			fsl,entry = <0>;
+			fsl,privileged;
+			fsl,hv-dtb = /incbin/("bin/partman-p1.dtb");
+			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
+			                       0 0x17000000 0 0x20000000 0x1000000
+			                       0 0xfe040000 0 0xfe040000 0x20000
+			                       0 0xfe060000 0 0xfe060000 0x1000
+			                       0 0xfe061000 0 0xfe062000 0x1000
+			                       0 0xfe062000 0xffffffff 0xffffffff 0x1e000>;
+			fsl,hv-load-image-table = <0 0xef100000 0 0 0x0
+			                           0 0xef800000 0 0x01300000 0x00400000>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+		};
+
+		part2 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <3 1>;
+			fsl,entry = <0>;
+			fsl,hv-dtb = /incbin/("bin/hello-p2.dtb");
+			fsl,hv-physaddr-map = <0 0 0 0x21000000 0x04000000>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+		};
+	};
+
+	chosen {
+	};
+};

@@ -1,0 +1,64 @@
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-platform-p4080", "fsl,hv-platform", "fsl,P4080SIM";
+	model = "fsl,partman-p2";
+	epapr-version = "ePAPR-1.0";
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "fsl,e500mc-vcpu";
+			reg = <0>;
+			d-cache-line-size = <64>;
+			i-cache-line-size = <64>;
+			d-cache-size = <32768>;
+			i-cache-size = <32768>;
+			timebase-frequency = <8333333>;
+			bus-frequency = <66666666>;
+			clock-frequency = <66666666>;
+		};
+
+	};
+	
+	memory {
+		reg = <0 0 0x04000000>;
+		device_type = "memory";
+	};
+	
+	ccsr@fe000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		device_type = "soc";
+		ranges = <0 0 0xfe000000 0x400000>;
+	};
+
+	vmpic:vmpic {
+		compatible = "fsl,hv-vmpic";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		fsl,hv-phandle-ref = <&vmpic>;
+	};
+
+	hypervisor {
+		handles {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
+			
+			byte-channel0 {
+				compatible = "fsl,hv-byte-channel-handle";
+				fsl,endpoint = "/byte-channels/byte-channel0";
+				interrupt-parent = <&vmpic>;
+			};
+		};
+	};
+
+};

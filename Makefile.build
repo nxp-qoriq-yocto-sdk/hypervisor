@@ -229,6 +229,20 @@ test-dma: bin/uv.uImage test/dma
 demo: bin/uv.uImage test/linux
 	$(SIMICS) test/linux/hv-demo.simics
 
+test-partman-hello: bin/uv.uImage test/linux
+	./tools/mux_server/mux_server localhost:9124 9000 &
+	xterm -e "telnet localhost 9000" &
+	simics test/linux/hv-hello.simics -e c
+
+
+#	./mux_server locallhost:9124 9000 32 &
+#	xterm -e "/usr/bin/telnet localhost 9000" &
+
+#	./mux_server locallhost:9124 9000 32 &
+#	xterm -e "telnet localhost 9000" &
+#	$(SIMICS) test/linux/hv-hello.simics -e
+
+
 .PHONY: FORCE test
 test/%: FORCE
 	make -C $@
