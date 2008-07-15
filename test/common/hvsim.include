@@ -6,7 +6,7 @@
 digit-grouping 16 8
 output-radix 16
 
-if not defined uboot		{$uboot  = "u-boot.8578"}
+if not defined uboot		{$uboot  = "u-boot.4080"}
 if not defined kernel_image	{$kernel_image  = "%script%/bin/uv.uImage"}
 if not defined kernel_addr      {$kernel_addr   = 0x40000}
 if not defined kernel_symbols	{$kernel_symbols = ""}
