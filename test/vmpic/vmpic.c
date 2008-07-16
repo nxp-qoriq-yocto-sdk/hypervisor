@@ -46,6 +46,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	unsigned int vector;
 	uint8_t c;
 	int rc;
+	unsigned int mask, active;
 
 	rc = fh_vmpic_iack(&vector);
 
@@ -61,11 +62,20 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (vector == *handle_p) {
 		extint_cnt++;
 		fh_vmpic_set_mask(*handle_p, 1);
+		/* Make sure we are masked now */
+		fh_vmpic_get_mask(*handle_p, &mask);
+		if (!mask)
+			printf("Unexpected behavior : Interrupt not masked\n");
 	} else {
 		printf("Unexpected extint %u\n", vector);
 	}
 
 	fh_vmpic_eoi(vector);
+
+	/* Make sure that eoi has made the interrupt inactive */
+	fh_vmpic_get_activity(*handle_p, &active);
+	if (active == 1)
+		printf("Unexpected behavior : Interrupt in-service @eoi\n");
 }
 
 void dump_dev_tree(void)
