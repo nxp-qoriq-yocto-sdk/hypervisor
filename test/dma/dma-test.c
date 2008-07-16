@@ -130,15 +130,5 @@ void start(unsigned long devtree_ptr)
 	liodnp = fdt_getprop_w(fdt, node, "fsl,liodn", &len);
 	printf("actual liodn = %ld\n", *liodnp);
 
-#if 0
-	/*
-	 * FIXME : Program liodn in our legacy guts register,
-	 * this will be removed when u-boot programs liodns for legacy
-	 * devices
-	 */
-
-	out32((uint32_t *)(CCSRBAR_VA+0xe0580), true_liodn);
-#endif
-
 	test_dma_memcpy();
 }

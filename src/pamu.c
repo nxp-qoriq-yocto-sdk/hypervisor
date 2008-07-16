@@ -41,8 +41,6 @@
 
 extern void *fdt;
 
-#define DEBUG
-
 static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 {
 	if (addrspace_size & (addrspace_size - 1)) {
@@ -224,9 +222,6 @@ void pamu_process_standard_liodns(guest_t *guest)
 
 		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
 
-#ifdef DEBUG
-		printf("pathbuf for liodn = %s\n", pathbuf);
-#endif
 		offset_in_gdt = fdt_path_offset(fdt, pathbuf);
 
 		liodnrp = fdt_getprop(fdt, offset_in_gdt,
@@ -278,9 +273,8 @@ void pamu_process_standard_liodns(guest_t *guest)
 
 		assigned_liodn = *liodnrp;
 
-#ifdef DEBUG
-		printf("assigned liodn = %ld\n", assigned_liodn);
-#endif
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			"Assigned standard liodn = %d\n", *liodnrp);
 
 		ret = pamu_config_assigned_liodn(guest,
 				assigned_liodn,
@@ -315,7 +309,6 @@ check_next_node:
 	}
 }
 
-
 void pamu_process_ppid_liodns(guest_t *guest)
 {
 	int len, ret;
@@ -341,13 +334,9 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
 
-#ifdef DEBUG
-		printf("pathbuf for ppid = %s\n", pathbuf);
-#endif
 		offset_in_gdt = fdt_path_offset(fdt, pathbuf);
 
-		ppidp = fdt_getprop(fdt, offset_in_gdt,
-				"fsl,ppid", &ppidp_len);
+		ppidp = fdt_getprop(fdt, offset_in_gdt, "fsl,ppid", &ppidp_len);
 
 		if (!ppidp)
 			goto check_next_node;
@@ -360,7 +349,6 @@ void pamu_process_ppid_liodns(guest_t *guest)
 		 * need to lookup fsl,ppid-to-liodn property in hypervisor
 		 * device tree.
 		 */
-
 
 		for (off_ppid_liodn = fdt_next_node(fdt, -1, NULL);
 		     off_ppid_liodn >= 0;
@@ -376,11 +364,16 @@ void pamu_process_ppid_liodns(guest_t *guest)
 		if (!ppid_to_liodn)
 			goto check_next_node;
 
+		if (*ppidp >= (ppid_liodn_len/sizeof(uint32_t))) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"error : fsl,ppid value is incorrect\n");
+			goto check_next_node;
+		}
+
 		assigned_liodn = ppid_to_liodn[*ppidp];
 
-#ifdef DEBUG
-		printf("ppid %d mapped to liodn %d\n", *ppidp, assigned_liodn);
-#endif
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			"ppid %d mapped to liodn %d\n", *ppidp, assigned_liodn);
 
 		dma_ranges = fdt_getprop(guest->devtree, offset,
 				"dma-ranges", &len);
