@@ -278,7 +278,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	       ((mas6 & MAS6_SAS) << MAS1_TS_SHIFT) |
 	       (mas6 & MAS6_SPID_MASK);
 
-	int tlb1 = guest_find_tlb1(-1, mas1, mfspr(SPR_MAS2) >> PAGE_SHIFT);
+	int tlb1 = guest_find_tlb1(-1, mas1, va >> PAGE_SHIFT);
 	if (tlb1 >= 0) {
 		mtspr(SPR_MAS0, MAS0_TLBSEL(1) | MAS0_ESEL(tlb1));
 		mtspr(SPR_MAS1, gcpu->gtlb1[tlb1].mas1);
