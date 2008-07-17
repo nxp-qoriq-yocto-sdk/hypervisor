@@ -320,6 +320,8 @@ void pamu_process_ppid_liodns(guest_t *guest)
 	int parent;
 	const uint32_t *ppidp;
 	const uint32_t *ppid_to_liodn = NULL;
+	const uint32_t *ppid_to_liodn_guest = NULL;
+	int ppid_liodn_len_guest;
 	int ppidp_len, offset, offset_in_gdt, off_ppid_liodn, ppid_liodn_len;
 	char pathbuf[256];
 	unsigned int assigned_liodn;
@@ -451,6 +453,29 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		if (ret < 0)
 			goto check_next_node;
+
+		/*
+		 * Search for correct offset in guest device tree to insert
+		 * pass-thru fsl,ppid-to-liodn property
+		 */
+		for (off_ppid_liodn = fdt_next_node(guest->devtree, -1, NULL);
+		     off_ppid_liodn >= 0;
+		     off_ppid_liodn = fdt_next_node(guest->devtree,
+			off_ppid_liodn, NULL)){
+
+			ppid_to_liodn_guest = fdt_getprop(guest->devtree,
+				off_ppid_liodn, "fsl,ppid-to-liodn",
+				 &ppid_liodn_len_guest);
+
+			if (ppid_to_liodn_guest && ppid_liodn_len_guest)
+				break;
+		}
+
+		if (!ppid_to_liodn_guest) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"pamu_partition_init: could not find the fsl,ppid-to-liodn property in guest device tree\n");
+			goto check_next_node;
+		}
 
 		ret = fdt_setprop(guest->devtree, off_ppid_liodn,
 				"fsl,ppid-to-liodn",
