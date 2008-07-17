@@ -1,8 +1,8 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080", "fsl,hv-platform", "fsl,P4080SIM";
-	model = "fsl,hv-test-linux-p1";
+	compatible = "fsl,hv-platform-p4080";
+	model = "fsl,hv-linux-p1";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
 	#size-cells = <1>;

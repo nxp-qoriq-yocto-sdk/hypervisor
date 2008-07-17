@@ -1,8 +1,8 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080", "fsl,hv-platform";
-	model = "fsl,hv-test-vmpic-p1";
+	compatible = "fsl,hv-platform-p4080";
+	model = "fsl,hv-vmpic";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
 	#size-cells = <1>;

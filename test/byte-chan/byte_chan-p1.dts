@@ -1,11 +1,8 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-P4080SIM",
-	             "fsl,hv-e500mc-partition",
-	             "fsl,hv-partition",
-	             "fsl,P4080SIM";
-
+	compatible = "fsl,hv-platform-p4080";
+	model = "fsl,hv-byte-chan";
 	#address-cells = <2>;
 	#size-cells = <1>;
 

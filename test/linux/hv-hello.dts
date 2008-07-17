@@ -1,8 +1,8 @@
 /dts-v1/;
 
 / {
-	model = "fsl,P4080SIM";
-	compatible = "fsl,P4080SIM";
+	compatible = "fsl,hv-platform-p4080";
+	model = "fsl,hv-hello";
 	#address-cells = <2>;
 	#size-cells = <1>;
 
