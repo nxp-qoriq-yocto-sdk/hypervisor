@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc6
-Date: 7/11/2008
+Revsion: 0.2-rc7
+Date: 7/17/2008
 
 -------------------------------------------------------
 Contents
@@ -31,6 +31,15 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc7 bug fixes and changes
+      -bug 1557-- HID0[TBEN] bit is removed
+      -PAMU/LIODN property process and handle allocation
+      -FH_DMA_MAP_PPID_LIODN hcall
+      -updated u-boot image
+      -bug 1694-- root level "compatible" property clean up
+      -bugs 1638 and 1639 are closed with a Topaz spec 
+       update (0.792)
 
    -Topaz 0.2-rc6 bug fixes and changes
       -treat missing endpoints (byte-channels, doorbells)
