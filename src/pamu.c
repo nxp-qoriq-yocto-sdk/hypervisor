@@ -120,7 +120,8 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 	current_ppaace->twbal = start_rpn; /* vptbl functions return pfn's */
 
 	/* PAACE is invalid, validated by enable hcall */
-	current_ppaace->v = 0;
+	current_ppaace->v = 1;  // FIXME: for right now we are leaving PAACE
+                                // entries enabled by default.
 
 	return 0;
 }
