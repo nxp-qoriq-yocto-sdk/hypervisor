@@ -529,7 +529,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
-	} else if (likely(mas1 & MAS1_VALID)) {
+	} else {
 		unsigned long mas8 = guest->lpid | MAS8_GTS;
 		unsigned long attr;
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
