@@ -39,20 +39,13 @@
 
 /* TODO:
  * 0. Add descriptive comment per function/data-structure.
- * 1. Do not use globals, used alloc() instead to carve out
+ * 1. Do not use globals, use alloc() instead to carve out
  *    chunks of memory at init time.
  *    CAUTION: Do not free the memory you got from alloc().
- * 2. Add tracers to byte_chan_(send, receive) and commit.
- *    under #ifdef DEBUG.
  */
 
 /* Context prefix for error messages. */
 #define CTXT_EMSG "gdb-stub"
-
-#define TRACE(fmt, info...) printlog(LOGTYPE_GDB_STUB,    \
-				LOGLEVEL_DEBUG,           \
-				"%s@[%s, %d]: " fmt "\n", \
-				__func__, __FILE__, __LINE__, ## info)
 
 static const byte_chan_t *find_gdb_stub_byte_channel(void);
 static int register_callbacks(void);
@@ -113,7 +106,7 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 		return NULL;
 	}
 	if (node_offset < 0) {
-		TRACE("%s: %s: libfdt error %d (%s).\n", CTXT_EMSG, __func__,
+		TRACE("%s: %s: libfdt error %d (%s).", CTXT_EMSG, __func__,
 		       node_offset, fdt_strerror(node_offset));
 		return NULL;
 	}
@@ -128,16 +121,16 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	if (fsl_ep == NULL) {
 		if (prop_length == -FDT_ERR_NOTFOUND) {
 			TRACE("%s: %s: Did not find fsl,endpoint in gdb-stub "
-			       "node in the device tree.\n", CTXT_EMSG,
+			       "node in the device tree.", CTXT_EMSG,
 			       __func__);
 			return NULL;
 		}
-		TRACE("%s: %s: Internal error: libfdt error return: %d.\n",
+		TRACE("%s: %s: Internal error: libfdt error return: %d.",
 		       CTXT_EMSG, __func__, prop_length);
 		return NULL;
 	}
 	if (prop_length != 4) {
-		TRACE("%s: %s: Invalid fsl,endpoint.\n", CTXT_EMSG, __func__);
+		TRACE("%s: %s: Invalid fsl,endpoint.", CTXT_EMSG, __func__);
 		return NULL;
 	}
 	bc_phandle = *fsl_ep;
@@ -150,21 +143,19 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	/* TODO: Use ptr_from_node() */
 	bc_ptr = fdt_getprop(fdt, bc_offset, "fsl,hv-internal-bc-ptr",
 		             &prop_length);
-	TRACE("bc_ptr: 0x%x, *bc_ptr: 0x%x\n",
-		(unsigned int) bc_ptr,
-		(unsigned int) *bc_ptr);
+	TRACE("bc_ptr: 0x%x, *bc_ptr: 0x%x", (uint32_t) bc_ptr, (uint32_t) *bc_ptr);
 	if (bc_ptr == NULL) {
 		if (prop_length == -FDT_ERR_NOTFOUND) {
-			TRACE("%s: %s: endpoint is not a byte channel\n",
+			TRACE("%s: %s: endpoint is not a byte channel",
 			       CTXT_EMSG, __func__);
 			return NULL;
 		}
-		TRACE("%s: %s: Internal error: libfdt error return: %d.\n",
+		TRACE("%s: %s: Internal error: libfdt error return: %d.",
 		       CTXT_EMSG, __func__, prop_length);
 		return NULL;
 	}
 	if (prop_length != 4) {
-		TRACE("%s: %s: gdb-stub got invalid fsl,hv-internal-bc-ptr.\n",
+		TRACE("%s: %s: gdb-stub got invalid fsl,hv-internal-bc-ptr.",
 		       CTXT_EMSG, __func__);
 		return NULL;
 	}
@@ -196,7 +187,7 @@ static int register_callbacks(void)
 		                                      byte_channel);
 		if (byte_channel_handle == NULL) {
 			TRACE("%s: %s: gdb-stub failed to claim gdb-stub"
-			       " byte-channel.\n", CTXT_EMSG, __func__);
+			       " byte-channel.", CTXT_EMSG, __func__);
 			return GDB_STUB_INIT_FAILURE;
 		}
 
@@ -263,7 +254,7 @@ static uint8_t hexit[] =
 typedef struct pkt
 {
 	uint8_t *buf;
-	unsigned int len;
+	uint32_t len;
 	uint8_t *cur;
 } pkt_t;
 
@@ -296,6 +287,9 @@ typedef enum token
 	set_thread,
 	read_memory,
 	write_memory,
+	insert_breakpoint,
+	remove_breakpoint,
+	single_step,
 	return_current_thread_id,
 	get_section_offsets,
 	supported_features,
@@ -322,6 +316,9 @@ static lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "H", set_thread },
 	{ "m", read_memory },
 	{ "M", write_memory },
+	{ "Z", insert_breakpoint },
+	{ "z", remove_breakpoint },
+	{ "s", single_step },
 	{ "qC", return_current_thread_id },
 	{ "qOffsets", get_section_offsets },
 	{ "qSupported", supported_features },
@@ -333,6 +330,7 @@ static inline uint8_t checksum(uint8_t *p);
 static inline uint8_t hdtoi(uint8_t hexit);
 static inline uint8_t upper_nibble(uint8_t c);
 static inline uint8_t lower_nibble(uint8_t c);
+static inline uint32_t htoi(uint8_t *hex_string);
 static inline token_t tokenize(uint8_t *lexeme);
 static inline uint8_t hex(uint8_t c);
 
@@ -345,8 +343,8 @@ static inline void pkt_update_cur(pkt_t *pkt);
 static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
 static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c);
 static inline void pkt_cat_string(pkt_t *pkt, char *s);
-static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, unsigned int n);
-static inline uint8_t pkt_read_byte(pkt_t *pkt, unsigned int i);
+static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, uint32_t n);
+static inline uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i);
 static inline int pkt_full(pkt_t *pkt);
 static inline void pkt_reset(pkt_t *pkt);
 static inline uint8_t *content(pkt_t *pkt);
@@ -356,14 +354,43 @@ static inline void nak(void);
 static inline int got_ack(void);
 static void receive_command(pkt_t *cmd);
 static void transmit_response(pkt_t *rsp);
-static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length);
+static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 
 /* RSP */
-static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, unsigned int byte_length);
-static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, unsigned int reg_num);
-static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, unsigned int reg_num);
+
+typedef enum breakpoint_type
+{
+	user,
+	/* 'stub' or internal breakpoints are strictly "once only".
+	 * i.e. We set these in order to do (software) single step;
+	 * as soon as we complete the single step, we delete this
+	 * kind of breakpoint - including - it's associated internal
+	 * breakpoint.
+	 */
+	stub,
+} breakpoint_type_t;
+
+typedef struct breakpoint
+{
+	uint32_t *addr;
+	uint32_t orig_insn;
+	uint32_t count;
+	uint8_t taken;
+	struct breakpoint *associated;
+	breakpoint_type_t type;
+} breakpoint_t;
+
+static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length);
+static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
+static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
 static inline uint8_t *scan_till(uint8_t *q, char c);
-static inline unsigned int scan_num(uint8_t **buffer, char c);
+static inline uint32_t scan_num(uint8_t **buffer, char c);
+static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
+static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
+static inline void dump_breakpoint_table(void);
+static inline breakpoint_t *locate_breakpoint(uint32_t *addr);
+static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
+static inline void delete_breakpoint(breakpoint_t *breakpoint);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 
 /* Auxiliary routines required by the RSP Engine.
@@ -408,11 +435,13 @@ static inline uint8_t lower_nibble(uint8_t c)
 }
 
 /* TODO: A more generalized vesion of this would be nice in libos. */
-static inline unsigned int htoi(uint8_t *hex_string)
+static inline uint32_t htoi(uint8_t *hex_string)
 {
 	uint8_t *p = hex_string;
-	unsigned int s = 0;
+	uint32_t s = 0;
 	TRACE();
+	if (*p == 0 && *(p + 1) && (*(p + 1) == 'x' || *(p + 1) == 'X'))
+		p += 2;
 	while (*p) {
 		s <<= 4;
 		s += hdtoi(*p++);
@@ -436,7 +465,7 @@ static inline token_t tokenize(uint8_t *lexeme)
 
 static inline uint8_t hex(uint8_t c)
 {
-	return hexit [c];
+	return hexit[c];
 }
 /* Aux ends. */
 
@@ -489,6 +518,8 @@ static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
+	TRACE("Upper nibble hexed: '%c'", hex(upper_nibble(c)));
+	TRACE("Lower nibble hexed: '%c'", hex(lower_nibble(c)));
 	pkt_write_byte_update_cur(rsp, hex(upper_nibble(c)));
 	pkt_write_byte_update_cur(rsp, hex(lower_nibble(c)));
 	return;
@@ -506,7 +537,7 @@ static inline void pkt_cat_string(pkt_t *pkt, char *s)
 	return;
 }
 
-static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, unsigned int n)
+static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, uint32_t n)
 {
         uint8_t *p;
         TRACE();
@@ -518,7 +549,7 @@ static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, unsigned int n)
         return;
 }
 
-static inline uint8_t pkt_read_byte(pkt_t *pkt, unsigned int i)
+static inline uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i)
 {
 	TRACE();
 	if (0 <= i && i < (pkt->cur - pkt->buf))
@@ -586,10 +617,10 @@ static void receive_command(pkt_t *cmd)
 
 		TRACE("Begin Looping:");
 		while ((c = get_debug_char()) != '#') {
-			TRACE("(Looping) Iteration: %d, got character: %c", i++, c);
+			TRACE("(Looping) Iteration: %d, got character: '%c'", i++, c);
 			pkt_write_byte_update_cur(cmd, c);
 		}
-		TRACE("Done Looping...");
+		TRACE("Done Looping.");
 		pkt_write_byte_update_cur(cmd, '\0');
 		TRACE("Received command: %s", content(cmd));
 
@@ -599,8 +630,7 @@ static void receive_command(pkt_t *cmd)
 		TRACE("Got checksum: %s", ccs);
 
 		if (!(c = (checksum(content(cmd)) == htoi(ccs)))) {
-			TRACE("Checksum mismatch."
-                               " Sending NAK and getting next packet.");
+			TRACE("Checksum mismatch. Sending NAK and getting next packet.");
 			nak();
 		}
 	} while (!c);
@@ -618,7 +648,7 @@ static void transmit_response(pkt_t *rsp)
 	uint8_t c;
 	TRACE();
 	do {
-		TRACE("Transmitting response: %s\n", content(rsp));
+		TRACE("Transmitting response: %s", content(rsp));
 		put_debug_char('$');
 		/* TODO: Why does this not work?
 		 * qprintf(byte_channel_handle->tx, "%s", content(rsp));
@@ -636,9 +666,9 @@ static void transmit_response(pkt_t *rsp)
 	return;
 }
 
-static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length)
+static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length)
 {
-	unsigned int i;
+	uint32_t i;
 
 	TRACE();
 	for (i = 0; i < length; i++, p++) {
@@ -654,7 +684,7 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, unsigned int length)
  */
 
 static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value,
-                                       unsigned int byte_length)
+                                       uint32_t byte_length)
 {
 	int i, offset;
 	offset = (byte_length == 4 ? 4 : 0);
@@ -668,12 +698,12 @@ static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value,
 }
 
 static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
-                           unsigned int reg_num)
+                           uint32_t reg_num)
 {
-	unsigned int byte_length = 0;
+	uint32_t byte_length = 0;
 	register_t reg_value = 0xdeadbeef;
 	uint64_t fp_reg_value = 0xdeadbeef;
-	unsigned int e500mc_reg_num;
+	uint32_t e500mc_reg_num;
 	uint8_t c;
 	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
 	byte_length = e500mc_reg_table[reg_num].bitsize/8;
@@ -683,6 +713,9 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
 		break;
 	case reg_cat_gpr:
 		c = read_ggpr(trap_frame, e500mc_reg_num, &reg_value);
+		break;
+	case reg_cat_pc:
+		c = read_gpc(trap_frame, &reg_value);
 		break;
 	case reg_cat_msr:
 		c = read_gmsr(trap_frame, &reg_value);
@@ -707,10 +740,10 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
 }
 
 static inline int write_reg(trapframe_t *trap_frame, uint8_t *value,
-                            unsigned int reg_num)
+                            uint32_t reg_num)
 {
 	uint64_t reg_value;
-	unsigned int e500mc_reg_num;
+	uint32_t e500mc_reg_num;
 	uint8_t c;
 	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
 	reg_value = htoi((uint8_t *) value);
@@ -757,10 +790,10 @@ static inline uint8_t *scan_till(uint8_t *q, char c)
  * character read (i.e. c or '\0' - whichever occurs
  * earlier).
  */
-static inline unsigned int scan_num(uint8_t **buffer, char c)
+static inline uint32_t scan_num(uint8_t **buffer, char c)
 {
 	uint8_t t, *sav_pos;
-	unsigned int n;
+	uint32_t n;
 
 	/* Important assumption: The data of interest
 	 * starts /after/ the first character.
@@ -774,58 +807,365 @@ static inline unsigned int scan_num(uint8_t **buffer, char c)
 	return n;
 }
 
-#define BREAK_IF_END(cur_pos)               \
-	if (!*(cur_pos)) {                  \
-		pkt_cat_string(rsp, "E00"); \
-		break;                      \
+#define BREAK_IF_END(cur_pos)                          \
+	if (!*(cur_pos)) {                             \
+		pkt_cat_string(rsp, "E");              \
+		pkt_write_hex_byte_update_cur(rsp, 0); \
+		break;                                 \
 	}
+
+static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
+{
+	int32_t result = n;
+	int32_t sign_bit, bitpos;
+	TRACE("n: 0x%x", n);
+	sign_bit = (n >> sign_bit_position) & 1;
+	TRACE("Sign bit: %d", sign_bit);
+	for (bitpos = sign_bit_position; bitpos < 32; bitpos++) {
+		result = (sign_bit << bitpos) | result;
+	}
+	TRACE("Returning: 0x%x", result);
+	return result;
+}
+
+static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
+{
+	uint32_t insn = 0x0;
+	uint32_t opcd, xo, aa, li, bd;
+	typedef enum branch_type { b, bc, bclr, bcctr } branch_type_t;
+	branch_type_t branch_type = b;
+	uint32_t *nia = 0x0;
+	uint32_t *pc = (uint32_t *)trap_frame->srr0;
+	TRACE("INSN_ADDR: 0x%p", pc);
+	/* First check if this is a branch instruction at all.
+	 * If not, return rightaway.
+	 */
+	guestmem_set_data(trap_frame);
+	if (guestmem_in32(pc, &insn) != 0) {
+		TRACE("Could not read insn, NIA: 0x%d", 0);
+		return 0x0;
+	}
+	TRACE("Decoded insn: 0x%x at addr: 0x%p", insn, pc);
+	/* We decode the following instructions:
+	 * Branch: b (ba, bl, bla)
+	 * Branch Conditional: bc (bca, bcl, bcla)
+	 * Branch Conditional to Link Register: bclr (bclrl)
+	 * Branch Conditional to Count Register: bcctr (bcctrl)
+	 */
+	TRACE("Checking if this is a branch insn.");
+	opcd = (insn >> 26) & 0x3f;
+	if (opcd != 16 /* Not bc? */
+	    && opcd != 18 /* Not b? */
+	    && (opcd != 19 /* Not bclr?, bcctr? (nor mcrf) */)) {
+		TRACE ("Not a branch insn.");
+		nia = pc + 1;
+		TRACE("NIA: 0x%p", nia);
+		return nia;
+	}
+	/* Do not let an mcrf slip through. */
+	xo = (insn >> 1) & 0x3ff;
+	if (xo == 0) /* mcrf XL-FORM */ {
+		TRACE ("Not a branch insn.");
+		nia = pc + 1;
+		TRACE("NIA: 0x%p", nia);
+		return nia;
+	}
+	TRACE("0x%x: Is a branch insn.", insn);
+	switch (opcd) {
+		case 18: branch_type = b; break;
+		case 16: branch_type = bc; break;
+		case 19: branch_type = (xo == 16) ? bclr : bcctr /* xo == 528 */;
+	}
+	TRACE("opcd: %d, xo: %d", opcd, xo);
+	aa = (insn >> 1) & 0x1;
+	TRACE("aa: 0x%x", aa);
+	switch (branch_type) {
+		case b:
+			li = (insn >> 2) & 0xffffff;
+			TRACE("li: 0x%x", li);
+			if (aa == 0) {
+				nia = (uint32_t *) ((sign_extend(li << 2, 25) >> 2) + pc);
+			} else /* (aa == 1) */ {
+				nia = (uint32_t *) sign_extend(li << 2, 25);
+			}
+			break;
+		case bc:
+			bd = (insn >> 2) & 0x3fff;
+			if (aa == 0) {
+				nia = (uint32_t *) ((sign_extend(bd << 2, 15) >> 2) + pc);
+			} else {
+				nia = (uint32_t *) sign_extend(bd << 2, 15);
+			}
+			break;
+		case bclr:
+			nia = (uint32_t *) (trap_frame->lr);
+			break;
+		case bcctr:
+			nia = (uint32_t *) (trap_frame->ctr);
+			break;
+	}
+	TRACE("nia: 0x%p", nia);
+	return nia;
+}
+
+/* The _actual_ upper bound on the number of breakpoints that the
+ * user can set per core is MAX_BREAKPOINT_COUNT/3. (We need to
+ * insert upto two associated breakpoints per breakpoint (external
+ * or internal) in order to single step,
+ * (to replace the original insn, have the CPU execute it, and then
+ * to replace back the trap_insn) when a breakpoint is hit).
+ */
+#define MAX_BREAKPOINT_COUNT 32*3
+static breakpoint_t breakpoint_table[MAX_BREAKPOINT_COUNT];
+
+/* tw 12,r2,r2: 0x7d821008 */
+const uint32_t trap_insn = 0x7d821008;
+
+static inline void dump_breakpoint_table(void)
+{
+	uint32_t index, flag = 0;
+	TRACE("Breakpoint table:");
+	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
+		if (breakpoint_table[index].taken) {
+			flag = 1;
+			TRACE("index: %d", index);
+			TRACE("\taddr: 0x%p", breakpoint_table[index].addr);
+			TRACE("\torig_insn: %x", breakpoint_table[index].orig_insn);
+			TRACE("\tcount: %d", breakpoint_table[index].count);
+			TRACE("\ttaken: %d", breakpoint_table[index].taken);
+			if (breakpoint_table[index].associated)
+				TRACE("\tassocated stub breakpoint: 0x%p",
+				         breakpoint_table[index].associated->addr);
+			else
+				TRACE("\tno assocated stub breakpoint");
+			TRACE("\ttype: %s", breakpoint_table[index].type == user ?
+			      "external" : "internal");
+		}
+	}
+	if (!flag)
+		TRACE("\tEmpty.");
+}
+
+static inline breakpoint_t *locate_breakpoint(uint32_t *addr)
+{
+	uint32_t index;
+	TRACE("Checking if there is an entry in the breakpoint table for address: 0x%p.", addr);
+	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
+		if (breakpoint_table[index].addr == addr) {
+			TRACE("Found entry for address: 0x%p at index: %d in breakpoint table.", addr, index);
+			return &breakpoint_table[index];
+		}
+	}
+	TRACE("No entry for address: 0x%p in breakpoint table.", addr);
+	return NULL;
+}
+
+static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type)
+{
+	uint32_t index;
+	uint32_t status = 1;
+	uint32_t orig_insn = 0x0;
+	breakpoint_t *breakpoint = NULL;
+
+	TRACE();
+	if (!addr) {
+		TRACE("Got NULL address - you cannot set a breakpoint there!");
+		return NULL;
+	}
+	/* First check if there already is a breakpoint at addr and return rightaway if so. */
+	breakpoint = locate_breakpoint(addr);
+	if (breakpoint) {
+		if (breakpoint->type == type) {
+			breakpoint->count++;
+			TRACE("Previous breakpoint (addr: 0x%p) found in breakpoint table. Count is now: %d",
+			       addr, breakpoint->count);
+			return breakpoint;
+		}
+		if (breakpoint->type == user && type == stub) {
+			TRACE("Previous external breakpoint (addr: 0x%p) found in breakpoint table. "
+			      "Cannot override with internal breakpoint.", addr);
+			return NULL;
+		}
+		if (breakpoint->type == stub && type == user) {
+			TRACE("Resetting internal breakpoint at addr: 0x%p.", addr);
+			TRACE("Creating new external breakpoint at addr: 0x%p", addr);
+			/* Internal breakpoints will always have a ref count of 1 so
+			 * the following delete should completely blow it off from
+			 * the breakpoint table.
+			 */
+			delete_breakpoint(breakpoint);
+		}
+	}
+
+	/* Now, check if we have any free slot and use the first one you find. */
+	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
+		if (!breakpoint_table[index].taken) {
+			/* Read the original instruction. */
+			guestmem_set_data(trap_frame);
+			status = guestmem_in32(addr, &orig_insn);
+			if (status != 0) {
+				TRACE("Could not read instruction at addr: 0x%p", addr);
+				break;
+			}
+			TRACE("Read orig_insn: 0x%x at addr: 0x%p", orig_insn, addr);
+			TRACE("Write trap instruction.");
+			status = guestmem_out32(addr, trap_insn);
+			/* TODO: Need to flush [ID]-caches here. */
+			if (status != 0) {
+				TRACE("Could not set breakpoint at addr: 0x%p", addr);
+				break;
+			}
+			TRACE("Set breakpoint at addr: 0x%p", addr);
+			/* Fill up entry with this breakpoint's info. */
+			breakpoint_table[index].addr = addr;
+			breakpoint_table[index].orig_insn = orig_insn;
+			breakpoint_table[index].count = 1;
+			breakpoint_table[index].taken = 1;
+			breakpoint_table[index].associated = NULL;
+			breakpoint_table[index].type = type;
+			status = 0;
+			TRACE("Entered %s breakpoint (addr: 0x%p) into breakpoint table.",
+			       type == user ? "external" : "internal", addr);
+			/* Quit iterating. */
+			break;
+		}
+	}
+	TRACE("Returning breakpoint table address: 0x%p for breakpoint at: 0x%p",
+	       &breakpoint_table[index], addr);
+	return (status == 0) ? &breakpoint_table[index] : NULL;
+}
+
+static inline void delete_breakpoint(breakpoint_t *breakpoint)
+{
+	TRACE();
+	if (!breakpoint) {
+		TRACE("Got NULL address - you cannot have a breakpoint there!");
+		return;
+	}
+	breakpoint->count--;
+	if (!breakpoint->count) {
+		TRACE("Count: 0; Deleteing breakpoint at addr: 0x%p. Clearing entry.", breakpoint->addr);
+		TRACE("Writing back original insn: 0x%x at address: 0x%p",
+		       breakpoint->orig_insn, breakpoint->addr);
+		guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
+		memset(breakpoint, 0, sizeof(breakpoint_table[0]));
+		TRACE("Cleared all data in entry with memset.");
+	}
+}
+
+int gdb_stub_process_trap(trapframe_t *trap_frame)
+{
+	register_t nip_reg_value = 0;
+	breakpoint_t *breakpoint = NULL;
+	uint8_t value[17];
+	TRACE("At entry");
+	/* register_t esr_reg_value = 0;
+	 * esr_reg_value = mfspr(SPR_ESR);
+	 * TRACE("esr_ptr check: %s", esr_reg_value == ESR_PTR ? "success" : "fail");
+	 * TRACE("esr_reg_value: 0x%08lx", esr_reg_value); */
+	nip_reg_value = trap_frame->srr0;
+	/* TRACE("nip_reg_value: 0x%08lx", nip_reg_value);
+	 *
+	 * TRACE("Sanity check registers dump:");
+	 * dump_regs(trap_frame); */
+	/* Check if this is a GDB stub registered breakpoint.
+	 * If so, invoke gdb_stub_event_handler();
+	 * Else return with code 1.
+	 */
+	breakpoint = locate_breakpoint((uint32_t *)nip_reg_value);
+	if (!breakpoint) {
+		TRACE("Breakpoint not set by stub, returning (1).");
+		return 1;
+	}
+	if (breakpoint->type == stub) {
+		TRACE("We've hit an internal (set by stub) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
+		if (breakpoint->associated) {
+			TRACE("Replace the original instruction back at the associated internal "
+			      "breakpoint: 0x%p", breakpoint->associated->addr);
+			guestmem_out32(breakpoint->associated->addr,
+			               breakpoint->associated->orig_insn);
+			TRACE("Delete the associated internal breakpoint: 0x%p",
+			       breakpoint->associated->addr);
+			delete_breakpoint(breakpoint->associated);
+		}
+		TRACE("Replace the original instruction back at the internal breakpoint: 0x%p", breakpoint->addr);
+		guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
+		delete_breakpoint(breakpoint);
+		breakpoint = NULL;
+	} else {
+		TRACE("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
+	}
+	/* We _have_ to let GDB know that we hit a breakpoint (even if it is internal). */
+	TRACE("Sending T rsp");
+	pkt_cat_string(rsp, "T");
+	pkt_write_hex_byte_update_cur(rsp, 5);
+	pkt_write_hex_byte_update_cur(rsp, 1); /* r1 */
+	pkt_cat_string(rsp, ":");
+	read_reg(trap_frame, value, 1);
+	pkt_cat_string(rsp, (char *)value);
+	pkt_cat_string(rsp, ";");
+	pkt_write_hex_byte_update_cur(rsp, 64); /* pc */
+	pkt_cat_string(rsp, ":");
+	read_reg(trap_frame, value, 64);
+	pkt_cat_string(rsp, (char *)value);
+	pkt_cat_string(rsp, ";");
+	/* FIXME: This is a HACK. Is this the right fix? */
+	byte_channel_handle->rx->data_avail = NULL;
+	transmit_response(rsp);
+	TRACE("Calling: gdb_stub_event_handler().");
+	gdb_stub_event_handler(trap_frame);
+	TRACE("Returning from gdb_stub_process_trap()");
+	return 0;
+}
 
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
 	uint8_t *cur_pos, *sav_pos, *data;
-	unsigned int offset, length;
+	uint32_t offset, length;
 	uint8_t err_flag = 0;
-	uint32_t *addr;
-	uint8_t value[17];
-	unsigned int reg_num, i;
+	uint32_t *addr = NULL;
+	uint32_t *nia = NULL, *pc = NULL;
+	uint8_t aux, value[17];
+	uint32_t reg_num, i;
+	uint8_t breakpoint_type;
+	breakpoint_t *breakpoint = NULL;
+	breakpoint_t *breakpoint_nia = NULL;
+	breakpoint_t *breakpoint_incrpc = NULL;
 	char *td; /* td: target description */
-
 	TRACE("In RSP Engine, main loop.");
-
 	stub_start: {
-		TRACE("At stub_start");
+		TRACE("At stub_start.");
 		/* Deregister call back. */
 		byte_channel_handle->rx->data_avail = NULL;
 		enable_critint();
 	}
-
-	/* TODO: Send back the target state, first thing. */
 	while (1) {
 
+		TRACE("In main loop.");
+		dump_breakpoint_table();
 		pkt_reset(cmd);
 		receive_command(cmd);
 		switch(tokenize(content(cmd))) {
 
 		case continue_execution:
-			/* disable_critint() on a continue.
-			 * reregister call backs
-			 * check byte channel if something arrived
-			 * in the meanwhile and if something _did_
-			 * arrive, loop back to the beginning
-			 * of the gdb_stub_event_handler where you
-			 * disable interrupts.
+			/* o disable_critint() on a continue.
+			 * o Reregister call backs.
+			 * o Check byte channel if something arrived in the
+			 *   meanwhile and if something _did_ arrive, loop
+			 *   back to the beginning of the gdb_stub_event_handler
+			 *   where interrupts are disabled.
 			 */
-			TRACE("Got 'c' packet.");
-			disable_critint();
-			byte_channel_handle->rx->data_avail = rx;
-			if (queue_empty(byte_channel_handle->rx)) {
-				TRACE("Returning to guest.");
-				return;
-			}
-			else {
-				TRACE("Back to stub_start.");
-				goto stub_start;
-			}
+			TRACE("GOT 'c' PACKET.");
+			return_to_guest:
+				disable_critint();
+				byte_channel_handle->rx->data_avail = rx;
+				if (queue_empty(byte_channel_handle->rx)) {
+					TRACE("Returning to guest.");
+					return;
+				} else {
+					TRACE("Back to stub_start.");
+					goto stub_start;
+				}
 			break;
 
 		case read_register:
@@ -853,9 +1193,15 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			reg_num = scan_num(&cur_pos, '=');
 			BREAK_IF_END(cur_pos);
 			data = ++cur_pos;
-			TRACE("Register: %d, write-value: %s (decimal: %d)", reg_num, data, htoi(data));
+			TRACE("Register: %d, write-value: %s (decimal: %d)",
+			       reg_num, data, htoi(data));
 			err_flag = write_reg(trap_frame, data, reg_num);
-			pkt_cat_string(rsp, err_flag == 0 ? "OK" : "E00");
+			if (err_flag == 0) {
+				pkt_cat_string(rsp, "OK");
+			} else {
+				pkt_cat_string(rsp, "E");
+				pkt_write_hex_byte_update_cur(rsp, 0);
+			}
 			break;
 
 		case write_registers:
@@ -915,19 +1261,20 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			addr = (uint32_t *)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, '\0');
-			TRACE("addr: 0x%p, length: %d\n", addr, length);
+			TRACE("Read memory at addr: 0x%p, length: %d", addr, length);
 			guestmem_set_data(trap_frame);
 			for (i = 0; i < length; i++) {
-				guestmem_in8((uint8_t *) addr + i, ((uint8_t *) value));
+				guestmem_in8((uint8_t *) addr + i, ((uint8_t *) (&value[0])));
 				if (value[0] == '\0')
 					TRACE("guestmem_in8 set value[0] to: 0");
 				else
 					TRACE("guestmem_in8 set value[0] to: %c", value[0]);
 				pkt_write_hex_byte_update_cur(rsp, value[0]);
 				TRACE("byte address: 0x%p, upper nibble value: %c",
-				      (uint8_t *) addr + i, hex(upper_nibble(value[0])));
+				      (uint8_t *)addr + i, hex(upper_nibble(value[0])));
 				TRACE("byte address: 0x%p, lower nibble value: %c",
-				      (uint8_t *) addr + i, hex(lower_nibble(value[0])));
+				      (uint8_t *)addr + i, hex(lower_nibble(value[0])));
+
 			}
 			break;
 
@@ -940,16 +1287,104 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			BREAK_IF_END(cur_pos);
 			cur_pos++;
 			data = cur_pos;
-			TRACE("addr: 0x%p, length: %d, data: %s\n", addr, length, data);
+			TRACE("addr: 0x%p, length: %d, data: %s", addr, length, data);
 			err_flag = 0;
 			for (i = 0; i < length; i++) {
 				value[0] = data[2*i];
 				value[1] = data[2*i+1];
 				value[2] = 0;
-				if (guestmem_out8((uint8_t *) addr + i, htoi((uint8_t *) value)) != 0)
+				if (guestmem_out8((uint8_t *)addr + i, htoi((uint8_t *)value)) != 0)
 					err_flag = 1;
 			}
-			pkt_cat_string(rsp, err_flag == 0 ? "OK" : "E00");
+			if (err_flag == 0) {
+				pkt_cat_string(rsp, "OK");
+			} else {
+				pkt_cat_string(rsp, "E");
+				pkt_write_hex_byte_update_cur(rsp, 0);
+			}
+			break;
+
+		case insert_breakpoint:
+		case remove_breakpoint:
+			cur_pos = content(cmd);
+			aux = *cur_pos;
+			err_flag = 0;
+			TRACE("Got '%c' packet.", *cur_pos);
+			breakpoint_type = scan_num(&cur_pos, ',');
+			if (breakpoint_type != 0) {
+				TRACE("We only support memory breakpoints.");
+				pkt_cat_string(rsp, "E");
+				pkt_write_hex_byte_update_cur(rsp, 0);
+				break;
+			}
+			BREAK_IF_END(cur_pos);
+			addr = (uint32_t *) scan_num(&cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			length = scan_num(&cur_pos, ':');
+			if (length != 4) {
+				TRACE("Breakpoint must be of length: 4.");
+				pkt_cat_string(rsp, "E");
+				pkt_write_hex_byte_update_cur(rsp, 0);
+				break;
+			}
+			TRACE("Breakpoint type: %d, addr: 0x%p, length: %d",
+			       breakpoint_type, addr, length);
+			TRACE("aux: %c", aux);
+			if (aux == 'Z') {
+				TRACE ("Invoking set_breakpoint.");
+				breakpoint = set_breakpoint(trap_frame, addr, user);
+				breakpoint->associated = NULL;
+				err_flag = breakpoint ? 0 : 1;
+			} else { /* 'z' */
+				TRACE("Invoking locate_breakpoint.");
+				breakpoint = locate_breakpoint(addr);
+				if (breakpoint) {
+					TRACE("Located breakpoint placed at: 0x%p", addr);
+					delete_breakpoint(breakpoint);
+				} else /* Vow! Spurious address! */ {
+					TRACE("No breakpoint placed at: 0x%p", addr);
+					err_flag = 1;
+				}
+			}
+			if (err_flag == 0) {
+				pkt_cat_string(rsp, "OK");
+			} else {
+				pkt_cat_string(rsp, "E");
+				pkt_write_hex_byte_update_cur(rsp, 0);
+			}
+			break;
+
+		case single_step:
+			TRACE("Got 's' packet.");
+			cur_pos = content(cmd);
+			pc = (uint32_t *)trap_frame->srr0;
+			/* If there is no address to resume at; we resume at pc. */
+			addr = cur_pos[1] ? (uint32_t *)scan_num(&cur_pos, '\0') : pc;
+			nia = next_insn_addr(trap_frame);
+			TRACE("Single stepping to insn at nia: 0x%p or pc + 4: 0x%p", nia, pc + 1);
+			TRACE("Setting internal breakpoint at nia: 0x%p.", nia);
+			breakpoint_nia = set_breakpoint(trap_frame, nia, stub);
+			TRACE("%s setting internal breakpoint at nia: 0x%p.",
+			       breakpoint_nia ? "Done" : "Not", nia);
+			/* Optimize: If nia == pc + 1 - create only one internal breakpoint. */
+			if (nia != pc + 1) {
+				TRACE("Setting internal breakpoint at pc + 4: 0x%p.", pc + 1);
+				breakpoint_incrpc = set_breakpoint(trap_frame, pc + 1, stub);
+				TRACE("%s setting internal breakpoint at pc + 4: 0x%p.",
+				       breakpoint_incrpc ? "Done" : "Not", pc + 1);
+			} else {
+				breakpoint_incrpc = NULL;
+			}
+			if (breakpoint_nia) {
+				breakpoint_nia->associated = breakpoint_incrpc;
+			}
+			if (breakpoint_incrpc) {
+				breakpoint_incrpc->associated = breakpoint_nia;
+			}
+			TRACE("Stepping after hitting internal (set by stub) breakpoint.");
+			TRACE("Done with s-packet, will return to guest.");
+			goto return_to_guest;
+			return;
 			break;
 
 		case return_current_thread_id:
@@ -988,21 +1423,15 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 				BREAK_IF_END(cur_pos);
 				td = "";
 				if (strncmp("target.xml", (char *) sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using "
-					      "td: "
-					      "e500mc_description");
+					TRACE("Using td: e500mc_description");
 					td = e500mc_description;
 				}
 				else if (strncmp ("power-core.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using "
-					      "td: "
-					      "power_core_description");
+					TRACE("Using td: power_core_description");
 					td = power_core_description;
 				}
 				else if (strncmp ("power-fpu.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using "
-					      "td: "
-					      "power_fpu_description");
+					TRACE("Using td: power_fpu_description");
 					td = power_fpu_description;
 				}
 				BREAK_IF_END(td);
@@ -1026,16 +1455,16 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 */
 			TRACE("Got stop reply packet: '?'");
 			pkt_cat_string(rsp, "S");
-			pkt_hex_copy(rsp, (uint8_t *) "2", 1);
+			pkt_write_hex_byte_update_cur(rsp, 2);
 			break;
 
 		default:
-			TRACE("Unhandled RSP directive: %s,"
-			       " transmitting response: '%s'\n",
-		               content(cmd), content(rsp));
+			TRACE("Unhandled RSP directive: %s, transmitting response: '%s'",
+			       content(cmd), content(rsp));
 			break;
 		}
 		transmit_response(rsp);
 	}
 }
+
 /* RSP ends. */

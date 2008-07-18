@@ -49,6 +49,9 @@ typedef enum reg_cat
 	reg_cat_fpr,
 #define REG_CAT_FPR "reg_cat_fpr"
 
+	reg_cat_pc,
+#define REG_CAT_PC "reg_cat_pc"
+
 	reg_cat_msr,
 #define REG_CAT_MSR "reg_cat_msr"
 
@@ -70,6 +73,7 @@ char *reg_cat_names[] =
 	REG_CAT_UNK,
 	REG_CAT_GPR,
 	REG_CAT_FPR,
+	REG_CAT_PC,
 	REG_CAT_MSR,
 	REG_CAT_CR,
 	REG_CAT_SPR,
@@ -226,14 +230,15 @@ struct register_description e500mc_registers[] =
 
 #define PC_INDEX 64
 	{ .name="pc", .bitsize="32", .type="code_ptr", .regnum="64",
-	  .cat=reg_cat_spr, },
+	  .cat=reg_cat_pc, },
 	{ .name="msr", .bitsize="32", .type="uint32", .cat=reg_cat_msr, },
 	{ .name="cr", .bitsize="32", .type="uint32", .cat=reg_cat_cr, },
 	{ .name="lr", .bitsize="32", .type="code_ptr", .cat=reg_cat_spr,
 	  .inum=SPR_LR },
 	{ .name="ctr", .bitsize="32", .type="uint32", .cat=reg_cat_spr,
 	  .inum=SPR_CTR },
-	{ .name="xer", .bitsize="32", .type="uint32", .cat=reg_cat_spr, },
+	{ .name="xer", .bitsize="32", .type="uint32", .cat=reg_cat_spr,
+	  .inum=SPR_XER },
 
 #define FPSCR_INDEX 70
 	{ .name="fpscr", .bitsize="32", .group="float", .regnum="70",

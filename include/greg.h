@@ -238,6 +238,12 @@ static inline int write_gfpr(trapframe_t *regs, int fpr, uint64_t *val)
 	};
 }
 
+static inline int read_gpc(trapframe_t *regs, register_t *val)
+{
+	*val = regs->srr0;
+	return 0;
+}
+
 static inline int read_gmsr(trapframe_t *regs, register_t *val)
 {
 	*val = regs->srr1;

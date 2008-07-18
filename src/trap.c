@@ -38,6 +38,29 @@
 #include <guestmemio.h>
 #include <vpic.h>
 #include <vmpic.h>
+#include <greg.h>
+#include <gdb-stub.h>
+
+void pre_reflect_trap(trapframe_t *trap_frame)
+{
+	register_t esr_reg_value = 0;
+
+	TRACE("At entry.");
+	/* check ESR */
+	esr_reg_value = mfspr(SPR_ESR);
+	if (esr_reg_value == ESR_PTR) {
+		/* First check if the GDB stub planted this trap. */
+		if (gdb_stub_process_trap(trap_frame)) {
+			TRACE("Not a GDB stub insterted trap; calling reflect_trap()");
+			reflect_trap(trap_frame);
+		}
+		TRACE("Returned from gdb_stub_process_trap().");
+	}
+	else {
+		TRACE("Not a trap, calling reflect_trap()");
+		reflect_trap(trap_frame);
+	}
+}
 
 /* Do not use this when entering via guest doorbell, since that saves
  * state in gsrr rather than srr, despite being directed to the

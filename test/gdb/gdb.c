@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *
@@ -59,6 +58,59 @@ void dump_dev_tree(void)
 	printf("------\n");
 }
 
+int X = 9;
+int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
+
+int const32(void)
+{
+	int i;
+	for (i = 0; i < 32;)
+		i++;
+	return i;
+}
+
+int maximum(int *a, int n)
+{
+	int m, *p;
+	m = a[0];
+	p = a;
+	while(p < &a[n]) {
+		if(*p > m)
+			m = *p;
+		p++;
+	}
+	return m;
+}
+
+int max_of_Y(void)
+{
+	int n;
+	n = maximum(Y, sizeof(Y)/sizeof(Y[0]));
+	return n;
+}
+
+int dive(int n)
+{
+	int k;
+	switch (n % 2) {
+	case 0: k = const32();
+		break;
+	default: k = max_of_Y();
+		break;
+	}
+	return k;
+}
+
+void gorp(void)
+{
+	int i;
+	int a[64];
+	for (i = 0; i < 64; i++) {
+		a[i] = i;
+	}
+	return;
+}
+
 void start(unsigned long devtree_ptr)
 {
 	uint32_t status;
@@ -69,7 +121,7 @@ void start(unsigned long devtree_ptr)
 	char buf[16];
 	uint32_t x;
 	unsigned int cnt;
-	int i;
+	int i = 0, j, t;
 	int node = -1;
 	int len;
 
@@ -80,6 +132,50 @@ void start(unsigned long devtree_ptr)
 	enable_extint();
 
 	printf("Hello World\n");
+	while (0) {
+		X = 0;
+		printf("In infinite loop. Iteration: %d\n", i++);
+		Y[0] = 0;
+		Y[1] = 1;
+		Y[2] = 2;
+		Y[3] = 3;
+		Y[4] = 4;
+		Y[5] = 5;
+		Y[6] = 6;
+		Y[7] = 7;
+		for (j = 0; j < 4; j++) {
+			t = Y[2*j];
+			Y[2*j] = Y[2*j+1];
+			Y[2*j+1] = t;
+		}
+		gorp();
+		Y[0] = 7;
+		Y[1] = 6;
+		Y[2] = 5;
+		Y[3] = 4;
+		Y[4] = 3;
+		Y[5] = 2;
+		Y[6] = 1;
+		Y[7] = 0;
+		X = dive(1024);
+		Y[0] = 0;
+		Y[1] = 1;
+		Y[2] = 2;
+		Y[3] = 3;
+		Y[4] = 4;
+		Y[5] = 5;
+		Y[6] = 6;
+		Y[7] = 7;
+		X = dive(127);
+		Y[0] = 7;
+		Y[1] = 6;
+		Y[2] = 5;
+		Y[3] = 4;
+		Y[4] = 3;
+		Y[5] = 2;
+		Y[6] = 1;
+		Y[7] = 0;
+	}
 
 	node = fdt_path_offset(fdt, "/handles/byte-channel1");
 	if (node < 0) {
