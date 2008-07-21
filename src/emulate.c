@@ -249,15 +249,18 @@ static void fixup_tlb_sx_re(void)
 	         "sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
 	         mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
 
-	unsigned long attr;
-	unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
-	                                grpn, &attr, PTE_PHYS_LEVELS);
+	/* Currently, we only use virtualization faults for bad mappings. */
+	if (likely(!(mfspr(SPR_MAS8) & MAS8_VF))) {
+		unsigned long attr;
+		unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
+		                                grpn, &attr, PTE_PHYS_LEVELS);
 
-	assert(attr & PTE_VALID);
+		assert(attr & PTE_VALID);
 
-	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
-	                (mas3 & (MAS3_FLAGS | MAS3_USER)));
-	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
+		                (mas3 & (MAS3_FLAGS | MAS3_USER)));
+		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+	}
 
 	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
 }
@@ -497,10 +500,12 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		 */
 		if (unlikely(!(attr & PTE_VALID))) {
 			mas8 |= MAS8_VF;
+			rpn = grpn;
 		} else {
-			mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 			mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 		}
+
+		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 
 		mtspr(SPR_MAS0, mas0);
 		mtspr(SPR_MAS1, mas1);
