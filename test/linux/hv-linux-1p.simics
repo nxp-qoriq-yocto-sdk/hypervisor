@@ -8,9 +8,9 @@
 $use_uart1 = 0
 
 $guest_image[0]  = "vmlinux"
-$guest_addr[0]   = 0xef100000
+$guest_addr[0]   = 0xe8100000
 $guest_image[1]  = "rootfs.ext2.gz"
-$guest_addr[1]   = 0xef600000
+$guest_addr[1]   = 0xe8600000
 
 $kernel_image  = "uv.uImage"
 

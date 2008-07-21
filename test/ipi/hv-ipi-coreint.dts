@@ -206,7 +206,7 @@
 			fsl,hv-dtb = /incbin/("bin/ipi-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
 			                       0 0x17000000 0 0x20000000 0x1000000>;
-			fsl,hv-load-image-table = <0 0xef200000 0 0 0>;
+			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 
@@ -216,7 +216,7 @@
 			fsl,entry = <0>;
 			fsl,hv-dtb = /incbin/("bin/ipi-p2.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x21000000 0x04000000>;
-			fsl,hv-load-image-table = <0 0xef300000 0 0 0>;
+			fsl,hv-load-image-table = <0 0xe8300000 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 	};

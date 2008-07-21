@@ -6,7 +6,7 @@ $use_uart1 = 1
 
 # simple guest
 $guest_image[0]  = "byte_chan"
-$guest_addr[0]   = 0xef200000
+$guest_addr[0]   = 0xe8200000
 
 $kernel_image  = "uv.uImage"
 

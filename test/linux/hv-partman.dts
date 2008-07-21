@@ -210,8 +210,8 @@
 			                       0 0xfe060000 0 0xfe060000 0x1000
 			                       0 0xfe061000 0 0xfe062000 0x1000
 			                       0 0xfe062000 0xffffffff 0xffffffff 0x1e000>;
-			fsl,hv-load-image-table = <0 0xef100000 0 0 0x0
-			                           0 0xef800000 0 0x01300000 0x00400000>;
+			fsl,hv-load-image-table = <0 0xe8100000 0 0 0x0
+			                           0 0xe8800000 0 0x01300000 0x00400000>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 

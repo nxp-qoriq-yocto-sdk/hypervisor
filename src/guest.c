@@ -326,8 +326,8 @@ fail:
 
 // FIXME: we're hard-coding the phys address of flash here, it should
 // read from the DTS instead.
-#define FLASH_ADDR      0xef000000
-#define FLASH_SIZE      (16 * 1024 * 1024)
+#define FLASH_ADDR      0xe8000000
+#define FLASH_SIZE      (128 * 1024 * 1024)
 
 /*
  * Map flash into memory and return a hypervisor virtual address for the
