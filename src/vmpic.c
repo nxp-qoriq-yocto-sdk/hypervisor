@@ -558,7 +558,7 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[4] = vmirq->irq->ops->is_enabled(vmirq->irq);
+	regs->gpregs[4] = vmirq->irq->ops->is_disabled(vmirq->irq);
 	regs->gpregs[3] = 0;  /* success */
 }
 

@@ -245,10 +245,10 @@ static void vpic_irq_unmask(interrupt_t *irq)
 	spin_unlock_critsave(&guest->vpic.lock, save);
 }
 
-static int vpic_irq_is_enabled(interrupt_t *irq)
+static int vpic_irq_is_disabled(interrupt_t *irq)
 {
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
-	return virq->enable;
+	return !virq->enable;
 }
 
 static void vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
@@ -313,7 +313,7 @@ int_ops_t vpic_ops = {
 	.eoi = vpic_eoi,
 	.enable = vpic_irq_unmask,
 	.disable = vpic_irq_mask,
-	.is_enabled = vpic_irq_is_enabled,
+	.is_disabled = vpic_irq_is_disabled,
 	.set_cpu_dest_mask = vpic_irq_set_destcpu,
 	.get_cpu_dest_mask = vpic_irq_get_destcpu,
 	.is_active = vpic_irq_is_active,
