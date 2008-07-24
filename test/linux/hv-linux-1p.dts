@@ -10,6 +10,7 @@
 		stdout = &uart0;
 		stdin = &uart0;
 		serial0 = &uart0;
+		qman = &qman;
 	};
 
 	cpus {
@@ -146,6 +147,17 @@
 		compatible = "fsl,p4080-ccsr", "simple-bus";
 		ranges = <0 0 0xfe000000 0x400000>;
 
+		pamu@20000 {
+			compatible = "fsl,p4080-pamu";
+			reg = <0x20000 0x5000>;
+		};
+
+		qman: qman@318000 {
+			compatible = "fsl,qman";
+			reg = <0x318000 0x1000>;
+			fsl,liodn = <0>;  // set by u-boot
+		};
+
 		mpic: pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
@@ -190,8 +202,7 @@
 			fsl,entry = <0>;
 			fsl,privileged;
 			fsl,hv-dtb = /incbin/("bin/linux-p1.dtb");
-			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
-			                       0 0x17000000 0 0x20000000 0x1000000>;
+			fsl,hv-physaddr-map = <0 0 0 0x20000000 0x20000000>;
 			fsl,hv-load-image-table = <0 0xe8100000 0 0 0x0
 			                           0 0xe8600000 0 0x01300000 0x00100000>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;

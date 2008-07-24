@@ -7,6 +7,21 @@
 	#address-cells = <2>;
 	#size-cells = <1>;
 
+	qman-portals@f4200000 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "simple-bus";
+		ranges = <0 0 0xf4200000 0x200000>;
+		qman-portal@24000 {
+			interrupts = <0x7a 0x2>;
+			interrupt-parent = <&mpic>;
+			compatible = "fsl,qman-portal";
+			reg = <0x24000 0x4000 0x109000 0x1000>;
+			cell-index = <0x9>;
+			fsl,ppid = <0xa>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -39,7 +54,7 @@
 	};
 	
 	memory {
-		reg = <0 0 0x18000000>;
+		reg = <0 0 0x20000000>;
 		device_type = "memory";
 	};
 	
@@ -49,6 +64,18 @@
 		compatible = "simple-bus";
 		device_type = "soc";
 		ranges = <0 0 0xfe000000 0x400000>;
+
+		qman: qman@318000 {
+			compatible = "fsl,qman";
+			reg = <0x318000 0x1000>;
+			dma-ranges = <0x0 0x0 0x20000000>;
+			fsl,liodn = <0>;  // set by u-boot
+		};
+
+		bman: bman@31a000 {
+			compatible = "fsl,bman";
+			reg = <0x31a000 0x1000>;
+		};
 
 		i2c0: i2c@118000 {
 			device_type = "i2c";

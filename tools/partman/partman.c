@@ -509,8 +509,7 @@ static int cmd_load_image(struct parameters *p)
 
 	if (!p->h_specified || !p->f_specified) {
 		usage();
-		ret = EINVAL;
-		goto exit;
+		return EINVAL;
 	}
 
 	image = load_image_file(p->f, &filesize, &load_address, NULL);

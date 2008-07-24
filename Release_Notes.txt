@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc7
-Date: 7/17/2008
+Revsion: 0.2-rc8
+Date: 7/24/2008
 
 -------------------------------------------------------
 Contents
@@ -23,17 +23,29 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc6
-      -is compatible with Simics 8578 3.2.31 - 3.2.33
+   -Topaz 0.2-rc8
+      -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc6
+      -requires libos tag v0.2-rc8
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
+   -Topaz 0.2-rc8 bug fixes and changes
+      -PAMU PAACE entries are enabled by default
+      -support for Simics 8578 3.2.35 model
+      -bug 1648 is fixed: tlb0 bad read entry caused assertion
+      -bug 1557 is fixed: tlbsx emulation bug
+      -gdb stub breakpoint and single step support
+      -bug 1677 is fixed: vmpic get/set mask give inconsistent results
+      -bug 1765 is fixed: partman crash on bad option
+      -pamu handle property names now have hv- prefix-- to
+       fsl,hv-liodn-handle and fsl,hv-ppid-handle
+      -bug 1499 is fixed: sc 1 call in user mode
+
    -Topaz 0.2-rc7 bug fixes and changes
-      -bug 1557-- HID0[TBEN] bit is removed
+      -bug 1625-- HID0[TBEN] bit is removed
       -PAMU/LIODN property process and handle allocation
       -FH_DMA_MAP_PPID_LIODN hcall
       -updated u-boot image
