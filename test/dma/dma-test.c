@@ -121,7 +121,7 @@ void start(unsigned long devtree_ptr)
 	}
 	node = ret;
 
-	liodnp = fdt_getprop_w(fdt, node, "fsl,liodn-handle", &len);
+	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-liodn-handle", &len);
 	if (!liodnp)
 		printf("fsl,liodn property not found\n");
 

@@ -292,7 +292,7 @@ void pamu_process_standard_liodns(guest_t *guest)
 			 goto check_next_node;
 
 		ret = fdt_setprop(guest->devtree, offset,
-				"fsl,liodn-handle", &ghandle, 4);
+				"fsl,hv-liodn-handle", &ghandle, 4);
 
 		if (ret < 0)
 			goto check_next_node;
@@ -440,7 +440,7 @@ void pamu_process_ppid_liodns(guest_t *guest)
 			 continue;
 
 		ret = fdt_setprop(guest->devtree, offset,
-				"fsl,ppid-handle", &ghandle, 4);
+				"fsl,hv-ppid-handle", &ghandle, 4);
 
 		if (ret < 0)
 			goto check_next_node;
