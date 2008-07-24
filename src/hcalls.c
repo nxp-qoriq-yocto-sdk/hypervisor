@@ -505,7 +505,7 @@ void hcall(trapframe_t *regs)
 		printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 		         "guest hcall from 0x%lx\n", regs->srr0);
 		regs->exc = EXC_PROGRAM;
-		mtspr(SPR_GESR, ESR_PPR);
+		mtspr(SPR_ESR, ESR_PPR);
 		reflect_trap(regs);
 	}
 
