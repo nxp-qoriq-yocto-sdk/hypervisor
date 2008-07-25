@@ -336,6 +336,7 @@ fail:
  * @phys: physical address inside flash space
  *
  * The TLB entry created by this function is temporary.
+ * FIXME: implement a more generalized I/O mapping mechanism.
  */
 static void *map_flash(phys_addr_t phys)
 {
@@ -347,13 +348,16 @@ static void *map_flash(phys_addr_t phys)
 
 	/*
 	 * There is no permanent TLB entry for flash, so we create a temporary
-	 * one here. TEMPTLB2 is a slot reserved for temporary mappings.  We
+	 * one here. TEMPTLB2/3 are slots reserved for temporary mappings.  We
 	 * can't use TEMPTLB1, because map_gphys() is using that one.
 	 */
 
-	tlb1_set_entry(TEMPTLB2, (unsigned long) temp_mapping[1],
-		       FLASH_ADDR, TLB_TSIZE_16M, TLB_MAS2_MEM,
-		       TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	tlb1_set_entry(TEMPTLB2, (unsigned long)temp_mapping[1],
+	               FLASH_ADDR, TLB_TSIZE_64M, TLB_MAS2_MEM,
+	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	tlb1_set_entry(TEMPTLB3, (unsigned long)temp_mapping[1] + 64 * 1024 * 1024,
+	               FLASH_ADDR, TLB_TSIZE_64M, TLB_MAS2_MEM,
+	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 	return temp_mapping[1] + (phys - FLASH_ADDR);
 }

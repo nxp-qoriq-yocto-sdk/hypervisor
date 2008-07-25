@@ -28,8 +28,9 @@
 
 #include <hv.h>
 
-#define TEMPTLB1 62
-#define TEMPTLB2 63
+#define TEMPTLB1 61
+#define TEMPTLB2 62
+#define TEMPTLB3 63
 
 #define PHYS_BITS 36
 #define VIRT_BITS 32

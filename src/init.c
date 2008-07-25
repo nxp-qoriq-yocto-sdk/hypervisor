@@ -146,7 +146,7 @@ void start(unsigned long devtree_ptr)
 	valloc_init(1024 * 1024, PHYSBASE);
 	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
-	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	temp_mapping[1] = valloc(128 * 1024 * 1024, 128 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
 
