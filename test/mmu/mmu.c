@@ -135,7 +135,7 @@ int *test_mem, *test_map;
 
 
 static void inv_all_test(const char *name, void (*inv)(int tlbmask),
-                         int secondary)
+                         int secondary, int unified)
 {
 	int *tlb0 = test_map + 65536/4;
 	int *tlb1 = test_map;
@@ -163,7 +163,7 @@ static void inv_all_test(const char *name, void (*inv)(int tlbmask),
 	expect(name, 1, 3, addrs, vals, (int[]){0, 0, 0});
 	sync_cores(secondary);
 
-	if (!secondary)
+	if (!secondary && !unified)
 		inv(0);
 
 	sync_cores(secondary);
@@ -188,7 +188,13 @@ static void inv_all_test(const char *name, void (*inv)(int tlbmask),
 		inv(1);
 
 	sync_cores(secondary);
-	expect(name, 4, 3, addrs, vals, (int[]){fault, 0, 0});
+	
+	if (unified) {
+		expect(name, 4, 3, addrs, vals, (int[]){fault, fault, fault});
+		create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	} else {
+		expect(name, 4, 3, addrs, vals, (int[]){fault, 0, 0});
+	}
 
 	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
 	expect(name, 5, 3, addrs, vals, (int[]){0, 0, 0});
@@ -198,7 +204,13 @@ static void inv_all_test(const char *name, void (*inv)(int tlbmask),
 		inv(2);
 
 	sync_cores(secondary);
-	expect(name, 6, 3, addrs, vals, (int[]){0, fault, fault});
+	
+	if (unified) {
+		expect(name, 6, 3, addrs, vals, (int[]){fault, fault, fault});
+		create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
+	} else {
+		expect(name, 6, 3, addrs, vals, (int[]){0, fault, fault});
+	}
 
 	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
 	expect(name, 7, 3, addrs, vals, (int[]){0, 0, 0});
@@ -232,7 +244,7 @@ static void mmucsr_inv(int tlb_mask)
 
 static void mmucsr_test(int secondary)
 {
-	inv_all_test("mmucsr", mmucsr_inv, secondary);
+	inv_all_test("mmucsr", mmucsr_inv, secondary, 0);
 }
 
 static void tlbivax_inv_all(int tlb_mask)
@@ -240,11 +252,11 @@ static void tlbivax_inv_all(int tlb_mask)
 	int val = 0;
 	
 	if (tlb_mask & 1)
-		asm volatile("tlbivax 0, %0; tlbsync" : :
+		asm volatile("tlbivax 0, %0" : :
 		             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
 		             "memory");
 	if (tlb_mask & 2)
-		asm volatile("tlbivax 0, %0; tlbsync" : :
+		asm volatile("tlbivax 0, %0" : :
 		             "r" (TLBIVAX_TLB1 | TLBIVAX_INV_ALL) :
 		             "memory");
 
@@ -258,11 +270,11 @@ static void tlbivax_inv(void *addr, int tlb_mask)
 	int val = 0;
 	
 	if (tlb_mask & 1)
-		asm volatile("tlbivax 0, %0; tlbsync" : :
+		asm volatile("tlbivax 0, %0" : :
 		             "r" (TLBIVAX_TLB0 | ea) :
 		             "memory");
 	if (tlb_mask & 2)
-		asm volatile("tlbivax 0, %0; tlbsync" : :
+		asm volatile("tlbivax 0, %0" : :
 		             "r" (TLBIVAX_TLB1 | ea) :
 		             "memory");
 
@@ -271,7 +283,7 @@ static void tlbivax_inv(void *addr, int tlb_mask)
 }
 
 static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
-                     int secondary)
+                     int secondary, int unified)
 {
 	int *tlb0 = test_map + 65536/4;
 	int *tlb1 = test_map;
@@ -306,14 +318,14 @@ static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
 	expect(name, 2, 3, addrs, vals, (int[]){0, 0, 0});
 	sync_cores(secondary);
 
-	if (!secondary)
+	if (!secondary && !unified)
 		inv(tlb0, 2);
 
 	sync_cores(secondary);
 	expect(name, 5, 3, addrs, vals, (int[]){0, 0, 0});
 	sync_cores(secondary);
 
-	if (!secondary)
+	if (!secondary && !unified)
 		inv(tlb1, 1);
 
 	sync_cores(secondary);
@@ -338,6 +350,7 @@ static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
 		inv(tlb0, 1);
 
 	sync_cores(secondary);
+
 	expect(name, 8, 3, addrs, vals, (int[]){fault, 0, 0});
 
 	create_mapping(0, 0, tlb0, memphys + 65536, TLB_TSIZE_4K);
@@ -377,14 +390,32 @@ static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
 
 static void tlbivax_test(int secondary)
 {
-	inv_all_test("tlbivax.all", tlbivax_inv_all, secondary);
-	inv_test("tlbivax.ea", tlbivax_inv, secondary);
+	inv_all_test("tlbivax.all", tlbivax_inv_all, secondary, 0);
+	inv_test("tlbivax.ea", tlbivax_inv, secondary, 0);
+}
+
+static void tlbilx_inv_all(int tlb_mask)
+{
+	asm volatile("tlbilxlpid; isync" : : : "memory");
+}
+
+static void tlbilx_inv(void *addr, int tlb_mask)
+{
+	register_t ea = ((register_t)addr) & ~4095;
+	asm volatile("tlbilxva 0, %0; isync" : : "r" (ea) : "memory");
+}
+
+static void tlbilx_test(int secondary)
+{
+	inv_all_test("tlbilx.all", tlbilx_inv_all, secondary, 1);
+	inv_test("tlbilx.ea", tlbilx_inv, secondary, 1);
 }
 
 static void secondary_entry(void)
 {
 	mmucsr_test(SECONDARY_NOINVAL);
 	tlbivax_test(SECONDARY_INVAL);
+	tlbilx_test(SECONDARY_NOINVAL);
 }
 
 void start(unsigned long devtree_ptr)
@@ -400,6 +431,7 @@ void start(unsigned long devtree_ptr)
 
 	mmucsr_test(PRIMARY);
 	tlbivax_test(PRIMARY);
+	tlbilx_test(PRIMARY);
 	
 	if (fail)
 		printf("FAILED\n");
