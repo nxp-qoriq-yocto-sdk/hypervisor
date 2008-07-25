@@ -226,6 +226,46 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
+{
+	unsigned long va = get_ea_indexed(regs, insn);
+	gcpu_t *gcpu = get_gcpu();
+	int type = (insn >> 21) & 3;
+	int ret = 0;
+	register_t saved;
+
+	saved = disable_critint_save(); 
+	save_mas(gcpu);
+
+	switch (type) {
+	case 0: /* Invalidate LPID */
+	case 1: /* Invalidate PID */
+		/* FIXME: only invalidate the requested PID */
+		guest_inv_tlb1(TLBIVAX_INV_ALL, 0);
+		asm volatile("tlbilxlpid" : : : "memory");
+		break;
+
+	case 2: /* Invalid */
+		printlog(LOGTYPE_EMU, LOGLEVEL_NORMAL,
+		         "tlbilx@0x%08lx: reserved instruction type 2\n",
+		         regs->srr0);
+
+		ret = 1;
+		break;
+
+	case 3: /* Invalidate address */
+		/* FIXME: only invalidate the requested PID */
+		guest_inv_tlb1(va, 0);
+		asm volatile("tlbilxva 0, %0" : : "r" (va) : "memory");
+		break;
+	}
+
+	restore_mas(gcpu);
+	restore_critint(saved);
+
+	return ret;
+}
+
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
 	tlbsync();
@@ -642,6 +682,10 @@ void hvpriv(trapframe_t *regs)
 
 		case 0x312:
 			fault = emu_tlbivax(regs, insn);
+			break;
+
+		case 0x313:
+			fault = emu_tlbilx(regs, insn);
 			break;
 	
 		case 0x3b2:
