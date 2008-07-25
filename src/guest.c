@@ -1031,7 +1031,9 @@ __attribute__((noreturn)) void init_guest(void)
 #endif
 
 		vmpic_partition_init(guest);
+#ifdef CONFIG_PAMU
 		pamu_partition_init(guest);
+#endif
 		start_guest_primary();
 	} else {
 		gpir = register_gcpu_with_guest(guest, cpus, len);
