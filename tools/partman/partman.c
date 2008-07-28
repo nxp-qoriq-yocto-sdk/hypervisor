@@ -122,17 +122,22 @@ static void usage(void)
 	printf("Show partition status:\n\tpartman -s\n\n");
 
 	printf("Load image:\n\tpartman -l -h <handle> -f <file> [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address\n");
+	printf("\t\tfor ELF images.\n\n");
 
 	printf("Start partition:\n\tpartman -g -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n");
-	printf("\t\tDefault value for -e is 0, or the entry point for ELF images.\n\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address\n");
+	printf("\t\tfor ELF images.\n");
+	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
+	printf("\t\timages.\n\n");
 
 	printf("Stop partition:\n\tpartman -x -h <handle>\n\n");
 
 	printf("Restart partition:\n\tpartman -r -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address for ELF images.\n");
-	printf("\t\tDefault value for -e is 0, or the entry point for ELF images.\n");
+	printf("\t\tDefault value for -a is 0, or the base physical address\n");
+	printf("\t\tfor ELF images.\n");
+	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
+	printf("\t\timages.\n\n");
 }
 
 /**
