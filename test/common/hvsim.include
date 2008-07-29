@@ -149,10 +149,6 @@ cpu0->compat_magic = FALSE
 
 # work arounds
 
-# workaround qman target id
-@m = conf.info.target_mapping
-@m[9][0] = 0x3c
-
 $eth_comp = $phy[0]
 if not defined eth_cnt { $eth_cnt = eth }
 run-command-file "%simics%/targets/common/add-eth-link.include"
