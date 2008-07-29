@@ -48,6 +48,16 @@
  */
 #include "fsl_hypervisor.h"
 
+
+char *cmd_to_str[6] = {
+	"UNUSED",
+	"PARTITION_RESTART",
+	"PARTITION_GET_STATUS",
+	"PARTITION_START",
+	"PARTITION_STOP",
+	"PARTITION_LOAD"
+};
+
 enum command {
 	e_none = 0,
 	e_status,
@@ -164,6 +174,10 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 		perror(__func__);
 	} else
 		ret = p->ret;
+
+	if (ret)
+		printf("Partman operation, %s failed with error = %d\n",
+			 cmd_to_str[cmd], ret);
 
 	close(f);
 
