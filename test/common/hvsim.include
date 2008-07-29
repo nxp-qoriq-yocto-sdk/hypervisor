@@ -254,6 +254,19 @@ if $do_boot == "yes" {
             $con.wait-then-write "=> " "setenv bootargs " + $cmdline + "\n"
         }
 
+	# Work-around for QMAN FDQ transactions accessing portal DLIODNs
+	# instead of QMAN_LIODNR,program all s/w portal DLIODNs to QMAN_LIODNR
+	$phys_mem.set 0xfe318000 0x10016
+	$phys_mem.set 0xfe318010 0x20016
+	$phys_mem.set 0xfe318020 0x30016
+	$phys_mem.set 0xfe318030 0x40016
+	$phys_mem.set 0xfe318040 0x50016
+	$phys_mem.set 0xfe318050 0x60016
+	$phys_mem.set 0xfe318060 0x70016
+	$phys_mem.set 0xfe318070 0x80016
+	$phys_mem.set 0xfe318080 0x90016
+	$phys_mem.set 0xfe318090 0xa0016
+
         # Note: user must override boot_command if dev_tree_blob is set
 	$con.wait-then-write "=> " "setenv bootcmd " + $boot_command + "\n"
 	$con.wait-then-write "=> " "boot\n"
