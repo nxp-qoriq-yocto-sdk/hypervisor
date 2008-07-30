@@ -50,7 +50,11 @@
 static const byte_chan_t *find_gdb_stub_byte_channel(void);
 static int register_callbacks(void);
 
-extern void *fdt;
+#define TRACE(fmt, info...) \
+		printlog(LOGTYPE_GDB_STUB, \
+		LOGLEVEL_DEBUG, \
+		"%s@[%s, %d]: " fmt "\n", \
+		__func__, __FILE__, __LINE__, ## info)
 
 /**
  * Enumerate the various events that we are interested in. The external world in

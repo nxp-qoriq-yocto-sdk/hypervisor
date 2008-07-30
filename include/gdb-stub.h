@@ -21,22 +21,15 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifdef CONFIG_GDB_STUB
+
 #ifndef __GDB_STUB_H__
 #define __GDB_STUB_H__
 
 #define GDB_STUB_INIT_SUCCESS  0
 #define GDB_STUB_INIT_FAILURE -1
 
-#define TRACE(fmt, info...) \
-		printlog(LOGTYPE_GDB_STUB, \
-		LOGLEVEL_DEBUG, \
-		"%s@[%s, %d]: " fmt "\n", \
-		__func__, __FILE__, __LINE__, ## info)
-
 int gdb_stub_init(void);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 int gdb_stub_process_trap(trapframe_t *trap_frame);
 
 #endif /* __GDB_STUB_H__ */
-#endif /* CONFIG_GDB_STUB */

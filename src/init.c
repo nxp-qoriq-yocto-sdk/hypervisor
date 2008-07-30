@@ -146,7 +146,7 @@ void start(unsigned long devtree_ptr)
 	valloc_init(1024 * 1024, PHYSBASE);
 	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
-	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	temp_mapping[1] = valloc(128 * 1024 * 1024, 128 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
 
@@ -371,7 +371,7 @@ static void core_init(void)
 
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
-	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD);
+	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD | EHCSR_DGTMI);
 
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
 

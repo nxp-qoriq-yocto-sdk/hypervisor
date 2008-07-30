@@ -26,7 +26,7 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
-#define BASE_TLB_ENTRY 61 /**< TLB entry used for initial mapping */
+#define BASE_TLB_ENTRY 60 /**< TLB entry used for initial mapping */
 #define PHYSBASE 0x40000000 /**< Virtual base of physical address space */
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
@@ -44,7 +44,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_MCHECK_HANDLER powerpc_mchk_interrupt
 #define EXC_DSI_HANDLER data_storage
 #define EXC_ALIGN_HANDLER reflect_trap
-#define EXC_PROGRAM_HANDLER pre_reflect_trap
+#define EXC_PROGRAM_HANDLER program_trap
 #define EXC_FPUNAVAIL_HANDLER reflect_trap
 #define EXC_DECR_HANDLER decrementer
 #define EXC_FIT_HANDLER fit
