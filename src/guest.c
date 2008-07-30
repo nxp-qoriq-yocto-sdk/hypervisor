@@ -134,6 +134,7 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 	while (offset < size) {
 		val_from_int(addrbuf, gaddr + offset);
 
+		// FIXME: address cells and size cells are hardcoded to 2 / 1
 		ret = xlate_one(addrbuf, physaddrmap, hvrlen, 2, 1, 2, 1, &rangesize);
 		if (ret == -FDT_ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
