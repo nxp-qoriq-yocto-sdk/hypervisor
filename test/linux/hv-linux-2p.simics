@@ -28,18 +28,3 @@ add-directory "%script%/bin" -prepend
 add-directory "%script%" -prepend
 
 run-command-file "hvsim.include"                                                                 
-
-@i=SIM_get_port_interface(conf.pamu0, 'signal', 'bypass')
-@i.signal_lower(conf.pamu0)
-
-@i=SIM_get_port_interface(conf.pamu1, 'signal', 'bypass')
-@i.signal_lower(conf.pamu1)
-
-@i=SIM_get_port_interface(conf.pamu2, 'signal', 'bypass')
-@i.signal_lower(conf.pamu2)
-
-@i=SIM_get_port_interface(conf.pamu3, 'signal', 'bypass')
-@i.signal_lower(conf.pamu3)
-
-@i=SIM_get_port_interface(conf.pamu4, 'signal', 'bypass')
-@i.signal_lower(conf.pamu4)

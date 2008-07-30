@@ -496,11 +496,16 @@ void pamu_partition_init(guest_t *guest)
 	pamu_process_ppid_liodns(guest);
 }
 
+#define PAMUBYPENR 0x604
 void pamu_global_init(void)
 {
 	int pamu_node, ret;
 	phys_addr_t addr, size;
-	unsigned long pamu_reg_base, pamu_reg_size;
+	unsigned long pamu_reg_base, pamu_reg_off;
+	int guts_node;
+	phys_addr_t guts_addr, guts_size;
+	uint32_t pamubypenr, pamu_counter;
+	uintptr_t pamubypenr_offset;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -522,9 +527,37 @@ void pamu_global_init(void)
 		return;
 	}
 
-	for (pamu_reg_size = 0; pamu_reg_size < size;
-		pamu_reg_size += PAMU_OFFSET) {
-		pamu_reg_base = (unsigned long) addr + pamu_reg_size;
-		pamu_hw_init(pamu_reg_base-CCSRBAR_PA, pamu_reg_size);
+	/*
+	 * FIXME : Need to fix compatible properties such as guts
+	 * to more appropriate names such as p4080-guts
+	 */
+	guts_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,mpc8572-guts");
+	if (guts_node < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"warning: no guts node found\n");
+		return;
 	}
+
+	ret = dt_get_reg(fdt, guts_node, 0, &guts_addr, &guts_size);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"ERROR : no guts reg found, ret = %d\n", ret);
+		return;
+	}
+
+	pamubypenr_offset = (CCSRBAR_VA + guts_addr - CCSRBAR_PA) + PAMUBYPENR;
+	pamubypenr = in32((uint32_t *) pamubypenr_offset);
+
+	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
+	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
+
+		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
+		pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+
+		/* Disable PAMU bypass for this PAMU */
+		pamubypenr &= ~pamu_counter;
+	}
+
+	/* Enable all relevant PAMU(s) */
+	out32((uint32_t *) pamubypenr_offset, pamubypenr);
 }
