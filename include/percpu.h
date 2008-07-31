@@ -43,7 +43,7 @@
 struct pte_t;
 struct guest;
 
-#define MAX_HANDLES 32
+#define MAX_HANDLES 1024
 
 struct handle;
 
