@@ -79,7 +79,8 @@ static void mux_get_data(queue_t *q)
 	int ch;
 	
 	if (spin_lock_held(&mux->byte_chan->rx_lock)) {
-		debug("mux_get_data: bcmux recursion detected\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			"mux_get_data: bcmux recursion detected\n");
 		return;
 	}
 	
@@ -99,8 +100,9 @@ static void mux_get_data(queue_t *q)
 				}
 				
 				mux->current_rx_bc = channel_find(mux, ch-CHAN0_MUX_CHAR);
-				debug("mux_get_data: switched to channel '%c' (%p)\n",
-				       ch, mux->current_rx_bc);
+				printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
+					"mux_get_data: switched to channel '%d' (%p)\n",
+					ch-CHAN0_MUX_CHAR, mux->current_rx_bc);
 
 				continue;
 			}
@@ -112,6 +114,9 @@ static void mux_get_data(queue_t *q)
 		if (mux->current_rx_bc) {
 			queue_t *txq = mux->current_rx_bc->byte_chan->tx;
 			int ret = queue_writechar(txq, ch);
+
+			printlog(LOGTYPE_BCMUX, LOGLEVEL_VERBOSE,
+				"mux: receive '%c'\n", ch);
 
 			/* If there's no room in outbound queue, discard the data
 			 * rather than stop processing input that could be
@@ -137,8 +142,9 @@ static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 	if (queue_get_space(mux->byte_chan->tx) < 2)
 		return -1;
 
-	debug("mux_tx_switch: switched to channel '%c' (%p)\n",
-	       cbc->num, cbc);
+	printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
+		"mux_tx_switch: switched to channel '%d' (%p)\n",
+		cbc->num, cbc);
 
 	assert(queue_writechar(mux->byte_chan->tx, CH_SWITCH_ESCAPE) == 0);
 	assert(queue_writechar(mux->byte_chan->tx, cbc->num+CHAN0_MUX_CHAR) == 0);
@@ -162,7 +168,8 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 		if (c < 0)
 			break;
 
-		debug("mux send '%c'\n", c);
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_VERBOSE,
+			"mux: send '%c'\n", c);
 
 		if (c == CH_SWITCH_ESCAPE) {
 			/* write the escape char twice */
@@ -187,7 +194,8 @@ static void mux_send_data_pull(queue_t *q)
 	int ret, total = 0;
 
 	if (spin_lock_held(&mux->byte_chan->tx_lock)) {
-		debug("mux_send_data_pull: bcmux recursion detected\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			"mux_send_data_pull: bcmux recursion detected\n");
 		return;
 	}
 	
@@ -228,7 +236,8 @@ static void mux_send_data_push(queue_t *q)
 	mux_complex_t *mux = cbc->mux_complex;
 
 	if (spin_lock_held(&cbc->byte_chan->tx_lock)) {
-		debug("mux_send_data_push: bcmux recursion detected\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			"mux_send_data_push: bcmux recursion detected\n");
 		return;
 	}
 	
@@ -241,7 +250,8 @@ static void mux_send_data_push(queue_t *q)
 		/* If we ran out of space, arm the pull callback. */
 		mux->byte_chan->tx->space_avail = mux_send_data_pull;
 	else
-		debug("mux_send_data_push: no data\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			"mux_send_data_push: no data\n");
 	
 	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
 }
@@ -406,12 +416,14 @@ void test_byte_chan_mux(void)
 
 	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
 	if (!cd) {
-		debug("test_byte_chan_mux: failed to alloc uart\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
+			"test_byte_chan_mux: failed to alloc uart\n");
 		return;
 	}
 
 	if (byte_chan_attach_chardev(&byte_chan_to_lld->handles[0], cd)) {
-		debug("test_byte_chan_mux: Couldn't attach to uart\n");
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
+			"test_byte_chan_mux: Couldn't attach to uart\n");
 		return;
 	}
 
