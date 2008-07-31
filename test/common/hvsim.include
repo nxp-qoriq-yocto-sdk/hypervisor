@@ -272,3 +272,8 @@ if $do_boot == "yes" {
 	$con.wait-then-write "=> " "boot\n"
     }
 }
+
+# workaround for qman: disable delays for Simics 3.2.35
+qman->push_interval=0
+qman->enqueue_interval=0
+
