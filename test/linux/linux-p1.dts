@@ -22,6 +22,20 @@
 		};
 	};
 
+	bman-portals@f4000000 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "simple-bus";
+		ranges = <0 0 0xf4000000 0x200000>;
+		bman-portal@24000 {
+			interrupts = <0x7a 0x2>;
+			interrupt-parent = <&mpic>;
+			compatible = "fsl,bman-portal";
+			reg = <0x24000 0x4000 0x109000 0x1000>;
+			cell-index = <0x9>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
