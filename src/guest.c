@@ -191,6 +191,12 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 	if (parent < 0)
 		return parent;
 
+	if (parent) {
+		ret = fdt_node_check_compatible(guest->devtree, parent, "simple-bus");
+		if (ret)
+			return 0;
+	}
+
 	ret = get_addr_format(guest->devtree, parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
