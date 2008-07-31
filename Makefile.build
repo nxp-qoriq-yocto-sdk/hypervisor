@@ -214,9 +214,6 @@ test-byte-chan: bin/uv.uImage test/byte-chan
 test-whoami: bin/uv.uImage test/whoami
 	$(SIMICS) test/whoami/hv-whoami.simics
 
-test-hcalls: bin/uv.uImage test/hcalls
-	$(SIMICS) test/hcalls/hv-hcalls.simics
-
 test-mmu: bin/uv.uImage test/mmu
 	$(SIMICS) test/mmu/mmu.simics
 
@@ -233,15 +230,6 @@ test-partman-hello: bin/uv.uImage test/linux
 	./tools/mux_server/mux_server localhost:9124 9000 &
 	xterm -e "telnet localhost 9000" &
 	simics test/linux/hv-hello.simics -e c
-
-
-#	./mux_server locallhost:9124 9000 32 &
-#	xterm -e "/usr/bin/telnet localhost 9000" &
-
-#	./mux_server locallhost:9124 9000 32 &
-#	xterm -e "telnet localhost 9000" &
-#	$(SIMICS) test/linux/hv-hello.simics -e
-
 
 .PHONY: FORCE test
 test/%: FORCE
