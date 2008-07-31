@@ -89,7 +89,7 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 		if (!start_rpn) {
 			start_rpn = rpn;
 		} else if (rpn != next_rpn) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 				"rpn = 0x%lx, size = 0x%lx\n",
 				start_rpn, mach_phys_contig_size);
 			break;
@@ -97,7 +97,7 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 
 		if (!(attr & (PTE_SW | PTE_UW))) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"dma-ranges not writeable!!!\n");
+				"dma-ranges not writeable!\n");
 			return -1;
 		}
 
@@ -108,6 +108,9 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 	}
 
 	current_ppaace = get_ppaace(assigned_liodn);
+	if (!current_ppaace)
+		return -1;
+
 	setup_default_xfer_to_host_ppaace(current_ppaace);
 
 	current_ppaace->wbah = 0;
@@ -274,7 +277,7 @@ void pamu_process_standard_liodns(guest_t *guest)
 
 		assigned_liodn = *liodnrp;
 
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 			"Assigned standard liodn = %d\n", *liodnrp);
 
 		ret = pamu_config_assigned_liodn(guest,
@@ -531,7 +534,7 @@ void pamu_global_init(void)
 	 * FIXME : Need to fix compatible properties such as guts
 	 * to more appropriate names such as p4080-guts
 	 */
-	guts_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,mpc8572-guts");
+	guts_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,p4080-guts");
 	if (guts_node < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"warning: no guts node found\n");
