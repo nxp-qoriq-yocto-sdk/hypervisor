@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,7 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: gdb_all
 
 include ../Makefile.inc
@@ -44,7 +42,9 @@ bin/gdb: $(GDB_OBJS)
 bin/gdb.map: bin/gdb
 	nm -n bin/gdb > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(GDB_OBJS:.o=.d)
+endif
 
 bin/hv-gdb.dtb: hv-gdb.dts bin/gdb-p1.dtb
 

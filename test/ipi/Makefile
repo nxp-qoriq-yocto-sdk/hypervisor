@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -22,7 +21,6 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
 
 all: ipi_all
 
@@ -58,7 +56,9 @@ bin/ipi.map: bin/ipi
 bin/ipi1.map: bin/ipi1
 	nm -n bin/ipi1 > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(IPI_OBJS:.o=.d) $(IPI1_OBJS:.o=.d)
+endif
 
 bin/hv-ipi-1p.dtb: hv-ipi-1p.dts bin/ipi-p1.dtb
 

@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,7 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: byte_chan_all
 
 include ../Makefile.inc
@@ -44,7 +42,9 @@ bin/byte_chan: $(BYTE_CHAN_OBJS)
 bin/byte_chan.map: bin/byte_chan
 	nm -n bin/byte_chan > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(BYTE_CHAN_OBJS:.o=.d)
+endif
 
 bin/hv-byte_chan-1p.dtb: hv-byte_chan-1p.dts bin/byte_chan-p1.dtb
 

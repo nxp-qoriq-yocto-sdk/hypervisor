@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -22,7 +21,6 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
 
 #
 # Copyright © 2007 Freescale Semiconductor, Inc
@@ -53,7 +51,9 @@ bin/msgsnd: $(MSGSND_OBJS)
 bin/msgsnd.map: bin/msgsnd
 	nm -n bin/msgsnd > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(MSGSND_OBJS:.o=.d)
+endif
 
 bin/hv-msgsnd-1p.dtb: hv-msgsnd-1p.dts bin/msgsnd-p1.dtb
 

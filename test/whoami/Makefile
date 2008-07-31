@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,12 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: whoami_all
 
 include ../Makefile.inc
 
-WHOAMI_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) whoami.c 
+WHOAMI_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) whoami.c
 WHOAMI_OBJS := $(basename $(WHOAMI_SRCS))
 WHOAMI_OBJS := $(WHOAMI_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 WHOAMI_OBJS := $(WHOAMI_OBJS:%=bin/%)
@@ -44,7 +42,9 @@ bin/whoami: $(WHOAMI_OBJS)
 bin/whoami.map: bin/whoami
 	nm -n bin/whoami > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(WHOAMI_OBJS:.o=.d)
+endif
 
 bin/hv-whoami-1p.dtb: hv-whoami-1p.dts bin/whoami-p1.dtb
 

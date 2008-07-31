@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,12 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: dma_all
 
 include ../Makefile.inc
 
-DMA_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) dma-test.c 
+DMA_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) dma-test.c
 DMA_OBJS := $(basename $(DMA_SRCS))
 DMA_OBJS := $(DMA_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 DMA_OBJS := $(DMA_OBJS:%=bin/%)
@@ -44,7 +42,9 @@ bin/dma: $(DMA_OBJS)
 bin/dma.map: bin/dma
 	nm -n bin/dma > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(DMA_OBJS:.o=.d)
+endif
 
 bin/hv-dma-1p.dtb: hv-dma-1p.dts bin/dma-test-p1.dtb
 

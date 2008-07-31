@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,12 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: hello_all
 
 include ../Makefile.inc
 
-HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) hello.c 
+HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) hello.c
 HELLO_OBJS := $(basename $(HELLO_SRCS))
 HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
@@ -44,7 +42,9 @@ bin/hello: $(HELLO_OBJS)
 bin/hello.map: bin/hello
 	nm -n bin/hello > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(HELLO_OBJS:.o=.d)
+endif
 
 bin/hv-hello-1p.dtb: hv-hello-1p.dts bin/hello-p1.dtb
 

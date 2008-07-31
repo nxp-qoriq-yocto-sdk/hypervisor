@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,12 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: fit_all
 
 include ../Makefile.inc
 
-FIT_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) fit.c 
+FIT_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) fit.c
 FIT_OBJS := $(basename $(FIT_SRCS))
 FIT_OBJS := $(FIT_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 FIT_OBJS := $(FIT_OBJS:%=bin/%)
@@ -44,7 +42,9 @@ bin/fit: $(FIT_OBJS)
 bin/fit.map: bin/fit
 	nm -n bin/fit > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(FIT_OBJS:.o=.d)
+endif
 
 bin/hv-fit.dtb: hv-fit.dts bin/fit-p1.dtb
 

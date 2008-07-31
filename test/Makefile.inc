@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -22,7 +21,6 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
 
 DTC_DIR := ../../../dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
@@ -94,8 +92,10 @@ bin/%.dtb : %.dts
 	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
 
 # include the dependecy files
+ifneq ($(MAKECMDGOALS),clean)
 ifeq ($(NO_LIBOS),)
 -include bin/libos/libos_assym.d
+endif
 endif
 
 bin/example.map: bin/example

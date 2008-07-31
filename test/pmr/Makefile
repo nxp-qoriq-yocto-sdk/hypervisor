@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,13 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
-
 all: pmr_all
 
 include ../Makefile.inc
 
-PMR_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) pmr.c 
+PMR_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) pmr.c
 PMR_OBJS := $(basename $(PMR_SRCS))
 PMR_OBJS := $(PMR_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 PMR_OBJS := $(PMR_OBJS:%=bin/%)
@@ -45,7 +42,9 @@ bin/pmr: $(PMR_OBJS)
 bin/pmr.map: bin/pmr
 	nm -n bin/pmr > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(PMR_OBJS:.o=.d)
+endif
 
 bin/hv-pmr.dtb: hv-pmr.dts bin/pmr.dtb
 

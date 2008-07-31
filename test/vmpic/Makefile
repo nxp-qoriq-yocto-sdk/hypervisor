@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,7 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: vmpic_all
 
 include ../Makefile.inc
@@ -44,7 +42,9 @@ bin/vmpic: $(VMPIC_OBJS)
 bin/vmpic.map: bin/vmpic
 	nm -n bin/vmpic > $@
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(VMPIC_OBJS:.o=.d)
+endif
 
 bin/hv-vmpic-1p.dtb: hv-vmpic-1p.dts bin/vmpic-p1.dtb
 bin/hv-vmpic-coreint.dtb: hv-vmpic-coreint.dts bin/vmpic-p1.dtb

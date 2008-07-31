@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,12 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 all: mmu_all
 
 include ../Makefile.inc
 
-MMU_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) mmu.c 
+MMU_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) mmu.c
 MMU_OBJS := $(basename $(MMU_SRCS))
 MMU_OBJS := $(MMU_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 MMU_OBJS := $(MMU_OBJS:%=bin/%)
@@ -41,7 +39,9 @@ bin/mmu.bin: bin/mmu
 bin/mmu: $(MMU_OBJS)
 	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(MMU_OBJS) -lgcc
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(MMU_OBJS:.o=.d)
+endif
 
 bin/hv-mmu.dtb: hv-mmu.dts bin/mmu.dtb
 
