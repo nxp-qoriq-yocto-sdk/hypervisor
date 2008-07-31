@@ -11,8 +11,11 @@
 		stdin = &uart0;
 		serial0 = &uart0;
 		serial1 = &uart1;
+		uartmux = &uartmux;
+		byte-channel0 = &bc0;
+		byte-channel1 = &bc1;
 		byte-channel2 = &bc2;
-		gdb-stub0 = &stub0;
+		byte-channel3 = &bc3;
 	};
 
 	cpus {
@@ -181,30 +184,133 @@
 		};
 	};
 
-	byte-channels {
-		bc2: byte-channel2 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uart1>;
-		};
+	uartmux: uartmux {
+		compatible = "fsl,hv-byte-channel-mux";
+		fsl,phys-dev = <&uart1>;
 	};
 
+	byte-channels {
+		/* bc0 here is a weird case for testing purposes.
+		 * It sets up a loopback in the mux, so that
+		 * data coming in channel 0 goes out channel 1.
+		 * bc0 is _not_ usable by a guest.
+		 */
+		bc0: byte-channel0 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <0>;
+		};
+
+		bc1: byte-channel1 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <1>;
+		};
+
+		bc2: byte-channel2 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <2>;
+		};
+
+		bc3: byte-channel3 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <3>;
+		};
+
+		bc3: byte-channel4 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <4>;
+		};
+
+		bc3: byte-channel5 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <5>;
+		};
+
+		bc3: byte-channel6 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <6>;
+		};
+
+		bc3: byte-channel7 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&uartmux>;
+			fsl,mux-channel = <7>;
+		};
+	};
 
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <0 1 2 1>;
+			fsl,hv-cpus = <0 1>;
 			fsl,entry = <0>;
-			fsl,privileged;
 			fsl,hv-physaddr-map = <0 0 0 0x10000000 0x10000000>;
 			fsl,hv-dtb = /incbin/("bin/gdb-p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 
-			stub0: gdb-stub0 {
+			debug-stub0 {
 				compatible = "fsl,hv-gdb-stub";
-				fsl,endpoint = <&bc2>;
 				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,endpoint = <&bc0>;
 			};
 		};
+
+		part2 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <1 1>;
+			fsl,entry = <0>;
+			fsl,hv-physaddr-map = <0 0 0 0x20000000 0x10000000>;
+			fsl,hv-dtb = /incbin/("bin/gdb-p2.dtb");
+			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+
+			debug-stub1 {
+				compatible = "fsl,hv-gdb-stub";
+				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,endpoint = <&bc1>;
+			};
+		};
+
+		part3 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <2 1>;
+			fsl,entry = <0>;
+			fsl,hv-physaddr-map = <0 0 0 0x30000000 0x10000000>;
+			fsl,hv-dtb = /incbin/("bin/gdb-p3.dtb");
+			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+
+			debug-stub2 {
+				compatible = "fsl,hv-gdb-stub";
+				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,endpoint = <&bc2>;
+			};
+		};
+
+		part4 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <3 1>;
+			fsl,entry = <0>;
+			fsl,hv-physaddr-map = <0 0 0 0x40000000 0x10000000>;
+			fsl,hv-dtb = /incbin/("bin/gdb-p4.dtb");
+			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+
+			debug-stub3 {
+				compatible = "fsl,hv-gdb-stub";
+				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,endpoint = <&bc3>;
+			};
+		};
+
+	};
+
+	chosen {
 	};
 };

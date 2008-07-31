@@ -45,6 +45,7 @@
 #include <elf.h>
 #include <events.h>
 #include <doorbell.h>
+#include <gdb-stub.h>
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
@@ -656,6 +657,10 @@ static void start_guest_primary_nowait(void)
 	assert(guest->state == guest_starting);
 	reset_spintbl(guest);
 
+#ifdef CONFIG_GDB_STUB
+	gdb_stub_init();
+#endif
+
 	/* FIXME: append device tree to image, or use address provided by
 	 * the device tree, or something sensible like that.
 	 */
@@ -787,6 +792,9 @@ static void start_guest_secondary(void)
 	if (cpu->ret_user_hook)
 		return;
 
+#ifdef CONFIG_GDB_STUB
+	gdb_stub_init();
+#endif
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
 	         "secondary %d/%d spun up, addr %lx\n",
 	         pir, gpir, guest->spintbl[gpir].addr_lo);

@@ -4,6 +4,7 @@
 
 /*
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -237,15 +238,15 @@ int main(void)
 {
 	printf("%s", freescale_copyright);
 
-	printf("char *power_core_description = \"\\\n");
+	printf("const char power_core_description[] = \"\\\n");
 	emit_power_core_description();
 	printf("\";\n");
 
-	printf("char *power_fpu_description = \"\\\n");
+	printf("const char power_fpu_description[] = \"\\\n");
 	emit_power_fpu_description();
 	printf("\";\n");
 
-	printf("char *e500mc_description = \"\\\n");
+	printf("const char e500mc_description[] = \"\\\n");
 	emit_e500mc_description();
 	printf("\";\n");
 

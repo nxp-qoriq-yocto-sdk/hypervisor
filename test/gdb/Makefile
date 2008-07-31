@@ -1,3 +1,4 @@
+
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -22,6 +23,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+
 all: gdb_all
 
 include ../Makefile.inc
@@ -31,7 +33,12 @@ GDB_OBJS := $(basename $(GDB_SRCS))
 GDB_OBJS := $(GDB_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 GDB_OBJS := $(GDB_OBJS:%=bin/%)
 
-gdb_all: bin/gdb.bin bin/gdb.map bin/hv-gdb.dtb
+GDB_HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdb-hello.c
+GDB_HELLO_OBJS := $(basename $(GDB_HELLO_SRCS))
+GDB_HELLO_OBJS := $(GDB_HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+GDB_HELLO_OBJS := $(GDB_HELLO_OBJS:%=bin/%)
+
+gdb_all: bin/gdb.bin bin/gdb.map bin/hv-gdb.dtb bin/gdb-hello.bin bin/hv-gdb-4p.dtb
 
 bin/gdb.bin: bin/gdb
 	$(CROSS_COMPILE)objcopy -O binary $< $@
@@ -43,9 +50,21 @@ bin/gdb.map: bin/gdb
 	nm -n bin/gdb > $@
 
 ifneq ($(MAKECMDGOALS),clean)
+bin/gdb-hello.bin: bin/gdb-hello
+	$(CROSS_COMPILE)objcopy -O binary $< $@
+
+bin/gdb-hello: $(GDB_HELLO_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDB_HELLO_OBJS) -lgcc
+
 -include $(GDB_OBJS:.o=.d)
+-include $(GDB_HELLO_OBJS:.o=.d)
 endif
 
 bin/hv-gdb.dtb: hv-gdb.dts bin/gdb-p1.dtb
-
 bin/gdb-p1.dtb: gdb-p1.dts
+
+bin/hv-gdb-4p.dtb: hv-gdb-4p.dts bin/gdb-p1.dtb bin/gdb-p2.dtb bin/gdb-p3.dtb bin/gdb-p4.dtb
+bin/gdb-p1.dtb: gdb-p1.dts
+bin/gdb-p2.dtb: gdb-p2.dts
+bin/gdb-p3.dtb: gdb-p3.dts
+bin/gdb-p4.dtb: gdb-p4.dts

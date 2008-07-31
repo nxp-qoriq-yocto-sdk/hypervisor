@@ -56,7 +56,7 @@
 
                         byte-channel0 {
                                 compatible = "fsl,hv-byte-channel-handle";
-                                fsl,endpoint = "/byte-channels/byte-channel4";
+                                fsl,endpoint = "/byte-channels/byte-channel5";
                         };
 		};
 	};

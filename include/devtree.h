@@ -76,4 +76,5 @@ void open_stdin(void);
 extern void *fdt;
 extern struct queue *stdin, *stdout;
 
+int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible);
 #endif

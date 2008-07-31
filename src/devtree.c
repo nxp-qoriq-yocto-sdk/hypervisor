@@ -741,3 +741,21 @@ int get_interrupt(const void *tree, int node, int intnum,
 		return ERR_BADTREE;
 	}
 }
+
+
+/*
+ * Searches for a descendant of the supplied offset by compatible
+ *
+ */
+int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible)
+{
+       while (1) {
+		offset = fdt_next_node(fdt, offset, depth);
+		if (offset < 0)
+			return offset;
+		if (*depth < 1)
+			return -FDT_ERR_NOTFOUND;
+		if (fdt_node_check_compatible(fdt, offset, compatible) == 0)
+			return offset;
+       }
+}

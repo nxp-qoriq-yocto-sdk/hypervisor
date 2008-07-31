@@ -38,7 +38,6 @@
 #include <pamu.h>
 #include <bcmux.h>
 #include <devtree.h>
-#include <gdb-stub.h>
 #include <ipi_doorbell.h>
 #include <shell.h>
 
@@ -202,10 +201,6 @@ void start(unsigned long devtree_ptr)
 
 #ifdef CONFIG_IPI_DOORBELL
 	create_doorbells();
-#endif
-
-#ifdef CONFIG_GDB_STUB
-	gdb_stub_init();
 #endif
 
 #ifdef CONFIG_PAMU

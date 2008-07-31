@@ -1,9 +1,17 @@
 /** @file
+ *
  * HV GDB Stub.
- */
-
-/*
+ *
+ * - GDB Remote Serial Protocol support for GDB (version 6.7 or later).
+ *   (Commands supported: g, G, m, M, c, s, ?, z0, Z0, qXfer:features:read).
+ * - GDB Target Description Format support per Appendix F of GDB 6.7
+ *   reference manual:
+ *     Debugging with GDB, The GNU Source-Level Debugger,
+ *     Ninth Edition, for gdb version 6.7.50.20080119
+ *     Free Software Foundation.
+ *
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,84 +45,98 @@
 #include <greg.h>
 #include <e500mc-data.h>
 
-/* TODO:
- * 0. Add descriptive comment per function/data-structure.
- * 1. Do not use globals, use alloc() instead to carve out
- *    chunks of memory at init time.
- *    CAUTION: Do not free the memory you got from alloc().
- */
+#define TRACE(fmt, info...) \
+	printlog(LOGTYPE_GDB_STUB, \
+	LOGLEVEL_DEBUG, \
+	"%s@[%s, %d]: " fmt "\n", \
+	__func__, __FILE__, __LINE__, ## info)
 
-/* Context prefix for error messages. */
-#define CTXT_EMSG "gdb-stub"
-
-static const byte_chan_t *find_gdb_stub_byte_channel(void);
+static const byte_chan_t *find_stub_byte_channel(char *compatible);
 static int register_callbacks(void);
 
-#define TRACE(fmt, info...) \
-		printlog(LOGTYPE_GDB_STUB, \
-		LOGLEVEL_DEBUG, \
-		"%s@[%s, %d]: " fmt "\n", \
-		__func__, __FILE__, __LINE__, ## info)
+extern void *fdt;
 
-/**
- * Enumerate the various events that we are interested in. The external world in
- * the hypervisor only knows that a "GDB event" occurred. However, within the
- * stub, we need to have a finer view of things, as captured in the following
- * enum 'event_type'. The global variable 'event_type', is used to record the
- * current event.
- */
+#define CHECK_MEM(p) \
+	if (!p) { \
+		TRACE("Out of memory?"); \
+		return GDB_STUB_INIT_FAILURE; \
+	}
 
-enum event_type {
+int gdb_stub_init(void)
+{
+	gdb_stub_core_context_t *stub;
+	gcpu_t *gcpu = NULL;
+	TRACE();
+	stub = (gdb_stub_core_context_t *)malloc(sizeof(gdb_stub_core_context_t));
+	memset(stub, 0, sizeof(gdb_stub_core_context_t));
+	stub->byte_channel = find_stub_byte_channel("fsl,hv-gdb-stub");
+	stub->cbuf = (uint8_t *)malloc(BUFMAX*sizeof(uint8_t));
+	CHECK_MEM(stub->cbuf);
+	memset(stub->cbuf, 0, BUFMAX*sizeof(uint8_t));
+	stub->command.buf = stub->cbuf;
+	stub->command.len = BUFMAX;
+	stub->command.cur = stub->cbuf;
+	stub->cmd = &stub->command;
+	stub->rbuf = (uint8_t *)malloc(BUFMAX*sizeof(uint8_t));
+	CHECK_MEM (stub->rbuf);
+	memset(stub->rbuf, 0, BUFMAX*sizeof(uint8_t));
+	stub->response.buf = stub->rbuf;
+	stub->response.len = BUFMAX;
+	stub->response.cur = stub->rbuf;
+	stub->rsp = &stub->response;
+	stub->breakpoint_table = (breakpoint_t *)malloc(MAX_BREAKPOINT_COUNT*sizeof(breakpoint_t));
+	CHECK_MEM (stub->breakpoint_table);
+	gcpu = get_gcpu();
+	CHECK_MEM (gcpu);
+	gcpu->debug_stub_data = stub;
+	return register_callbacks();
+}
 
-	/* RX interrupt. */
-	received_data,
-};
-
-/* TODO: make it per-guest. */
-enum event_type event_type;
-
-/**
- * The byte channel for the GDB stub. All communication in and out of the GDB
- * stub flows through this byte channel.
- *
- * TODO: There's more than one guest; thus, there can be more than one GDB
- *       stub active.
- */
-
-static const byte_chan_t *byte_channel = NULL;
-static byte_chan_handle_t *byte_channel_handle = NULL;
-
-/** Find in the device-tree, the byte-channel that the gdb-stub is connected to.
+/** Find in the device-tree, the byte-channel that this instance of the gdb-stub
+ * is connected to.
  * @return pointer to the byte-channel with the gdb-stub as it's end-point.
  */
-static const byte_chan_t *find_gdb_stub_byte_channel(void)
+static const byte_chan_t *find_stub_byte_channel(char *compatible)
 {
-	int start_offset = -1;
-	int prop_length = 0;
-	int node_offset = 0;
+	gcpu_t *gcpu = NULL;
+	gcpu = get_gcpu();
+	int32_t off = -1, vcpu_num;
 	const uint32_t *fsl_ep = NULL;
+	int32_t prop_length = 0;
+	uint32_t node_offset = 0;
 	uint32_t bc_phandle = 0;
-	int bc_offset = 0;
+	uint32_t bc_offset = 0;
 	byte_chan_t *const *bc_ptr = NULL;
+	uint8_t match = 0;
+	int32_t depth = 0;
 
-	TRACE();
-
-	/* Search flat device tree for gdb-stub node.
-	 */
-	node_offset = fdt_node_offset_by_compatible(fdt, start_offset,
-	                                            "fsl,hv-gdb-stub");
-	if (node_offset == -FDT_ERR_NOTFOUND) {
-		/* This is not an error - it just means that no GDB stubs were
-		 * configured. We should return silently.
-		 */
-		return NULL;
+	off = gcpu->guest->partition;
+	while (1) {
+		off = fdt_next_descendant_by_compatible(fdt, off, &depth, compatible);
+		TRACE("off: %d\n", off);
+		if (off < 0)
+			break;
+		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-debug-cpus", &prop_length);
+		if (fsl_ep == NULL) {
+			if (prop_length == -FDT_ERR_NOTFOUND) {
+				TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
+				return NULL;
+			}
+			TRACE("Internal error: libfdt error return: %d.", prop_length);
+			return NULL;
+		}
+		/* FIXME: Handle multiple vcpu's */
+		vcpu_num = *fsl_ep;
+		TRACE("VCPU_NUM = %d\n", vcpu_num);
+		TRACE("GCPU_NUM = %d\n", gcpu->gcpu_num);
+		if (vcpu_num == gcpu->gcpu_num) {
+			match = 1;
+			break;
+		}
 	}
-	if (node_offset < 0) {
-		TRACE("%s: %s: libfdt error %d (%s).", CTXT_EMSG, __func__,
-		       node_offset, fdt_strerror(node_offset));
+	if (!match)
 		return NULL;
-	}
-
+	node_offset = off;
 	/* Get value of fsl,endpoint (a phandle), which gives you the offset of
 	 * the byte-channel in the device tree.
 	 */
@@ -124,17 +146,14 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	fsl_ep = fdt_getprop(fdt, node_offset, "fsl,endpoint", &prop_length);
 	if (fsl_ep == NULL) {
 		if (prop_length == -FDT_ERR_NOTFOUND) {
-			TRACE("%s: %s: Did not find fsl,endpoint in gdb-stub "
-			       "node in the device tree.", CTXT_EMSG,
-			       __func__);
+			TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
 			return NULL;
 		}
-		TRACE("%s: %s: Internal error: libfdt error return: %d.",
-		       CTXT_EMSG, __func__, prop_length);
+		TRACE("Internal error: libfdt error return: %d.", prop_length);
 		return NULL;
 	}
 	if (prop_length != 4) {
-		TRACE("%s: %s: Invalid fsl,endpoint.", CTXT_EMSG, __func__);
+		TRACE("Invalid fsl,endpoint.");
 		return NULL;
 	}
 	bc_phandle = *fsl_ep;
@@ -150,17 +169,14 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	TRACE("bc_ptr: 0x%x, *bc_ptr: 0x%x", (uint32_t) bc_ptr, (uint32_t) *bc_ptr);
 	if (bc_ptr == NULL) {
 		if (prop_length == -FDT_ERR_NOTFOUND) {
-			TRACE("%s: %s: endpoint is not a byte channel",
-			       CTXT_EMSG, __func__);
+			TRACE("endpoint is not a byte channel");
 			return NULL;
 		}
-		TRACE("%s: %s: Internal error: libfdt error return: %d.",
-		       CTXT_EMSG, __func__, prop_length);
+		TRACE("Internal error: libfdt error return: %d.", prop_length);
 		return NULL;
 	}
 	if (prop_length != 4) {
-		TRACE("%s: %s: gdb-stub got invalid fsl,hv-internal-bc-ptr.",
-		       CTXT_EMSG, __func__);
+		TRACE("gdb-stub got invalid fsl,hv-internal-bc-ptr.");
 		return NULL;
 	}
 
@@ -168,15 +184,31 @@ static const byte_chan_t *find_gdb_stub_byte_channel(void)
 	return *bc_ptr; /* PS: Note deref. */
 }
 
+/**
+ * Enumerate the various events that we are interested in. The external world in
+ * the hypervisor only knows that a "GDB event" occurred. However, within the
+ * stub, we need to have a finer view of things, as captured in the following
+ * enum 'event_type'. The global variable 'event_type', is used to record the
+ * current event.
+ */
+
+enum event_type {
+
+	/* RX interrupt. */
+	received_data,
+};
+
+enum event_type event_type;
+
 /** Callback for RX interrupt.
  *
  */
 static void rx(queue_t *q)
 {
 	TRACE();
-	/* Record the event type and setevent GEV_GDB on the current CPU. */
+	/* Record the event type and setgevent GEV_GDB on the current CPU. */
 	event_type = received_data;
-	setgevent(get_gcpu(), GEV_GDB);
+	setgevent((gcpu_t*)q->consumer, GEV_GDB);
 	/* TODO: What if there were some other event in progress?  It'll be
 	 * lost. The GDB event handler should check whether the input queue
 	 * is empty, rather than rely on a "received data" flag.
@@ -185,31 +217,25 @@ static void rx(queue_t *q)
 
 static int register_callbacks(void)
 {
+	gdb_stub_core_context_t *stub;
+	gcpu_t *gcpu = NULL;
+	gcpu = get_gcpu();
+	stub = gcpu->debug_stub_data;
 	TRACE();
-	if (byte_channel != NULL) {
-		byte_channel_handle = byte_chan_claim((byte_chan_t *)
-		                                      byte_channel);
-		if (byte_channel_handle == NULL) {
-			TRACE("%s: %s: gdb-stub failed to claim gdb-stub"
-			       " byte-channel.", CTXT_EMSG, __func__);
+	if (stub->byte_channel != NULL) {
+		stub->byte_channel_handle = byte_chan_claim((byte_chan_t *) stub->byte_channel);
+		if (stub->byte_channel_handle == NULL) {
+			TRACE("gdb-stub failed to claim gdb-stub byte-channel.");
 			return GDB_STUB_INIT_FAILURE;
 		}
 
-		/* No callback on a TX, since we're polling.
-		 * Register RX callback.
-		 */
-		byte_channel_handle->rx->data_avail = rx;
+		/* No callback on a TX, since we're polling. Register RX callback. */
+		stub->byte_channel_handle->rx->data_avail = rx;
+		stub->byte_channel_handle->rx->consumer = gcpu;
 		return GDB_STUB_INIT_SUCCESS;
 	}
 	else
 		return GDB_STUB_INIT_FAILURE;
-}
-
-int gdb_stub_init(void)
-{
-	TRACE();
-	byte_channel = find_gdb_stub_byte_channel();
-	return register_callbacks();
 }
 
 /* get_debug_char() and put_debug_char() are our
@@ -217,25 +243,25 @@ int gdb_stub_init(void)
  * one character at a time.
  */
 
-static uint8_t get_debug_char(void)
+static uint8_t get_debug_char(gdb_stub_core_context_t *stub)
 {
 	ssize_t byte_count = 0;
 	uint8_t ch;
 	TRACE();
 	do {
-		byte_count = byte_chan_receive(byte_channel_handle, &ch, 1);
+		byte_count = byte_chan_receive(stub->byte_channel_handle, &ch, 1);
 		/* internal error if byte_count > len */
 	} while (byte_count <= 0);
 	return ch;
 }
 
-static void put_debug_char(uint8_t c)
+static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c)
 {
 	size_t len = 1;
 	uint8_t buf[len];
 	buf[0] = c;
 	TRACE();
-	byte_chan_send(byte_channel_handle, buf, len);
+	byte_chan_send(stub->byte_channel_handle, buf, len);
 }
 
 /* TODO: Where do we call this? */
@@ -247,36 +273,13 @@ static inline int bufsize_sanity_check(void)
 #define ACK '+'
 #define NAK '-'
 
-static uint8_t hexit[] =
+static const uint8_t hexit[] =
 {
 	'0', '1', '2', '3',
 	'4', '5', '6', '7',
 	'8', '9', 'a', 'b',
 	'c', 'd', 'e', 'f',
 };
-
-typedef struct pkt
-{
-	uint8_t *buf;
-	uint32_t len;
-	uint8_t *cur;
-} pkt_t;
-
-/* These two packets contain the command received from GDB and the response to
- * be sent to GDB. cmd is to always contain a command whoose checksum has been
- * verified and with the leading '$', trailing '#' and 'checksum' removed.
- * Similarly, rsp is always to contain the content of the response packet
- * _without_ the leading '$' and '#' and the 'checksum'.
- * (All routines that operate on these buffers must ensure and should
- * assume that the content in these buffers is '\0' terminated).
- */
-static uint8_t cbuf[BUFMAX];
-static pkt_t command = { cbuf, BUFMAX, cbuf };
-static pkt_t *cmd = &command;
-
-static uint8_t rbuf[BUFMAX];
-static pkt_t response = { rbuf, BUFMAX, rbuf };
-static pkt_t *rsp = &response;
 
 /* Note: See lexeme_token_pairs. */
 typedef enum token
@@ -309,7 +312,7 @@ typedef struct lexeme_token_pair
 /* Note: lexeme_token_pairs and enum token_t have to be kept in synch as the token
  *       values are used to index the array.
  */
-static lexeme_token_pair_t lexeme_token_pairs[] =
+static const lexeme_token_pair_t lexeme_token_pairs[] =
 {
 	{ "?", reason_halted },
 	{ "c", continue_execution },
@@ -352,37 +355,15 @@ static inline uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i);
 static inline int pkt_full(pkt_t *pkt);
 static inline void pkt_reset(pkt_t *pkt);
 static inline uint8_t *content(pkt_t *pkt);
-static void put_debug_char(uint8_t c);
-static inline void ack(void);
-static inline void nak(void);
-static inline int got_ack(void);
-static void receive_command(pkt_t *cmd);
-static void transmit_response(pkt_t *rsp);
+static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c);
+static inline void ack(gdb_stub_core_context_t *stub);
+static inline void nak(gdb_stub_core_context_t *stub);
+static inline int got_ack(gdb_stub_core_context_t *stub);
+static void receive_command(gdb_stub_core_context_t *stub);
+static void transmit_response(gdb_stub_core_context_t *stub);
 static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 
 /* RSP */
-
-typedef enum breakpoint_type
-{
-	user,
-	/* 'stub' or internal breakpoints are strictly "once only".
-	 * i.e. We set these in order to do (software) single step;
-	 * as soon as we complete the single step, we delete this
-	 * kind of breakpoint - including - it's associated internal
-	 * breakpoint.
-	 */
-	stub,
-} breakpoint_type_t;
-
-typedef struct breakpoint
-{
-	uint32_t *addr;
-	uint32_t orig_insn;
-	uint32_t count;
-	uint8_t taken;
-	struct breakpoint *associated;
-	breakpoint_type_t type;
-} breakpoint_t;
 
 static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length);
 static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
@@ -391,10 +372,10 @@ static inline uint8_t *scan_till(uint8_t *q, char c);
 static inline uint32_t scan_num(uint8_t **buffer, char c);
 static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
-static inline void dump_breakpoint_table(void);
-static inline breakpoint_t *locate_breakpoint(uint32_t *addr);
-static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
-static inline void delete_breakpoint(breakpoint_t *breakpoint);
+static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
+static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
+static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
+static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 
 /* Auxiliary routines required by the RSP Engine.
@@ -524,8 +505,8 @@ static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
 	TRACE();
 	TRACE("Upper nibble hexed: '%c'", hex(upper_nibble(c)));
 	TRACE("Lower nibble hexed: '%c'", hex(lower_nibble(c)));
-	pkt_write_byte_update_cur(rsp, hex(upper_nibble(c)));
-	pkt_write_byte_update_cur(rsp, hex(lower_nibble(c)));
+	pkt_write_byte_update_cur(pkt, hex(upper_nibble(c)));
+	pkt_write_byte_update_cur(pkt, hex(lower_nibble(c)));
 	return;
 }
 
@@ -582,32 +563,32 @@ static inline uint8_t *content(pkt_t *pkt)
 	return pkt->buf;
 }
 
-static inline void ack(void)
+static inline void ack(gdb_stub_core_context_t *stub)
 {
 	TRACE();
-	put_debug_char(ACK);
+	put_debug_char(stub, ACK);
 	return;
 }
 
-static inline void nak(void)
+static inline void nak(gdb_stub_core_context_t *stub)
 {
 	TRACE();
-	put_debug_char(NAK);
+	put_debug_char(stub, NAK);
 	return;
 }
 
-static inline int got_ack(void)
+static inline int got_ack(gdb_stub_core_context_t *stub)
 {
 	uint8_t c;
 	TRACE();
-	c = (get_debug_char() == ACK);
+	c = (get_debug_char(stub) == ACK);
 	TRACE("Got: %c", c ? ACK : NAK);
 	return c;
 }
 
 /* Create well-defined content into cmd buffer.
  */
-static void receive_command(pkt_t *cmd)
+static void receive_command(gdb_stub_core_context_t *stub)
 {
 	uint8_t c;
 	uint32_t i = 0;
@@ -615,58 +596,59 @@ static void receive_command(pkt_t *cmd)
 
 	TRACE();
 	do {
-		while ((c = get_debug_char()) != '$') {
+		while ((c = get_debug_char(stub)) != '$') {
 			TRACE("Skipping '%c'. (Expecting '$').", c);
 		}
 
 		TRACE("Begin Looping:");
-		while ((c = get_debug_char()) != '#') {
+		while ((c = get_debug_char(stub)) != '#') {
 			TRACE("(Looping) Iteration: %d, got character: '%c'", i++, c);
-			pkt_write_byte_update_cur(cmd, c);
+			pkt_write_byte_update_cur(stub->cmd, c);
 		}
 		TRACE("Done Looping.");
-		pkt_write_byte_update_cur(cmd, '\0');
-		TRACE("Received command: %s", content(cmd));
+		pkt_write_byte_update_cur(stub->cmd, '\0');
+		TRACE("Received command: %s", content(stub->cmd));
 
 		for (i = 0; i < 2; i++) {
-			ccs[i] = get_debug_char();
+			ccs[i] = get_debug_char(stub);
 		}
 		TRACE("Got checksum: %s", ccs);
 
-		if (!(c = (checksum(content(cmd)) == htoi(ccs)))) {
+		if (!(c = (checksum(content(stub->cmd)) == htoi(ccs)))) {
 			TRACE("Checksum mismatch. Sending NAK and getting next packet.");
-			nak();
+			nak(stub);
 		}
 	} while (!c);
 
 	TRACE("Checksum match; sending ACK");
-	ack();
+	ack(stub);
 	return;
 }
 
 /* Create well-defined content into rsp buffer.
  */
-static void transmit_response(pkt_t *rsp)
+static void transmit_response(gdb_stub_core_context_t *stub)
 {
 	int i;
 	uint8_t c;
 	TRACE();
 	do {
-		TRACE("Transmitting response: %s", content(rsp));
-		put_debug_char('$');
+		TRACE("Transmitting response: %s", content(stub->rsp));
+		put_debug_char(stub, '$');
 		/* TODO: Why does this not work?
-		 * qprintf(byte_channel_handle->tx, "%s", content(rsp));
+		 * qprintf(byte_channel_handle->tx, "%s", content(stub->rsp));
 		 */
 		i = 0;
-		while (i < pkt_len(rsp) && (c = pkt_read_byte(rsp, i))) {
-			put_debug_char(c);
+		while (i < pkt_len(stub->rsp) && (c = pkt_read_byte(stub->rsp, i))) {
+			put_debug_char(stub, c);
 			i++;
 		}
-		put_debug_char('#');
-		put_debug_char(hex(upper_nibble(checksum(content(rsp)))));
-		put_debug_char(hex(lower_nibble(checksum(content(rsp)))));
-	} while (!got_ack());
-	pkt_reset(rsp);
+		put_debug_char(stub, '#');
+		TRACE("Got checksum: %d", checksum(content(stub->rsp)));
+		put_debug_char(stub, hex(upper_nibble(checksum(content(stub->rsp)))));
+		put_debug_char(stub, hex(lower_nibble(checksum(content(stub->rsp)))));
+	} while (!got_ack(stub));
+	pkt_reset(stub->rsp);
 	return;
 }
 
@@ -687,8 +669,7 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length)
 /* RSP Engine.
  */
 
-static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value,
-                                       uint32_t byte_length)
+static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length)
 {
 	int i, offset;
 	offset = (byte_length == 4 ? 4 : 0);
@@ -701,8 +682,7 @@ static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value,
 	value[2*byte_length] = '\0';
 }
 
-static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
-                           uint32_t reg_num)
+static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint32_t byte_length = 0;
 	register_t reg_value = 0xdeadbeef;
@@ -743,8 +723,7 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value,
 	return c;
 }
 
-static inline int write_reg(trapframe_t *trap_frame, uint8_t *value,
-                            uint32_t reg_num)
+static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint64_t reg_value;
 	uint32_t e500mc_reg_num;
@@ -811,11 +790,11 @@ static inline uint32_t scan_num(uint8_t **buffer, char c)
 	return n;
 }
 
-#define BREAK_IF_END(cur_pos)                          \
-	if (!*(cur_pos)) {                             \
-		pkt_cat_string(rsp, "E");              \
-		pkt_write_hex_byte_update_cur(rsp, 0); \
-		break;                                 \
+#define BREAK_IF_END(cur_pos) \
+	if (!*(cur_pos)) { \
+		pkt_cat_string(stub->rsp, "E"); \
+		pkt_write_hex_byte_update_cur(stub->rsp, 0); \
+		break; \
 	}
 
 static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
@@ -912,20 +891,10 @@ static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
 	return nia;
 }
 
-/* The _actual_ upper bound on the number of breakpoints that the
- * user can set per core is MAX_BREAKPOINT_COUNT/3. (We need to
- * insert upto two associated breakpoints per breakpoint (external
- * or internal) in order to single step,
- * (to replace the original insn, have the CPU execute it, and then
- * to replace back the trap_insn) when a breakpoint is hit).
- */
-#define MAX_BREAKPOINT_COUNT 32*3
-static breakpoint_t breakpoint_table[MAX_BREAKPOINT_COUNT];
-
 /* tw 12,r2,r2: 0x7d821008 */
 const uint32_t trap_insn = 0x7d821008;
 
-static inline void dump_breakpoint_table(void)
+static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table)
 {
 	uint32_t index, flag = 0;
 	TRACE("Breakpoint table:");
@@ -938,11 +907,11 @@ static inline void dump_breakpoint_table(void)
 			TRACE("\tcount: %d", breakpoint_table[index].count);
 			TRACE("\ttaken: %d", breakpoint_table[index].taken);
 			if (breakpoint_table[index].associated)
-				TRACE("\tassocated stub breakpoint: 0x%p",
+				TRACE("\tassocated internal breakpoint: 0x%p",
 				         breakpoint_table[index].associated->addr);
 			else
-				TRACE("\tno assocated stub breakpoint");
-			TRACE("\ttype: %s", breakpoint_table[index].type == user ?
+				TRACE("\tno assocated internal breakpoint");
+			TRACE("\ttype: %s", breakpoint_table[index].type == external ?
 			      "external" : "internal");
 		}
 	}
@@ -950,7 +919,7 @@ static inline void dump_breakpoint_table(void)
 		TRACE("\tEmpty.");
 }
 
-static inline breakpoint_t *locate_breakpoint(uint32_t *addr)
+static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr)
 {
 	uint32_t index;
 	TRACE("Checking if there is an entry in the breakpoint table for address: 0x%p.", addr);
@@ -964,7 +933,7 @@ static inline breakpoint_t *locate_breakpoint(uint32_t *addr)
 	return NULL;
 }
 
-static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type)
+static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type)
 {
 	uint32_t index;
 	uint32_t status = 1;
@@ -977,7 +946,7 @@ static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *ad
 		return NULL;
 	}
 	/* First check if there already is a breakpoint at addr and return rightaway if so. */
-	breakpoint = locate_breakpoint(addr);
+	breakpoint = locate_breakpoint(breakpoint_table, addr);
 	if (breakpoint) {
 		if (breakpoint->type == type) {
 			breakpoint->count++;
@@ -985,19 +954,19 @@ static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *ad
 			       addr, breakpoint->count);
 			return breakpoint;
 		}
-		if (breakpoint->type == user && type == stub) {
+		if (breakpoint->type == external && type == internal) {
 			TRACE("Previous external breakpoint (addr: 0x%p) found in breakpoint table. "
 			      "Cannot override with internal breakpoint.", addr);
 			return NULL;
 		}
-		if (breakpoint->type == stub && type == user) {
+		if (breakpoint->type == internal && type == external) {
 			TRACE("Resetting internal breakpoint at addr: 0x%p.", addr);
 			TRACE("Creating new external breakpoint at addr: 0x%p", addr);
 			/* Internal breakpoints will always have a ref count of 1 so
 			 * the following delete should completely blow it off from
 			 * the breakpoint table.
 			 */
-			delete_breakpoint(breakpoint);
+			delete_breakpoint(breakpoint_table, breakpoint);
 		}
 	}
 
@@ -1029,7 +998,7 @@ static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *ad
 			breakpoint_table[index].type = type;
 			status = 0;
 			TRACE("Entered %s breakpoint (addr: 0x%p) into breakpoint table.",
-			       type == user ? "external" : "internal", addr);
+			       type == external ? "external" : "internal", addr);
 			/* Quit iterating. */
 			break;
 		}
@@ -1039,7 +1008,7 @@ static inline breakpoint_t *set_breakpoint(trapframe_t *trap_frame, uint32_t *ad
 	return (status == 0) ? &breakpoint_table[index] : NULL;
 }
 
-static inline void delete_breakpoint(breakpoint_t *breakpoint)
+static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint)
 {
 	TRACE();
 	if (!breakpoint) {
@@ -1059,10 +1028,14 @@ static inline void delete_breakpoint(breakpoint_t *breakpoint)
 
 int gdb_stub_process_trap(trapframe_t *trap_frame)
 {
+	gdb_stub_core_context_t *stub;
+	gcpu_t *gcpu = NULL;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
 	uint8_t value[17];
 	TRACE("At entry");
+	gcpu = get_gcpu();
+	stub = gcpu->debug_stub_data;
 	/* register_t esr_reg_value = 0;
 	 * esr_reg_value = mfspr(SPR_ESR);
 	 * TRACE("esr_ptr check: %s", esr_reg_value == ESR_PTR ? "success" : "fail");
@@ -1076,12 +1049,12 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 	 * If so, invoke gdb_stub_event_handler();
 	 * Else return with code 1.
 	 */
-	breakpoint = locate_breakpoint((uint32_t *)nip_reg_value);
+	breakpoint = locate_breakpoint(stub->breakpoint_table, (uint32_t *)nip_reg_value);
 	if (!breakpoint) {
 		TRACE("Breakpoint not set by stub, returning (1).");
 		return 1;
 	}
-	if (breakpoint->type == stub) {
+	if (breakpoint->type == internal) {
 		TRACE("We've hit an internal (set by stub) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
 		if (breakpoint->associated) {
 			TRACE("Replace the original instruction back at the associated internal "
@@ -1090,32 +1063,32 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 			               breakpoint->associated->orig_insn);
 			TRACE("Delete the associated internal breakpoint: 0x%p",
 			       breakpoint->associated->addr);
-			delete_breakpoint(breakpoint->associated);
+			delete_breakpoint(stub->breakpoint_table, breakpoint->associated);
 		}
 		TRACE("Replace the original instruction back at the internal breakpoint: 0x%p", breakpoint->addr);
 		guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
-		delete_breakpoint(breakpoint);
+		delete_breakpoint(stub->breakpoint_table, breakpoint);
 		breakpoint = NULL;
 	} else {
 		TRACE("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
 	}
 	/* We _have_ to let GDB know that we hit a breakpoint (even if it is internal). */
 	TRACE("Sending T rsp");
-	pkt_cat_string(rsp, "T");
-	pkt_write_hex_byte_update_cur(rsp, 5);
-	pkt_write_hex_byte_update_cur(rsp, 1); /* r1 */
-	pkt_cat_string(rsp, ":");
+	pkt_cat_string(stub->rsp, "T");
+	pkt_write_hex_byte_update_cur(stub->rsp, 5);
+	pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
+	pkt_cat_string(stub->rsp, ":");
 	read_reg(trap_frame, value, 1);
-	pkt_cat_string(rsp, (char *)value);
-	pkt_cat_string(rsp, ";");
-	pkt_write_hex_byte_update_cur(rsp, 64); /* pc */
-	pkt_cat_string(rsp, ":");
+	pkt_cat_string(stub->rsp, (char *)value);
+	pkt_cat_string(stub->rsp, ";");
+	pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
+	pkt_cat_string(stub->rsp, ":");
 	read_reg(trap_frame, value, 64);
-	pkt_cat_string(rsp, (char *)value);
-	pkt_cat_string(rsp, ";");
+	pkt_cat_string(stub->rsp, (char *)value);
+	pkt_cat_string(stub->rsp, ";");
 	/* FIXME: This is a HACK. Is this the right fix? */
-	byte_channel_handle->rx->data_avail = NULL;
-	transmit_response(rsp);
+	stub->byte_channel_handle->rx->data_avail = NULL;
+	transmit_response(stub);
 	TRACE("Calling: gdb_stub_event_handler().");
 	gdb_stub_event_handler(trap_frame);
 	TRACE("Returning from gdb_stub_process_trap()");
@@ -1124,6 +1097,8 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
+	gdb_stub_core_context_t *stub;
+	gcpu_t *gcpu = NULL;
 	uint8_t *cur_pos, *sav_pos, *data;
 	uint32_t offset, length;
 	uint8_t err_flag = 0;
@@ -1135,21 +1110,23 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	breakpoint_t *breakpoint = NULL;
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
-	char *td; /* td: target description */
+	const char *td; /* td: target description */
 	TRACE("In RSP Engine, main loop.");
+	gcpu = get_gcpu();
+	stub = gcpu->debug_stub_data;
 	stub_start: {
 		TRACE("At stub_start.");
 		/* Deregister call back. */
-		byte_channel_handle->rx->data_avail = NULL;
+		stub->byte_channel_handle->rx->data_avail = NULL;
 		enable_critint();
 	}
 	while (1) {
 
 		TRACE("In main loop.");
-		dump_breakpoint_table();
-		pkt_reset(cmd);
-		receive_command(cmd);
-		switch(tokenize(content(cmd))) {
+		dump_breakpoint_table(stub->breakpoint_table);
+		pkt_reset(stub->cmd);
+		receive_command(stub);
+		switch(tokenize(content(stub->cmd))) {
 
 		case continue_execution:
 			/* o disable_critint() on a continue.
@@ -1162,8 +1139,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			TRACE("GOT 'c' PACKET.");
 			return_to_guest:
 				disable_critint();
-				byte_channel_handle->rx->data_avail = rx;
-				if (queue_empty(byte_channel_handle->rx)) {
+				stub->byte_channel_handle->rx->data_avail = rx;
+				if (queue_empty(stub->byte_channel_handle->rx)) {
 					TRACE("Returning to guest.");
 					return;
 				} else {
@@ -1174,11 +1151,11 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 
 		case read_register:
 			TRACE("Got 'p' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '\0');
 			read_reg(trap_frame, value, reg_num);
 			TRACE("Register: %d, read-value: %s", reg_num, value);
-			pkt_cat_string(rsp, (char *)value);
+			pkt_cat_string(stub->rsp, (char *)value);
 			break;
 
 		case read_registers:
@@ -1186,14 +1163,14 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
 				read_reg(trap_frame, value, reg_num);
 				TRACE("Register: %d, read-value: %s", reg_num, value);
-				pkt_cat_string(rsp, (char *)value);
+				pkt_cat_string(stub->rsp, (char *)value);
 			}
 			break;
 
 		case write_register:
 			TRACE("Got 'P' packet.");
 			err_flag = 0;
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '=');
 			BREAK_IF_END(cur_pos);
 			data = ++cur_pos;
@@ -1201,16 +1178,16 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			       reg_num, data, htoi(data));
 			err_flag = write_reg(trap_frame, data, reg_num);
 			if (err_flag == 0) {
-				pkt_cat_string(rsp, "OK");
+				pkt_cat_string(stub->rsp, "OK");
 			} else {
-				pkt_cat_string(rsp, "E");
-				pkt_write_hex_byte_update_cur(rsp, 0);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 			}
 			break;
 
 		case write_registers:
 			TRACE("Got 'G' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			data = ++cur_pos;
 			BREAK_IF_END(data);
 			TRACE("Got data (register values): %s", data);
@@ -1226,12 +1203,12 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 				data += 2 * byte_length;
 			}
 			TRACE("Done writing registers, sending: OK");
-			pkt_cat_string(rsp, "OK");
+			pkt_cat_string(stub->rsp, "OK");
 			break;
 
 		case set_thread:
 			TRACE("Got packet: 'H'");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			cur_pos++;
 			switch(*cur_pos) {
 
@@ -1256,35 +1233,32 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			} else {
 				TRACE("Thread: %s", cur_pos);
 			}
-			pkt_cat_string(rsp, "OK");
+			pkt_cat_string(stub->rsp, "OK");
 			break;
 
 		case read_memory:
 			TRACE("Got 'm' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			addr = (uint32_t *)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, '\0');
 			TRACE("Read memory at addr: 0x%p, length: %d", addr, length);
 			guestmem_set_data(trap_frame);
 			for (i = 0; i < length; i++) {
-				guestmem_in8((uint8_t *) addr + i, ((uint8_t *) (&value[0])));
-				if (value[0] == '\0')
-					TRACE("guestmem_in8 set value[0] to: 0");
-				else
-					TRACE("guestmem_in8 set value[0] to: %c", value[0]);
-				pkt_write_hex_byte_update_cur(rsp, value[0]);
+				if (guestmem_in8((uint8_t *) addr + i, ((uint8_t *) (&value[0]))) != 0)
+					value[0] = 0;
+				TRACE("value[0]: %c", value[0]);
+				pkt_write_hex_byte_update_cur(stub->rsp, value[0]);
 				TRACE("byte address: 0x%p, upper nibble value: %c",
-				      (uint8_t *)addr + i, hex(upper_nibble(value[0])));
+				       (uint8_t *)addr + i, hex(upper_nibble(value[0])));
 				TRACE("byte address: 0x%p, lower nibble value: %c",
-				      (uint8_t *)addr + i, hex(lower_nibble(value[0])));
-
+				       (uint8_t *)addr + i, hex(lower_nibble(value[0])));
 			}
 			break;
 
 		case write_memory:
 			TRACE("Got 'M' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			addr = (uint32_t *) scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, ':');
@@ -1301,24 +1275,24 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 					err_flag = 1;
 			}
 			if (err_flag == 0) {
-				pkt_cat_string(rsp, "OK");
+				pkt_cat_string(stub->rsp, "OK");
 			} else {
-				pkt_cat_string(rsp, "E");
-				pkt_write_hex_byte_update_cur(rsp, 0);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 			}
 			break;
 
 		case insert_breakpoint:
 		case remove_breakpoint:
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			aux = *cur_pos;
 			err_flag = 0;
 			TRACE("Got '%c' packet.", *cur_pos);
 			breakpoint_type = scan_num(&cur_pos, ',');
 			if (breakpoint_type != 0) {
 				TRACE("We only support memory breakpoints.");
-				pkt_cat_string(rsp, "E");
-				pkt_write_hex_byte_update_cur(rsp, 0);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 				break;
 			}
 			BREAK_IF_END(cur_pos);
@@ -1327,8 +1301,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			length = scan_num(&cur_pos, ':');
 			if (length != 4) {
 				TRACE("Breakpoint must be of length: 4.");
-				pkt_cat_string(rsp, "E");
-				pkt_write_hex_byte_update_cur(rsp, 0);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 				break;
 			}
 			TRACE("Breakpoint type: %d, addr: 0x%p, length: %d",
@@ -1336,44 +1310,44 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			TRACE("aux: %c", aux);
 			if (aux == 'Z') {
 				TRACE ("Invoking set_breakpoint.");
-				breakpoint = set_breakpoint(trap_frame, addr, user);
+				breakpoint = set_breakpoint(stub->breakpoint_table, trap_frame, addr, external);
 				breakpoint->associated = NULL;
 				err_flag = breakpoint ? 0 : 1;
 			} else { /* 'z' */
 				TRACE("Invoking locate_breakpoint.");
-				breakpoint = locate_breakpoint(addr);
+				breakpoint = locate_breakpoint(stub->breakpoint_table, addr);
 				if (breakpoint) {
 					TRACE("Located breakpoint placed at: 0x%p", addr);
-					delete_breakpoint(breakpoint);
+					delete_breakpoint(stub->breakpoint_table, breakpoint);
 				} else /* Vow! Spurious address! */ {
 					TRACE("No breakpoint placed at: 0x%p", addr);
 					err_flag = 1;
 				}
 			}
 			if (err_flag == 0) {
-				pkt_cat_string(rsp, "OK");
+				pkt_cat_string(stub->rsp, "OK");
 			} else {
-				pkt_cat_string(rsp, "E");
-				pkt_write_hex_byte_update_cur(rsp, 0);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 			}
 			break;
 
 		case single_step:
 			TRACE("Got 's' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
 			/* If there is no address to resume at; we resume at pc. */
 			addr = cur_pos[1] ? (uint32_t *)scan_num(&cur_pos, '\0') : pc;
 			nia = next_insn_addr(trap_frame);
 			TRACE("Single stepping to insn at nia: 0x%p or pc + 4: 0x%p", nia, pc + 1);
 			TRACE("Setting internal breakpoint at nia: 0x%p.", nia);
-			breakpoint_nia = set_breakpoint(trap_frame, nia, stub);
+			breakpoint_nia = set_breakpoint(stub->breakpoint_table, trap_frame, nia, internal);
 			TRACE("%s setting internal breakpoint at nia: 0x%p.",
 			       breakpoint_nia ? "Done" : "Not", nia);
 			/* Optimize: If nia == pc + 1 - create only one internal breakpoint. */
 			if (nia != pc + 1) {
 				TRACE("Setting internal breakpoint at pc + 4: 0x%p.", pc + 1);
-				breakpoint_incrpc = set_breakpoint(trap_frame, pc + 1, stub);
+				breakpoint_incrpc = set_breakpoint(stub->breakpoint_table, trap_frame, pc + 1, internal);
 				TRACE("%s setting internal breakpoint at pc + 4: 0x%p.",
 				       breakpoint_incrpc ? "Done" : "Not", pc + 1);
 			} else {
@@ -1394,29 +1368,29 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		case return_current_thread_id:
 			TRACE("Got 'qC' packet.");
 			/* For now let pid == 0 */
-			pkt_cat_string(rsp, "QC0");
+			pkt_cat_string(stub->rsp, "QC0");
 			break;
 
 		case get_section_offsets:
 			TRACE("Got 'qOffsets' packet.");
-			pkt_cat_string(rsp, "Text=0;Data=0;Bss=0");
+			pkt_cat_string(stub->rsp, "Text=0;Data=0;Bss=0");
 			break;
 
 		case supported_features:
 			TRACE("Got 'qSupported' packet.");
-			pkt_cat_string(rsp, "PacketSize=" BUFMAX_HEX ";");
-			pkt_cat_string(rsp, "qXfer:auxv:read-;"
-			                    "qXfer:features:read+;"
-			                    "qXfer:libraries:read-;"
-			                    "qXfer:memory-map:read-;"
-			                    "qXfer:spu:read-;"
-			                    "qXfer:spu:write-;"
-			                    "QPassSignals-;");
+			pkt_cat_string(stub->rsp, "PacketSize=" BUFMAX_HEX ";");
+			pkt_cat_string(stub->rsp, "qXfer:auxv:read-;"
+			                          "qXfer:features:read+;"
+			                          "qXfer:libraries:read-;"
+			                          "qXfer:memory-map:read-;"
+			                          "qXfer:spu:read-;"
+			                          "qXfer:spu:write-;"
+			                          "QPassSignals-;");
 			break;
 
 		case qxfer:
 			TRACE("Got 'qXfer' packet.");
-			cur_pos = content(cmd);
+			cur_pos = content(stub->cmd);
 			cur_pos += 5;
 			if (strncmp(":features:read:", (char *) cur_pos, 15) == 0) {
 				TRACE ("Got :features:read:");
@@ -1444,10 +1418,10 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 				length = scan_num (&cur_pos, '\0');
 				TRACE ("td-len: %d, offset: %d, length: %d", strlen (td), offset, length);
 				if (offset < strlen (td)) {
-					pkt_cat_string(rsp, "m");
-					pkt_cat_stringn(rsp, (uint8_t *)(td + offset), length);
+					pkt_cat_string(stub->rsp, "m");
+					pkt_cat_stringn(stub->rsp, (uint8_t *)(td + offset), length);
 				} else {
-					pkt_cat_string(rsp, "l");
+					pkt_cat_string(stub->rsp, "l");
 				}
 			}
 			break;
@@ -1458,16 +1432,16 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 * TODO: Also, signal == 2 For now.
 			 */
 			TRACE("Got stop reply packet: '?'");
-			pkt_cat_string(rsp, "S");
-			pkt_write_hex_byte_update_cur(rsp, 2);
+			pkt_cat_string(stub->rsp, "S");
+			pkt_write_hex_byte_update_cur(stub->rsp, 2);
 			break;
 
 		default:
 			TRACE("Unhandled RSP directive: %s, transmitting response: '%s'",
-			       content(cmd), content(rsp));
+			       content(stub->cmd), content(stub->rsp));
 			break;
 		}
-		transmit_response(rsp);
+		transmit_response(stub);
 	}
 }
 

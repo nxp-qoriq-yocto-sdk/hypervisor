@@ -168,7 +168,10 @@ endif
 bin/uv.map: bin/uv
 	nm -n bin/uv > $@
 
-.PHONY: test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
+.PHONY: test-gdb-hello test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
+
+test-gdb-hello: bin/uv.uImage test/gdb
+	$(SIMICS) test/gdb/hv-gdb-4p.simics
 
 test-gdb: bin/uv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb.simics

@@ -162,6 +162,7 @@ typedef struct gcpu {
 	uint32_t timer_flags;
 	
 	unsigned int stats[num_gcpu_stats];
+	void *debug_stub_data;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
