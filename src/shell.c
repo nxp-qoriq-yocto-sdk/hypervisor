@@ -26,6 +26,7 @@
  */
 
 #include <libos/readline.h>
+#include <libos/pamu.h>
 
 #include <errors.h>
 #include <devtree.h>
@@ -399,3 +400,31 @@ static command_t pi = {
 	            "  The partition number can be obtained with list-partitions.",
 };
 shell_cmd(pi);
+
+#ifdef CONFIG_PAMU
+static void paact_dump_fn(shell_t *shell, char *args)
+{
+	int liodn;
+	ppaace_t *entry;
+
+	/*
+	 * Currently all PAMUs in the platform share the same PAACT(s), hence,
+	 * this command does not support a PAMU#
+	 */
+
+	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
+		entry = get_ppaace(liodn);
+		if (entry->v) {
+			qprintf(shell->out, "liodn#: %d wba: 0x%x wse: 0x%x twba: 0x%x\n",
+				liodn, entry->wbal, entry->wse, entry->twbal);
+		}
+	}
+}
+
+static command_t paact = {
+	.name = "paact",
+	.action = paact_dump_fn,
+	.shorthelp = "Dump PAMU's PAACT table entries",
+};
+shell_cmd(paact);
+#endif
