@@ -11,6 +11,7 @@
 		stdin = &uart0;
 		serial0 = &uart0;
 		qman = &qman;
+		bman = &bman;
 	};
 
 	cpus {
@@ -155,6 +156,12 @@
 		qman: qman@318000 {
 			compatible = "fsl,qman";
 			reg = <0x318000 0x1000>;
+			fsl,liodn = <0>;  // set by u-boot
+		};
+
+		bman: bman@31a000 {
+			compatible = "fsl,bman";
+			reg = <0x31a000 0x1000>;
 			fsl,liodn = <0>;  // set by u-boot
 		};
 
