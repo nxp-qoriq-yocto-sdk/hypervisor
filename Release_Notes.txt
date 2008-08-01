@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc9
-Date: 8/01/2008
+Revsion: 0.2-rc10
+Date: 8/09/2008
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,31 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc9
+   -Topaz 0.2-rc10
       -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc9
+      -requires libos tag v0.2-rc10
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc10 bug fixes and changes
+      -check for negative and free handles (bug 1839)
+      -image load table gets entry point from first ELF image
+       (bug 1824)
+      -print error when core is referenced by multiple partitions
+      -improved logging for guest device tree processing (bug 1803)
+      -partman tool has improved error handling-- note requires
+       new Linux kernel driver
+      -gdb stub supports debugging from 1st instruction of guest
+      -support fsl,hv-map-ranges property
+      -improved error checking for partman (bug 1766)
+      -added partition label support-- "label" property on 
+       partition node let's guests identify themselves through
+       the guest device tree.  This property is also displayed
+       on partman -s.
+      -implement entry-point in FH_PARTITION_START (bug 1880)
 
    -Topaz 0.2-rc9 bug fixes and changes
       -increased number of handles supported-- fixes bugs
@@ -195,23 +212,26 @@ Contents
    -"Guest cache lock mode" as defined by the Topaz spec is not
     implemented
 
-
- C. Platform Feature Limitations
+ C. p4080 Platform Features
 
    -Coherence subdomains
-      -support for coherence subdomains is not implemented
+      -Support for coherence subdomains is not implemented.  All
+       memory is globally coherent.
 
    -L3 / Platform Cache configuration is not implemented
 
    -platform error interrupts
-      -in the platform MPIC multiple error interrupts are multiplexed
+      -In the platform MPIC multiple error interrupts are multiplexed
        to interrupt 0.  De-multiplexing and routing of platform
        error interrupts to partitions is not implemented.
 
- D. Hypervisor Services Limitations
+ D. Configuration
+   -the hypervisor must be loaded and run from physical address 0x0
+
+ E. Hypervisor Services
 
    -Partition Management
-      -partition management interrupts (as specified in the
+      -Partition management interrupts (as specified in the
        Topaz spec) are not implemented:
          -partition state change 
          -watchdog expiration
@@ -227,7 +247,7 @@ Contents
       -the stub is limited to debugging the boot core in 
        each partition.  SMP debugging is not supported.
 
- E. ePAPR Related Notes
+ F. ePAPR Related Notes
 
     -The hypervisor does not currently comply with the ePAPR 
      ELF loading requirements with respect to the physical
