@@ -507,8 +507,7 @@ void pamu_global_init(void)
 	unsigned long pamu_reg_base, pamu_reg_off;
 	int guts_node;
 	phys_addr_t guts_addr, guts_size;
-	uint32_t pamubypenr, pamu_counter;
-	uintptr_t pamubypenr_offset;
+	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -548,8 +547,9 @@ void pamu_global_init(void)
 		return;
 	}
 
-	pamubypenr_offset = (CCSRBAR_VA + guts_addr - CCSRBAR_PA) + PAMUBYPENR;
-	pamubypenr = in32((uint32_t *) pamubypenr_offset);
+	pamubypenr_ptr = (uint32_t *)((uintptr_t) (CCSRBAR_VA + guts_addr
+				- CCSRBAR_PA) + PAMUBYPENR);
+	pamubypenr = in32(pamubypenr_ptr);
 
 	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
@@ -562,5 +562,5 @@ void pamu_global_init(void)
 	}
 
 	/* Enable all relevant PAMU(s) */
-	out32((uint32_t *) pamubypenr_offset, pamubypenr);
+	out32(pamubypenr_ptr, pamubypenr);
 }
