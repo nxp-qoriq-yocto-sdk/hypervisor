@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc8
-Date: 7/24/2008
+Revsion: 0.2-rc9
+Date: 8/01/2008
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,36 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc8
+   -Topaz 0.2-rc9
       -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc8
+      -requires libos tag v0.2-rc9
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc9 bug fixes and changes
+      -increased number of handles supported-- fixes bugs
+       1811 and 1826
+      -support for mapping all 128MB of flash
+      -bug 1784- build issue when no gdb stub
+      -bug 1785- build issue when no pamu
+      -implement missing tlbilx emulation
+      -allow write to TLB0 when MAS1 valid bit is 0 (bug 1650)
+      -pamu is now enabled using GUTS PAMUBYPENR
+      -workaround in simics script to fix QMAN FDQ transactions
+       accessing portal DLIODNs instead of QMAN_LIODNR-- this
+       should be fixed in Simics
+      -cleanup in Linux unit tests so Qman/Bman driver self 
+       tests can run
+      -simics script-- simics workaround for qman-- disasble
+       delays
+      -only map reg properties that are on a simple-bus (bug 1805)
+      -Multi-core support added to GDB stub-- supports multiple 
+       instances of gdb attached to different partitions
+      -PAMU driver uses compatible of "fsl,p4080-guts" for GUTs
+       instead of the old 8572 compatible value
 
    -Topaz 0.2-rc8 bug fixes and changes
       -PAMU PAACE entries are enabled by default
@@ -128,10 +150,11 @@ Contents
       -invalid MMU mappings are permitted to be written into
        the TLB, and a machine check will occur on access to
        the mapping--  this is not implemented for TLB1.  Access
-       to invalid TLB1 mappings will result in another TLB miss
+       to invalid TLB1 mappings will result in another TLB miss.
       -If the guest-to-real address mapping is sufficiently
        misaligned, TLB1 entries can be depleted, causing
        a hypervisor panic.
+      -tlbre of TLB0 is not supported
 
    -physical addresses greater than 32 bits are not supported
 
@@ -199,17 +222,16 @@ Contents
        and input is not supported
 
    -gdb stub
-      -the gdb stub does not support the following:
-         -breakpoints
-         -single step
       -the gdb stub does not support hardware breakpoints or
-       hardware watchpoints (not planne
+       hardware watchpoints 
+      -the stub is limited to debugging the boot core in 
+       each partition.  SMP debugging is not supported.
 
  E. ePAPR Related Notes
 
     -The hypervisor does not currently comply with the ePAPR 
      ELF loading requirements with respect to the physical
      load address of the image.  The ET_EXEC and ET_DYN
-     flags are ignored and the image is loaded at the specified
+     flags are ignored and guest images is loaded at the specified
      address address (fsl,hv-load-image-table property or 
      partman utility)
