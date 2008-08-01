@@ -138,7 +138,7 @@ enum gcpu_stats {
 };
 	
 typedef struct gcpu {
-	kstack_t uvstack;
+	kstack_t hvstack;
 	guest_t *guest;
 	cpu_t *cpu;
 	tlbmap_t tlb1_inuse;

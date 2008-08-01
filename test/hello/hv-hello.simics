@@ -9,7 +9,7 @@ $use_uart1 = 1
 $guest_image[0]  = "hello"
 $guest_addr[0]   = 0xe8200000
 
-$kernel_image  = "uv.uImage"
+$kernel_image  = "hv.uImage"
 
 $dtb_image  = "hv-hello-1p.dtb"
 

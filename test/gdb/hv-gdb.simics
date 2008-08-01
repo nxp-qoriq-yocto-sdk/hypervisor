@@ -11,7 +11,7 @@ $use_uart3 = 1
 $guest_image[0]  = "gdb"
 $guest_addr[0]   = 0xe8200000
 
-$kernel_image  = "uv.uImage"
+$kernel_image  = "hv.uImage"
 
 $dtb_image  = "hv-gdb.dtb"
 

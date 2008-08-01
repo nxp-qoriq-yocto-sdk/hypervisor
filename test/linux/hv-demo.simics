@@ -16,7 +16,7 @@ $guest_addr[0]   = 0xe8100000
 $guest_image[1]  = "bin/rootfs2.ext2.gz"
 $guest_addr[1]   = 0xe8800000
 
-$kernel_image  = "uv.uImage"
+$kernel_image  = "hv.uImage"
 
 $dtb_image  = "hv-demo.dtb"
 

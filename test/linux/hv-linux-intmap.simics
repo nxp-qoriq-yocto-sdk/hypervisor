@@ -12,7 +12,7 @@ $guest_addr[0]   = 0xe8100000
 $guest_image[1]  = "rootfs.ext2.gz"
 $guest_addr[1]   = 0xe8600000
 
-$kernel_image  = "uv.uImage"
+$kernel_image  = "hv.uImage"
 
 $dtb_image  = "hv-linux-intmap.dtb"
 

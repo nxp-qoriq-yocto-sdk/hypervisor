@@ -77,7 +77,7 @@ HOSTCC_OPTS_C= -Wall \
 
 -include include/config/auto.conf
 
-all: bin/uv.uImage bin/uv.map
+all: bin/hv.uImage bin/hv.map
 
 .PRECIOUS: bin/include/%.d
 bin/include/%.d : include/%.h
@@ -110,17 +110,17 @@ OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 OBJS := $(OBJS:%=bin/%)
 HDRS := $(shell find include -path 'include/config' -prune -o -name '*.h' -print)
 
-bin/uv.uImage: bin/uv.bin
+bin/hv.uImage: bin/hv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
 
-bin/uv.bin.gz: bin/uv.bin
+bin/hv.bin.gz: bin/hv.bin
 	gzip -f $<
 
-bin/uv.bin: bin/uv
+bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/uv: include/config/auto.conf $(OBJS)
-	$(CC) $(LD_OPTS) -Wl,-Tuv.lds -o $@ $(OBJS) -lgcc
+bin/hv: include/config/auto.conf $(OBJS)
+	$(CC) $(LD_OPTS) -Wl,-Thv.lds -o $@ $(OBJS) -lgcc
 
 bin/gdb-stub.d : src/gdb-stub.c bin/include/e500mc-data.h
 
@@ -165,73 +165,73 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(OBJS:%.o=%.d)
 endif
 
-bin/uv.map: bin/uv
-	nm -n bin/uv > $@
+bin/hv.map: bin/hv
+	nm -n bin/hv > $@
 
 .PHONY: test-gdb-hello test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
 
-test-gdb-hello: bin/uv.uImage test/gdb
+test-gdb-hello: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb-4p.simics
 
-test-gdb: bin/uv.uImage test/gdb
+test-gdb: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb.simics
 
-test-hello: bin/uv.uImage test/hello
+test-hello: bin/hv.uImage test/hello
 	$(SIMICS) test/hello/hv-hello.simics
 
-test-msgsnd: bin/uv.uImage test/msgsnd
+test-msgsnd: bin/hv.uImage test/msgsnd
 	$(SIMICS) test/msgsnd/hv-msgsnd.simics
 
-test-vmpic: bin/uv.uImage test/vmpic
+test-vmpic: bin/hv.uImage test/vmpic
 	$(SIMICS) test/vmpic/hv-vmpic.simics
 
-test-vmpic-coreint: bin/uv.uImage test/vmpic
+test-vmpic-coreint: bin/hv.uImage test/vmpic
 	$(SIMICS) test/vmpic/hv-vmpic-coreint.simics
 
-test-linux-1p: bin/uv.uImage test/linux
+test-linux-1p: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
 
-test-linux-intmap: bin/uv.uImage test/linux
+test-linux-intmap: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-intmap.simics
 
-test-partman: bin/uv.uImage test/linux
+test-partman: bin/hv.uImage test/linux
 	make -C test/linux rootfs
 	$(SIMICS) test/linux/hv-partman.simics
 
-test-linux-2p: bin/uv.uImage test/linux
+test-linux-2p: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-2p.simics
 
-test-ipi-1p: bin/uv.uImage test/ipi
+test-ipi-1p: bin/hv.uImage test/ipi
 	$(SIMICS) test/ipi/hv-ipi.simics
 
-test-ipi-2p: bin/uv.uImage test/ipi
+test-ipi-2p: bin/hv.uImage test/ipi
 	$(SIMICS) test/ipi/hv-ipi-2p.simics
 
-test-ipi-coreint: bin/uv.uImage test/ipi
+test-ipi-coreint: bin/hv.uImage test/ipi
 	$(SIMICS) test/ipi/hv-ipi-coreint.simics
 
-test-fit: bin/uv.uImage test/fit
+test-fit: bin/hv.uImage test/fit
 	$(SIMICS) test/fit/hv-fit.simics
 
-test-byte-chan: bin/uv.uImage test/byte-chan
+test-byte-chan: bin/hv.uImage test/byte-chan
 	$(SIMICS) test/byte-chan/hv-byte_chan.simics
 
-test-whoami: bin/uv.uImage test/whoami
+test-whoami: bin/hv.uImage test/whoami
 	$(SIMICS) test/whoami/hv-whoami.simics
 
-test-mmu: bin/uv.uImage test/mmu
+test-mmu: bin/hv.uImage test/mmu
 	$(SIMICS) test/mmu/mmu.simics
 
-test-pmr: bin/uv.uImage test/pmr
+test-pmr: bin/hv.uImage test/pmr
 	$(SIMICS) test/pmr/hv-pmr.simics
 
-test-dma: bin/uv.uImage test/dma
+test-dma: bin/hv.uImage test/dma
 	$(SIMICS) test/dma/hv-dma.simics
 
-demo: bin/uv.uImage test/linux
+demo: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-demo.simics
 
-test-partman-hello: bin/uv.uImage test/linux
+test-partman-hello: bin/hv.uImage test/linux
 	./tools/mux_server/mux_server localhost:9124 9000 &
 	xterm -e "telnet localhost 9000" &
 	simics test/linux/hv-hello.simics -e c
