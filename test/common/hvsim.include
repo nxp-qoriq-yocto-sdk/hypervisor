@@ -12,7 +12,10 @@ if not defined kernel_addr      {$kernel_addr   = 0x40000}
 if not defined kernel_symbols	{$kernel_symbols = ""}
 if not defined uboot_symbols	{$uboot_symbols = ""}
 if not defined dtb_image	{$dtb_image  = "%script%/bin/mpc8578sim-hv.dtb"}
-if not defined dtb_addr      	{$dtb_addr   = 0x20000}
+if not defined flash_base	{$flash_base   = 0xe8000000}
+if not defined dtb_flash_offset	{$dtb_flash_offset   = 0x20000}
+if not defined dtb_ram_addr	{$dtb_ram_addr  = 0x00f00000}
+if not defined dtb_size		{$dtb_size  = 0x00100000}
 if not defined use_uart0	{$use_uart0 = 1}
 if not defined use_uart1	{$use_uart1 = 0}
 if not defined use_uart2	{$use_uart2 = 1}
@@ -22,7 +25,7 @@ if not defined create_network  {$create_network = "yes"}
 if not defined host_name	{$host_name   = "MPC8578-simple"}
 if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
 if not defined guest_image	{$guest_image = ""}
-if not defined boot_command  {$boot_command  = "bootm 0xe8040000 - 0xe8020000"}
+if not defined boot_command  {$boot_command  = "bootm 0xe8040000 - 0x00f00000"}
 if not defined mac_address   {$mac_address   = "00:01:af:07:9b:8a"}
 if not defined mac_address1  {$mac_address1  = "00:01:af:07:9b:8b"}
 if not defined mac_address2  {$mac_address2  = "00:01:af:07:9b:8c"}
@@ -179,7 +182,7 @@ foreach $i in (range (list-length $guest_image)) {
 }
 
 if ($dtb_image != "") {
-	flash_space.load-file $dtb_image $dtb_addr
+	flash_space.load-file $dtb_image $dtb_flash_offset
 }
 
 # U-boot uses l1 cache without backing RAM
@@ -218,7 +221,7 @@ if $do_boot == "yes" {
         local $ip_address1  = $ip_address1
         local $ip_address2  = $ip_address2
         local $ip_address3  = $ip_address3
-        local $dtb_addr     = $dtb_addr
+        local $dtb_flash_offset     = $dtb_flash_offset
         local $dtb_image    = $dtb_image
 
         $con.wait-for-string "autoboot:"
@@ -267,7 +270,9 @@ if $do_boot == "yes" {
 	$phys_mem.set 0xfe318080 0x90016
 	$phys_mem.set 0xfe318090 0xa0016
 
+
         # Note: user must override boot_command if dev_tree_blob is set
+	$con.wait-then-write "=> " "fdt move " + (hex ($flash_base + $dtb_flash_offset)) + " " + (hex $dtb_ram_addr) + " " + (hex $dtb_size) + "\n"
 	$con.wait-then-write "=> " "setenv bootcmd " + $boot_command + "\n"
 	$con.wait-then-write "=> " "boot\n"
     }
