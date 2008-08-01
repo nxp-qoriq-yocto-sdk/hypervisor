@@ -384,7 +384,9 @@ static void *map_flash(phys_addr_t phys)
  * If the image is an ELF, then 'length' is used only to verify the image
  * data.  To skip verification, set length to -1.
  */
-static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys, phys_addr_t guest_phys, size_t length)
+static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
+                                 phys_addr_t guest_phys, size_t length,
+                                 register_t *entry)
 {
 	void *image = map_flash(image_phys);
 	if (!image) {
@@ -395,7 +397,7 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys, phys_ad
 
 	if (is_elf(image)) {
 		printf("guest %s: loading ELF image from flash\n", guest->name);
-		return load_elf(guest, image, length, guest_phys, &guest->entry);
+		return load_elf(guest, image, length, guest_phys, entry);
 	}
 
 	/* It's not an ELF image, so it must be a binary. */
@@ -411,7 +413,8 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys, phys_ad
 	if (copy_to_gphys(guest->gphys, guest_phys, image, length) != length)
 		return ERR_BADADDR;
 
-	guest->entry = guest_phys;
+	if (entry)
+		*entry = guest_phys;
 
 	return 0;
 }
@@ -432,7 +435,7 @@ static int load_image(guest_t *guest)
 		uint32_t length;
 	} __attribute__ ((packed)) *table;
 	int node = guest->partition;
-	int ret, size;
+	int ret, size, first = 1;
 
 	table = fdt_getprop(fdt, node, "fsl,hv-load-image-table", &size);
 	if (!table) {
@@ -453,13 +456,16 @@ static int load_image(guest_t *guest)
 
 	while (size) {
 		ret = load_image_from_flash(guest, table->image_addr,
-			table->guest_addr, table->length ? table->length : -1);
+		                            table->guest_addr,
+		                            table->length ? table->length : -1,
+		                            first ? &guest->entry : NULL);
 		if (ret < 0) {
 			printf("guest %s: could not load image\n", guest->name);
 			return ret;
 		}
 
-                table++;
+		table++;
+		first = 0;
 		size -= sizeof(*table);
 	}
 	
