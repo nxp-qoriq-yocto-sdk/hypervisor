@@ -73,7 +73,10 @@ static inline guest_t *handle_to_guest(int handle)
 	if (handle == -1)
 		return get_gcpu()->guest;
 
-	if (handle >= MAX_HANDLES)
+	if ((unsigned int)handle >= MAX_HANDLES)
+		return NULL;
+
+	if (!get_gcpu()->guest->handles[handle])
 		return NULL;
 
 	return get_gcpu()->guest->handles[handle]->guest;
