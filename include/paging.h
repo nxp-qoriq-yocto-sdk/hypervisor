@@ -117,7 +117,16 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long mas2flags, unsigned long mas3flags);
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
 int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
-void guest_inv_tlb1(register_t ivax, int inv_iprot);
+
+#define INV_IPROT 1
+#define INV_TLB0  MMUCSR_L2TLB0_FI
+#define INV_TLB1  MMUCSR_L2TLB1_FI
+
+void guest_inv_tlb(register_t ivax, int pid, int flags);
+
+int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
+                   register_t mas3, unsigned long rpn, register_t mas8);
+
 void guest_reset_tlb(void);
 void tlbsync(void);
 
@@ -134,5 +143,7 @@ size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len);
 size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len);
 size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
                            pte_t *stbl, phys_addr_t src, size_t len);
+
+void tlbcache_init(void);
 
 #endif

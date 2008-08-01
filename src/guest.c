@@ -877,6 +877,11 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 	return gpir;
 }
 
+static void guest_core_init(guest_t *guest)
+{
+	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
+}
+
 static void start_guest_primary_nowait(void)
 {
 	register register_t r3 asm("r3");
@@ -895,6 +900,8 @@ static void start_guest_primary_nowait(void)
 		return;
 
 	assert(guest->state == guest_starting);
+
+	guest_core_init(guest);
 	reset_spintbl(guest);
 
 #ifdef CONFIG_GDB_STUB
@@ -1038,6 +1045,8 @@ static void start_guest_secondary(void)
 	disable_critint();
 	if (cpu->ret_user_hook)
 		return;
+
+	guest_core_init(guest);
 
 #ifdef CONFIG_GDB_STUB
 	gdb_stub_init();

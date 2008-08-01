@@ -34,7 +34,23 @@
 
 #ifndef _ASM
 typedef struct {
+	/** Fast exception save area
+	 * The entire cache line will be clobbered.  This may not be used
+	 * within critical interrupts (or similar elevated exception levels). 
+	 * This must be the first thing in cpu_t.
+	 */
+	char fastsave[64] __attribute__((aligned(64)));
+
 	struct gcpu *gcpu;
+
+#ifdef CONFIG_TLB_CACHE
+	struct tlbcset *tlbcache;
+
+	/* The number of virtual address bits used as an index
+	 * into the TLB cache.
+	 */
+	int tlbcache_bits;
+#endif
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
@@ -48,7 +64,8 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_FPUNAVAIL_HANDLER reflect_trap
 #define EXC_DECR_HANDLER decrementer
 #define EXC_FIT_HANDLER fit
-#define EXC_DTLB_HANDLER dtlb_miss
+#define EXC_DTLB_HANDLER tlb_miss
+#define EXC_ITLB_HANDLER tlb_miss
 #define EXC_GDOORBELL_HANDLER guest_doorbell
 #define EXC_GDOORBELLC_HANDLER guest_critical_doorbell
 #define EXC_HCALL_HANDLER hcall
