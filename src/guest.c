@@ -223,8 +223,14 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 
 	while ((node = fdt_next_node(guest->devtree, node, NULL)) >= 0) {
 		int ret = map_guest_reg(guest, node, partition);
-		if (ret < 0)
+		if (ret < 0) {
+			int len;
+			const char *node_name = fdt_get_name(guest->devtree, node, &len);
+			if (node_name)
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+					"error : map_guest_reg failed for node %s\n", node_name);
 			return ret;
+		}
 	}
 	
 	if (node != -FDT_ERR_NOTFOUND)
@@ -484,9 +490,14 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	const uint32_t *prop;
 
 	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
-	if (!prop)
+	if (!prop) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"guest missing property fsl,hv-dtb-window\n");
 		goto fail;
+	}
 	if (ret < 12) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"guest has invalid property len for fsl,hv-dtb-window\n");
 		ret = ERR_BADTREE;
 		goto fail;
 	}
@@ -495,9 +506,11 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	gfdt_size = prop[2];
 
 	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
-	if (!guest_origtree)
+	if (!guest_origtree) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"guest missing property fsl,hv-dtb\n");
 		goto fail;
-	
+	}
 	gfdt_size += ret;
 	
 	guest->devtree = alloc(gfdt_size, 16);
@@ -535,21 +548,27 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	while (1) {
 		// get a pointer to the first/next partition-handle node
 		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition-handle");
-		if (off < 0)
+		if (off < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: guest missing fsl,hv-partition-handle\n",
+				guest->name);
 			break;
+		}
 
 		// Find the end-point partition node in the hypervisor device tree
 
 		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
 		if (!s) {
-			printf("guest %s: missing fsl,endpoint property or value\n",
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: missing fsl,endpoint property or value\n",
 				guest->name);
 			goto fail;
 		}
 
 		int endpoint = fdt_path_offset(fdt, s);
 		if (endpoint < 0) {
-			printf("guest %s: partition %s does not exist\n",
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: partition %s does not exist\n",
 				guest->name, s);
 			goto fail;
 		}
@@ -557,7 +576,8 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		// Get the guest_t for the partition, or create one if necessary
 		guest_t *target_guest = node_to_partition(endpoint);
 		if (!target_guest) {
-			printf("guest %s: partition %s does not exist\n",
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: partition %s does not exist\n",
 				guest->name, s);
 			goto fail;
 		}
@@ -565,7 +585,8 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		// Allocate a handle
 		int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
 		if (ghandle < 0) {
-			printf("guest %s: too many handles\n", guest->name);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: too many handles\n", guest->name);
 			goto fail;
 		}
 
@@ -576,15 +597,17 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		// guest device tree
 		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
 		if (ret) {
-			printf("guest %s: could not insert 'reg' property\n", guest->name);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"guest %s: could not insert 'reg' property\n", guest->name);
 			goto fail;
 		}
 	}
 
 	return 0;
 fail:
-	printf("error %d (%s) building guest device tree for %s\n",
-	       ret, fdt_strerror(ret), guest->name);
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		"error %d (%s) building guest device tree for %s\n",
+		ret, fdt_strerror(ret), guest->name);
 
 	return ret;
 }
