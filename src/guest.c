@@ -973,71 +973,80 @@ static void partition_config(guest_t *guest)
 
 __attribute__((noreturn)) void init_guest(void)
 {
-	int off = -1, found = 0, ret;
+	int off = -1, partition = 0, ret;
 	int pir = mfspr(SPR_PIR);
-	const uint32_t *cpus = NULL;
+	const uint32_t *cpus = NULL, *prop;
 	char buf[MAX_PATH];
 	guest_t *guest = NULL;
-	int gpir, len;
+	int gpir, len, cpus_len = 0;
 	
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
-		if (off < 0)
-			goto wait;
+		if (off < 0) {
+			if (partition)
+				break;
 
-		cpus = fdt_getprop(fdt, off, "fsl,hv-cpus", &len);
-		if (!cpus) {
+			goto wait;
+		}
+
+		prop = fdt_getprop(fdt, off, "fsl,hv-cpus", &len);
+		if (!prop) {
 			ret = fdt_get_path(fdt, off, buf, sizeof(buf));
-			printf("No fsl,hv-cpus in guest %s\n", buf);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "No fsl,hv-cpus in guest %s\n", buf);
 			continue;
 		}
 
-		if (!cpu_in_cpulist(cpus, len, pir))
+		if (!cpu_in_cpulist(prop, len, pir))
 			continue;
 
 		ret = fdt_get_path(fdt, off, buf, sizeof(buf));
 		if (ret < 0) {
-			printf("start_guest: error %d (%s) getting path at offset %d\n",
-			       ret, fdt_strerror(ret), off);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "start_guest: error %d (%s) getting path at offset %d\n",
+			         ret, fdt_strerror(ret), off);
 			continue;
 		}
 		
-		if (found) {
-			printf("extra guest %s on core %d\n", buf, pir);
+		if (partition) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "extra guest %s on core %d\n", buf, pir);
 			continue;
 		}
 
-		printf("guest at %s on core %d\n", buf, pir);
-		found = 1;
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		         "guest at %s on core %d\n", buf, pir);
+		partition = off;
 		
-		guest = node_to_partition(off);
+		guest = node_to_partition(partition);
 		mtspr(SPR_LPIDR, guest->lpid);
 	
 		get_gcpu()->guest = guest;
-		break;
-	};
+		cpus = prop;
+		cpus_len = len;
+
+		if (pir == cpus[0]) {
+			int name_len = strlen(buf) + 1;
+			guest->name = alloc(name_len, 1);
+			if (!guest->name)
+				goto nomem;
+
+			memcpy(guest->name, buf, name_len);
+		}
+	}
 
 	if (pir == cpus[0]) {
-		int name_len;
-	
 		/* Boot CPU */
 		/* count number of cpus for this partition and alloc data struct */
-		guest->cpucnt = count_cpus(cpus, len);
+		guest->cpucnt = count_cpus(cpus, cpus_len);
 		guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
 		if (!guest->gcpus)
 			goto nomem;
 
-		gpir = register_gcpu_with_guest(guest, cpus, len);
+		gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
 		assert(gpir == 0);
 		
-		name_len = strlen(buf) + 1;
-		guest->name = alloc(name_len, 1);
-		if (!guest->name)
-			goto nomem;
-		
-		memcpy(guest->name, buf, name_len);
-		
-		ret = process_guest_devtree(guest, off, cpus, len);
+		ret = process_guest_devtree(guest, partition, cpus, cpus_len);
 		if (ret < 0)
 			goto wait;
 
@@ -1057,7 +1066,7 @@ __attribute__((noreturn)) void init_guest(void)
 #endif
 		start_guest_primary();
 	} else {
-		gpir = register_gcpu_with_guest(guest, cpus, len);
+		gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
 	}
 
 wait: {
@@ -1079,7 +1088,8 @@ wait: {
 	}	
 
 nomem:
-	printf("out of memory in start_guest\n");
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "out of memory in start_guest\n");
 	goto wait;
 } 
 
