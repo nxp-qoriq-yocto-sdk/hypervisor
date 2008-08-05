@@ -32,9 +32,11 @@
 static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
                              int insert)
 {
+	pte_t *ptep = NULL;
+
 	while (--*levels >= 0) {
 		int idx = (epn >> (PGDIR_SHIFT * *levels)) & (PGDIR_SIZE - 1);
-		pte_t *ptep = &tbl[idx];
+		ptep = &tbl[idx];
 
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "pte %lx attr %lx epn %lx level %d\n", ptep->page, ptep->attr,
@@ -60,7 +62,7 @@ static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
 		tbl = (pte_t *)ptep->page;
 	}
 
-	BUG();
+	return ptep;
 }
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
@@ -109,6 +111,9 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 {
 	unsigned long end = epn + npages;
 
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+	         "vptbl_map: epn %lx end %lx rpn %lx\n", epn, end, rpn);
+
 	while (epn < end) {
 		unsigned int size = min(max_page_size(epn, end - epn),
 		                        natural_alignment(rpn));
@@ -136,28 +141,36 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 			                             epn >> (PGDIR_SHIFT * largepage),
 			                             1);
 
-			if (largepage && ptep->page && !(ptep->attr & PTE_SIZE)) {
-				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
-				         "vptbl_map: Tried to overwrite a small page with "
-				         "a large page at %llx\n",
-				         ((uint64_t )epn) << PAGE_SHIFT);
-				return;
-			}
-
-			if (!largepage && level != 0) {
-				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+			if (!largepage && level > 0) {
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 				         "vptbl_map: Tried to overwrite a large page with "
 				         "a small page at %llx\n",
-				         ((uint64_t )epn) << PAGE_SHIFT);
-				return;
+				         ((uint64_t)epn) << PAGE_SHIFT);
+
+				/* FIXME: verify that the rpn is the same */
+				goto next;
 			}
+
+			if (level < 0) {
+				if (!largepage || !ptep->page || (ptep->attr & PTE_SIZE))
+					BUG();
+
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+				         "vptbl_map: Overwriting a small page with "
+				         "a large page at %llx\n",
+				         ((uint64_t)epn) << PAGE_SHIFT);
+
+				/* FIXME: verify that the all rpns are the same */
+				free((void *)ptep->page);
+			} 
 
 			ptep->page = rpn;
 			ptep->attr = attr;
 			
-			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 			         "epn %lx: setting rpn %lx attr %lx\n", epn, rpn, attr);
 
+next:
 			epn = (epn | incr) + 1;
 			rpn = (rpn | incr) + 1;
 		}

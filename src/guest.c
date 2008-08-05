@@ -50,9 +50,11 @@
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
 
-static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
+#define MAX_PATH 256
+
+static int cpu_in_cpulist(const uint32_t *cpulist, unsigned int len, int cpu)
 {
-	int i;
+	unsigned int i;
 	for (i = 0; i < len / 4; i += 2) {
 		if (cpu >= cpulist[i] && cpu < cpulist[i] + cpulist[i + 1])
 			return 1;
@@ -61,14 +63,14 @@ static int cpu_in_cpulist(const uint32_t *cpulist, int len, int cpu)
 	return 0;
 }
 
-static int get_gcpu_num(const uint32_t *cpulist, int len, int cpu)
+static int get_gcpu_num(const uint32_t *cpulist, unsigned int len, int cpu)
 {
-	int i;
-	int total = 0; 
+	unsigned int i;
+	unsigned int total = 0; 
 
 	for (i = 0; i < len / 4; i += 2) {
-		int base = cpulist[i];
-		int num = cpulist[i + 1];
+		unsigned int base = cpulist[i];
+		unsigned int num = cpulist[i + 1];
 
 		if (cpu >= base && cpu < base + num)
 			return total + cpu - base;
@@ -79,10 +81,10 @@ static int get_gcpu_num(const uint32_t *cpulist, int len, int cpu)
 	return -1;
 }
 
-static int count_cpus(const uint32_t *cpulist, int len)
+static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 {
-	int i;
-	int total = 0;
+	unsigned int i;
+	unsigned int total = 0;
 
 	for (i = 0; i < len / 4; i += 2)
 		total += cpulist[i + 1];	
@@ -90,8 +92,8 @@ static int count_cpus(const uint32_t *cpulist, int len)
 	return total;
 }
 
-static void map_guest_range(guest_t *guest, phys_addr_t gaddr,
-                            phys_addr_t addr, phys_addr_t size)
+static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
+                                 phys_addr_t addr, phys_addr_t size)
 {
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
@@ -107,23 +109,24 @@ static void map_guest_range(guest_t *guest, phys_addr_t gaddr,
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 }
 
-static int map_guest_reg_one(guest_t *guest, int node, int partition,
-                             const uint32_t *reg)
+static int map_guest_reg_one(guest_t *guest, int node,
+                             int partition, const uint32_t *reg,
+                             uint32_t naddr, uint32_t nsize)
 {
 	phys_addr_t gaddr, size;
 	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr = 0;
 	phys_addr_t rangesize, addr, offset = 0;
-	int hvrlen;
+	int maplen;
 
 	const uint32_t *physaddrmap = fdt_getprop(fdt, partition,
-	                                       "fsl,hv-physaddr-map", &hvrlen);
-	if (!physaddrmap && hvrlen != -FDT_ERR_NOTFOUND)
-		return hvrlen;
-	if (!physaddrmap || hvrlen % 4)
+	                                          "fsl,hv-physaddr-map", &maplen);
+	if (!physaddrmap && maplen != -FDT_ERR_NOTFOUND)
+		return maplen;
+	if (!physaddrmap || maplen & 3)
 		return ERR_BADTREE;
 
 	int ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
-	                        &rootnaddr, &size);
+	                        &rootnaddr, &size, naddr, nsize);
 	if (ret < 0)
 		return ret;	
 
@@ -136,13 +139,13 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 		val_from_int(addrbuf, gaddr + offset);
 
 		// FIXME: address cells and size cells are hardcoded to 2 / 1
-		ret = xlate_one(addrbuf, physaddrmap, hvrlen, 2, 1, 2, 1, &rangesize);
+		ret = xlate_one(addrbuf, physaddrmap, maplen, 2, 1, 2, 1, &rangesize);
 		if (ret == -FDT_ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
 			// in physaddrmap, then none of it is.
 
-			map_guest_range(guest, gaddr + offset,
-			                gaddr + offset, size - offset);
+			map_guest_addr_range(guest, gaddr + offset,
+			                     gaddr + offset, size - offset);
 			return 0;
 		}
 		
@@ -157,8 +160,72 @@ static int map_guest_reg_one(guest_t *guest, int node, int partition,
 		if (rangesize > size - offset)
 			rangesize = size - offset;
 		
-		map_guest_range(guest, gaddr + offset, addr, rangesize);
+		map_guest_addr_range(guest, gaddr + offset, addr, rangesize);
 		offset += rangesize;
+	}
+
+	return 0;
+}
+
+static int map_guest_ranges(guest_t *guest, int node, int partition)
+{
+	int len, ret;
+	uint32_t naddr, nsize, caddr, csize;
+	char path[MAX_PATH];
+
+	const uint32_t *reg = fdt_getprop(guest->devtree, node,
+	                                  "fsl,hv-map-ranges", &len);
+	if (!reg) {
+		if (len == -FDT_ERR_NOTFOUND)
+			return 0;
+	
+		return len;
+	}
+
+	reg = fdt_getprop(guest->devtree, node, "ranges", &len);
+	if (!reg) {
+		if (len == -FDT_ERR_NOTFOUND)
+			return 0;
+	
+		return len;
+	}
+
+	if (len & 3) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "Unaligned ranges length %d\n", len);
+		return ERR_BADTREE;
+	}
+
+	len >>= 2;
+
+	ret = fdt_get_path(guest->devtree, node, path, sizeof(path));
+	if (ret >= 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		         "found ranges in %s\n", path);
+
+	int parent = fdt_parent_offset(guest->devtree, node);
+	if (parent < 0)
+		return parent;
+
+	ret = get_addr_format_nozero(guest->devtree, parent, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	ret = get_addr_format_nozero(guest->devtree, node, &caddr, &csize);
+	if (ret < 0)
+		return ret;
+
+	for (int i = 0; i < len; i += caddr + naddr + csize) {
+		if (i + caddr + naddr + csize > len) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			         "Incomplete ranges entry\n");
+			return ERR_BADTREE;
+		}
+
+		ret = map_guest_reg_one(guest, node, partition,
+		                        reg + i + caddr, naddr, csize);
+		if (ret < 0 && ret != ERR_NOTRANS)
+			return ret;
 	}
 
 	return 0;
@@ -168,6 +235,7 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 {
 	int len, ret;
 	uint32_t naddr, nsize;
+	char path[MAX_PATH];
 
 	const uint32_t *reg = fdt_getprop(guest->devtree, node, "reg", &len);
 	if (!reg) {
@@ -177,16 +245,14 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 		return len;
 	}
 
-	if (len % 4)
+	if (len & 3)
 		return ERR_BADTREE;
 
-	len /= 4;
+	len >>= 2;
 
-	char path[256];
 	ret = fdt_get_path(guest->devtree, node, path, sizeof(path));
-	if (ret < 0)
-		return ret;
-	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG, "found reg in %s\n", path);
+	if (ret >= 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG, "found reg in %s\n", path);
 
 	int parent = fdt_parent_offset(guest->devtree, node);
 	if (parent < 0)
@@ -203,10 +269,14 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 		return ret;
 
 	for (int i = 0; i < len; i += naddr + nsize) {
-		if (i + naddr + nsize > len)
+		if (i + naddr + nsize > len) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			         "Incomplete reg entry\n");
 			return ERR_BADTREE;
+		}
 
-		ret = map_guest_reg_one(guest, node, partition, reg + i);
+		ret = map_guest_reg_one(guest, node, partition,
+		                        reg + i, naddr, nsize);
 		if (ret < 0 && ret != ERR_NOTRANS)
 			return ret;
 	}
@@ -224,8 +294,18 @@ static int map_guest_reg_all(guest_t *guest, int partition)
 			int len;
 			const char *node_name = fdt_get_name(guest->devtree, node, &len);
 			if (node_name)
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-					"error : map_guest_reg failed for node %s\n", node_name);
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "error: map_guest_reg failed for node %s\n", node_name);
+			return ret;
+		}
+
+		ret = map_guest_ranges(guest, node, partition);
+		if (ret < 0) {
+			int len;
+			const char *node_name = fdt_get_name(guest->devtree, node, &len);
+			if (node_name)
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "map_guest_ranges failed for node %s\n", node_name);
 			return ret;
 		}
 	}
@@ -332,8 +412,6 @@ fail:
 
 	return ret;
 }
-
-#define MAX_PATH 256
 
 // FIXME: we're hard-coding the phys address of flash here, it should
 // read from the DTS instead.
@@ -1341,7 +1419,7 @@ phys_addr_t find_lowest_guest_phys(void)
 			continue;
 		
 		entry_len = gnaddr + naddr + gnsize;
-		while (i + entry_len <= ret / 4) {
+		while (i + entry_len <= ret >> 2) {
 			phys_addr_t real;
 			
 			real = prop[i + gnaddr];

@@ -1,7 +1,7 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080";
+	compatible = "fsl,hv-platform-p4080", "simple-bus";
 	model = "fsl,hv-linux-p1";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
@@ -196,6 +196,47 @@
 			device_type = "open-pic";
 			big-endian;
 			fsl,hv-interrupt-controller;
+		};
+
+	};
+
+	pci0: pcie@fe200000 {
+		cell-index = <0>;
+		compatible = "fsl,p4080-pcie", "fsl,mpc8548-pcie";
+		device_type = "pci";
+		#interrupt-cells = <1>;
+		#size-cells = <2>;
+		#address-cells = <3>;
+		reg = <0 0xfe200000 0x1000>;
+		bus-range = <0x0 0xff>;
+		fsl,hv-map-ranges;
+		ranges = <0x02000000 0 0x80000000 0 0x80000000 0x0 0x20000000
+		          0x01000000 0 0x00000000 0 0xffc00000 0x0 0x00010000>;
+		clock-frequency = <33333333>;
+		interrupt-parent = <&mpic>;
+		interrupts = <24 2>;
+
+		interrupt-map-mask = <0xf800 0 0 7>;
+		interrupt-map = <
+			/* IDSEL 0x0 */
+			0000 0 0 1 &mpic 40 1
+			0000 0 0 2 &mpic 1 1
+			0000 0 0 3 &mpic 2 1
+			0000 0 0 4 &mpic 3 1
+		>;
+
+		pcie@0 {
+			reg = <0 0 0 0 0>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			device_type = "pci";
+			ranges = <0x02000000 0 80000000
+				  0x02000000 0 80000000
+				  0 0x20000000
+
+				  0x01000000 0 00000000
+				  0x01000000 0 00000000
+				  0 0x00010000>;
 		};
 	};
 

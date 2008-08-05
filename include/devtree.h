@@ -56,7 +56,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
-                  phys_addr_t *size);
+                  phys_addr_t *size, uint32_t naddr, uint32_t nsize);
 
 int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);

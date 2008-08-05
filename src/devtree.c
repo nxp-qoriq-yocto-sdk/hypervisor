@@ -226,20 +226,15 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
-                  phys_addr_t *size)
+                  phys_addr_t *size, uint32_t naddr, uint32_t nsize)
 {
-	int parent;
-	uint32_t naddr, nsize, prev_naddr, prev_nsize;
+	uint32_t prev_naddr, prev_nsize;
 	const uint32_t *ranges;
 	int len, ret;
 
-	parent = fdt_parent_offset(tree, node);
+	int parent = fdt_parent_offset(tree, node);
 	if (parent < 0)
 		return parent;
-
-	ret = get_addr_format(tree, parent, &naddr, &nsize);
-	if (ret < 0)
-		return ret;
 
 	copy_val(addrbuf, reg, naddr);
 
@@ -293,9 +288,18 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
               phys_addr_t *addr, phys_addr_t *size)
 {
 	uint32_t addrbuf[MAX_ADDR_CELLS];
-	uint32_t rootnaddr;
+	uint32_t rootnaddr, naddr, nsize;
 
-	int ret = xlate_reg_raw(tree, node, reg, addrbuf, &rootnaddr, size);
+	int parent = fdt_parent_offset(tree, node);
+	if (parent < 0)
+		return parent;
+
+	int ret = get_addr_format(tree, parent, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	ret = xlate_reg_raw(tree, node, reg, addrbuf,
+	                    &rootnaddr, size, naddr, nsize);
 	if (ret < 0)
 		return ret;
 
