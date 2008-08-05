@@ -41,12 +41,15 @@
 #include <greg.h>
 #include <gdb-stub.h>
 
-void program_trap(trapframe_t *trap_frame)
+void program_trap(trapframe_t *regs)
 {
 #ifdef CONFIG_GDB_STUB
-	if (mfspr(SPR_ESR) != ESR_PTR || gdb_stub_process_trap(trap_frame))
+	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS) &&
+	    gdb_stub_process_trap(regs))
+		return;
 #endif
-		reflect_trap(trap_frame);
+
+	reflect_trap(regs);
 }
 
 /* Do not use this when entering via guest doorbell, since that saves
