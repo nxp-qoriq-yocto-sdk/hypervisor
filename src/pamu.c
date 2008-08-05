@@ -220,6 +220,9 @@ void pamu_process_standard_liodns(guest_t *guest)
 	int ghandle;
 	uint32_t propval = 0;
 
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		"processing standard liodns...\n");
+
 	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,liodn",
 					       &propval, sizeof(uint32_t));
 	while (offset != -FDT_ERR_NOTFOUND) {
@@ -334,15 +337,34 @@ void pamu_process_ppid_liodns(guest_t *guest)
 	int ghandle;
 	uint32_t propval = 0;
 
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		"processing ppid liodns...\n");
+
 	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,ppid",
 						&propval, sizeof(uint32_t));
+
+	if (offset < 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		"no fsl,ppid properties found, fdt rc = %d\n",offset);
+
 	while (offset != -FDT_ERR_NOTFOUND) {
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+			"doing ppid/liodn lookup for %s\n",
+			fdt_get_name(guest->devtree,offset,NULL));
 
 		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
 
 		offset_in_gdt = fdt_path_offset(fdt, pathbuf);
 
+		if (offset_in_gdt < 0)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"fsl,ppid not found in global dev tree: %s\n",pathbuf);
+
 		ppidp = fdt_getprop(fdt, offset_in_gdt, "fsl,ppid", &ppidp_len);
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+			"	ppid = %d\n", *ppidp);
 
 		if (!ppidp)
 			goto check_next_node;
@@ -367,8 +389,15 @@ void pamu_process_ppid_liodns(guest_t *guest)
 				break;
 		}
 
-		if (!ppid_to_liodn)
+
+		if (!ppid_to_liodn) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"warning: fsl,ppid-to-liodn prop not found in hypervisor dev tree\n");
 			goto check_next_node;
+		}
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+			"found fsl,ppid-to-liodn on node %s\n", fdt_get_name(fdt,off_ppid_liodn,NULL));
 
 		if (*ppidp >= (ppid_liodn_len/sizeof(uint32_t))) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -378,7 +407,7 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		assigned_liodn = ppid_to_liodn[*ppidp];
 
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 			"ppid %d mapped to liodn %d\n", *ppidp, assigned_liodn);
 
 		dma_ranges = fdt_getprop(guest->devtree, offset,
@@ -477,7 +506,7 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		if (!ppid_to_liodn_guest) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"pamu_partition_init: could not find the fsl,ppid-to-liodn property in guest device tree\n");
+				"could not find the fsl,ppid-to-liodn property in guest device tree\n");
 			goto check_next_node;
 		}
 
@@ -518,7 +547,7 @@ void pamu_global_init(void)
 	/* find the pamu node */
 	pamu_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,p4080-pamu");
 	if (pamu_node < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 			"warning: no pamu node found\n");
 		return;
 	}
