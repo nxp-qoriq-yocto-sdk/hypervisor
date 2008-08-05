@@ -198,12 +198,9 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 			return 0;
 	}
 
-	ret = get_addr_format(guest->devtree, parent, &naddr, &nsize);
+	ret = get_addr_format_nozero(guest->devtree, parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
-
-	if (naddr == 0 || nsize == 0)
-		return 0;
 
 	for (int i = 0; i < len; i += naddr + nsize) {
 		if (i + naddr + nsize > len)
@@ -1318,7 +1315,7 @@ phys_addr_t find_lowest_guest_phys(void)
 	const void *gtree;
 	uint32_t naddr, nsize;
 
-	ret = get_addr_format(fdt, 0, &naddr, &nsize);
+	ret = get_addr_format_nozero(fdt, 0, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
 
@@ -1335,7 +1332,7 @@ phys_addr_t find_lowest_guest_phys(void)
 		if (!gtree)
 			continue;
 
-		ret = get_addr_format(gtree, 0, &gnaddr, &gnsize);
+		ret = get_addr_format_nozero(gtree, 0, &gnaddr, &gnsize);
 		if (ret < 0)
 			continue;
 

@@ -50,6 +50,8 @@ int get_addr_format(const void *tree, int node,
 	} else if (len == 4 && *naddrp <= MAX_ADDR_CELLS) {
 		*naddr = *naddrp;
 	} else {
+		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		         "Bad addr cells %d\n", *naddrp);
 		return ERR_BADTREE;
 	}
 
@@ -60,10 +62,26 @@ int get_addr_format(const void *tree, int node,
 	} else if (len == 4 && *nsizep <= MAX_SIZE_CELLS) {
 		*nsize = *nsizep;
 	} else {
+		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		         "Bad size cells %d\n", *nsizep);
 		return ERR_BADTREE;
 	}
 
 	return 0;
+}
+
+int get_addr_format_nozero(const void *tree, int node,
+                           uint32_t *naddr, uint32_t *nsize)
+{
+	int ret = get_addr_format(tree, node, naddr, nsize);
+	if (!ret && (*naddr == 0 || *nsize == 0)) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		         "Bad addr/size cells %d/%d\n", *naddr, *nsize);
+
+		ret = ERR_BADTREE;
+	}
+
+	return ret;
 }
 
 void copy_val(uint32_t *dest, const uint32_t *src, int naddr)

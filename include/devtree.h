@@ -37,6 +37,8 @@
 
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize);
+int get_addr_format_nozero(const void *tree, int node,
+                           uint32_t *naddr, uint32_t *nsize);
 
 void *ptr_from_node(const void *devtree, int offset, const char *type);
 int lookup_alias(const void *tree, const char *path);
