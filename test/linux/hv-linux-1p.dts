@@ -12,6 +12,8 @@
 		serial0 = &uart0;
 		qman = &qman;
 		bman = &bman;
+                fman0 = &fman0;
+                fman1 = &fman1;
 	};
 
 	cpus {
@@ -142,11 +144,41 @@
 		device_type = "memory";
 	};
 
+	qman-portals@f4200000 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "simple-bus";
+		ranges = <0 0 0xf4200000 0x200000>;
+		qman-portal@24000 {
+			interrupts = <0x7a 0x2>;
+			interrupt-parent = <&mpic>;
+			compatible = "fsl,qman-portal";
+			reg = <0x24000 0x4000 0x109000 0x1000>;
+			cell-index = <0x9>;
+			fsl,ppid = <0xa>;
+		};
+	};
+
+	bman-portals@f4000000 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "simple-bus";
+		ranges = <0 0 0xf4000000 0x200000>;
+		bman-portal@24000 {
+			interrupts = <0x7b 0x2>;
+			interrupt-parent = <&mpic>;
+			compatible = "fsl,bman-portal";
+			reg = <0x24000 0x4000 0x109000 0x1000>;
+			cell-index = <0x9>;
+		};
+	};
+
 	ccsr@fe000000 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "fsl,p4080-ccsr", "simple-bus";
 		ranges = <0 0 0xfe000000 0x400000>;
+		interrupt-parent = <&mpic>;
 
 		pamu@20000 {
 			compatible = "fsl,p4080-pamu";
@@ -165,6 +197,18 @@
 			fsl,liodn = <0>;  // set by u-boot
 		};
 
+		fman0: fman@400000 {
+			compatible = "fsl,p4080-fman", "fsl,fman";
+			reg = <0x400000 0x100000>;
+			interrupts = <96 2>;
+		};
+
+		fman1: fman@500000 {
+			compatible = "fsl,p4080-fman", "fsl,fman";
+			reg = <0x500000 0x100000>;
+			interrupts = <97 2>;
+		};
+
 		mpic: pic@40000 {
 			clock-frequency = <0>;
 			interrupt-controller;
@@ -181,7 +225,6 @@
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
 			reg = <0x11c500 0x100>;
 			clock-frequency = <0>;
 		};
@@ -190,7 +233,6 @@
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
 			reg = <0x11c600 0x100>;
 			clock-frequency = <0>;
 		};
