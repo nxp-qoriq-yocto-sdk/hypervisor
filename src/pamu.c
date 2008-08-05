@@ -485,7 +485,8 @@ void pamu_process_ppid_liodns(guest_t *guest)
 				"fsl,ppid-to-liodn",
 				ppid_to_liodn, ppid_liodn_len);
 
-check_next_node:
+check_next_node: /* reset the offset since stuff has been inserted */
+		offset = fdt_path_offset(guest->devtree, pathbuf);
 		offset = fdt_node_offset_by_prop_value(guest->devtree,
 				offset, "fsl,ppid",
 				&propval, sizeof(uint32_t));
