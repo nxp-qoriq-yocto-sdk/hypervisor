@@ -84,7 +84,6 @@ bin/include/%.d : include/%.h
 	@$(MKDIR) $(@D)
 	$(LIBOS_DIR)/confdep "$<" "$<" >> "$@"
 
-LIBFDT_objdir := src
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
