@@ -129,7 +129,7 @@ bin/%.d : src/%.c
 	@$(MKDIR) $(@D)
 	@OBJ=`echo $@ | sed 's/\.d$$/\.o/'` && \
 	$(CC) -M $(CC_OPTS) $(CC_OPTS_C) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" > "$@"
+	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
 
 bin/%.o : src/%.c bin/%.d
 	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) -c -o "$@" $<
@@ -138,7 +138,7 @@ bin/%.d : src/%.S $(LIBOS_BIN)/assym.s
 	@$(MKDIR) $(@D)
 	@OBJ=`echo "$@" | sed 's/\.d$$/\.o/'` && \
 	$(CC) -M $(CC_OPTS) $(CC_OPTS_ASM) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" > "$@"
+	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
 
 bin/%.o : src/%.S bin/%.d
 	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM) -c -o $@ $<
@@ -148,7 +148,7 @@ bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 	@$(MKDIR) $(@D)
 	@OBJ=`echo "$@" | sed 's/\.d$$/\.o/'` && \
 	$(CC) -M $(CC_OPTS) $(CC_OPTS_C) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" > "$@"
+	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
 	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
