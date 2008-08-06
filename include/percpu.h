@@ -70,6 +70,14 @@ typedef struct handle {
 	struct guest *guest;
 } handle_t;
 
+/** operations for debug stubs
+ *
+ */
+typedef struct {
+	int (*debug_int_handler)(trapframe_t *trap_frame);
+	void (*wait_at_start_hook)(uint32_t entry, register_t msr);
+} stub_ops_t;
+
 /**
  * Guest states
  *
@@ -110,6 +118,7 @@ typedef struct guest {
 	/** Offset to partition node in main device tree. */
 	int partition;
 
+	stub_ops_t *stub_ops;
 	uint32_t lock;
 	gstate_t state;
 } guest_t;

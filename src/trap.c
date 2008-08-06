@@ -39,13 +39,14 @@
 #include <vpic.h>
 #include <vmpic.h>
 #include <greg.h>
-#include <gdb-stub.h>
 
 void program_trap(trapframe_t *regs)
 {
 #ifdef CONFIG_GDB_STUB
-	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS) &&
-	    gdb_stub_process_trap(regs))
+	gcpu_t *gcpu = get_gcpu();
+	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
+	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_int_handler 
+	    && gcpu->guest->stub_ops->debug_int_handler(regs))
 		return;
 #endif
 

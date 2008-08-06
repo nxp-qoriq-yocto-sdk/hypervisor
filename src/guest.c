@@ -823,6 +823,10 @@ static void start_guest_primary_nowait(void)
 
 	cpu->traplevel = 0;
 
+	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
+		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
+
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
 	// map 1GiB, so we don't support loading/booting an OS above that
 	// address.  Also, we pass the guest physical address even though it
@@ -931,6 +935,10 @@ static void start_guest_secondary(void)
 
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+
+	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
+		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
 	r4 = 0;
