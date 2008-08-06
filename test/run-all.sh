@@ -11,10 +11,10 @@ files="test/hello/hv-hello.simics \
 	test/ipi/hv-ipi-2p.simics \
 	test/ipi/hv-ipi-coreint.simics \
 	test/whoami/hv-whoami.simics \
-	test/hcalls/hv-hcalls.simics \
 	test/byte-chan/hv-byte_chan.simics \
 	test/mmu/mmu.simics \
 	test/dma/hv-dma.simics \
+	test/pmr/hv-pmr.simics \
 	test/fit/hv-fit.simics"
 
 for i in $files

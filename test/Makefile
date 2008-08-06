@@ -23,7 +23,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SUBDIRS = gdb hello linux msgsnd ipi vmpic fit whoami byte-chan mmu dma
+SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami
 
 .PHONY: subdirs $(SUBDIRS)
 
