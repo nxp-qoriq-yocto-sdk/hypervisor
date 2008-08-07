@@ -256,7 +256,7 @@
 
 			debug-stub0 {
 				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 				fsl,endpoint = <&bc0>;
 			};
 		};
@@ -272,7 +272,7 @@
 
 			debug-stub1 {
 				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 				fsl,endpoint = <&bc1>;
 			};
 		};
@@ -288,7 +288,7 @@
 
 			debug-stub2 {
 				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 				fsl,endpoint = <&bc2>;
 			};
 		};
@@ -304,7 +304,7 @@
 
 			debug-stub3 {
 				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 				fsl,endpoint = <&bc3>;
 			};
 		};

@@ -203,7 +203,7 @@
 			stub0: gdb-stub0 {
 				compatible = "fsl,hv-gdb-stub";
 				fsl,endpoint = <&bc2>;
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 			};
 		};
 	};

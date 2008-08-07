@@ -116,7 +116,7 @@ static const byte_chan_t *find_stub_byte_channel(char *compatible)
 		TRACE("off: %d\n", off);
 		if (off < 0)
 			break;
-		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-debug-cpus", &prop_length);
+		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-dbg-cpus", &prop_length);
 		if (fsl_ep == NULL) {
 			if (prop_length == -FDT_ERR_NOTFOUND) {
 				TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
