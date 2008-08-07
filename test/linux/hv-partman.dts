@@ -205,11 +205,7 @@
 			fsl,privileged;
 			fsl,hv-dtb = /incbin/("bin/partman-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
-			                       0 0x17000000 0 0x20000000 0x1000000
-			                       0 0xfe040000 0 0xfe040000 0x20000
-			                       0 0xfe060000 0 0xfe060000 0x1000
-			                       0 0xfe061000 0 0xfe062000 0x1000
-			                       0 0xfe062000 0xffffffff 0xffffffff 0x1e000>;
+					0 0x17000000 0 0x20000000 0x1000000>;
 			fsl,hv-load-image-table = <0 0xe8100000 0 0 0x0
 			                           0 0xe8800000 0 0x01300000 0x00400000>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
@@ -220,12 +216,7 @@
 			fsl,hv-cpus = <5 2 1 1 3 1>;
 			fsl,entry = <0>;
 			fsl,hv-dtb = /incbin/("bin/partman-p2.dtb");
-			fsl,hv-physaddr-map = <0 0 0 0x21000000 0x04000000
-			                 0 0xfe040000 0 0xfe040000 0x20000
-			                 0 0xfe060000 0 0xfe065000 0x2000
-			                 0 0xfe062000 0 0xfe061000 0x1000
-			                 0 0xfe063000 0 0xfe063000 0x1000
-			                 0 0xfe064000 0xffffffff 0xffffffff 0x1c000>;
+			fsl,hv-physaddr-map = <0 0 0 0x21000000 0x04000000>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
 		};
 	};
