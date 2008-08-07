@@ -560,12 +560,82 @@ static const uint32_t hv_version[4] = {
 	FH_API_COMPAT_VERSION
 };
 
+static int process_partition_handles(guest_t *guest)
+{
+	int off = -1;
+	int ret;
+
+	// Add a 'reg' property to every partition-handle node
+
+	while (1) {
+		// get a pointer to the first/next partition-handle node
+		off = fdt_node_offset_by_compatible(guest->devtree, off,
+		                                    "fsl,hv-partition-handle");
+		if (off < 0) {
+			if (off == -FDT_ERR_NOTFOUND)
+				return 0;
+
+			return off;
+		}
+
+		// Find the end-point partition node in the hypervisor device tree
+
+		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
+		if (!s) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "guest %s: partition node missing fsl,endpoint (%d)\n",
+			         guest->name, ret);
+			continue;
+		}
+
+		int endpoint = fdt_path_offset(fdt, s);
+		if (endpoint < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "guest %s: partition %s does not exist (%d)\n",
+			         guest->name, s, endpoint);
+			continue;
+		}
+
+		// Get the guest_t for the partition, or create one if necessary
+		guest_t *target_guest = node_to_partition(endpoint);
+		if (!target_guest) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "guest %s: %s is not a partition\n",
+			         guest->name, s);
+			continue;
+		}
+
+		// Store the pointer to the target guest in our list of handles
+		target_guest->handle.guest = target_guest;
+
+		// Allocate a handle
+		int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
+		if (ghandle < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "guest %s: too many handles\n", guest->name);
+			return ghandle;
+		}
+
+		// Insert a 'reg' property into the partition-handle node of the
+		// guest device tree
+		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
+		if (ret)
+			return ret;
+
+		ret = fdt_setprop(guest->devtree, off, "label",
+		                  target_guest->name, strlen(target_guest->name));
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
 {
 	int ret;
-	int off = -1;
 	uint32_t gfdt_size;
 	const void *guest_origtree;
 	const uint32_t *prop;
@@ -624,67 +694,22 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 
-	// Add a 'reg' property to every partition-handle node
+	ret = process_partition_handles(guest);
+	if (ret < 0)
+		goto fail;
 
-	while (1) {
-		// get a pointer to the first/next partition-handle node
-		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition-handle");
-		if (off < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: guest missing fsl,hv-partition-handle\n",
-				guest->name);
-			break;
-		}
-
-		// Find the end-point partition node in the hypervisor device tree
-
-		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
-		if (!s) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: missing fsl,endpoint property or value\n",
-				guest->name);
-			goto fail;
-		}
-
-		int endpoint = fdt_path_offset(fdt, s);
-		if (endpoint < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: partition %s does not exist\n",
-				guest->name, s);
-			goto fail;
-		}
-
-		// Get the guest_t for the partition, or create one if necessary
-		guest_t *target_guest = node_to_partition(endpoint);
-		if (!target_guest) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: partition %s does not exist\n",
-				guest->name, s);
-			goto fail;
-		}
-
-		// Allocate a handle
-		int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
-		if (ghandle < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: too many handles\n", guest->name);
-			goto fail;
-		}
-
-		// Store the pointer to the target guest in our list of handles
-		guest->handles[ghandle]->guest = target_guest;
-
-		// Insert a 'reg' property into the partition-handle node of the
-		// guest device tree
-		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
-		if (ret) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"guest %s: could not insert 'reg' property\n", guest->name);
-			goto fail;
-		}
-	}
+	ret = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
+	if (ret == -FDT_ERR_NOTFOUND)
+		ret = fdt_add_subnode(guest->devtree, 0, "hypervisor");
+	if (ret < 0)
+		goto fail;
+	ret = fdt_setprop(guest->devtree, ret, "fsl,hv-partition-label",
+	                  guest->name, strlen(guest->name));
+	if (ret)
+		goto fail;
 
 	return 0;
+
 fail:
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		"error %d (%s) building guest device tree for %s\n",
@@ -697,7 +722,8 @@ uint32_t start_guest_lock;
 
 guest_t *node_to_partition(int partition)
 {
-	int i;
+	int i, len;
+	char *name;
 
 	// Verify that 'partition' points to a compatible node
 	if (fdt_node_check_compatible(fdt, partition, "fsl,hv-partition")) {
@@ -715,12 +741,39 @@ guest_t *node_to_partition(int partition)
 	
 	if (i == last_lpid) {
 		if (last_lpid >= MAX_PARTITIONS) {
-			printf("too many partitions\n");
-		} else {
-			guests[i].state = guest_starting;
-			guests[i].partition = partition;
-			guests[i].lpid = ++last_lpid;
+			spin_unlock(&start_guest_lock);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "node_to_partition: too many partitions\n");
+			return NULL;
 		}
+
+		name = fdt_getprop_w(fdt, partition, "label", &len);
+		if (len > 0) {
+			name[len - 1] = 0;
+		} else {
+			/* If no label, use the partition node path. */
+			name = malloc(MAX_PATH);
+			if (!name) {
+				spin_unlock(&start_guest_lock);
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "node_to_partition: out of memory\n");
+				return NULL;
+			}
+
+			int ret = fdt_get_path(fdt, partition, name, MAX_PATH);
+			if (ret >= 0) {
+				name[MAX_PATH - 1] = 0;
+			} else {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "node_to_partition: Couldn't get partition node path.\n");
+				sprintf(name, "partition %d", i);
+			}
+		}
+
+		guests[i].name = name;
+		guests[i].state = guest_starting;
+		guests[i].partition = partition;
+		guests[i].lpid = ++last_lpid;
 	}
 	
 	spin_unlock(&start_guest_lock);
@@ -1074,8 +1127,7 @@ __attribute__((noreturn)) void init_guest(void)
 	int off = -1, partition = 0, ret;
 	int pir = mfspr(SPR_PIR);
 	const uint32_t *cpus = NULL, *prop;
-	char buf[MAX_PATH];
-	guest_t *guest = NULL;
+	guest_t *guest = NULL, *temp_guest;
 	int gpir, len, cpus_len = 0;
 	
 	while (1) {
@@ -1089,6 +1141,7 @@ __attribute__((noreturn)) void init_guest(void)
 
 		prop = fdt_getprop(fdt, off, "fsl,hv-cpus", &len);
 		if (!prop) {
+			char buf[MAX_PATH];
 			ret = fdt_get_path(fdt, off, buf, sizeof(buf));
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "No fsl,hv-cpus in guest %s\n", buf);
@@ -1098,39 +1151,26 @@ __attribute__((noreturn)) void init_guest(void)
 		if (!cpu_in_cpulist(prop, len, pir))
 			continue;
 
-		ret = fdt_get_path(fdt, off, buf, sizeof(buf));
-		if (ret < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "start_guest: error %d (%s) getting path at offset %d\n",
-			         ret, fdt_strerror(ret), off);
+		temp_guest = node_to_partition(off);
+		if (!temp_guest)
 			continue;
-		}
-		
+
 		if (partition) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "extra guest %s on core %d\n", buf, pir);
+			         "extra guest %s on core %d\n", temp_guest->name, pir);
 			continue;
 		}
 
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-		         "guest at %s on core %d\n", buf, pir);
 		partition = off;
-		
-		guest = node_to_partition(partition);
-		mtspr(SPR_LPIDR, guest->lpid);
-	
+		guest = temp_guest;
 		get_gcpu()->guest = guest;
 		cpus = prop;
 		cpus_len = len;
 
-		if (pir == cpus[0]) {
-			int name_len = strlen(buf) + 1;
-			guest->name = alloc(name_len, 1);
-			if (!guest->name)
-				goto nomem;
-
-			memcpy(guest->name, buf, name_len);
-		}
+		mtspr(SPR_LPIDR, guest->lpid);
+	
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		         "guest at %s on core %d\n", guest->name, pir);
 	}
 
 	if (pir == cpus[0]) {

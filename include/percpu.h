@@ -88,7 +88,7 @@ typedef struct guest {
 	vpic_t vpic;
 	struct pte *gphys;      /**< guest phys to real phys mapping */
 	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
-	char *name;
+	const char *name;
 	void *devtree;
 	handle_t handle;        /**< The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
