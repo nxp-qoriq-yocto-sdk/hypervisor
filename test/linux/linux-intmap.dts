@@ -113,13 +113,6 @@
 				fsl,endpoint = "byte-channel0";
 				interrupt-parent = <&vmpic>;
 			};
-
-			gpio {
-				reg = <1>;
-				compatible = "fsl,hv-gpio";
-				fsl,real-dev = "gpio";
-				fsl,bitmask = <0x103ecc00>;
-			};
 		};
 	};
 
