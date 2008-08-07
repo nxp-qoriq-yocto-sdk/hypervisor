@@ -40,6 +40,7 @@
 #include <paging.h>
 
 extern void *fdt;
+int pamu_global_init_done;
 
 static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 {
@@ -524,6 +525,9 @@ check_next_node: /* reset the offset since stuff has been inserted */
 
 void pamu_partition_init(guest_t *guest)
 {
+	if (!pamu_global_init_done)
+		return;
+
 	pamu_process_standard_liodns(guest);
 
 	pamu_process_ppid_liodns(guest);
@@ -559,10 +563,6 @@ void pamu_global_init(void)
 		return;
 	}
 
-	/*
-	 * FIXME : Need to fix compatible properties such as guts
-	 * to more appropriate names such as p4080-guts
-	 */
 	guts_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,p4080-guts");
 	if (guts_node < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -585,7 +585,15 @@ void pamu_global_init(void)
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
 
 		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
-		pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+		if (ret < 0) {
+			/* This can only fail for the first instance due to
+			 * memory allocation issues, hence this failure
+			 * implies global pamu init failure and let all
+			 * PAMU(s) remain in bypass mode.
+			 */
+			return;
+		}
 
 		/* Disable PAMU bypass for this PAMU */
 		pamubypenr &= ~pamu_counter;
@@ -593,4 +601,5 @@ void pamu_global_init(void)
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
+	pamu_global_init_done = 1;
 }

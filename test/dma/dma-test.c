@@ -122,8 +122,10 @@ void start(unsigned long devtree_ptr)
 	node = ret;
 
 	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-liodn-handle", &len);
-	if (!liodnp)
+	if (!liodnp) {
 		printf("fsl,liodn property not found\n");
+		return;
+	}
 
 	fh_dma_enable(*liodnp);
 
