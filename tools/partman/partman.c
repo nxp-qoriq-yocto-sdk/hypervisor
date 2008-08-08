@@ -587,11 +587,6 @@ static int cmd_start(struct parameters *p)
 			return ret;
 	}
 
-	if (!p->e_specified) {
-		usage();
-		return EINVAL;
-	}
-
 	im.partition = p->h;
 	im.entry_point = p->e;
 
