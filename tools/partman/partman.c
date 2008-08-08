@@ -447,25 +447,24 @@ static int cmd_status(void)
 		return errno;
 	}
 
-	printf("Partition\n"
-	       "Name             Handle        Status\n"
-	       "----------------------------------------\n");
+	printf("Partition Name                  Handle  Status\n"
+	       "----------------------------------------------\n");
 
 	while ((dp = readdir(dir)))
 		if ((dp->d_type == DT_DIR) && (dp->d_name[0] != '.')) {
 			size_t size;
 			char filename[300];
-			char *compatible;
+			char *strprop;
 			uint32_t *reg;
 			struct fsl_hv_ioctl_status status;
 
 			sprintf(filename, "%s/compatible", dp->d_name);
-			compatible = read_property(filename, &size);
-			if (!compatible)
+			strprop = read_property(filename, &size);
+			if (!strprop)
 				goto exit;
-			if (!is_compatible(compatible, size, "fsl,hv-partition-handle"))
+			if (!is_compatible(strprop, size, "fsl,hv-partition-handle"))
 				continue;
-			free(compatible);
+			free(strprop);
 
 			sprintf(filename, "%s/reg", dp->d_name);
 			reg = read_property(filename, &size);
@@ -478,7 +477,14 @@ static int cmd_status(void)
 				goto exit;
 			}
 
-			printf("%-15s  %-12u  ", dp->d_name, *reg);
+			sprintf(filename, "%s/label", dp->d_name);
+			strprop = read_property(filename, &size);
+			if (!strprop)
+				goto exit;
+
+			strprop[size - 1] = 0;
+			printf("%-31s %-7u ", strprop, *reg);
+			free(strprop);
 
 			status.partition = *reg;
 			ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
