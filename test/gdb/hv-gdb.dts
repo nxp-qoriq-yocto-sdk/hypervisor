@@ -193,17 +193,16 @@
 		part1 {
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 1 2 1>;
-			fsl,entry = <0>;
-			fsl,privileged;
 			fsl,hv-physaddr-map = <0 0 0 0x10000000 0x10000000>;
 			fsl,hv-dtb = /incbin/("bin/gdb-p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+			fsl,hv-dbg-wait-at-start;
 
 			stub0: gdb-stub0 {
 				compatible = "fsl,hv-gdb-stub";
 				fsl,endpoint = <&bc2>;
-				fsl,hv-debug-cpus = <0 1>; // vcpu 0
+				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
 			};
 		};
 	};

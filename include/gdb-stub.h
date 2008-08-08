@@ -53,6 +53,14 @@ typedef enum breakpoint_type
 	 * associated internal breakpoint.
 	 */
 	internal,
+
+	/* A stub can set a breakpoint on the first instruction of the
+	 * guest.  In this special case we need to enter the main
+	 * stub loop and not send out a reason halted packet.  Otherwise
+	 * handled like internal breakpoints.
+	 */
+	internal_1st_inst,
+
 } breakpoint_type_t;
 
 typedef struct breakpoint
@@ -111,5 +119,6 @@ typedef struct gdb_stub_core_context {
 int gdb_stub_init(void);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 int gdb_stub_process_trap(trapframe_t *trap_frame);
+void gdb_wait_at_start(uint32_t entry, register_t msr);
 
 #endif /* __GDB_STUB_H__ */

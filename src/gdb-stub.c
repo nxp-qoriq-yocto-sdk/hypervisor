@@ -47,7 +47,7 @@
 
 #define TRACE(fmt, info...) \
 	printlog(LOGTYPE_GDB_STUB, \
-	LOGLEVEL_DEBUG, \
+	LOGLEVEL_VERBOSE, \
 	"%s@[%s, %d]: " fmt "\n", \
 	__func__, __FILE__, __LINE__, ## info)
 
@@ -62,33 +62,44 @@ extern void *fdt;
 		return GDB_STUB_INIT_FAILURE; \
 	}
 
+static stub_ops_t stub_ops = {
+        .debug_int_handler = gdb_stub_process_trap,
+        .wait_at_start_hook = gdb_wait_at_start,
+};
+
 int gdb_stub_init(void)
 {
+	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub;
-	gcpu_t *gcpu = NULL;
+
 	TRACE();
-	stub = (gdb_stub_core_context_t *)malloc(sizeof(gdb_stub_core_context_t));
+
+	stub = malloc(sizeof(gdb_stub_core_context_t));
+	CHECK_MEM(stub);
 	memset(stub, 0, sizeof(gdb_stub_core_context_t));
+
 	stub->byte_channel = find_stub_byte_channel("fsl,hv-gdb-stub");
-	stub->cbuf = (uint8_t *)malloc(BUFMAX*sizeof(uint8_t));
+	stub->cbuf = malloc(BUFMAX*sizeof(uint8_t));
 	CHECK_MEM(stub->cbuf);
 	memset(stub->cbuf, 0, BUFMAX*sizeof(uint8_t));
 	stub->command.buf = stub->cbuf;
 	stub->command.len = BUFMAX;
 	stub->command.cur = stub->cbuf;
 	stub->cmd = &stub->command;
-	stub->rbuf = (uint8_t *)malloc(BUFMAX*sizeof(uint8_t));
+	stub->rbuf = malloc(BUFMAX*sizeof(uint8_t));
 	CHECK_MEM (stub->rbuf);
 	memset(stub->rbuf, 0, BUFMAX*sizeof(uint8_t));
 	stub->response.buf = stub->rbuf;
 	stub->response.len = BUFMAX;
 	stub->response.cur = stub->rbuf;
 	stub->rsp = &stub->response;
-	stub->breakpoint_table = (breakpoint_t *)malloc(MAX_BREAKPOINT_COUNT*sizeof(breakpoint_t));
+	stub->breakpoint_table = malloc(MAX_BREAKPOINT_COUNT*sizeof(breakpoint_t));
 	CHECK_MEM (stub->breakpoint_table);
-	gcpu = get_gcpu();
-	CHECK_MEM (gcpu);
 	gcpu->debug_stub_data = stub;
+
+	if (!gcpu->guest->stub_ops)
+		gcpu->guest->stub_ops = &stub_ops;
+
 	return register_callbacks();
 }
 
@@ -98,8 +109,7 @@ int gdb_stub_init(void)
  */
 static const byte_chan_t *find_stub_byte_channel(char *compatible)
 {
-	gcpu_t *gcpu = NULL;
-	gcpu = get_gcpu();
+	gcpu_t *gcpu = get_gcpu();
 	int32_t off = -1, vcpu_num;
 	const uint32_t *fsl_ep = NULL;
 	int32_t prop_length = 0;
@@ -116,7 +126,7 @@ static const byte_chan_t *find_stub_byte_channel(char *compatible)
 		TRACE("off: %d\n", off);
 		if (off < 0)
 			break;
-		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-debug-cpus", &prop_length);
+		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-dbg-cpus", &prop_length);
 		if (fsl_ep == NULL) {
 			if (prop_length == -FDT_ERR_NOTFOUND) {
 				TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
@@ -217,10 +227,8 @@ static void rx(queue_t *q)
 
 static int register_callbacks(void)
 {
-	gdb_stub_core_context_t *stub;
-	gcpu_t *gcpu = NULL;
-	gcpu = get_gcpu();
-	stub = gcpu->debug_stub_data;
+	gcpu_t *gcpu = get_gcpu();
+	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
 	TRACE();
 	if (stub->byte_channel != NULL) {
 		stub->byte_channel_handle = byte_chan_claim((byte_chan_t *) stub->byte_channel);
@@ -941,10 +949,7 @@ static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapf
 	breakpoint_t *breakpoint = NULL;
 
 	TRACE();
-	if (!addr) {
-		TRACE("Got NULL address - you cannot set a breakpoint there!");
-		return NULL;
-	}
+
 	/* First check if there already is a breakpoint at addr and return rightaway if so. */
 	breakpoint = locate_breakpoint(breakpoint_table, addr);
 	if (breakpoint) {
@@ -974,7 +979,7 @@ static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapf
 	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
 		if (!breakpoint_table[index].taken) {
 			/* Read the original instruction. */
-			guestmem_set_data(trap_frame);
+			guestmem_set_insn(trap_frame);
 			status = guestmem_in32(addr, &orig_insn);
 			if (status != 0) {
 				TRACE("Could not read instruction at addr: 0x%p", addr);
@@ -1028,14 +1033,15 @@ static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_
 
 int gdb_stub_process_trap(trapframe_t *trap_frame)
 {
-	gdb_stub_core_context_t *stub;
-	gcpu_t *gcpu = NULL;
+	gcpu_t *gcpu = get_gcpu();
+	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
 	uint8_t value[17];
-	TRACE("At entry");
-	gcpu = get_gcpu();
-	stub = gcpu->debug_stub_data;
+	breakpoint_type_t bptype = breakpoint->type;
+
+	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
+
 	/* register_t esr_reg_value = 0;
 	 * esr_reg_value = mfspr(SPR_ESR);
 	 * TRACE("esr_ptr check: %s", esr_reg_value == ESR_PTR ? "success" : "fail");
@@ -1054,8 +1060,13 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 		TRACE("Breakpoint not set by stub, returning (1).");
 		return 1;
 	}
-	if (breakpoint->type == internal) {
+
+	/* need to save this so after bp is cleared we still know */
+	bptype = breakpoint->type;
+
+	if (bptype == internal || bptype == internal_1st_inst) {
 		TRACE("We've hit an internal (set by stub) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
+		guestmem_set_data(trap_frame);
 		if (breakpoint->associated) {
 			TRACE("Replace the original instruction back at the associated internal "
 			      "breakpoint: 0x%p", breakpoint->associated->addr);
@@ -1072,23 +1083,31 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 	} else {
 		TRACE("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
 	}
-	/* We _have_ to let GDB know that we hit a breakpoint (even if it is internal). */
-	TRACE("Sending T rsp");
-	pkt_cat_string(stub->rsp, "T");
-	pkt_write_hex_byte_update_cur(stub->rsp, 5);
-	pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
-	pkt_cat_string(stub->rsp, ":");
-	read_reg(trap_frame, value, 1);
-	pkt_cat_string(stub->rsp, (char *)value);
-	pkt_cat_string(stub->rsp, ";");
-	pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
-	pkt_cat_string(stub->rsp, ":");
-	read_reg(trap_frame, value, 64);
-	pkt_cat_string(stub->rsp, (char *)value);
-	pkt_cat_string(stub->rsp, ";");
-	/* FIXME: This is a HACK. Is this the right fix? */
-	stub->byte_channel_handle->rx->data_avail = NULL;
-	transmit_response(stub);
+
+	if (bptype != internal_1st_inst) {
+		/* We _have_ to let GDB know that we hit a breakpoint (even if it is internal). */
+		TRACE("Sending T rsp");
+		pkt_cat_string(stub->rsp, "T");
+		pkt_write_hex_byte_update_cur(stub->rsp, 5);
+		pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
+		pkt_cat_string(stub->rsp, ":");
+		read_reg(trap_frame, value, 1);
+		pkt_cat_string(stub->rsp, (char *)value);
+		pkt_cat_string(stub->rsp, ";");
+		pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
+		pkt_cat_string(stub->rsp, ":");
+		read_reg(trap_frame, value, 64);
+		pkt_cat_string(stub->rsp, (char *)value);
+		pkt_cat_string(stub->rsp, ";");
+		/* FIXME: This is a HACK. Is this the right fix? */
+		stub->byte_channel_handle->rx->data_avail = NULL;
+		transmit_response(stub);
+	}
+
+	if (bptype == internal_1st_inst)
+		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_NORMAL,
+			"gdb: waiting for host debugger...\n");
+
 	TRACE("Calling: gdb_stub_event_handler().");
 	gdb_stub_event_handler(trap_frame);
 	TRACE("Returning from gdb_stub_process_trap()");
@@ -1097,8 +1116,8 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
-	gdb_stub_core_context_t *stub;
-	gcpu_t *gcpu = NULL;
+	gcpu_t *gcpu = get_gcpu();
+	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
 	uint8_t *cur_pos, *sav_pos, *data;
 	uint32_t offset, length;
 	uint8_t err_flag = 0;
@@ -1111,9 +1130,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
 	const char *td; /* td: target description */
-	TRACE("In RSP Engine, main loop.");
-	gcpu = get_gcpu();
-	stub = gcpu->debug_stub_data;
+	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+		"gdb: in RSP Engine, main loop.");
 	stub_start: {
 		TRACE("At stub_start.");
 		/* Deregister call back. */
@@ -1121,7 +1139,6 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		enable_critint();
 	}
 	while (1) {
-
 		TRACE("In main loop.");
 		dump_breakpoint_table(stub->breakpoint_table);
 		pkt_reset(stub->cmd);
@@ -1136,7 +1153,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 *   back to the beginning of the gdb_stub_event_handler
 			 *   where interrupts are disabled.
 			 */
-			TRACE("GOT 'c' PACKET.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"GOT 'c' PACKET.\n");
 			return_to_guest:
 				disable_critint();
 				stub->byte_channel_handle->rx->data_avail = rx;
@@ -1150,7 +1168,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_register:
-			TRACE("Got 'p' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'p' packet.\n");
 			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '\0');
 			read_reg(trap_frame, value, reg_num);
@@ -1159,7 +1178,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_registers:
-			TRACE("Got 'g' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'g' packet.\n");
 			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
 				read_reg(trap_frame, value, reg_num);
 				TRACE("Register: %d, read-value: %s", reg_num, value);
@@ -1168,7 +1188,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_register:
-			TRACE("Got 'P' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'P' packet.\n");
 			err_flag = 0;
 			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '=');
@@ -1186,7 +1207,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_registers:
-			TRACE("Got 'G' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'G' packet.\n");
 			cur_pos = content(stub->cmd);
 			data = ++cur_pos;
 			BREAK_IF_END(data);
@@ -1207,7 +1229,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case set_thread:
-			TRACE("Got packet: 'H'");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got packet: 'H'\n");
 			cur_pos = content(stub->cmd);
 			cur_pos++;
 			switch(*cur_pos) {
@@ -1237,7 +1260,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_memory:
-			TRACE("Got 'm' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'm' packet.\n");
 			cur_pos = content(stub->cmd);
 			addr = (uint32_t *)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
@@ -1257,7 +1281,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_memory:
-			TRACE("Got 'M' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'M' packet.\n");
 			cur_pos = content(stub->cmd);
 			addr = (uint32_t *) scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
@@ -1286,8 +1311,9 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		case remove_breakpoint:
 			cur_pos = content(stub->cmd);
 			aux = *cur_pos;
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got '%c' packet.\n", *cur_pos);
 			err_flag = 0;
-			TRACE("Got '%c' packet.", *cur_pos);
 			breakpoint_type = scan_num(&cur_pos, ',');
 			if (breakpoint_type != 0) {
 				TRACE("We only support memory breakpoints.");
@@ -1311,7 +1337,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			if (aux == 'Z') {
 				TRACE ("Invoking set_breakpoint.");
 				breakpoint = set_breakpoint(stub->breakpoint_table, trap_frame, addr, external);
-				breakpoint->associated = NULL;
+				if (breakpoint)
+					breakpoint->associated = NULL;
 				err_flag = breakpoint ? 0 : 1;
 			} else { /* 'z' */
 				TRACE("Invoking locate_breakpoint.");
@@ -1333,7 +1360,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case single_step:
-			TRACE("Got 's' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 's' packet.\n");
 			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
 			/* If there is no address to resume at; we resume at pc. */
@@ -1366,18 +1394,21 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case return_current_thread_id:
-			TRACE("Got 'qC' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'qC' packet.\n");
 			/* For now let pid == 0 */
 			pkt_cat_string(stub->rsp, "QC0");
 			break;
 
 		case get_section_offsets:
-			TRACE("Got 'qOffsets' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'qOffsets' packet.\n");
 			pkt_cat_string(stub->rsp, "Text=0;Data=0;Bss=0");
 			break;
 
 		case supported_features:
-			TRACE("Got 'qSupported' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'qSupported' packet.\n");
 			pkt_cat_string(stub->rsp, "PacketSize=" BUFMAX_HEX ";");
 			pkt_cat_string(stub->rsp, "qXfer:auxv:read-;"
 			                          "qXfer:features:read+;"
@@ -1389,7 +1420,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case qxfer:
-			TRACE("Got 'qXfer' packet.");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got 'qXfer' packet.\n");
 			cur_pos = content(stub->cmd);
 			cur_pos += 5;
 			if (strncmp(":features:read:", (char *) cur_pos, 15) == 0) {
@@ -1431,13 +1463,15 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 * in include/gdb/signals.h
 			 * TODO: Also, signal == 2 For now.
 			 */
-			TRACE("Got stop reply packet: '?'");
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Got stop reply packet: '?'\n");
 			pkt_cat_string(stub->rsp, "S");
 			pkt_write_hex_byte_update_cur(stub->rsp, 2);
 			break;
 
 		default:
-			TRACE("Unhandled RSP directive: %s, transmitting response: '%s'",
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+				"Unhandled RSP directive: %s, transmitting response: '%s'\n",
 			       content(stub->cmd), content(stub->rsp));
 			break;
 		}
@@ -1445,4 +1479,26 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	}
 }
 
-/* RSP ends. */
+void gdb_wait_at_start(uint32_t entry, register_t msr)
+{
+	gcpu_t *gcpu = get_gcpu();
+	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
+	trapframe_t trap_frame;
+	breakpoint_t *breakpoint;
+
+	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+		"setting breakpoint on 1st instruction\n");
+
+	/* contruct enough of a trap frame so that set_breakpoint() can
+	 * do its thing.
+	 */
+	trap_frame.srr1 = msr;
+
+	/* set up EPLC and EPSC so we can set our breakpoint */
+	mtspr(SPR_EPLC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
+	mtspr(SPR_EPSC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
+
+	breakpoint = set_breakpoint(stub->breakpoint_table, &trap_frame, (uint32_t *)entry, internal_1st_inst);
+}
+
+

@@ -40,6 +40,7 @@
 #include <paging.h>
 
 extern void *fdt;
+int pamu_global_init_done;
 
 static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 {
@@ -340,6 +341,31 @@ void pamu_process_ppid_liodns(guest_t *guest)
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		"processing ppid liodns...\n");
 
+	/*
+	 * Current assumption is that FMAN, Crypto, PME will all
+	 * express the same LIODN for a given PPID, hence we simply
+	 * need to lookup fsl,ppid-to-liodn property in hypervisor
+	 * device tree, search it once and cache it for ppaace programming
+	 * & pass-thru to the guest device trees.
+	 */
+
+	for (off_ppid_liodn = fdt_next_node(fdt, -1, NULL);
+	     off_ppid_liodn >= 0;
+	     off_ppid_liodn = fdt_next_node(fdt, off_ppid_liodn, NULL)){
+
+		ppid_to_liodn = fdt_getprop(fdt, off_ppid_liodn,
+			"fsl,ppid-to-liodn", &ppid_liodn_len);
+
+		if (ppid_to_liodn && ppid_liodn_len)
+			break;
+	}
+
+	if (!ppid_to_liodn) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"pamu_partition_init: no fsl,ppid-to-liodn property\n");
+		return;
+	}
+
 	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,ppid",
 						&propval, sizeof(uint32_t));
 
@@ -370,34 +396,6 @@ void pamu_process_ppid_liodns(guest_t *guest)
 			goto check_next_node;
 		if (ppidp_len < 0)
 			goto check_next_node;
-
-		/*
-		 * Current assumption is that FMAN, Crypto, PME will all
-		 * express the same LIODN for a given PPID, hence we simply
-		 * need to lookup fsl,ppid-to-liodn property in hypervisor
-		 * device tree.
-		 */
-
-		for (off_ppid_liodn = fdt_next_node(fdt, -1, NULL);
-		     off_ppid_liodn >= 0;
-		     off_ppid_liodn = fdt_next_node(fdt, off_ppid_liodn, NULL)){
-
-			ppid_to_liodn = fdt_getprop(fdt, off_ppid_liodn,
-					"fsl,ppid-to-liodn", &ppid_liodn_len);
-
-			if (ppid_to_liodn && ppid_liodn_len)
-				break;
-		}
-
-
-		if (!ppid_to_liodn) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"warning: fsl,ppid-to-liodn prop not found in hypervisor dev tree\n");
-			goto check_next_node;
-		}
-
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-			"found fsl,ppid-to-liodn on node %s\n", fdt_get_name(fdt,off_ppid_liodn,NULL));
 
 		if (*ppidp >= (ppid_liodn_len/sizeof(uint32_t))) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -478,52 +476,42 @@ void pamu_process_ppid_liodns(guest_t *guest)
 			goto check_next_node;
 
 		/*
-		 * Pass-thru "fsl,ppid" & "fsl,ppid-to-liodn" to
-		 * the guest device tree
+		 * Pass-thru "fsl,ppid" to * the guest device tree
 		 */
-		ret = fdt_setprop(guest->devtree, offset,
-				"fsl,ppid", ppidp, 4);
+		ret = fdt_setprop(guest->devtree, offset, "fsl,ppid", ppidp, 4);
 
-		if (ret < 0)
-			goto check_next_node;
-
-		/*
-		 * Search for correct offset in guest device tree to insert
-		 * pass-thru fsl,ppid-to-liodn property
-		 */
-		for (off_ppid_liodn = fdt_next_node(guest->devtree, -1, NULL);
-		     off_ppid_liodn >= 0;
-		     off_ppid_liodn = fdt_next_node(guest->devtree,
-			off_ppid_liodn, NULL)){
-
-			ppid_to_liodn_guest = fdt_getprop(guest->devtree,
-				off_ppid_liodn, "fsl,ppid-to-liodn",
-				 &ppid_liodn_len_guest);
-
-			if (ppid_to_liodn_guest && ppid_liodn_len_guest)
-				break;
-		}
-
-		if (!ppid_to_liodn_guest) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"could not find the fsl,ppid-to-liodn property in guest device tree\n");
-			goto check_next_node;
-		}
-
-		ret = fdt_setprop(guest->devtree, off_ppid_liodn,
-				"fsl,ppid-to-liodn",
-				ppid_to_liodn, ppid_liodn_len);
-
-check_next_node: /* reset the offset since stuff has been inserted */
-		offset = fdt_path_offset(guest->devtree, pathbuf);
+check_next_node:
 		offset = fdt_node_offset_by_prop_value(guest->devtree,
 				offset, "fsl,ppid",
 				&propval, sizeof(uint32_t));
+	}
+
+	/*
+	 * Pass-thru "fsl,ppid-to-liodn" property to the guest device tree
+	 */
+
+	for (off_ppid_liodn = fdt_next_node(guest->devtree, -1, NULL);
+	     off_ppid_liodn >= 0;
+	     off_ppid_liodn = fdt_next_node(guest->devtree,
+		off_ppid_liodn, NULL)) {
+
+		ppid_to_liodn_guest = fdt_getprop(guest->devtree,
+			off_ppid_liodn, "fsl,ppid-to-liodn",
+			 &ppid_liodn_len_guest);
+
+		if (ppid_to_liodn_guest && ppid_liodn_len_guest) {
+			ret = fdt_setprop(guest->devtree, off_ppid_liodn,
+				"fsl,ppid-to-liodn",
+				ppid_to_liodn, ppid_liodn_len);
+		}
 	}
 }
 
 void pamu_partition_init(guest_t *guest)
 {
+	if (!pamu_global_init_done)
+		return;
+
 	pamu_process_standard_liodns(guest);
 
 	pamu_process_ppid_liodns(guest);
@@ -559,10 +547,6 @@ void pamu_global_init(void)
 		return;
 	}
 
-	/*
-	 * FIXME : Need to fix compatible properties such as guts
-	 * to more appropriate names such as p4080-guts
-	 */
 	guts_node = fdt_node_offset_by_compatible(fdt, -1, "fsl,p4080-guts");
 	if (guts_node < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -585,7 +569,15 @@ void pamu_global_init(void)
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
 
 		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
-		pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+		if (ret < 0) {
+			/* This can only fail for the first instance due to
+			 * memory allocation issues, hence this failure
+			 * implies global pamu init failure and let all
+			 * PAMU(s) remain in bypass mode.
+			 */
+			return;
+		}
 
 		/* Disable PAMU bypass for this PAMU */
 		pamubypenr &= ~pamu_counter;
@@ -593,4 +585,5 @@ void pamu_global_init(void)
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
+	pamu_global_init_done = 1;
 }

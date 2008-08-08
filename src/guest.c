@@ -366,14 +366,16 @@ static int create_guest_spin_table(guest_t *guest)
 		if (!reg)
 			goto fail;
 		if (ret != 4) {
-			printf("create_guest_spin_table(%s): bad cpu reg property\n",
+			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			         "create_guest_spin_table(%s): bad cpu reg property\n",
 			       guest->name);
 			return ERR_BADTREE;
 		}
 
 		cpu = *reg;
 		if (cpu >= num_cpus) {
-			printf("partition %s has no cpu %u\n", guest->name, *reg);
+			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			         "partition %s has no cpu %u\n", guest->name, *reg);
 			continue;
 		}
 
@@ -407,7 +409,8 @@ static int create_guest_spin_table(guest_t *guest)
 	return 0;
 
 fail:
-	printf("create_guest_spin_table(%s): libfdt error %d (%s)\n",
+	printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+	         "create_guest_spin_table(%s): libfdt error %d (%s)\n",
 	       guest->name, ret, fdt_strerror(ret));
 
 	return ret;
@@ -431,7 +434,8 @@ static void *map_flash(phys_addr_t phys)
 {
 	/* Make sure 'phys' points to flash */
 	if ((phys < FLASH_ADDR) || (phys > (FLASH_ADDR + FLASH_SIZE - 1))) {
-		printf("%s: phys addr %llx is out of range\n", __FUNCTION__, phys);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys addr %llx is out of range\n", __FUNCTION__, phys);
 		return NULL;
 	}
 
@@ -471,25 +475,29 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
 {
 	void *image = map_flash(image_phys);
 	if (!image) {
-		printf("guest %s: image source address %llx not in flash\n",
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest %s: image source address %llx not in flash\n",
 		       guest->name, image_phys);
 		return ERR_BADTREE;
 	}
 
 	if (is_elf(image)) {
-		printf("guest %s: loading ELF image from flash\n", guest->name);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "guest %s: loading ELF image from flash\n", guest->name);
 		return load_elf(guest, image, length, guest_phys, entry);
 	}
 
 	/* It's not an ELF image, so it must be a binary. */
 
 	if (!length || (length == (size_t) -1)) {
-		printf("guest %s: missing or invalid image size\n",
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest %s: missing or invalid image size\n",
 			guest->name);
 		return ERR_BADTREE;
 	}
 
-	printf("guest %s: loading binary image from flash\n", guest->name);
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+	         "guest %s: loading binary image from flash\n", guest->name);
 
 	if (copy_to_gphys(guest->gphys, guest_phys, image, length) != length)
 		return ERR_BADADDR;
@@ -524,14 +532,16 @@ static int load_image(guest_t *guest)
 		if (size == -FDT_ERR_NOTFOUND)
 			return 0;
 
-		printf("guest %s: could not read fsl,hv-load-image-table property\n",
-			guest->name);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest %s: could not read fsl,hv-load-image-table property\n",
+		         guest->name);
 		return size;
 	}
 
 	if (!size || (size % sizeof(*table))) {
-		printf("guest %s: invalid fsl,hv-load-image-table property\n",
-			guest->name);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest %s: invalid fsl,hv-load-image-table property\n",
+		         guest->name);
 		return ERR_BADTREE;
 	}
 
@@ -541,7 +551,8 @@ static int load_image(guest_t *guest)
 		                            table->length ? table->length : -1,
 		                            first ? &guest->entry : NULL);
 		if (ret < 0) {
-			printf("guest %s: could not load image\n", guest->name);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "guest %s: could not load image\n", guest->name);
 			return ret;
 		}
 
@@ -643,12 +654,12 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
 	if (!prop) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"guest missing property fsl,hv-dtb-window\n");
+		         "guest missing property fsl,hv-dtb-window\n");
 		goto fail;
 	}
 	if (ret < 12) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"guest has invalid property len for fsl,hv-dtb-window\n");
+		         "guest has invalid property len for fsl,hv-dtb-window\n");
 		ret = ERR_BADTREE;
 		goto fail;
 	}
@@ -659,7 +670,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
 	if (!guest_origtree) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"guest missing property fsl,hv-dtb\n");
+		         "guest missing property fsl,hv-dtb\n");
 		goto fail;
 	}
 	gfdt_size += ret;
@@ -712,7 +723,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 
 fail:
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		"error %d (%s) building guest device tree for %s\n",
+	         "error %d (%s) building guest device tree for %s\n",
 		ret, fdt_strerror(ret), guest->name);
 
 	return ret;
@@ -727,7 +738,8 @@ guest_t *node_to_partition(int partition)
 
 	// Verify that 'partition' points to a compatible node
 	if (fdt_node_check_compatible(fdt, partition, "fsl,hv-partition")) {
-		printf("%s: invalid offset %u\n", __FUNCTION__, partition);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: invalid offset %u\n", __FUNCTION__, partition);
 		return NULL;
 	}
 
@@ -824,15 +836,17 @@ static void start_guest_primary_nowait(void)
 	int ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
 	                        guest->devtree, fdt_totalsize(guest->devtree));
 	if (ret != fdt_totalsize(guest->devtree)) {
-		printf("Couldn't copy device tree to guest %s, %d\n",
-		       guest->name, ret);
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "Couldn't copy device tree to guest %s, %d\n",
+		         guest->name, ret);
 		return;
 	}
 
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, 0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	printf("branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
 	guest->active_cpus = guest->cpucnt;
 	guest->state = guest_running;
 	smp_mbar();
@@ -840,7 +854,8 @@ static void start_guest_primary_nowait(void)
 	for (i = 1; i < guest->cpucnt; i++) {
 		if (!guest->gcpus[i]) {
 			enable_critint();
-			printf("guest %s waiting for cpu %d...\n", guest->name, i);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			         "guest %s waiting for cpu %d...\n", guest->name, i);
 		
 			while (!guest->gcpus[i]) {
 				if (cpu->ret_user_hook)
@@ -859,6 +874,10 @@ static void start_guest_primary_nowait(void)
 	}
 
 	cpu->traplevel = 0;
+
+	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
+		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
 	// map 1GiB, so we don't support loading/booting an OS above that
@@ -968,6 +987,10 @@ static void start_guest_secondary(void)
 
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+
+	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
+		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
 	r4 = 0;

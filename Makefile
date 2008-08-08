@@ -50,6 +50,7 @@ config %config: FORCE
 	$(MAKE) -f kconfig/Makefile obj=bin srctree=$(CURDIR) src=kconfig $@
 
 non-config := $(filter-out %config clean, $(MAKECMDGOALS))
+non-config := $(filter-out %config distclean, $(MAKECMDGOALS))
 ifeq ($(MAKECMDGOALS),)
 	non-config := all
 endif
@@ -62,3 +63,8 @@ clean:
 	rm -rf include/config
 	rm -f dts/*.dtb
 	rm -f libos
+
+.PHONY: distclean
+distclean: clean
+	rm -f tools/mux_server/mux_server
+	rm -f .config*

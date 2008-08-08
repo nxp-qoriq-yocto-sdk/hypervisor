@@ -103,13 +103,6 @@
 				compatible = "fsl,hv-byte-channel-handle";
 				fsl,endpoint = "uartmux";
 			};
-	
-			gpio {
-				reg = <1>;
-				compatible = "fsl,hv-gpio-handle";
-				fsl,real-dev = "gpio";
-				fsl,bitmask = <0x020033ff>;
-			};
 		};
 	};
 

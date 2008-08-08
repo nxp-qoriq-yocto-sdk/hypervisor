@@ -119,13 +119,6 @@
 				interrupt-parent = <&vmpic>;
 			};
 	
-			gpio {
-				reg = <1>;
-				compatible = "fsl,hv-gpio-handle";
-				fsl,real-dev = "gpio";
-				fsl,bitmask = <0x020033ff>;
-			};
-	
 			partition@0 {
 				compatible = "fsl,hv-partition-handle";
 				fsl,endpoint = "/partitions/part1";

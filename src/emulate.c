@@ -65,7 +65,8 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	 * DBELL_CRIT (1)
 	 */
 	if (type > 1) {
-		printf("msgsnd@0x%08lx: invalid message type %u\n", regs->srr0, type);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "msgsnd@0x%08lx: invalid message type %u\n", regs->srr0, type);
 		return 1;
 	}
 
@@ -89,7 +90,8 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 		unsigned int pir = msg & 0x3fff;
 
 		if (pir >= guest->cpucnt) {
-			printf("msgsnd@0x%08lx: invalid pir %u\n", regs->srr0, pir);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "msgsnd@0x%08lx: invalid pir %u\n", regs->srr0, pir);
 			return 1;
 		}
 
@@ -130,7 +132,8 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 	 * DBELL_CRIT (1)
 	 */
 	if (type > 1) {
-		printf("msgclr@0x%08lx: invalid message type %u\n", regs->srr0, type);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "msgclr@0x%08lx: invalid message type %u\n", regs->srr0, type);
 		return 1;
 	}
 
@@ -145,7 +148,8 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 		unsigned int pir = msg & 0x3fff;
 
 		if (pir >= guest->cpucnt) {
-			printf("msgclr@0x%08lx: invalid pir %u\n", regs->srr0, pir);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "msgclr@0x%08lx: invalid pir %u\n", regs->srr0, pir);
 			return 1;
 		}
 
@@ -343,7 +347,8 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	unsigned int entry, tlb;
 	
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
-		printf("tlbre@0x%08lx: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbre@0x%08lx: reserved bits in MAS0: 0x%08x\n", regs->srr0, mas0);
 		return 1;
 	}
 
@@ -358,8 +363,9 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 	entry = MAS0_GET_TLB1ESEL(mas0);
 	if (entry >= TLB1_GSIZE) {
-		printf("tlbre@0x%08lx: attempt to read TLB1 entry %d (max %d)\n",
-		       regs->srr0, entry, TLB1_GSIZE);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbre@0x%08lx: attempt to read TLB1 entry %d (max %d)\n",
+		         regs->srr0, entry, TLB1_GSIZE);
 		return 1;
 	}
 
@@ -393,40 +399,45 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		restore_mas(gcpu);
 		enable_critint();
-		printf("tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n",
-		       regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n",
+		         regs->srr0, mas0);
 		return 1;
 	}
 
 	if (gcpu->mas1 & MAS1_RESERVED) {
 		restore_mas(gcpu);
 		enable_critint();
-		printf("tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n",
-		       regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n",
+		         regs->srr0, mas0);
 		return 1;
 	}
 
 	if (gcpu->mas2 & MAS2_RESERVED) {
 		restore_mas(gcpu);
 		enable_critint();
-		printf("tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n",
-		       regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n",
+		         regs->srr0, mas0);
 		return 1;
 	}
 
 	if (gcpu->mas3 & MAS3_RESERVED) {
 		restore_mas(gcpu);
 		enable_critint();
-		printf("tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n",
-		       regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n",
+		         regs->srr0, mas0);
 		return 1;
 	}
 
 	if (gcpu->mas7 & MAS7_RESERVED) {
 		restore_mas(gcpu);
 		enable_critint();
-		printf("tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n",
-		       regs->srr0, mas0);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n",
+		         regs->srr0, mas0);
 		return 1;
 	}
 
@@ -458,17 +469,20 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			restore_mas(gcpu);
 			enable_critint();
 
-			printf("tlbwe@%d,0x%lx: duplicate TLB1 entry\n",
-			       cpu->coreid, regs->srr0);
-			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, mas0, mas1,
-			       mas2, mas3, mas7);
-			printf("tlbwe@%d,0x%lx: dup: entry = %d, mas1 = 0x%lx,\n"
-			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, dup,
-			       gcpu->gtlb1[dup].mas1, gcpu->gtlb1[dup].mas2,
-			       gcpu->gtlb1[dup].mas3, gcpu->gtlb1[dup].mas7);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: duplicate TLB1 entry\n",
+			         cpu->coreid, regs->srr0);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         cpu->coreid, regs->srr0, mas0, mas1,
+			         mas2, mas3, mas7);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: dup: entry = %d, mas1 = 0x%lx,\n"
+			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         cpu->coreid, regs->srr0, dup,
+			         gcpu->gtlb1[dup].mas1, gcpu->gtlb1[dup].mas2,
+			         gcpu->gtlb1[dup].mas3, gcpu->gtlb1[dup].mas7);
 
 			return 1;
 		}
@@ -498,17 +512,20 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			restore_mas(gcpu);
 			enable_critint();
 
-			printf("tlbwe@%d,0x%lx: duplicate TLB0 entry\n",
-			       cpu->coreid, regs->srr0);
-			printf("tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, mas0, mas1,
-			       mas2, mas3, mas7);
-			printf("tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
-			       "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			       cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
-			       mfspr(SPR_MAS1), mfspr(SPR_MAS2),
-			       mfspr(SPR_MAS3), mfspr(SPR_MAS7));
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: duplicate TLB0 entry\n",
+			         cpu->coreid, regs->srr0);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         cpu->coreid, regs->srr0, mas0, mas1,
+			         mas2, mas3, mas7);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
+			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
+			         mfspr(SPR_MAS1), mfspr(SPR_MAS2),
+			         mfspr(SPR_MAS3), mfspr(SPR_MAS7));
 
 			return 1;
 		}
@@ -522,8 +539,9 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			restore_mas(gcpu);
 			enable_critint();
 
-			printf("tlbwe@0x%lx: attempt to write TLB1 entry %d (max %d)\n",
-			       regs->srr0, entry, TLB1_GSIZE);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@0x%lx: attempt to write TLB1 entry %d (max %d)\n",
+			         regs->srr0, entry, TLB1_GSIZE);
 			return 1;
 		}
 		
@@ -577,7 +595,8 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	gcpu->stats[stat_emu_spr]++;
 
 	if (read_gspr(regs, spr, &ret)) {
-		printf("mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "mfspr@0x%lx: unknown reg %d\n", regs->srr0, spr);
 		ret = 0;
 //FIXME		return 1;
 	}
@@ -596,8 +615,9 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	gcpu->stats[stat_emu_spr]++;
 
 	if (write_gspr(regs, spr, val)) {
-		printf("mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
-		       regs->srr0, spr, val);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "mtspr@0x%lx: unknown reg %d, val 0x%lx\n",
+		         regs->srr0, spr, val);
 //FIXME		return 1;
 	}
 
@@ -639,7 +659,8 @@ void hvpriv(trapframe_t *regs)
 
 	ret = guestmem_in32((uint32_t *)regs->srr0, &insn);
 	if (ret != GUESTMEM_OK) {
-		printf("guestmem in returned %d\n", ret);
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "guestmem in returned %d\n", ret);
 		if (ret == GUESTMEM_TLBMISS)
 			regs->exc = EXC_ITLB;
 		else
