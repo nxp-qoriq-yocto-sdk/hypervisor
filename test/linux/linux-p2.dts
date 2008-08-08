@@ -127,7 +127,7 @@
 
 	chosen {
 		linux,initrd-start = <0x01300000>;
-		linux,initrd-end = <0x01400000>;
+		linux,initrd-end = <0x01b00000>;
 	};
 	
 	aliases {

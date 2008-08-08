@@ -266,6 +266,6 @@
 		linux,stdout-path = "/ccsr@fe000000/serial@11d500";
 		bootargs = "console=ttyS0,115200";
 		linux,initrd-start = <0x01300000>;
-		linux,initrd-end = <0x01400000>;
+		linux,initrd-end = <0x01b00000>;
 	};
 };
