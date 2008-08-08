@@ -153,10 +153,6 @@ bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
 	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
 
-bin/%.dtb : %.dts
-	@$(MKDIR) $(@D)
-	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
-
 # include the dependecy files
 ifneq ($(MAKECMDGOALS),clean)
 -include bin/libos/libos_assym.d
