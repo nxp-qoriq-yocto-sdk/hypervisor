@@ -623,7 +623,7 @@ static int process_partition_handles(guest_t *guest)
 			return ret;
 
 		ret = fdt_setprop(guest->devtree, off, "label",
-		                  target_guest->name, strlen(target_guest->name));
+		                  target_guest->name, strlen(target_guest->name) + 1);
 		if (ret)
 			return ret;
 	}
@@ -704,7 +704,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 	ret = fdt_setprop(guest->devtree, ret, "fsl,hv-partition-label",
-	                  guest->name, strlen(guest->name));
+	                  guest->name, strlen(guest->name) + 1);
 	if (ret)
 		goto fail;
 
