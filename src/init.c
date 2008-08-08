@@ -128,7 +128,8 @@ static void pic_init(void)
 			coreint = 1;
 	}
 
-	printf("coreint is %d\n", coreint);
+	printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
+		"coreint mode is %d\n", coreint);
 	mpic_init((unsigned long)fdt, coreint);
 }
 
