@@ -52,13 +52,13 @@ bin/hv-demo.dtb: bin/demo-p2.dtb bin/demo-p1.dtb hv-demo.dts
 
 bin/hv-hello.dtb: bin/hello-p2.dtb bin/partman-p1.dtb hv-hello.dts
 
-../../tools/partman/bin/partman:
+../../tools/partman/bin/partman: ../../tools/partman/partman.c
 	make -C ../../tools/partman
 
 # Mount rootfs2.ext.gz into the bin directory
 mount2:
-	cp rootfs.ext2.gz bin/rootfs2.ext2.gz
-	gunzip bin/rootfs2.ext2.gz
+	cp -f rootfs.ext2.gz bin/rootfs2.ext2.gz
+	gunzip -f bin/rootfs2.ext2.gz
 	mkdir -p bin/rootfs
 	sudo mount -t ext2 -o rw,loop bin/rootfs2.ext2 bin/rootfs
 
@@ -70,8 +70,8 @@ umount2:
 
 # Mount rootfs3.ext.gz into the bin directory
 mount3:
-	cp rootfs.ext2.gz bin/rootfs3.ext2.gz
-	gunzip bin/rootfs3.ext2.gz
+	cp -f rootfs.ext2.gz bin/rootfs3.ext2.gz
+	gunzip -f bin/rootfs3.ext2.gz
 	mkdir -p bin/rootfs
 	sudo mount -t ext2 -o rw,loop bin/rootfs3.ext2 bin/rootfs
 
