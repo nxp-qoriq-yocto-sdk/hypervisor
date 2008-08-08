@@ -640,12 +640,8 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	while (1) {
 		// get a pointer to the first/next partition-handle node
 		off = fdt_node_offset_by_compatible(guest->devtree, off, "fsl,hv-partition-handle");
-		if (off < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "guest %s: guest missing fsl,hv-partition-handle\n",
-				 guest->name);
+		if (off < 0)
 			break;
-		}
 
 		// Find the end-point partition node in the hypervisor device tree
 
