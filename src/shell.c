@@ -414,7 +414,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
 		entry = get_ppaace(liodn);
-		if (entry->v) {
+		if (entry && entry->v) {
 			qprintf(shell->out, "liodn#: %d wba: 0x%x wse: 0x%x twba: 0x%x\n",
 				liodn, entry->wbal, entry->wse, entry->twbal);
 		}
