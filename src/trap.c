@@ -46,7 +46,7 @@ void program_trap(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
 	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_int_handler 
-	    && gcpu->guest->stub_ops->debug_int_handler(regs))
+	    && !gcpu->guest->stub_ops->debug_int_handler(regs))
 		return;
 #endif
 
