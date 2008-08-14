@@ -367,8 +367,9 @@ static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c);
 static inline void ack(gdb_stub_core_context_t *stub);
 static inline void nak(gdb_stub_core_context_t *stub);
 static inline int got_ack(gdb_stub_core_context_t *stub);
-static void receive_command(gdb_stub_core_context_t *stub);
+static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static void transmit_response(gdb_stub_core_context_t *stub);
+static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 
 /* RSP */
@@ -594,9 +595,10 @@ static inline int got_ack(gdb_stub_core_context_t *stub)
 	return c;
 }
 
+#define CTRL_C 0x03
 /* Create well-defined content into cmd buffer.
  */
-static void receive_command(gdb_stub_core_context_t *stub)
+static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
 {
 	uint8_t c;
 	uint32_t i = 0;
@@ -605,7 +607,11 @@ static void receive_command(gdb_stub_core_context_t *stub)
 	TRACE();
 	do {
 		while ((c = get_debug_char(stub)) != '$') {
-			TRACE("Skipping '%c'. (Expecting '$').", c);
+			if (c == CTRL_C) {
+				printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "gdb: Got CTRL-C.\n");
+				transmit_stop_reply_pkt_T(trap_frame, stub);
+			} else
+				TRACE("Skipping '%c'. (Expecting '$').", c);
 		}
 
 		TRACE("Begin Looping:");
@@ -1031,13 +1037,33 @@ static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_
 	}
 }
 
+static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
+{
+	uint8_t value[32];
+	TRACE("Sending T rsp");
+	pkt_cat_string(stub->rsp, "T");
+	pkt_write_hex_byte_update_cur(stub->rsp, 5);
+	pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
+	pkt_cat_string(stub->rsp, ":");
+	read_reg(trap_frame, value, 1);
+	pkt_cat_string(stub->rsp, (char *)value);
+	pkt_cat_string(stub->rsp, ";");
+	pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
+	pkt_cat_string(stub->rsp, ":");
+	read_reg(trap_frame, value, 64);
+	pkt_cat_string(stub->rsp, (char *)value);
+	pkt_cat_string(stub->rsp, ";");
+	/* FIXME: This is a HACK. Is this the right fix? */
+	stub->byte_channel_handle->rx->data_avail = NULL;
+	transmit_response(stub);
+}
+
 int gdb_stub_process_trap(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
-	uint8_t value[17];
 	breakpoint_type_t bptype = breakpoint->type;
 
 	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
@@ -1084,25 +1110,8 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 		TRACE("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
 	}
 
-	if (bptype != internal_1st_inst) {
-		/* We _have_ to let GDB know that we hit a breakpoint (even if it is internal). */
-		TRACE("Sending T rsp");
-		pkt_cat_string(stub->rsp, "T");
-		pkt_write_hex_byte_update_cur(stub->rsp, 5);
-		pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
-		pkt_cat_string(stub->rsp, ":");
-		read_reg(trap_frame, value, 1);
-		pkt_cat_string(stub->rsp, (char *)value);
-		pkt_cat_string(stub->rsp, ";");
-		pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
-		pkt_cat_string(stub->rsp, ":");
-		read_reg(trap_frame, value, 64);
-		pkt_cat_string(stub->rsp, (char *)value);
-		pkt_cat_string(stub->rsp, ";");
-		/* FIXME: This is a HACK. Is this the right fix? */
-		stub->byte_channel_handle->rx->data_avail = NULL;
-		transmit_response(stub);
-	}
+	if (bptype != internal_1st_inst)
+		transmit_stop_reply_pkt_T(trap_frame, stub);
 
 	if (bptype == internal_1st_inst)
 		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_NORMAL,
@@ -1131,7 +1140,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	breakpoint_t *breakpoint_incrpc = NULL;
 	const char *td; /* td: target description */
 	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
-		"gdb: in RSP Engine, main loop.");
+		"gdb: in RSP Engine, main loop.\n");
 	stub_start: {
 		TRACE("At stub_start.");
 		/* Deregister call back. */
@@ -1142,7 +1151,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		TRACE("In main loop.");
 		dump_breakpoint_table(stub->breakpoint_table);
 		pkt_reset(stub->cmd);
-		receive_command(stub);
+		receive_command(trap_frame, stub);
 		switch(tokenize(content(stub->cmd))) {
 
 		case continue_execution:
