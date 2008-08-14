@@ -128,19 +128,24 @@ static int map_guest_reg_one(guest_t *guest, int node,
                              uint32_t naddr, uint32_t nsize)
 {
 	phys_addr_t gaddr, size;
-	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr = 0;
+	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr, rootnsize;
+	uint32_t hvnaddr, hvnsize;
 	phys_addr_t rangesize, addr, offset = 0;
-	int maplen;
+	int maplen, ret;
+	const uint32_t *physaddrmap;
 
-	const uint32_t *physaddrmap = fdt_getprop(fdt, partition,
-	                                          "fsl,hv-physaddr-map", &maplen);
+	ret = get_addr_format_nozero(fdt, 0, &hvnaddr, &hvnsize);
+	if (ret < 0)
+		return ret;
+	
+	physaddrmap = fdt_getprop(fdt, partition, "fsl,hv-physaddr-map", &maplen);
 	if (!physaddrmap && maplen != -FDT_ERR_NOTFOUND)
 		return maplen;
 	if (!physaddrmap || maplen & 3)
 		return ERR_BADTREE;
 
-	int ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
-	                        &rootnaddr, &size, naddr, nsize);
+	ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
+	                    &rootnaddr, &rootnsize, &size, naddr, nsize);
 	if (ret < 0)
 		return ret;	
 
@@ -152,8 +157,8 @@ static int map_guest_reg_one(guest_t *guest, int node,
 	while (offset < size) {
 		val_from_int(addrbuf, gaddr + offset);
 
-		// FIXME: address cells and size cells are hardcoded to 2 / 1
-		ret = xlate_one(addrbuf, physaddrmap, maplen, 2, 1, 2, 1, &rangesize);
+		ret = xlate_one(addrbuf, physaddrmap, maplen, hvnaddr, hvnsize,
+		                rootnaddr, rootnsize, &rangesize);
 		if (ret == -FDT_ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
 			// in physaddrmap, then none of it is.

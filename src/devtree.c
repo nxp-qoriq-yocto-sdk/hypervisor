@@ -226,7 +226,8 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, uint32_t *rootnaddr,
-                  phys_addr_t *size, uint32_t naddr, uint32_t nsize)
+                  uint32_t *rootnsize, phys_addr_t *size,
+                  uint32_t naddr, uint32_t nsize)
 {
 	uint32_t prev_naddr, prev_nsize;
 	const uint32_t *ranges;
@@ -281,6 +282,10 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 	}
 
 	*rootnaddr = naddr;
+	
+	if (rootnsize)
+		*rootnsize = nsize;
+
 	return 0;
 }
 
@@ -299,7 +304,7 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 		return ret;
 
 	ret = xlate_reg_raw(tree, node, reg, addrbuf,
-	                    &rootnaddr, size, naddr, nsize);
+	                    &rootnaddr, NULL, size, naddr, nsize);
 	if (ret < 0)
 		return ret;
 
