@@ -52,6 +52,20 @@ unsigned long last_lpid;
 
 #define MAX_PATH 256
 
+static int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
+{
+	unsigned int i, vcpu_base = 0;
+	
+	for (i = 0; i < len / 4; i += 2) {
+		if (vcpu >= vcpu_base && vcpu < vcpu_base + cpulist[i + 1])
+			return cpulist[i] + vcpu_base - vcpu;
+
+		vcpu_base += cpulist[i + 1];
+	}
+
+	return ERR_RANGE;
+}
+
 static int cpu_in_cpulist(const uint32_t *cpulist, unsigned int len, int cpu)
 {
 	unsigned int i;
@@ -78,7 +92,7 @@ static int get_gcpu_num(const uint32_t *cpulist, unsigned int len, int cpu)
 		total += num;
 	}
 
-	return -1;
+	return ERR_RANGE;
 }
 
 static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
@@ -330,10 +344,64 @@ static void reset_spintbl(guest_t *guest)
 	}
 }
 
-static int create_guest_spin_table(guest_t *guest)
+static const char *cpu_clocks[] = {
+	"clock-frequency",
+	"timebase-frequency",
+	"bus-frequency",
+};
+
+static int copy_cpu_clocks(guest_t *guest, int vnode, int vcpu,
+                           const uint32_t *cpulist, int cpulist_len)
+{
+	int pcpu, node;
+	const uint32_t *prop;
+	int i;
+	
+	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
+	if (pcpu < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "partition %s has no cpu %d\n", guest->name, vcpu);
+		return pcpu;
+	}
+
+	node = get_cpu_node(fdt, pcpu);
+	if (node < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "partition %s vcpu %d maps to non-existent CPU %d\n",
+		         guest->name, vcpu, pcpu);
+		return node;
+	}
+
+	for (i = 0; i < sizeof(cpu_clocks) / sizeof(char *); i++) {
+		int ret, len;
+
+		prop = fdt_getprop(fdt, node, cpu_clocks[i], &len);
+		if (!prop) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			         "copy_cpu_clocks: failed to read clock property, "
+			         "error %d\n", len);
+
+			return len;
+		}
+
+		ret = fdt_setprop(guest->devtree, vnode, cpu_clocks[i], prop, len);
+		if (ret < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "copy_cpu_clocks: failed to set clock property, "
+			         "error %d\n", ret);
+
+			return len;
+		}
+	}
+
+	return 0;
+} 
+
+static int create_guest_spin_table(guest_t *guest,
+                                   const uint32_t *cpulist,
+                                   int cpulist_len)
 {
 	unsigned long rpn;
-	unsigned int num_cpus = guest->cpucnt;
 	uint64_t spin_addr;
 	int ret, i;
 	
@@ -342,7 +410,7 @@ static int create_guest_spin_table(guest_t *guest)
 		return ERR_NOMEM;
 
 	/* FIXME: hardcoded cache line size */
-	for (i = 0; i < num_cpus * sizeof(struct boot_spin_table); i += 32)
+	for (i = 0; i < guest->cpucnt * sizeof(struct boot_spin_table); i += 32)
 		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)guest->spintbl + i ) :
 		             "memory");
 
@@ -353,7 +421,7 @@ static int create_guest_spin_table(guest_t *guest)
 
 	int off = 0;
 	while (1) {
-		uint32_t cpu;
+		uint32_t pcpu;
 		ret = fdt_node_offset_by_prop_value(guest->devtree, off,
 		                                    "device_type", "cpu", 4);
 		if (ret == -FDT_ERR_NOTFOUND)
@@ -372,14 +440,12 @@ static int create_guest_spin_table(guest_t *guest)
 			return ERR_BADTREE;
 		}
 
-		cpu = *reg;
-		if (cpu >= num_cpus) {
-			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-			         "partition %s has no cpu %u\n", guest->name, *reg);
+		pcpu = *reg;
+		ret = copy_cpu_clocks(guest, off, pcpu, cpulist, cpulist_len);
+		if (ret < 0)
 			continue;
-		}
 
-		if (cpu == 0) {
+		if (pcpu == 0) {
 			ret = fdt_setprop_string(guest->devtree, off, "status", "okay");
 			if (ret < 0)
 				goto fail;
@@ -396,14 +462,14 @@ static int create_guest_spin_table(guest_t *guest)
 		if (ret < 0)
 			goto fail;
 
-		spin_addr = 0xfffff000 + cpu * sizeof(struct boot_spin_table);
+		spin_addr = 0xfffff000 + pcpu * sizeof(struct boot_spin_table);
 		ret = fdt_setprop(guest->devtree, off,
 		                  "cpu-release-addr", &spin_addr, 8);
 		if (ret < 0)
 			goto fail;
 
 		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-		         "cpu-release-addr of CPU%u: %llx\n", cpu, spin_addr);
+		         "cpu-release-addr of CPU%u: %llx\n", pcpu, spin_addr);
 	}
 
 	return 0;
@@ -697,7 +763,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
 		goto fail;
 	}
 
-	ret = create_guest_spin_table(guest);
+	ret = create_guest_spin_table(guest, cpulist, cpulist_len);
 	if (ret < 0)
 		goto fail;
 

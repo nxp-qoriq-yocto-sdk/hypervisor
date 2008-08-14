@@ -781,3 +781,27 @@ int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, c
 			return offset;
 	}
 }
+
+int get_cpu_node(const void *fdt, int cpunum)
+{
+	int off = 0;
+
+	while (1) {
+		const uint32_t *reg;
+		int len;
+
+		off = fdt_node_offset_by_prop_value(fdt, off, "device_type", "cpu", 4);
+		if (off < 0)
+			return off;
+
+		reg = fdt_getprop(fdt, off, "reg", &len);
+		if (!reg) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			         "Missing reg property in cpu node, fdt error %d\n", len);
+			return len;
+		}
+
+		if (*reg == cpunum)
+			return off;
+	}
+}

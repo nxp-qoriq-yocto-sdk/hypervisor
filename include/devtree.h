@@ -79,4 +79,6 @@ extern void *fdt;
 extern struct queue *stdin, *stdout;
 
 int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible);
+int get_cpu_node(const void *fdt, int cpu);
+
 #endif
