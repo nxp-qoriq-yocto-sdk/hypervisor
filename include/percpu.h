@@ -117,6 +117,9 @@ typedef struct guest {
 
 	/** Offset to partition node in main device tree. */
 	int partition;
+	
+	/** #address-cells and #size-cells at root of guest tree */
+	uint32_t naddr, nsize;
 
 	stub_ops_t *stub_ops;
 	uint32_t lock;

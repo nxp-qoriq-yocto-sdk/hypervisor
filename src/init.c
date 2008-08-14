@@ -133,6 +133,8 @@ static void pic_init(void)
 	mpic_init((unsigned long)fdt, coreint);
 }
 
+uint32_t rootnaddr, rootnsize;
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t lowest_guest_addr;
@@ -149,6 +151,7 @@ void start(unsigned long devtree_ptr)
 	temp_mapping[1] = valloc(128 * 1024 * 1024, 128 * 1024 * 1024);
 
 	fdt = (void *)(devtree_ptr + PHYSBASE);
+	get_addr_format_nozero(fdt, 0, &rootnaddr, &rootnsize);
 
 	mem_end = find_memory();
 	lowest_guest_addr = find_lowest_guest_phys();

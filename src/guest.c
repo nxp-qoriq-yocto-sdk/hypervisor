@@ -128,16 +128,11 @@ static int map_guest_reg_one(guest_t *guest, int node,
                              uint32_t naddr, uint32_t nsize)
 {
 	phys_addr_t gaddr, size;
-	uint32_t addrbuf[MAX_ADDR_CELLS], rootnaddr, rootnsize;
-	uint32_t hvnaddr, hvnsize;
+	uint32_t addrbuf[MAX_ADDR_CELLS];
 	phys_addr_t rangesize, addr, offset = 0;
 	int maplen, ret;
 	const uint32_t *physaddrmap;
 
-	ret = get_addr_format_nozero(fdt, 0, &hvnaddr, &hvnsize);
-	if (ret < 0)
-		return ret;
-	
 	physaddrmap = fdt_getprop(fdt, partition, "fsl,hv-physaddr-map", &maplen);
 	if (!physaddrmap && maplen != -FDT_ERR_NOTFOUND)
 		return maplen;
@@ -145,20 +140,17 @@ static int map_guest_reg_one(guest_t *guest, int node,
 		return ERR_BADTREE;
 
 	ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
-	                    &rootnaddr, &rootnsize, &size, naddr, nsize);
+	                    &size, naddr, nsize);
 	if (ret < 0)
 		return ret;	
-
-	if (rootnaddr < 0 || rootnaddr > 2)
-		return ERR_BADTREE;
 
 	gaddr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
 	while (offset < size) {
 		val_from_int(addrbuf, gaddr + offset);
 
-		ret = xlate_one(addrbuf, physaddrmap, maplen, hvnaddr, hvnsize,
-		                rootnaddr, rootnsize, &rangesize);
+		ret = xlate_one(addrbuf, physaddrmap, maplen, rootnaddr, rootnsize,
+		                guest->naddr, guest->nsize, &rangesize);
 		if (ret == -FDT_ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
 			// in physaddrmap, then none of it is.
@@ -589,16 +581,15 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
  */
 static int load_image(guest_t *guest)
 {
-	const struct {
-		uint64_t image_addr;
-		uint64_t guest_addr;
-		uint32_t length;
-	} __attribute__ ((packed)) *table;
 	int node = guest->partition;
 	int ret, size, first = 1;
+	const uint32_t *prop, *end;
+	uint64_t image_addr;
+	uint64_t guest_addr;
+	uint64_t length;
 
-	table = fdt_getprop(fdt, node, "fsl,hv-load-image-table", &size);
-	if (!table) {
+	prop = fdt_getprop(fdt, node, "fsl,hv-load-image-table", &size);
+	if (!prop) {
 		/* 'size' will never equal zero if table is NULL */
 		if (size == -FDT_ERR_NOTFOUND)
 			return 0;
@@ -609,17 +600,22 @@ static int load_image(guest_t *guest)
 		return size;
 	}
 
-	if (!size || (size % sizeof(*table))) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest %s: invalid fsl,hv-load-image-table property\n",
-		         guest->name);
-		return ERR_BADTREE;
-	}
+	end = (const uint32_t *)((uintptr_t)prop + size);
 
-	while (size) {
-		ret = load_image_from_flash(guest, table->image_addr,
-		                            table->guest_addr,
-		                            table->length ? table->length : -1,
+	while (prop + rootnaddr + guest->naddr + guest->nsize <= end) {
+		image_addr = int_from_tree(&prop, rootnaddr);
+		guest_addr = int_from_tree(&prop, guest->naddr);
+		length = int_from_tree(&prop, guest->nsize);
+
+		if (length != (size_t)length) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_image: guest %s: invalid length %#llx\n",
+			         guest->name, length);
+			continue;
+		}
+
+		ret = load_image_from_flash(guest, image_addr, guest_addr,
+		                            length ? length : -1,
 		                            first ? &guest->entry : NULL);
 		if (ret < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -627,9 +623,7 @@ static int load_image(guest_t *guest)
 			return ret;
 		}
 
-		table++;
 		first = 0;
-		size -= sizeof(*table);
 	}
 	
 	return 1;
@@ -722,28 +716,34 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	const void *guest_origtree;
 	const uint32_t *prop;
 
-	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
-	if (!prop) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest missing property fsl,hv-dtb-window\n");
-		goto fail;
-	}
-	if (ret < 12) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest has invalid property len for fsl,hv-dtb-window\n");
-		ret = ERR_BADTREE;
-		goto fail;
-	}
-
-	guest->dtb_gphys = ((uint64_t)prop[0] << 32) | prop[1];
-	gfdt_size = prop[2];
-
 	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
 	if (!guest_origtree) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "guest missing property fsl,hv-dtb\n");
 		goto fail;
 	}
+
+	ret = get_addr_format_nozero(guest_origtree, 0,
+	                             &guest->naddr, &guest->nsize);
+	if (ret < 0)
+		goto fail;
+
+	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
+	if (!prop) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest missing property fsl,hv-dtb-window\n");
+		goto fail;
+	}
+	if (ret != (guest->naddr + guest->nsize) * 4) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest has invalid property len for fsl,hv-dtb-window\n");
+		ret = ERR_BADTREE;
+		goto fail;
+	}
+
+	guest->dtb_gphys = int_from_tree(&prop, guest->naddr);
+	gfdt_size = int_from_tree(&prop, guest->nsize);
+
 	gfdt_size += ret;
 	
 	guest->devtree = alloc(gfdt_size, 16);
@@ -1525,11 +1525,6 @@ phys_addr_t find_lowest_guest_phys(void)
 	phys_addr_t low = (phys_addr_t)-1;
 	const uint32_t *prop;
 	const void *gtree;
-	uint32_t naddr, nsize;
-
-	ret = get_addr_format_nozero(fdt, 0, &naddr, &nsize);
-	if (ret < 0)
-		return ret;
 
 	while (1) {
 		uint32_t gnaddr, gnsize;
@@ -1552,7 +1547,7 @@ phys_addr_t find_lowest_guest_phys(void)
 		if (!prop)
 			continue;
 		
-		entry_len = gnaddr + naddr + gnsize;
+		entry_len = gnaddr + rootnaddr + gnsize;
 		while (i + entry_len <= ret >> 2) {
 			phys_addr_t real;
 			

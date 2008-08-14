@@ -35,6 +35,9 @@
 
 #define CELL_SIZE 4
 
+/** #address-cells and #size-cells at root of hv tree */
+extern uint32_t rootnaddr, rootnsize;
+
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize);
 int get_addr_format_nozero(const void *tree, int node,
@@ -55,8 +58,8 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
               phys_addr_t *rangesize);
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
-                  uint32_t *addrbuf, uint32_t *rootnaddr, uint32_t *rootnsize,
-                  phys_addr_t *size, uint32_t naddr, uint32_t nsize);
+                  uint32_t *addrbuf, phys_addr_t *size,
+                  uint32_t naddr, uint32_t nsize);
 
 int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);
@@ -69,6 +72,18 @@ static inline void val_from_int(uint32_t *dest, phys_addr_t src)
 	dest[1] = 0;
 	dest[2] = src >> 32;
 	dest[3] = (uint32_t)src;
+}
+
+static inline uint64_t int_from_tree(const uint32_t **src, int ncells)
+{
+	uint64_t ret = 0;
+
+	if (ncells == 2) {
+		ret = *(*src)++;
+		ret <<= 32;
+	}
+
+	return ret | *(*src)++;
 }
 
 void create_ns16550(void);

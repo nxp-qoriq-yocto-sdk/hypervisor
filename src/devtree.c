@@ -225,8 +225,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 }
 
 int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
-                  uint32_t *addrbuf, uint32_t *rootnaddr,
-                  uint32_t *rootnsize, phys_addr_t *size,
+                  uint32_t *addrbuf, phys_addr_t *size,
                   uint32_t naddr, uint32_t nsize)
 {
 	uint32_t prev_naddr, prev_nsize;
@@ -281,11 +280,6 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 			return ret;
 	}
 
-	*rootnaddr = naddr;
-	
-	if (rootnsize)
-		*rootnsize = nsize;
-
 	return 0;
 }
 
@@ -293,7 +287,7 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
               phys_addr_t *addr, phys_addr_t *size)
 {
 	uint32_t addrbuf[MAX_ADDR_CELLS];
-	uint32_t rootnaddr, naddr, nsize;
+	uint32_t naddr, nsize;
 
 	int parent = fdt_parent_offset(tree, node);
 	if (parent < 0)
@@ -303,13 +297,9 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 	if (ret < 0)
 		return ret;
 
-	ret = xlate_reg_raw(tree, node, reg, addrbuf,
-	                    &rootnaddr, NULL, size, naddr, nsize);
+	ret = xlate_reg_raw(tree, node, reg, addrbuf, size, naddr, nsize);
 	if (ret < 0)
 		return ret;
-
-	if (rootnaddr < 0 || rootnaddr > 2)
-		return ERR_BADTREE;
 
 	if (addrbuf[0] || addrbuf[1])
 		return ERR_BADTREE;
