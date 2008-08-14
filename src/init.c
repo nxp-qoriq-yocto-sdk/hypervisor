@@ -223,24 +223,24 @@ void secondary_init(void)
 
 static void release_secondary_cores(void)
 {
-	int node = fdt_subnode_offset(fdt, 0, "cpus");
-	int depth = 0;
+	int node = 0;
 
-	if (node < 0) {
-		printf("Missing /cpus node\n");
-		goto fail;
-	}
-
-	while ((node = fdt_next_node(fdt, node, &depth)) >= 0) {
+	while (1) {
 		int len;
 		const char *status;
-		
-		if (node < 0)
-			break;
-		if (depth > 1)
-			continue;
-		if (depth < 1)
+
+		node = fdt_node_offset_by_prop_value(fdt, node, "device_type",
+		                                     "cpu", 4);
+		if (node == -FDT_ERR_NOTFOUND)
 			return;
+		if (node < 0) {
+			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			         "error %d (%s) reading CPU nodes, "
+			         "secondary cores may not be released.\n",
+			         node, fdt_strerror(node));
+
+			return;
+		}
 		
 		status = fdt_getprop(fdt, node, "status", &len);
 		if (!status) {
@@ -319,13 +319,6 @@ static void release_secondary_cores(void)
 next_core:
 		;
 	}
-
-fail:
-	printf("error %d (%s) reading CPU nodes, "
-	       "secondary cores may not be released.\n",
-	       node, fdt_strerror(node));
-
-	return;
  
 nomem:
 	printf("out of memory reading CPU nodes, "
