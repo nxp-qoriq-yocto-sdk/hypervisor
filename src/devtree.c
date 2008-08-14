@@ -556,6 +556,9 @@ phys_addr_t find_memory(void)
 	int len;
 	
 	while (1) {
+		uint32_t naddr, nsize;
+		int parent;
+
 		memnode = fdt_node_offset_by_prop_value(fdt, memnode, "device_type",
 		                                        "memory", strlen("memory") + 1);
 		if (memnode < 0)
@@ -570,8 +573,16 @@ phys_addr_t find_memory(void)
 			continue;
 		}
 
-		uint32_t naddr, nsize;
-		int ret = get_addr_format(fdt, memnode, &naddr, &nsize);
+		parent = fdt_parent_offset(fdt, memnode);
+		if (parent < 0) {
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "error %d (%s) finding memory parent\n", len,
+			         fdt_strerror(len));
+
+			continue;
+		}
+
+		int ret = get_addr_format(fdt, parent, &naddr, &nsize);
 		if (ret < 0) {
 			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
 			         "error %d (%s) getting address format for memory node\n",
