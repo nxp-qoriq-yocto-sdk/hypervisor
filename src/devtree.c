@@ -771,7 +771,7 @@ int get_interrupt(const void *tree, int node, int intnum,
  */
 int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible)
 {
-       while (1) {
+	while (1) {
 		offset = fdt_next_node(fdt, offset, depth);
 		if (offset < 0)
 			return offset;
@@ -779,5 +779,5 @@ int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, c
 			return -FDT_ERR_NOTFOUND;
 		if (fdt_node_check_compatible(fdt, offset, compatible) == 0)
 			return offset;
-       }
+	}
 }
