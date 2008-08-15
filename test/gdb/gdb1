@@ -1,0 +1,3 @@
+target remote :9001
+symbol-file bin/gdb-hello
+b gdb-hello.c:134
