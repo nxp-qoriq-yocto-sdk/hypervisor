@@ -54,7 +54,8 @@ if $want_magic_inst == 1 {
 
 ###
 
-if not defined freq_mhz      {$freq_mhz      = 1333.3}
+if not defined freq_mhz      {$freq_mhz      = 30}
+if not defined sysclk_frequency {$sysclk_frequency = 5}
 if not defined memory_megs   {$memory_megs   = 2048}
 if not defined cpu_cores     {$cpu_cores     = 8}
 ###
@@ -65,6 +66,7 @@ load-module std-components
 load-module phy-components
 
 $system = (create-simple-MPC8578-board cpu_cores = $cpu_cores
+                                       sysclk_frequency = $sysclk_frequency
                                        cpu_frequency = $freq_mhz)
 
 if $use_uart0 == 1 {
