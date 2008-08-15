@@ -5,7 +5,7 @@
 	model = "fsl,hv-mmu";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
-	#size-cells = <1>;
+	#size-cells = <2>;
 
 	cpus {
 		#address-cells = <1>;
@@ -65,7 +65,7 @@
 	};
 	
 	memory {
-		reg = <0 0 0x18000000>;
+		reg = <0 0 0 0x18000000>;
 		device_type = "memory";
 	};
 

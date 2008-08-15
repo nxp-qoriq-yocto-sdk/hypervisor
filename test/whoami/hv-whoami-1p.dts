@@ -4,7 +4,7 @@
 	compatible = "fsl,hv-platform-p4080";
 	model = "fsl,hv-whoami";
 	#address-cells = <2>;
-	#size-cells = <1>;
+	#size-cells = <2>;
 
 	aliases {
 		stdout = &uart0;
@@ -127,7 +127,7 @@
 	};
 
 	memory {
-		reg = <0 0 0x100000>;
+		reg = <0 0 0 0x100000>;
 		device_type = "memory";
 	};
 
@@ -216,12 +216,11 @@
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <0 1 2 3>;
-			fsl,hv-physaddr-map = <0 0 0 0x1000000 0x17000000
-			                       0 0x17000000 0 0x20000000 0x1000000>;
+			fsl,hv-cpus = <0 4>;
+			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
 			fsl,hv-dtb = /incbin/("bin/whoami-p1.dtb");
-			fsl,hv-load-image-table = <0 0xe8200000 0 0 0>;
-			fsl,hv-dtb-window = <0 0x01000000 0x10000>;
+			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 		};
 	};
 

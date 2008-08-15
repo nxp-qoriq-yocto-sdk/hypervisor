@@ -5,7 +5,7 @@
 	model = "fsl,hv-linux-p1";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
-	#size-cells = <1>;
+	#size-cells = <2>;
 
 	cpus {
 		#address-cells = <1>;
@@ -39,7 +39,7 @@
 	};
 	
 	memory {
-		reg = <0 0 0x20000000>;
+		reg = <0 0 0 0x20000000>;
 		device_type = "memory";
 	};
 
@@ -214,7 +214,7 @@
 		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
-		reg = <0 0xfe200000 0x1000>;
+		reg = <0 0xfe200000 0 0x1000>;
 		bus-range = <0x0 0xff>;
 		fsl,hv-map-ranges;
 		ranges = <0x02000000 0 0x80000000 0 0x80000000 0x0 0x20000000

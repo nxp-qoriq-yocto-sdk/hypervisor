@@ -5,7 +5,7 @@
 	model = "fsl,hv-ipi-p2";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;
-	#size-cells = <1>;
+	#size-cells = <2>;
 
 	cpus {
 		#address-cells = <1>;
@@ -40,12 +40,12 @@
 	};
 
 	memory {
-		reg = <0 0 0x04000000>;
+		reg = <0 0 0 0x04000000>;
 		device_type = "memory";
 	};
 
 	mem {
-		reg = <0 0x25000000 0x1000>;
+		reg = <0 0x25000000 0 0x1000>;
 		compatible = "fsl,share-mem-test";
 	};
 
