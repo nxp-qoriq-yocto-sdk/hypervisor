@@ -58,7 +58,7 @@ static int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 	
 	for (i = 0; i < len / 4; i += 2) {
 		if (vcpu >= vcpu_base && vcpu < vcpu_base + cpulist[i + 1])
-			return cpulist[i] + vcpu_base - vcpu;
+			return cpulist[i] + vcpu - vcpu_base;
 
 		vcpu_base += cpulist[i + 1];
 	}
