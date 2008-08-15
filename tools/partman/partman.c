@@ -27,6 +27,9 @@
 /**
  * Sample Linux partition management utility
  *
+ * Support for restarting a parition has been disabled, since the hypervisor
+ * does not fully support restarting a partition, and since the partman
+ * utility does not accept "-1" as a partition handle.
  */
 
 #include <stdio.h>
@@ -47,16 +50,6 @@
  * tree.  So every time that file is updated, you need to copy it here.
  */
 #include "fsl_hypervisor.h"
-
-
-char *cmd_to_str[6] = {
-	"UNUSED",
-	"PARTITION_RESTART",
-	"PARTITION_GET_STATUS",
-	"PARTITION_START",
-	"PARTITION_STOP",
-	"PARTITION_LOAD"
-};
 
 enum command {
 	e_none = 0,
@@ -85,6 +78,8 @@ struct parameters {
 #define ELFCLASS32   1  /* 32-bit objects */
 #define EI_DATA      5  /* Data encoding */
 #define ELFDATA2MSB  2  /* 2's complement, big endian */
+
+static int verbose = 0;
 
 /*
  * ELF header
@@ -142,12 +137,14 @@ static void usage(void)
 	printf("\t\timages.\n\n");
 
 	printf("Stop partition:\n\tpartman -x -h <handle>\n\n");
-
+/*
 	printf("Restart partition:\n\tpartman -r -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
 	printf("\t\tDefault value for -a is 0, or the base physical address\n");
 	printf("\t\tfor ELF images.\n");
 	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
 	printf("\t\timages.\n\n");
+*/
+	printf("Specify -v for verbose output\n\n");
 }
 
 /**
@@ -165,19 +162,20 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 	int f = open("/dev/fsl-hv", O_RDWR | O_SYNC);
 	if (f == -1) {
 		ret = errno;
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		return ret;
 	}
 
 	if (ioctl(f, cmd, p) == -1) {
 		ret = errno;
-		perror(__func__);
-	} else
+		if (verbose)
+			perror(__func__);
+	} else {
 		ret = p->ret;
-
-	if (ret)
-		printf("Partman operation, %s failed with error = %d\n",
-			 cmd_to_str[cmd], ret);
+		if (verbose && ret)
+			printf("Hypervisor returned error %u\n", ret);
+	}
 
 	close(f);
 
@@ -212,37 +210,42 @@ static int copy_to_partition(unsigned int partition, void *buffer,
  * @elf_length: length of the ELF image, or -1 to ignore length checking
  * @bin_length: pointer to returned buffer length
  * @load_address: pointer to returned load address
- * @entry: pointer to returned offset of entry address within buffer
+ * @entry_offset: pointer to returned offset of entry address within buffer
  */
 static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
-	unsigned long *load_address, unsigned long *entry)
+	unsigned long *load_address, unsigned long *entry_offset)
 {
 	struct elf_header *hdr = (struct elf_header *) elf;
 	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
 	void *buffer = NULL;
 	size_t size = 0;
 	unsigned long base = -1;
+	unsigned long vbase = -1;
 	unsigned int i;
 
 	if (elf_length < sizeof(struct elf_header)) {
-		printf("Truncated ELF image\n");
+		if (verbose)
+			printf("%s: truncated ELF image\n", __func__);
 		return NULL;
 	}
 
 	if (elf_length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
-		printf("Truncated ELF image\n");
+		if (verbose)
+			printf("%s: truncated ELF image\n", __func__);
 		return NULL;
 	}
 
 	/* We only support 32-bit for now */
 	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
-		printf("Only 32-bit ELF images are supported\n");
+		if (verbose)
+			printf("%s: only 32-bit ELF images are supported\n", __func__);
 		return NULL;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
 	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
-		printf("Only big-endian ELF images are supported\n");
+		if (verbose)
+			printf("%s: only big-endian ELF images are supported\n", __func__);
 		return NULL;
 	}
 
@@ -253,15 +256,21 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 	 */
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].offset + phdr[i].filesz > elf_length) {
-			printf("Truncated ELF image\n");
+			if (verbose)
+				printf("%s: truncated ELF image\n", __func__);
 			return NULL;
 		}
 		if (phdr[i].filesz > phdr[i].memsz) {
-			printf("Invalid ELF program header file size\n");
+			if (verbose)
+				printf("%s: invalid ELF program header file size\n", __func__);
 			return NULL;
 		}
-		if ((phdr[i].type == PT_LOAD) && (phdr[i].paddr < base))
-			base = phdr[i].paddr;
+		if (phdr[i].type == PT_LOAD) {
+			if (phdr[i].paddr < base)
+				base = phdr[i].paddr;
+			if (phdr[i].vaddr < vbase)
+				vbase = phdr[i].vaddr;
+		}
 	}
 
 	/* Copy each PT_LOAD segment to memory */
@@ -280,11 +289,18 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 		}
 	}
 
+	if (verbose) {
+		printf("%s: load address is 0x%lx\n", __func__, base);
+		printf("%s: virtual base address is 0x%lx\n", __func__, vbase);
+		printf("%s: entry offset is 0x%lx\n", __func__, hdr->entry - vbase);
+		printf("%s: image size is 0x%x\n", __func__, size);
+	}
+
 	if (load_address)
 		*load_address = base;
 
-	if (entry)
-		*entry = hdr->entry - base;
+	if (entry_offset)
+		*entry_offset = hdr->entry - vbase;
 
 	if (bin_length)
 		*bin_length = size;
@@ -304,29 +320,35 @@ static void *read_property(const char *filename, size_t *size)
 
 	f = open(filename, O_RDONLY);
 	if (f == -1) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		return NULL;
 	}
 
 	if (fstat(f, &buf)) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		goto fail;
 	}
 
 	off = buf.st_size;
 	if (!off) {
-		printf("%s: file %s is zero bytes long\n", __func__, filename);
+		if (verbose)
+			printf("%s: device tree property file %s is zero bytes long\n",
+				__func__, filename);
 		goto fail;
 	}
 
 	buffer = malloc(off);
 	if (!buffer) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		goto fail;
 	}
 
 	if (read(f, buffer, off) != off) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		goto fail;
 	}
 
@@ -346,49 +368,59 @@ fail:
 /**
  * Load an image file into memory and parse it if it's an ELF
  *
+ * @filename: file name of image
+ * @size: returned size of loaded image
+ * @load_address: pointer to returned load address
+ * @entry_offset: pointer to returned offset of entry address within buffer
+ *
  * Returns a pointer to a buffer if success.  The buffer must be released
  * with free().
  *
  * Returns NULL if there was an error
  */
 static void *load_image_file(const char *filename, size_t *size,
-	unsigned long *load_address, unsigned long *entry)
+	unsigned long *load_address, unsigned long *entry_offset)
 {
 	off_t off;
 	int f;
-	void *mapped = NULL;
+	void *mapped = MAP_FAILED;
 	void *buffer = NULL;
 	struct stat buf;
 
 	f = open(filename, O_RDONLY);
 	if (f == -1) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		return NULL;
 	}
 
 	if (fstat(f, &buf)) {
-		perror(__func__);
+		if (verbose)
+			perror(__func__);
 		goto fail;
 	}
 
 	off = buf.st_size;
 	if (off < 4) {
-		printf("%s: file %s is too small\n", __func__, filename);
+		if (verbose)
+			printf("%s: file %s is too small\n", __func__, filename);
 		goto fail;
 	}
 
 	mapped = mmap(0, off, PROT_READ, MAP_SHARED, f, 0);
-	if (!mapped) {
-		perror(__func__);
+	if (mapped == MAP_FAILED) {
+		if (verbose)
+			perror(__func__);
 		goto fail;
 	}
 
 	if (memcmp(mapped, "\177ELF", 4) == 0) {
-		buffer = parse_elf(mapped, off, size, load_address, entry);
+		buffer = parse_elf(mapped, off, size, load_address, entry_offset);
 	} else {
 		buffer = malloc(off);
 		if (!buffer) {
-			perror(__func__);
+			if (verbose)
+				perror(__func__);
 			goto fail;
 		}
 		memcpy(buffer, mapped, off);
@@ -397,8 +429,8 @@ static void *load_image_file(const char *filename, size_t *size,
 			*size = off;
 		if (load_address)
 			*load_address = 0;
-		if (entry)
-			*entry = 0;
+		if (entry_offset)
+			*entry_offset = 0;
 	}
 
 	munmap(mapped, off);
@@ -407,7 +439,7 @@ static void *load_image_file(const char *filename, size_t *size,
 	return buffer;
 
 fail:
-	if (mapped)
+	if (mapped != MAP_FAILED)
 		munmap(mapped, off);
 
 	free(buffer);
@@ -441,6 +473,7 @@ static int is_compatible(const char *haystack, size_t length, const char *needle
 
 /* Command parsers */
 
+static const char handle_path[] = "/proc/device-tree/hypervisor/handles";
 /**
  * Displays a list of partitions and their status
  */
@@ -450,14 +483,20 @@ static int cmd_status(void)
 	struct dirent *dp;
 	int ret = 0;
 
-	if (chdir("/proc/device-tree/hypervisor/handles")) {
-		perror(__func__);
+	printf("Partition status\n\n");
+
+	if (chdir(handle_path)) {
+		printf("Cannot find %s path\n", handle_path);
+		if (verbose)
+			perror(__func__);
 		return errno;
 	}
 
 	dir = opendir(".");
 	if (!dir) {
-		perror(__func__);
+		printf("Cannot open directory %s\n", handle_path);
+		if (verbose)
+			perror(__func__);
 		return errno;
 	}
 
@@ -472,10 +511,12 @@ static int cmd_status(void)
 			uint32_t *reg;
 			struct fsl_hv_ioctl_status status;
 
-			sprintf(filename, "%s/compatible", dp->d_name);
+			snprintf(filename, sizeof(filename) - 1, "%s/compatible", dp->d_name);
 			strprop = read_property(filename, &size);
-			if (!strprop)
+			if (!strprop) {
+				printf("Could not read property %s\n", filename);
 				goto exit;
+			}
 			if (!is_compatible(strprop, size, "fsl,hv-partition-handle"))
 				continue;
 			free(strprop);
@@ -502,9 +543,10 @@ static int cmd_status(void)
 
 			status.partition = *reg;
 			ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
-			if (ret)
+			if (ret) {
 				printf("error %i\n", ret);
-			else {
+				ret = 0;
+			} else {
 				switch (status.status) {
 				case 0: printf("stopped\n"); break;
 				case 1: printf("running\n"); break;
@@ -530,6 +572,7 @@ static int cmd_load_image(struct parameters *p)
 	void *image;
 	size_t filesize;
 	unsigned long load_address;
+	unsigned long entry_offset;
 	int ret = 0;
 
 	if (!p->h_specified || !p->f_specified) {
@@ -537,19 +580,27 @@ static int cmd_load_image(struct parameters *p)
 		return EINVAL;
 	}
 
-	image = load_image_file(p->f, &filesize, &load_address, NULL);
+	printf("Loading file %s\n", p->f);
+
+	image = load_image_file(p->f, &filesize, &load_address, &entry_offset);
 	if (!image) {
-		ret = EIO;
-		goto exit;
+		printf("Could not load file %s\n", p->f);
+		return EIO;
 	}
 
 	if (!p->a_specified)
 		p->a = load_address;
 
+	printf("Copying image to partition %i at address 0x%lx\n", p->h, p->a);
+
 	ret = copy_to_partition(p->h, image, p->a, filesize);
 
-exit:
 	free(image);
+
+	if (ret)
+		printf("Copy failed with error %i\n", ret);
+	else
+		printf("(Entry address is 0x%lx)\n", load_address + entry_offset);
 
 	return ret;
 }
@@ -557,20 +608,31 @@ exit:
 static int cmd_start(struct parameters *p)
 {
 	struct fsl_hv_ioctl_start im;
+	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
 
+	printf("Starting partition %i\n", p->h);
+
+	if (!p->e_specified)
+		p->e = 0;
+
+	if (!p->a_specified)
+		p->a = 0;
+
 	if (p->f_specified) {
 		void *image;
 		size_t filesize;
 		unsigned long load_address;
-		unsigned long entry;
+		unsigned long entry_offset;
 		int ret = 0;
 
-		image = load_image_file(p->f, &filesize, &load_address, &entry);
+		printf("Loading file %s\n", p->f);
+
+		image = load_image_file(p->f, &filesize, &load_address, &entry_offset);
 		if (!image)
 			return EIO;
 
@@ -578,43 +640,64 @@ static int cmd_start(struct parameters *p)
 			p->a = load_address;
 
 		if (!p->e_specified)
-			p->e = entry;
+			p->e = p->a + entry_offset;
+
+		printf("Copying image to partition at address 0x%lx\n", p->a);
 
 		ret = copy_to_partition(p->h, image, p->a, filesize);
 
 		free(image);
-		if (ret)
+		if (ret) {
+			printf("Could not copy file %s to partition %i, error=%i\n",
+				p->f, p->h, ret);
 			return ret;
+		}
 	}
 
 	im.partition = p->h;
 	im.entry_point = p->e;
 
-	return hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
+	printf("Starting partition at entry point 0x%lx\n", p->e);
+
+	ret = hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
+	if (ret)
+		printf("Hypervisor returned error %i\n", ret);
+
+	return ret;
 }
 
 static int cmd_stop(struct parameters *p)
 {
 	struct fsl_hv_ioctl_stop im;
+	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
 
+	printf("Stopping partition %i\n", p->h);
+
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_STOP, (void *) &im);
+	ret = hv(FSL_HV_IOCTL_PARTITION_STOP, (void *) &im);
+	if (ret)
+		printf("Hypervisor returned error %i\n", ret);
+
+	return ret;
 }
 
 static int cmd_restart(struct parameters *p)
 {
 	struct fsl_hv_ioctl_restart im;
+	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
+
+	printf("Restarting partition %i\n", p->h);
 
 	if (p->f_specified) {
 		void *image;
@@ -622,6 +705,8 @@ static int cmd_restart(struct parameters *p)
 		unsigned long load_address;
 		unsigned long entry;
 		int ret = 0;
+
+		printf("Loading image %s\n", p->f);
 
 		image = load_image_file(p->f, &filesize, &load_address, &entry);
 		if (!image)
@@ -633,16 +718,27 @@ static int cmd_restart(struct parameters *p)
 		if (!p->e_specified)
 			p->e = entry;
 
+		printf("Copying image to partition at address 0x%lx\n", p->a);
+
 		ret = copy_to_partition(p->h, image, p->a, filesize);
 
 		free(image);
-		if (ret)
+		if (ret) {
+			printf("Could not copy file %s to partition %i, error=%i\n",
+				p->f, p->h, ret);
 			return ret;
+		}
 	}
 
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
+	printf("Restarting partition\n");
+
+	ret = hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
+	if (ret)
+		printf("Hypervisor returned error %i\n", ret);
+
+	return ret;
 }
 
 int main(int argc, char *argv[])
@@ -650,12 +746,13 @@ int main(int argc, char *argv[])
 	enum command cmd = e_none;
 	struct parameters p;
 	int c;
+	int ret = 0;
 
 	memset(&p, 0, sizeof(p));
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "slgxrh:f:a:e:")) != -1) {
+	while ((c = getopt(argc, argv, "slgxvh:f:a:e:")) != -1) {
 		switch (c) {
 		case 's':
 			cmd = e_status;
@@ -671,6 +768,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			cmd = e_restart;
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		case 'h':
 			p.h = strtol(optarg, NULL, 0);
@@ -698,19 +798,24 @@ int main(int argc, char *argv[])
 
 	switch (cmd) {
 	case e_status:
-		return cmd_status();
+		ret = cmd_status();
+		break;
 	case e_load:
-		return cmd_load_image(&p);
+		ret = cmd_load_image(&p);
+		break;
 	case e_start:
-		return cmd_start(&p);
+		ret = cmd_start(&p);
+		break;
 	case e_stop:
-		return cmd_stop(&p);
+		ret = cmd_stop(&p);
+		break;
 	case e_restart:
-		return cmd_restart(&p);
+		ret = cmd_restart(&p);
+		break;
 	default:
 		usage();
 		break;
 	}
 
-	return 0;
+	return ret ? 1 : 0;
 }
