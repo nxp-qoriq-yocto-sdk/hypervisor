@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc10
-Date: 8/09/2008
+Revsion: 0.2-rc11
+Date: 8/15/2008
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,27 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc10
+   -Topaz 0.2-rc11
       -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc10
+      -requires libos tag v0.2-rc11
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc11 bug fixes and changes
+      -bug 1888-- return value check in gdb stub was wrong
+      -bug 1900-- copy cpu node frequencies from hypervisor device
+       tree to guest device tree
+      -bug 1864-- invalid CPU numbers in fsl,hv-cpus is not 
+       handled
+      -bug 1912-- support #size-cells=2
+      -bug 1910-- gdb stub does not ctrl-c
+      -bug 1892
+      -bug 1914-- delete -r from partman
+      -partman has a -v option for more verbose output
+      -updated Linux and u-boot images in unit tests
 
    -Topaz 0.2-rc10 bug fixes and changes
       -check for negative and free handles (bug 1839)
