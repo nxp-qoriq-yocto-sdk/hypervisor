@@ -23,6 +23,7 @@
 #
 
 DTC_DIR := ../../../dtc
+DTC := $(DTC_DIR)/dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../../libos/lib
 LIBOS_INC := ../../../libos/include
@@ -89,7 +90,7 @@ bin/common/%.o : $(COMMON_DIR)/%.c
 
 bin/%.dtb : %.dts
 	@$(MKDIR) `dirname $@`
-	$(DTC_DIR)/dtc -p 1024 -O dtb $< -o $@
+	$(DTC) -p 1024 -O dtb $< -o $@
 
 # include the dependecy files
 ifneq ($(MAKECMDGOALS),clean)
