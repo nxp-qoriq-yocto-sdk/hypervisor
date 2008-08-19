@@ -186,6 +186,9 @@ test-vmpic-coreint: bin/hv.uImage test/vmpic
 test-linux-1p: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
 
+test-linux-fman: bin/hv.uImage test/linux
+	$(SIMICS) -e '$$create_fman=TRUE' test/linux/hv-linux-fman.simics
+
 test-linux-intmap: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-intmap.simics
 

@@ -38,9 +38,11 @@ include ../Makefile.inc
 .PHONY: dtbs mount umount rootfs
 
 dtbs: bin/hv-linux-1p.dtb bin/hv-linux-2p.dtb bin/hv-linux-intmap.dtb bin/hv-partman.dtb \
-      bin/hv-demo.dtb bin/hv-hello.dtb
+      bin/hv-demo.dtb bin/hv-hello.dtb bin/hv-linux-fman.dtb
 
 bin/hv-linux-1p.dtb: bin/linux-p1.dtb hv-linux-1p.dts
+
+bin/hv-linux-fman.dtb: bin/linux-fman-p1.dtb hv-linux-fman.dts ../common/p4080master.dts
 
 bin/hv-linux-intmap.dtb: bin/linux-intmap.dtb hv-linux-intmap.dts
 

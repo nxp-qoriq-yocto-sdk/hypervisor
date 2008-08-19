@@ -1,0 +1,40 @@
+/*
+ * P4080 Simulator Device Tree Source
+ *
+ * Copyright 2007-2008 Freescale Semiconductor Inc.
+ *
+ * This program is free software; you can redistribute	it and/or modify it
+ * under  the terms of	the GNU General	 Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+
+/dts-v1/;
+
+/ {
+	model = "fsl,P4080SIM";
+	compatible = "fsl,hv-platform-p4080";
+	#address-cells = <2>;
+	#size-cells = <0x2>;
+
+	/include/ "../common/p4080master.dts"
+
+	byte-channels {
+		byte-channel0 {
+			compatible = "fsl,hv-byte-channel";
+			fsl,endpoint = <&serial1>;
+		};
+	};
+
+	partitions {
+		part1 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <0 4>;
+			fsl,hv-dtb = /incbin/("bin/linux-fman-p1.dtb");
+			fsl,hv-physaddr-map = <0 0 0 0x10000000 0 0x10000000>;
+			fsl,hv-load-image-table = <0 0xe8100000 0 0x00000000 0 0x000000
+						   0 0xe8600000 0 0x01300000 0 0x400000>;
+			fsl,hv-dtb-window = <0 0x1000000 0 0x10000>;
+		};
+	};
+};

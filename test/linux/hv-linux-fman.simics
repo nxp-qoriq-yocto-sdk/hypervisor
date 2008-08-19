@@ -1,0 +1,26 @@
+#
+# Script to run 8578/u-boot/ultravisor/linux on simulator
+#
+
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
+$use_uart1 = 1
+
+$guest_image[0]  = "vmlinux.fman"
+$guest_addr[0]   = 0xe8100000
+$guest_image[1]  = "rootfs.ext2.gz"
+$guest_addr[1]   = 0xe8600000
+
+$kernel_image  = "hv.uImage"
+
+$initrd_image = ""
+
+$dev_tree_blob  = "hv-linux-fman.dtb"
+
+add-directory "%script%/../common" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
+add-directory "%script%" -prepend
+
+run-command-file "runsim.simics"
