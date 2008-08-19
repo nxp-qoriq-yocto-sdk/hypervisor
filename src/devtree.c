@@ -811,3 +811,22 @@ int get_cpu_node(const void *fdt, int cpunum)
 			return off;
 	}
 }
+
+int fdt_node_offset_by_prop(const void *fdt, int startoffset,
+                                  const char *propname)
+{
+	int offset;
+	int len;
+	const void *val;
+
+	for (offset = fdt_next_node(fdt, startoffset, NULL);
+	     offset >= 0;
+	     offset = fdt_next_node(fdt, offset, NULL)) {
+		val = fdt_getprop(fdt, offset, propname, &len);
+		if (val)
+			return offset;
+	}
+	
+	return offset; /* error from fdt_next_node() */
+}
+
