@@ -23,4 +23,4 @@ add-directory "%script%/../../bin" -prepend
 add-directory "%script%/bin" -prepend
 add-directory "%script%" -prepend
 
-run-command-file "runsim.simics"
+run-command-file "startsim.simics"

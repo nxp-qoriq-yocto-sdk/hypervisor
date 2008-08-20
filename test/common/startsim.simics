@@ -1,0 +1,356 @@
+#
+# Script to run p4080/u-boot/linux on simulator
+#
+#
+# display options
+digit-grouping 16 8
+output-radix 16
+
+if not defined uboot		{$uboot  = "u-boot.4080"}
+if not defined kernel_image	{$kernel_image  = "uImage.4080"}
+if not defined dev_tree_blob	{$dev_tree_blob = "p4080sim.dtb"}
+#if not defined initrd_image	{$initrd_image  = "busybox-1.1.3.u-boot"}
+if not defined initrd_image	{$initrd_image  = "rootfs.ext2.gz.uboot"}
+#if not defined initrd_image	{$initrd_image  = "ramdisk.image.gz.uboot"}
+##if not defined initrd_image	{$initrd_image  = "rootfs.ext2.gz.uboot-big"}
+if not defined kernel_symbols	{$kernel_symbols = ""}
+if not defined uboot_symbols	{$uboot_symbols = ""}
+if not defined use_uart0	{$use_uart0 = 1}
+if not defined use_uart1	{$use_uart1 = 0}
+if not defined use_uart2	{$use_uart2 = 0}
+if not defined use_uart3	{$use_uart3 = 0}
+if not defined create_fman	{$create_fman = FALSE}
+if not defined do_boot		{$do_boot = "yes"}
+if not defined create_network	{$create_network = "yes"}
+if not defined host_name	{$host_name   = "p4080sim"}
+if not defined system_info	{$system_info = $host_name + " - Linux 2.6.x (IP " + $ip_address + ")" }
+
+if not defined kernel_addr   {$kernel_addr   = 0x1000000}
+if not defined initrd_addr   {$initrd_addr   = 0x1300000}
+if not defined dev_tree_addr {$dev_tree_addr = 0x00f00000}
+if not defined simicfs_addr  {$simicfs_addr  = 0xfdfffff0}
+#if not defined boot_command  {$boot_command  = "bootm start 0x1000000 0x1300000 0xf00000"}
+if not defined boot_command {
+	$boot_command = "bootm " + (hex $kernel_addr) + " "
+	if ($initrd_image == "") {
+		$boot_command += "-"
+	} else {
+		$boot_command += (hex $initrd_addr)
+	}
+	$boot_command += " " + (hex $dev_tree_addr)
+}
+if not defined mac_address   {$mac_address    = "02:00:c0:a8:0b:fe"}
+if not defined mac_address1  {$mac_address1   = "02:00:c0:a8:15:fe"}
+if not defined mac_address2  {$mac_address2   = "02:00:c0:a8:1f:fe"}
+if not defined mac_address3  {$mac_address3   = "02:00:c0:a8:29:fe"}
+if not defined mac_address4  {$mac_address4   = "02:00:c0:a8:33:fe"}
+if not defined mac_address5  {$mac_address5   = "02:00:c0:a8:3d:fe"}
+if not defined mac_address6  {$mac_address6   = "02:00:c0:a8:47:fe"}
+if not defined mac_address7  {$mac_address7   = "02:00:c0:a8:51:fe"}
+if not defined mac_address8  {$mac_address8   = "02:00:c0:a8:5b:fe"}
+if not defined mac_address9  {$mac_address9   = "02:00:c0:a8:65:fe"}
+if not defined ip_address    {$ip_address    = "10.10.0.80"}
+if not defined service_node  {}
+
+if not defined kernel_cmdline {$kernel_cmdline = "console=ttyS0,115200 ramdisk_size=262144"}
+
+sim->handle_outside_memory = 1
+add-directory "%script%" -prepend
+add-directory "%script%/images/" -prepend
+
+###
+
+if not defined cpu_freq_mhz	{$cpu_freq_mhz		= 30}
+if not defined sysclk_freq_mhz	{$sysclk_freq_mhz	= 5}
+if not defined memory_megs	{$memory_megs		= 2048}
+if not defined cpu_cores	{$cpu_cores		= 8}
+###
+
+load-module mpc8578-components
+load-module memory-components
+load-module std-components
+load-module phy-components
+
+$system = (create-simple-MPC8578-board cpu_cores = $cpu_cores
+                                       cpu_frequency = $cpu_freq_mhz
+				       sysclk_frequency = $sysclk_freq_mhz
+				       create_fman = $create_fman)
+
+if $use_uart0 == 1 {
+	$con1 = (create-std-text-console)
+	$system.connect uart0 $con1
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con1->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con1->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con1->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con1->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart1 == 1 {
+	$con2 = (create-std-text-console)
+	$system.connect uart1 $con2
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con2->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con2->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con2->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con2->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart2 == 1 {
+	$con3 = (create-std-text-console)
+	$system.connect uart2 $con3
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con3->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con3->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con3->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con3->x11_font   = $terminal_x11_font}
+}
+
+if $use_uart2_tty == 1 {
+	$con3_tty = (create-std-host-serial-console)
+	$system.connect uart2 $con3_tty
+}
+
+if $use_uart1_net == 1 {
+	$con2_tty = (create-std-server-console "foo" 9124)
+	$system.connect uart1 $con2_tty
+}
+
+if $use_uart2_net == 1 {
+	$con3_tty = (create-std-server-console "foo" 9999)
+	$system.connect uart2 $con3_tty
+}
+
+if $use_uart3 == 1 {
+	$con4 = (create-std-text-console)
+	$system.connect uart3 $con4
+	# Terminal color & font, optionally settable
+	if defined terminal_bg_color   {$con4->bg_color   = $terminal_bg_color}
+	if defined terminal_fg_color   {$con4->fg_color   = $terminal_fg_color}
+	if defined terminal_win32_font {$con4->win32_font = $terminal_win32_font}
+	if defined terminal_x11_font   {$con4->x11_font   = $terminal_x11_font}
+}
+
+# Create ethernet PHYs and connect them to the MACs
+foreach $phy_idx in (range 4) {
+        # Create a generic MII transceiver identified as a Marvell 88E1011S
+        $phy[$phy_idx] = (create-phy-mii-transceiver phy_id = 0x01410c60
+                                                     mii_address = $phy_idx)
+        $system.connect (etsec-phy + $phy_idx) $phy[$phy_idx]
+}
+
+if $create_fman {
+	foreach $fman_idx in (range 2) {
+		foreach $phy_idx in (range 5) {
+			$fman_phy[$phy_idx] = (create-phy-mii-transceiver
+					       mii_address = $phy_idx)
+			$system.connect ("fman" + $fman_idx + "-phy" + $phy_idx) $fman_phy[$phy_idx]
+		}
+	}
+}
+
+# setup CS0/CS1 on DDR2 w/1G and CS0/1 on DDR2 w/1G
+(create-and-connect-ddr-memory $system $memory_megs "A-A-"
+                               ranks_per_module = 2
+			       max_module_size = 2048
+			       ddr_type = DDR2)
+
+# Pulls in the create-pci commands
+load-module pci-components
+
+# Create and connect a SIL controller with a single IDE disk to the first
+# PCIe interface
+#$sil = (create-pci-sil680a)
+#$disk = (create-std-ide-disk size = (80 * 1024 * 1024 * 1024))
+#$sil.connect ide0-slot0 $disk
+#$system.connect pcie0-slot0 $sil
+
+instantiate-components
+
+cpu0->compat_magic = FALSE
+
+# workarounds
+#
+# Workaround Beta1 issue. The Qman/Bman self-tests are using the synchronous
+# behaviour of the functional model to simplify correctness-checking logic, but
+# v3.2.35 of the simics model introduced timing delays to make the model more
+# "realistic" which was too late to rewrite the tests for release. This change
+# cancels the delays, the tests will then be fixed for the following release so
+# that this hack isn't required.
+qman->push_interval=0
+qman->enqueue_interval=0
+# end
+
+if $create_fman {
+	foreach $fman_idx in (range (list-length (get-object-list mpc8578-fman))) {
+		local $fman = "fman" + $fman_idx
+
+		$fman->fil_fm_log_file = "simics-fman.log"
+		$fman->fil_fm_parser_log_file = "simics-fman.log"
+
+		foreach $phy_idx in (range (list-length ($fman->phy))) {
+			local $phy_cmp = "phy_cmp" + (4 + 5 * $fman_idx + $phy_idx)
+			local $phy = ($phy_cmp.get-component-object phy)
+
+			$phy->tx_bandwidth = 0
+			$phy->mac_address = "02:00:c0:a8:" + (hex -p 10 * (1 + 5 * $fman_idx + $phy_idx) + 1) + ":fe"
+			$phy->model_crc = 1
+
+			local $fman_link_cmp = (new-std-ethernet-link link_name = $fman + "_link" + $phy_idx)
+			$phy_cmp.connect $fman_link_cmp
+			($fman_link_cmp.get-component-object link).connect-real-network-bridge ($fman + "_eth" + $phy_idx) -no-mac-xlate
+		}
+	}
+}
+
+$eth_comp = $phy[0]
+if not defined eth_cnt { $eth_cnt = eth }
+run-command-file "%simics%/targets/common/add-eth-link.include"
+
+$console = $con1
+
+###
+$system->system_info = $system_info
+
+if $service_node {
+    local $sn = ($service_node:sn)
+    ($sn.add-host name = $host_name
+                         ip = $ip_address domain = network.sim
+                         mac = $mac_address)
+}
+
+default-port-forward-target $ip_address
+
+$phys_mem = ($system:phys_mem)
+$phys_mem.load-file $uboot 0xfff80000
+
+foreach $i in (range (list-length $guest_image)) {
+	flash_space.load-file $guest_image[$i] $guest_addr[$i]
+}
+
+# U-boot uses l1 cache without backing RAM
+# the address has to match u-boot build/config
+($phys_mem.add-map
+        ($system:l1_cache)
+        base = 0xfdd00000 length = 0x4000
+        priority = 200 offset = 0xfdd00000)
+
+# move simicfs portal
+phys_mem.del-map hfs
+phys_mem.add-map hfs $simicfs_addr 0x10 
+
+# U-boot symbols
+if $uboot_symbols != "" {
+        local $syms = (lookup-file $uboot_symbols)
+        new-symtable uboot file = $syms
+}
+
+# Kernel symbols
+if $kernel_symbols != "" {
+        local $syms = (lookup-file $kernel_symbols)
+        new-symtable kernel file = $syms
+}
+
+if $do_boot == "yes" {
+    script-branch {
+	local $con          = ($console:con)
+        local $phys_mem     = ($system:phys_mem)
+
+        local $initrd_image = $initrd_image
+        local $initrd_addr  = $initrd_addr
+        local $kernel_image = $kernel_image
+        local $kernel_addr  = $kernel_addr
+        local $boot_command = $boot_command
+        local $cmdline      = $kernel_cmdline
+        local $mac_address  = $mac_address
+        local $mac_address1 = $mac_address1
+        local $mac_address2 = $mac_address2
+        local $mac_address3 = $mac_address3
+	local $mac_address4 = $mac_address4
+	local $mac_address5 = $mac_address5
+	local $mac_address6 = $mac_address6
+	local $mac_address7 = $mac_address7
+	local $mac_address8 = $mac_address8
+	local $mac_address9 = $mac_address9
+        local $ip_address   = $ip_address
+        local $ip_address1  = $ip_address1
+        local $ip_address2  = $ip_address2
+        local $ip_address3  = $ip_address3
+	local $ip_address4  = $ip_address4
+	local $ip_address5  = $ip_address5
+	local $ip_address6  = $ip_address6
+	local $ip_address7  = $ip_address7
+	local $ip_address8  = $ip_address8
+	local $ip_address9  = $ip_address9
+        local $dev_tree_blob= $dev_tree_blob
+        local $dev_tree_addr= $dev_tree_addr
+
+        $con.wait-for-string "autoboot:"
+        $con.input "\n"
+
+        # u-boot does not read the MAC from the PHY, but reads them directly
+        # from it's environment variables.
+
+        # First ethernet interface
+        $con.wait-then-write "=> " "setenv ethaddr " + $mac_address + "\n"
+        $con.wait-then-write "=> " "setenv ipaddr " + $ip_address + "\n"
+
+	# Looks like u-boot does not set MAC1-9 correctly
+
+	# Second ethernet interface
+	$con.wait-then-write "=> " "setenv eth1addr " + $mac_address1 + "\n"
+
+	# Third ethernet interface
+	$con.wait-then-write "=> " "setenv eth2addr " + $mac_address2 + "\n"
+
+	# Fourth ethernet interface
+	$con.wait-then-write "=> " "setenv eth3addr " + $mac_address3 + "\n"
+
+	# Fifth ethernet interface
+	$con.wait-then-write "=> " "setenv eth4addr " + $mac_address4 + "\n"
+
+	# Sixth ethernet interface
+	$con.wait-then-write "=> " "setenv eth5addr " + $mac_address5 + "\n"
+
+	# Seventh ethernet interface
+	$con.wait-then-write "=> " "setenv eth6addr " + $mac_address6 + "\n"
+
+	# Eigth ethernet interface
+	$con.wait-then-write "=> " "setenv eth7addr " + $mac_address7 + "\n"
+
+	# Nineth ethernet interface
+	$con.wait-then-write "=> " "setenv eth8addr " + $mac_address8 + "\n"
+
+	# Tenth, and last, ethernet interface
+	$con.wait-then-write "=> " "setenv eth9addr " + $mac_address9 + "\n"
+
+        if $service_node {
+                $con.wait-then-write "=> " "setenv gatewayip 10.10.0.1\n"
+                $con.wait-then-write "=> " "setenv serverip 10.10.0.1\n"
+        }
+
+        # Boot the linux kernel
+        $con.wait-for-string "=> "
+        $phys_mem.load-file $kernel_image $kernel_addr
+	if ($initrd_image != "") {
+		$phys_mem.load-file $initrd_image $initrd_addr
+	}
+        # Load flat device tree blob
+        if ($dev_tree_blob != "") {
+            # Must load to address covered by initial TLB entry
+            $phys_mem.load-file $dev_tree_blob $dev_tree_addr
+        }
+	$con.input "# images has been forced into memory\n"
+
+        if ($cmdline != "") {
+            $con.wait-then-write "=> " "setenv bootargs " + $cmdline + "\n"
+        }
+
+        # Note: user must override boot_command if dev_tree_blob is set
+	$con.wait-then-write "=> " "setenv bootcmd " + $boot_command + "\n"
+	$con.wait-then-write "=> " "fdt addr " + (hex $dev_tree_addr) + " 10000\n"
+#	$con.wait-then-write "=> " "setenv bootm_low  10000000\n"
+#	$con.wait-then-write "=> " "setenv bootm_size 10000000\n"
+	$con.wait-then-write "=> " "boot\n"
+    }
+}
