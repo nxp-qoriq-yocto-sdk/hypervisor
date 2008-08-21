@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc11
-Date: 8/15/2008
+Revsion: 0.2-rc12
+Date: 8/21/2008
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,19 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc11
+   -Topaz 0.2-rc12
       -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc11
+      -requires libos tag v0.2-rc12
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc12 bug fixes and changes
+      -some unit test updates-- added fman+linux scenario
+      -support guest device trees with non-zero liodns and
+       ppid values
 
    -Topaz 0.2-rc11 bug fixes and changes
       -bug 1888-- return value check in gdb stub was wrong
@@ -39,8 +44,9 @@ Contents
       -bug 1864-- invalid CPU numbers in fsl,hv-cpus is not 
        handled
       -bug 1912-- support #size-cells=2
-      -bug 1910-- gdb stub does not ctrl-c
-      -bug 1892
+      -bug 1910-- gdb stub does not support ctrl-c
+      -bug 1892-- partman does not support loading at non zero
+       offsets
       -bug 1914-- delete -r from partman
       -partman has a -v option for more verbose output
       -updated Linux and u-boot images in unit tests
