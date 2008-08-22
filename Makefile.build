@@ -186,6 +186,9 @@ test-vmpic-coreint: bin/hv.uImage test/vmpic
 test-linux-1p: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-1p.simics
 
+test-linux-fman: bin/hv.uImage test/linux
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(SIMICS) -e '$$create_fman=TRUE' test/linux/hv-linux-fman.simics
+
 test-linux-intmap: bin/hv.uImage test/linux
 	$(SIMICS) test/linux/hv-linux-intmap.simics
 
@@ -237,6 +240,9 @@ test/%: FORCE
 
 test:
 	make -C $@
+
+lib:
+	$(SIMICS) -q -e 'echo (resolve-file "%simics%" + sim->host_arch + "-" + sim->host_os + "/lib"); quit' | tail -1
 
 docs:
 	doxygen doc/Doxyfile

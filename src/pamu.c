@@ -214,19 +214,20 @@ void pamu_process_standard_liodns(guest_t *guest)
 	uint32_t  c_naddr, c_nsize, p_naddr, p_nsize;
 	int parent;
 	const uint32_t *liodnrp;
-	int liodnrp_len, offset, offset_in_gdt;
+	int offset = -1;
+	int liodnrp_len, offset_in_gdt;
 	char pathbuf[256];
 	unsigned long assigned_liodn;
 	pamu_handle_t *pamu_handle;
 	int ghandle;
-	uint32_t propval = 0;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		"processing standard liodns...\n");
 
-	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,liodn",
-					       &propval, sizeof(uint32_t));
-	while (offset != -FDT_ERR_NOTFOUND) {
+	while (1) {
+		offset = fdt_node_offset_by_prop(guest->devtree, offset, "fsl,liodn");
+		if (offset == -FDT_ERR_NOTFOUND) 
+			break;
 
 		ret = fdt_get_path(guest->devtree, offset, pathbuf, 256);
 
@@ -236,24 +237,24 @@ void pamu_process_standard_liodns(guest_t *guest)
 				"fsl,liodn", &liodnrp_len);
 
 		if (!liodnrp)
-			goto check_next_node;
+			continue;
 		if (liodnrp_len < 0)
-			goto check_next_node;
+			continue;
 
 		dma_ranges = fdt_getprop(guest->devtree, offset,
 				"dma-ranges", &len);
 		if (!dma_ranges) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				"pamu_partition_init: error getting dma-ranges property, error_code = %d\n", len);
-			goto check_next_node;
+			continue;
 		}
 		if (len == 0)
-			goto check_next_node;
+			continue;
 
 		ret = get_addr_format(guest->devtree, offset,
 				&c_naddr, &c_nsize);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		copy_val(cas_addrbuf, dma_ranges, c_naddr);
 
@@ -261,12 +262,12 @@ void pamu_process_standard_liodns(guest_t *guest)
 
 		parent = fdt_parent_offset(guest->devtree, offset);
 		if (parent == -FDT_ERR_NOTFOUND)
-			goto check_next_node;
+			continue;
 
 		ret = get_addr_format(guest->devtree, parent, &p_naddr,
 						&p_nsize);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		copy_val(pas_addrbuf, dma_ranges, p_naddr);
 
@@ -288,7 +289,7 @@ void pamu_process_standard_liodns(guest_t *guest)
 				assigned_liodn,
 				cas_addrbuf, cas_sizebuf);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		pamu_handle = alloc_type(pamu_handle_t);
 		pamu_handle->user.pamu = pamu_handle;
@@ -296,24 +297,19 @@ void pamu_process_standard_liodns(guest_t *guest)
 
 		ghandle = alloc_guest_handle(guest, &pamu_handle->user);
 		if (ghandle < 0)
-			 goto check_next_node;
+			 continue;
 
 		ret = fdt_setprop(guest->devtree, offset,
 				"fsl,hv-liodn-handle", &ghandle, 4);
 
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		/*
 		 * Pass-thru "fsl,liodn" to the guest device tree
 		 */
 		ret = fdt_setprop(guest->devtree, offset,
 				"fsl,liodn", &assigned_liodn, 4);
-
-check_next_node:
-		offset = fdt_node_offset_by_prop_value(guest->devtree,
-				offset, "fsl,liodn",
-				&propval, sizeof(uint32_t));
 	}
 }
 
@@ -330,13 +326,13 @@ void pamu_process_ppid_liodns(guest_t *guest)
 	const uint32_t *ppid_to_liodn = NULL;
 	const uint32_t *ppid_to_liodn_guest = NULL;
 	int ppid_liodn_len_guest;
-	int ppidp_len, offset, offset_in_gdt, off_ppid_liodn, ppid_liodn_len;
+	int offset = -1;
+	int ppidp_len, offset_in_gdt, off_ppid_liodn, ppid_liodn_len;
 	char pathbuf[256];
 	unsigned int assigned_liodn;
 	pamu_handle_t *pamu_handle;
 	ppid_handle_t *ppid_handle;
 	int ghandle;
-	uint32_t propval = 0;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		"processing ppid liodns...\n");
@@ -366,14 +362,10 @@ void pamu_process_ppid_liodns(guest_t *guest)
 		return;
 	}
 
-	offset = fdt_node_offset_by_prop_value(guest->devtree, -1, "fsl,ppid",
-						&propval, sizeof(uint32_t));
-
-	if (offset < 0)
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-		"no fsl,ppid properties found, fdt rc = %d\n",offset);
-
-	while (offset != -FDT_ERR_NOTFOUND) {
+	while (1) {
+		offset = fdt_node_offset_by_prop(guest->devtree, offset, "fsl,ppid");
+		if (offset == -FDT_ERR_NOTFOUND)
+			break;
 
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 			"doing ppid/liodn lookup for %s\n",
@@ -393,14 +385,14 @@ void pamu_process_ppid_liodns(guest_t *guest)
 			"	ppid = %d\n", *ppidp);
 
 		if (!ppidp)
-			goto check_next_node;
+			continue;
 		if (ppidp_len < 0)
-			goto check_next_node;
+			continue;
 
 		if (*ppidp >= (ppid_liodn_len/sizeof(uint32_t))) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				"error : fsl,ppid value is incorrect\n");
-			goto check_next_node;
+			continue;
 		}
 
 		assigned_liodn = ppid_to_liodn[*ppidp];
@@ -413,15 +405,15 @@ void pamu_process_ppid_liodns(guest_t *guest)
 		if (!dma_ranges) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				"pamu_partition_init: error getting dma-ranges property, error_code = %d\n", len);
-			goto check_next_node;
+			continue;
 		}
 		if (len == 0)
-			goto check_next_node;
+			continue;
 
 		ret = get_addr_format(guest->devtree, offset,
 				&c_naddr, &c_nsize);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		copy_val(cas_addrbuf, dma_ranges, c_naddr);
 
@@ -429,12 +421,12 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		parent = fdt_parent_offset(guest->devtree, offset);
 		if (parent == -FDT_ERR_NOTFOUND)
-			goto check_next_node;
+			continue;
 
 		ret = get_addr_format(guest->devtree, parent, &p_naddr,
 						&p_nsize);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		copy_val(pas_addrbuf, dma_ranges, p_naddr);
 
@@ -451,7 +443,7 @@ void pamu_process_ppid_liodns(guest_t *guest)
 				assigned_liodn,
 				cas_addrbuf, cas_sizebuf);
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		pamu_handle = alloc_type(pamu_handle_t);
 		pamu_handle->user.pamu = pamu_handle;
@@ -459,7 +451,7 @@ void pamu_process_ppid_liodns(guest_t *guest)
 
 		ghandle = alloc_guest_handle(guest, &pamu_handle->user);
 		if (ghandle < 0)
-			 goto check_next_node;
+			 continue;
 
 		ppid_handle = alloc_type(ppid_handle_t);
 		ppid_handle->user.ppid = ppid_handle;
@@ -473,17 +465,12 @@ void pamu_process_ppid_liodns(guest_t *guest)
 				"fsl,hv-ppid-handle", &ghandle, 4);
 
 		if (ret < 0)
-			goto check_next_node;
+			continue;
 
 		/*
 		 * Pass-thru "fsl,ppid" to * the guest device tree
 		 */
 		ret = fdt_setprop(guest->devtree, offset, "fsl,ppid", ppidp, 4);
-
-check_next_node:
-		offset = fdt_node_offset_by_prop_value(guest->devtree,
-				offset, "fsl,ppid",
-				&propval, sizeof(uint32_t));
 	}
 
 	/*

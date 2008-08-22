@@ -29,7 +29,7 @@ $(shell ln -sfn $(LIBOS_DIR) libos)
 
 export VERSION=0
 export SUBVERSION=2
-export EXTRAVERSION=-rc11
+export EXTRAVERSION=-rc12
 export LOCALVERSION := $(shell tools/setlocalversion)
 
 export PROJECTVERSION=$(VERSION).$(SUBVERSION)$(EXTRAVERSION)$(LOCALVERSION)
