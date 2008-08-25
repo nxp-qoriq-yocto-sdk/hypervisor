@@ -231,7 +231,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_TLB1CFG:
-		*val = mfspr(SPR_TLB1CFG) & ~TLBCFG_NENTRY_MASK;
+		*val = mfspr(SPR_TLB1CFG) & ~(TLBCFG_NENTRY_MASK | TLBCFG_ASSOC_MASK);
 		*val |= TLB1_GSIZE;
 		break;
 
