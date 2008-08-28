@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
+#include <libos/io.h>
 
 /* The relevent guestmem_set() call must be made prior
  * to executing any guestmem_in() calls.  It is not
@@ -35,24 +36,30 @@
  */
 static inline void guestmem_set_data(trapframe_t *regs)
 {
-	uint32_t tmp;
+	uint32_t eplc = mfspr(SPR_EPLC);
+	uint32_t new_eplc = eplc;
 
-	asm volatile("mfspr %0, %1; rlwimi %0, %2, %3, %4; mtspr %1, %0" :
-	             "=&r" (tmp) :
-	             "i" (SPR_EPLC), "r" (regs->srr1),
-	             "i" (MSRBIT_DS - EPCBIT_EAS), "i" (EPC_EAS) :
-	             "memory");
+	new_eplc &= ~EPCBIT_EAS;
+	new_eplc |= (regs->srr1 << (MSRBIT_DS - EPCBIT_EAS)) & EPC_EAS;
+
+	if (eplc != new_eplc) {
+		mtspr(SPR_EPLC, new_eplc);
+		isync();
+	}
 }
 
 static inline void guestmem_set_insn(trapframe_t *regs)
 {
-	uint32_t tmp;
+	uint32_t eplc = mfspr(SPR_EPLC);
+	uint32_t new_eplc = eplc;
 
-	asm volatile("mfspr %0, %1; rlwimi %0, %2, %3, %4; mtspr %1, %0" :
-	             "=&r" (tmp) :
-	             "i" (SPR_EPLC), "r" (regs->srr1),
-	             "i" (MSRBIT_IS - EPCBIT_EAS), "i" (EPC_EAS) :
-	             "memory");
+	new_eplc &= ~EPCBIT_EAS;
+	new_eplc |= (regs->srr1 << (MSRBIT_IS - EPCBIT_EAS)) & EPC_EAS;
+
+	if (eplc != new_eplc) {
+		mtspr(SPR_EPLC, new_eplc);
+		isync();
+	}
 }
 
 #define GUESTMEM_OK 0

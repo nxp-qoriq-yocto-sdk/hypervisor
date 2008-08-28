@@ -157,9 +157,9 @@ void start(unsigned long devtree_ptr)
 	lowest_guest_addr = find_lowest_guest_phys();
 	if (mem_end > lowest_guest_addr - 1)
 		mem_end = lowest_guest_addr - 1;
-	
-	core_init();
 
+	tlb1_init();
+	
 	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
 	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
@@ -168,6 +168,7 @@ void start(unsigned long devtree_ptr)
 		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
 		                       (void *)ULONG_MAX);
 	malloc_init();
+	core_init();
 	
 	fdt_size = fdt_totalsize(fdt) + 4096;
 	new_fdt = malloc(fdt_size);
@@ -218,6 +219,7 @@ void start(unsigned long devtree_ptr)
 
 void secondary_init(void)
 {
+	tlb1_init();
 	core_init();
 	mpic_reset_core();
 	enable_critint();
@@ -345,9 +347,6 @@ static void partition_init(void)
 
 static void core_init(void)
 {
-	/* set up a TLB entry for CCSR space */
-	tlb1_init();
-
 	/* PIR was set by firmware-- record in cpu_t struct */
 	cpu->coreid = mfspr(SPR_PIR);
 
@@ -361,11 +360,20 @@ static void core_init(void)
 	mtspr(SPR_DEC, 0x0);
 	mtspr(SPR_TSR, TSR_DIS);
 
+
+	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
+
+#ifdef CONFIG_TLB_CACHE
+	mtspr(SPR_EHCSR,
+	      EHCSR_EXTGS | EHCSR_DSIGS | EHCSR_ISIGS |
+	      EHCSR_DUVD | EHCSR_DGTMI | EHCSR_DMIUH);
+
+	tlbcache_init();
+#else
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD | EHCSR_DGTMI);
-
-	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
+#endif
 
  	isync();
  	mtspr(SPR_MSRP, mfspr(SPR_MSRP) & ~MSR_PMM);

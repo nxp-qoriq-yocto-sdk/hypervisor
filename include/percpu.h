@@ -35,6 +35,7 @@
 #include <libos/percpu.h>
 #include <hv.h>
 #include <vpic.h>
+#include <tlbcache.h>
 #endif
 
 #define TLB1_GSIZE 16 /* As seen by the guest */

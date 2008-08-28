@@ -87,8 +87,8 @@ bin/include/%.d : include/%.h
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(LIBOS_DIR)/Makefile.libos
 
-LIBOS_SRC := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-             $(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_MP) \
+LIBOS_SRC_EARLY := $(LIBOS_STARTUP) $(LIBOS_EXCEPTION) 
+LIBOS_SRC := $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_MP) \
              $(LIBOS_MPIC) $(libos-src-y)
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
@@ -100,11 +100,14 @@ hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
 hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
 hv-src-$(CONFIG_SHELL) += shell.c
 hv-src-$(CONFIG_PAMU) += pamu.c
+hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 
-SRCS := $(LIBOS_SRC:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
-	$(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
+SRCS := $(LIBOS_SRC_EARLY:%=$(LIBOS_DIR)/%) \
+        $(LIBOS_SRC:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
+        $(hv-src-early-y:%=src/%) $(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
 
-OBJS := $(basename $(LIBOS_SRC:%=libos/%) $(hv-src-y:%=%))
+OBJS := $(basename $(LIBOS_SRC_EARLY:%=libos/%) $(hv-src-early-y:%=%) \
+                   $(LIBOS_SRC:%=libos/%) $(hv-src-y:%=%))
 OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
 OBJS := $(OBJS:%=bin/%)
 HDRS := $(shell find include -path 'include/config' -prune -o -name '*.h' -print)
