@@ -219,10 +219,8 @@ static void guest_inv_tlb0_va(register_t va, int pid)
 	tlbctag_t tag = make_tag(va, pid < 0 ? 0 : pid, 0);
 	int way;
 
-	if (find_gtlb_entry(va, tag, &set, &way, 1)) {
+	if (find_gtlb_entry(va, tag, &set, &way, 1))
 		set->tag[way].valid = 0;
-		tlb_inv_addr(va);
-	}
 }
 
 void dtlb_miss_fast(void);
@@ -369,9 +367,7 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 		else
 			tlb_inv_pid();
 	} else {
-#ifndef CONFIG_TLB_CACHE
 		tlb_inv_addr(va);
-#endif
 	}
 
 	if (flags & INV_TLB1)
