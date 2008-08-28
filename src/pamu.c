@@ -62,7 +62,7 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 	unsigned long attr;
 	unsigned long mach_phys_contig_size = 0;
 	unsigned long start_rpn = 0;
-	unsigned long grpn = gpa_range[3];
+	unsigned long grpn = gpa_range[3] >> PAGE_SHIFT; /* vptbl needs pfn */
 	unsigned long size_pages;
 	unsigned long next_rpn = 0;
 
