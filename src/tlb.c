@@ -388,8 +388,9 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	if (ret) {
 		if (unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "existing: tag 0x%08lx entry 0x%08x 0x%08x\n",
-			         set->tag[way].tag, set->entry[way].mas3, set->entry[way].pad);
+			         "existing: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
+			         set->tag[way].tag, set->entry[way].mas3,
+			         set->entry[way].pad, way);
 
 			return ERR_BUSY;
 		}
@@ -399,7 +400,7 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 	         "setting TLB0 for 0x%08lx (%#lx)\n", vaddr, rpn);
-	way = MAS0_GET_TLB0ESEL(mas1);
+	way = MAS0_GET_TLB0ESEL(mas0);
 
 	entry = &set->entry[way];
 	entry->mas2 = mas2;
