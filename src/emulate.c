@@ -231,7 +231,6 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		spin_unlock_critsave(&guest->lock, saved);
 	}
 
-	asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
 	return 0;
 }
 
@@ -252,13 +251,11 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	switch (type) {
 	case 0: /* Invalidate LPID */
 		guest_inv_tlb(TLBIVAX_INV_ALL, -1, INV_TLB0 | INV_TLB1);
-		asm volatile("tlbilxlpid" : : : "memory");
 		break;
 
 
 	case 1: /* Invalidate PID */
 		guest_inv_tlb(TLBIVAX_INV_ALL, pid, INV_TLB0 | INV_TLB1);
-		asm volatile("tlbilxpid" : : : "memory");
 		break;
 
 	case 2: /* Invalid */
@@ -271,7 +268,6 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 
 	case 3: /* Invalidate address */
 		guest_inv_tlb(va, pid, INV_TLB0 | INV_TLB1);
-		asm volatile("tlbilxva 0, %0" : : "r" (va) : "memory");
 		break;
 	}
 
@@ -281,9 +277,9 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	return ret;
 }
 
+/* No-op, as we never actually execute a tlbivax */
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
-	tlbsync();
 	return 0;
 }
 
