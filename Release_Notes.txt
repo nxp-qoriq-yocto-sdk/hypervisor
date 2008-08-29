@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.2
-Revsion: 0.2-rc12
-Date: 8/21/2008
+Revsion: 0.2-rc13
+Date: 8/29/2008
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,17 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc12
+   -Topaz 0.2-rc13
       -is compatible with Simics 8578 3.2.35 and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc12
+      -requires libos tag v0.2-rc13
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.2-rc13 bug fixes and changes
+      -bug 1947 PAMU1 with CAAM not working
 
    -Topaz 0.2-rc12 bug fixes and changes
       -some unit test updates-- added fman+linux scenario
