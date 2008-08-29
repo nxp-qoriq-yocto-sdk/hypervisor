@@ -49,8 +49,7 @@ include/config/auto.conf: .config include/config/auto.conf.cmd
 config %config: FORCE
 	$(MAKE) -f kconfig/Makefile obj=bin srctree=$(CURDIR) src=kconfig $@
 
-non-config := $(filter-out %config clean, $(MAKECMDGOALS))
-non-config := $(filter-out %config distclean, $(MAKECMDGOALS))
+non-config := $(filter-out %config clean distclean, $(MAKECMDGOALS))
 ifeq ($(MAKECMDGOALS),)
 	non-config := all
 endif

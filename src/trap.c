@@ -218,11 +218,39 @@ void data_storage(trapframe_t *regs)
 		reflect_trap(regs);
 }
 
-void dtlb_miss(trapframe_t *regs)
+void tlb_miss(trapframe_t *regs)
 {
-	assert(!(regs->srr1 & MSR_GS));
+	int itlb = regs->exc == EXC_ITLB;
 
-	if (mfspr(SPR_ESR) & ESR_EPID)
+#ifdef CONFIG_TLB_CACHE
+	if (likely(regs->srr1 & MSR_GS)) {
+		register_t dear = itlb ? regs->srr0 : mfspr(SPR_DEAR);
+		register_t mas1, mas2;
+		int space = itlb ? (regs->srr1 & MSR_IS) >> 3 :
+		                   (regs->srr1 & MSR_DS) >> 2;
+
+		mtspr(SPR_MAS6, (mfspr(SPR_PID) << MAS6_SPID_SHIFT) | space);
+		asm volatile("tlbsx 0, %0" : : "r" (dear));
+		
+		mas1 = mfspr(SPR_MAS1);
+		assert(!(mas1 & MAS1_VALID));
+		mtspr(SPR_MAS1, mas1 | MAS1_VALID);
+		
+		mas2 = mfspr(SPR_MAS2);
+		mas2 &= MAS2_EPN;
+		mas2 |= dear & MAS2_EPN;
+		mtspr(SPR_MAS2, mas2);
+
+		mtspr(SPR_GESR, mfspr(SPR_ESR)); 
+		mtspr(SPR_GDEAR, dear);
+		reflect_trap(regs);
+		return;
+	}
+#else
+	assert(!(regs->srr1 & MSR_GS));
+#endif
+
+	if (!itlb && mfspr(SPR_ESR) & ESR_EPID)
 		abort_guest_access(regs, GUESTMEM_TLBMISS);
 	else
 		reflect_trap(regs);

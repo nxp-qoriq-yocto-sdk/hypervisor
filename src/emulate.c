@@ -32,6 +32,7 @@
 #include <percpu.h>
 #include <libos/trap_booke.h>
 #include <paging.h>
+#include <tlbcache.h>
 #include <timers.h>
 #include <greg.h>
 #include <events.h>
@@ -184,9 +185,10 @@ void tlbivax_ipi(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
+	int tlb = (guest->tlbivax_addr & TLBIVAX_TLB1) ? INV_TLB1 : INV_TLB0;
 
 	save_mas(gcpu);
-	guest_inv_tlb1(guest->tlbivax_addr, 0);
+	guest_inv_tlb(guest->tlbivax_addr, -1, tlb);
 	restore_mas(gcpu);
 	
 	atomic_add(&guest->tlbivax_count, -1);
@@ -198,6 +200,11 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	register_t saved;
+#ifdef CONFIG_TLB_CACHE
+	const int tlbcache = 1;
+#else
+	const int tlbcache = 0;
+#endif
 	int i;
 	
 	if (va & TLBIVAX_RESERVED) {
@@ -207,7 +214,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
  
-	if (((va & TLBIVAX_TLB_NUM) >> TLBIVAX_TLB_NUM_SHIFT) == 1) {
+	if (tlbcache || ((va & TLBIVAX_TLB_NUM) >> TLBIVAX_TLB_NUM_SHIFT) == 1) {
 		saved = spin_lock_critsave(&guest->lock);
 		guest->tlbivax_addr = va;
 		guest->tlbivax_count = guest->cpucnt;
@@ -222,9 +229,6 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 			barrier();
 
 		spin_unlock_critsave(&guest->lock, saved);
-	} else {
-		mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
-		asm volatile("tlbivax 0, %0" : : "r" (va) : "memory");
 	}
 
 	return 0;
@@ -234,6 +238,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
 	gcpu_t *gcpu = get_gcpu();
+	unsigned int pid;
 	int type = (insn >> 21) & 3;
 	int ret = 0;
 	register_t saved;
@@ -241,16 +246,20 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	saved = disable_critint_save(); 
 	save_mas(gcpu);
 
+	pid = (gcpu->mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT;
+
 	switch (type) {
 	case 0: /* Invalidate LPID */
+		guest_inv_tlb(TLBIVAX_INV_ALL, -1, INV_TLB0 | INV_TLB1);
+		break;
+
+
 	case 1: /* Invalidate PID */
-		/* FIXME: only invalidate the requested PID */
-		guest_inv_tlb1(TLBIVAX_INV_ALL, 0);
-		asm volatile("tlbilxlpid" : : : "memory");
+		guest_inv_tlb(TLBIVAX_INV_ALL, pid, INV_TLB0 | INV_TLB1);
 		break;
 
 	case 2: /* Invalid */
-		printlog(LOGTYPE_EMU, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbilx@0x%08lx: reserved instruction type 2\n",
 		         regs->srr0);
 
@@ -258,9 +267,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case 3: /* Invalidate address */
-		/* FIXME: only invalidate the requested PID */
-		guest_inv_tlb1(va, 0);
-		asm volatile("tlbilxva 0, %0" : : "r" (va) : "memory");
+		guest_inv_tlb(va, pid, INV_TLB0 | INV_TLB1);
 		break;
 	}
 
@@ -270,19 +277,21 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	return ret;
 }
 
+/* No-op, as we never actually execute a tlbivax */
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
-	tlbsync();
 	return 0;
 }
 
 static void fixup_tlb_sx_re(void)
 {
-	gcpu_t *gcpu = get_gcpu();
-
 	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
 		return;
 
+#ifdef CONFIG_TLB_CACHE
+	BUG();
+#else
+	gcpu_t *gcpu = get_gcpu();
 	unsigned long mas3 = mfspr(SPR_MAS3);
 	unsigned long mas7 = mfspr(SPR_MAS7);
 
@@ -307,6 +316,7 @@ static void fixup_tlb_sx_re(void)
 	}
 
 	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
+#endif
 }
 
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
@@ -329,10 +339,24 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 		mtspr(SPR_MAS2, gcpu->gtlb1[tlb1].mas2);
 		mtspr(SPR_MAS3, gcpu->gtlb1[tlb1].mas3);
 		mtspr(SPR_MAS7, gcpu->gtlb1[tlb1].mas7);
+
+		enable_critint();
 		return 0;
 	}
 
-	mtspr(SPR_MAS5, MAS5_SGS | mfspr(SPR_LPIDR));
+#ifdef CONFIG_TLB_CACHE
+	tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
+	                         mas6 & MAS6_SAS);
+	tlbcset_t *set;
+	int way;
+
+	if (find_gtlb_entry(va, tag, &set, &way, 0)) {
+		gtlb0_to_mas(set - cpu->client.tlbcache, way);
+		enable_critint();
+		return 0;
+	}
+#endif
+
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
 
@@ -355,8 +379,15 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	tlb = MAS0_GET_TLBSEL(mas0);
 	if (tlb == 0) {
 		disable_critint();
+
+#ifdef CONFIG_TLB_CACHE
+		gtlb0_to_mas((mfspr(SPR_MAS2) >> MAS2_EPN_SHIFT) &
+		             (cpu->client.tlbcache_bits - 1),
+		             MAS0_GET_TLB0ESEL(mas0));
+#else
 		asm volatile("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
+#endif
 		enable_critint();
 		return 0;
 	}
@@ -448,7 +479,6 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	if (mas1 & MAS1_VALID) {
 		unsigned long epn = mas2 >> PAGE_SHIFT;
 		unsigned long pages;
-		unsigned long i;
 		int tlb1esel;
 
 		if (mas0 & MAS0_TLBSEL1) {
@@ -470,16 +500,16 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			enable_critint();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: duplicate TLB1 entry\n",
+			         "tlbwe@%d,0x%lx: duplicate TLB entry\n",
 			         cpu->coreid, regs->srr0);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			         cpu->coreid, regs->srr0, mas0, mas1,
 			         mas2, mas3, mas7);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: dup: entry = %d, mas1 = 0x%lx,\n"
-			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         "tlbwe@%d,0x%lx: dup: TLB1 entry = %d, mas1 = 0x%lx,\n"
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			         cpu->coreid, regs->srr0, dup,
 			         gcpu->gtlb1[dup].mas1, gcpu->gtlb1[dup].mas2,
 			         gcpu->gtlb1[dup].mas3, gcpu->gtlb1[dup].mas7);
@@ -487,11 +517,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			return 1;
 		}
 
-		mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
+#ifndef CONFIG_TLB_CACHE
 		mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
 		                ((mas1 >> MAS1_TS_SHIFT) & 1));
 
-		for (i = epn; i < epn + pages; i++) {
+		for (unsigned long i = epn; i < epn + pages; i++) {
 			unsigned long sx_mas0;
 		
 			mtspr(SPR_MAS2, i << PAGE_SHIFT);
@@ -513,22 +543,23 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			enable_critint();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: duplicate TLB0 entry\n",
+			         "tlbwe@%d,0x%lx: duplicate TLB entry\n",
 			         cpu->coreid, regs->srr0);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			         cpu->coreid, regs->srr0, mas0, mas1,
 			         mas2, mas3, mas7);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
-			         "   mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
 			         cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
 			         mfspr(SPR_MAS1), mfspr(SPR_MAS2),
 			         mfspr(SPR_MAS3), mfspr(SPR_MAS7));
 
 			return 1;
 		}
+#endif
 	}
 
 	if (mas0 & MAS0_TLBSEL1) {
@@ -565,13 +596,18 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 
-		mtspr(SPR_MAS0, mas0);
-		mtspr(SPR_MAS1, mas1);
-		mtspr(SPR_MAS2, mas2);
-		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3);
-		mtspr(SPR_MAS8, mas8);
-		asm volatile("tlbwe" : : : "memory");
+		if (unlikely(guest_set_tlb0(mas0, mas1, mas2,
+		                            mas3, rpn, mas8) == ERR_BUSY)) {
+			restore_mas(gcpu);
+			enable_critint();
+
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         regs->srr0, mas0, mas1, mas2, mas3, mas7);
+		}
 	}
 
 	restore_mas(gcpu);

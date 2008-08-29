@@ -72,3 +72,20 @@ config PAMU
 	select LIBOS_PAMU
 	help
 		Provides support for Peripheral Access Management Unit.
+
+config TLB_CACHE
+	bool "Cache TLB entries"
+	help
+		Rather than sending TLB misses directly to the guest,
+		a larger TLB is maintained by the hypervisor in software,
+		from which the hypervisor satisfies most TLB misses.  Only
+		when an access misses the larger TLB cache will the guest's
+		TLB miss handler be invoked.
+		
+		Besides improving performance, this option removes
+		restrictions on size and alignment of TLB1 entries, and
+		improves the handling of access holes within TLB1 entries.
+
+		The cost of this option is 64KiB per core, and the possibility
+		of some small added latency when accessing pages that
+		the guest believes are pinned to TLB1.
