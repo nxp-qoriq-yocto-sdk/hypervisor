@@ -361,6 +361,15 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 	}
 #endif
 
+	if (global) {
+		if (pid < 0)
+			tlb_inv_lpid();
+		else
+			tlb_inv_pid();
+	} else {
+		tlb_inv_addr(va);
+	}
+
 	if (flags & INV_TLB1)
 		guest_inv_tlb1(va, pid, flags, global);
 }
@@ -385,21 +394,32 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	int way, ret;
 
 	ret = find_gtlb_entry(vaddr, tag, &set, &way, 0);
-	if (ret) {
-		if (unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
-			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "existing: tag 0x%08lx entry 0x%08x 0x%08x\n",
-			         set->tag[way].tag, set->entry[way].mas3, set->entry[way].pad);
+	if (ret && (mas1 & MAS1_VALID) &&
+	    unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "existing: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
+		         set->tag[way].tag, set->entry[way].mas3,
+		         set->entry[way].pad, way);
 
-			return ERR_BUSY;
-		}
-
-		asm volatile("tlbilxva 0, %0" : : "r" (vaddr));
+		return ERR_BUSY;
 	}
 
+	way = MAS0_GET_TLB0ESEL(mas0);
+
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-	         "setting TLB0 for 0x%08lx (%#lx)\n", vaddr, rpn);
-	way = MAS0_GET_TLB0ESEL(mas1);
+	         "setting TLB0 for 0x%08lx (%#lx), way %d\n", vaddr, rpn, way);
+
+	/* If we're replacing a valid entry, invalidate it. */
+	if (set->tag[way].valid) {
+		int tagshift = cpu->client.tlbcache_bits + PAGE_SHIFT;
+		register_t mask = (1 << tagshift) - 1;
+		register_t oldvaddr = (vaddr & mask) |
+		                      (set->tag[way].vaddr << tagshift);
+
+		set->tag[way].valid = 0;
+		mtspr(SPR_MAS6, set->tag[way].pid << MAS6_SPID_SHIFT);
+		tlb_inv_addr(oldvaddr);
+	}
 
 	entry = &set->entry[way];
 	entry->mas2 = mas2;
@@ -461,15 +481,6 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 	
 	return -1;
 }                         
-
-void tlbsync(void)
-{
-	static uint32_t tlbsync_lock;
-
-	register_t saved = spin_lock_critsave(&tlbsync_lock);
-	asm volatile("mbar 1; tlbsync" : : : "memory");
-	spin_unlock_critsave(&tlbsync_lock, saved);
-}
 
 void tlb1_init(void)
 {
