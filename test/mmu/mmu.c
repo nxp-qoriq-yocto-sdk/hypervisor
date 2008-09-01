@@ -86,7 +86,7 @@ static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa, int tsi
 {
 	mtspr(SPR_MAS0, MAS0_TLBSEL(tlb) | MAS0_ESEL(entry));
 	mtspr(SPR_MAS1, MAS1_VALID | (tsize << MAS1_TSIZE_SHIFT));
-	mtspr(SPR_MAS2, (register_t)va);
+	mtspr(SPR_MAS2, ((register_t)va) | MAS2_M);
 	mtspr(SPR_MAS3, (uint32_t)pa | MAS3_SR | MAS3_SW);
 	mtspr(SPR_MAS7, (uint32_t)(pa >> 32));
 
