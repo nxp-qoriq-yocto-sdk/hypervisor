@@ -39,7 +39,7 @@ static inline void guestmem_set_data(trapframe_t *regs)
 	uint32_t eplc = mfspr(SPR_EPLC);
 	uint32_t new_eplc = eplc;
 
-	new_eplc &= ~EPCBIT_EAS;
+	new_eplc &= ~EPC_EAS;
 	new_eplc |= (regs->srr1 << (MSRBIT_DS - EPCBIT_EAS)) & EPC_EAS;
 
 	if (eplc != new_eplc) {
@@ -53,7 +53,7 @@ static inline void guestmem_set_insn(trapframe_t *regs)
 	uint32_t eplc = mfspr(SPR_EPLC);
 	uint32_t new_eplc = eplc;
 
-	new_eplc &= ~EPCBIT_EAS;
+	new_eplc &= ~EPC_EAS;
 	new_eplc |= (regs->srr1 << (MSRBIT_IS - EPCBIT_EAS)) & EPC_EAS;
 
 	if (eplc != new_eplc) {
