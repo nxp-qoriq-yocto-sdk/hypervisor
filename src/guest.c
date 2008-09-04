@@ -880,6 +880,7 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 static void guest_core_init(guest_t *guest)
 {
 	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
+	mtspr(SPR_PID, 0);
 }
 
 static void start_guest_primary_nowait(void)
