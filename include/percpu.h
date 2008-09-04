@@ -123,7 +123,7 @@ typedef struct guest {
 	uint32_t naddr, nsize;
 
 	stub_ops_t *stub_ops;
-	uint32_t lock;
+	uint32_t state_lock, inv_lock;
 	gstate_t state;
 } guest_t;
 

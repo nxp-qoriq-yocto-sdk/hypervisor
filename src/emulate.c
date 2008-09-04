@@ -199,7 +199,6 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	unsigned long va = get_ea_indexed(regs, insn);
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	register_t saved;
 	int i;
 	
 	if (va & TLBIVAX_RESERVED) {
@@ -209,7 +208,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
  
-	saved = spin_lock_critsave(&guest->lock);
+	spin_lock(&guest->inv_lock);
 	guest->tlbivax_addr = va;
 	guest->tlbivax_count = guest->cpucnt;
 
@@ -222,7 +221,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	while (guest->tlbivax_count != 0)
 		barrier();
 
-	spin_unlock_critsave(&guest->lock, saved);
+	spin_unlock(&guest->inv_lock);
 	return 0;
 }
 

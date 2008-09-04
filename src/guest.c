@@ -990,15 +990,14 @@ static void start_guest_primary(void)
 	if (cpu->ret_user_hook)
 		return;
 
-	spin_lock(&guest->lock);
 	assert(guest->state == guest_starting);
 
 	ret = load_image(guest);
 	if (ret <= 0) {
-		guest->state = guest_stopped;
-
 		// TODO: send signal to manager
-		spin_unlock(&guest->lock);
+		register_t saved = spin_lock_critsave(&guest->state_lock);
+		guest->state = guest_stopped;
+		spin_unlock_critsave(&guest->state_lock, saved);
 
 		/* No hypervisor-loadable image; wait for a manager to start us. */
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
@@ -1006,7 +1005,6 @@ static void start_guest_primary(void)
 		return;
 	}
 
-	spin_unlock(&guest->lock);
 	start_guest_primary_nowait();
 }
 
@@ -1167,14 +1165,14 @@ void stop_core(trapframe_t *regs)
 int stop_guest(guest_t *guest)
 {
 	unsigned int i, ret = 0;
-	spin_lock(&guest->lock);
+	register_t saved = spin_lock_critsave(&guest->state_lock);
 
 	if (guest->state != guest_running)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
 
-	spin_unlock(&guest->lock);
+	spin_unlock_critsave(&guest->state_lock, saved);
 	
 	if (ret)
 		return ret;
@@ -1188,14 +1186,14 @@ int stop_guest(guest_t *guest)
 int start_guest(guest_t *guest)
 {
 	int ret = 0;
-	spin_lock(&guest->lock);
+	register_t saved = spin_lock_critsave(&guest->state_lock);
 
 	if (guest->state != guest_stopped)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_starting;
 
-	spin_unlock(&guest->lock);
+	spin_unlock_critsave(&guest->state_lock, saved);
 	
 	if (ret)
 		return ret;

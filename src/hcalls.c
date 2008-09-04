@@ -101,14 +101,14 @@ static void fh_partition_restart(trapframe_t *regs)
 		return;
 	}
 	
-	saved = spin_lock_critsave(&guest->lock);
+	saved = spin_lock_critsave(&guest->state_lock);
 
 	if (guest->state != guest_running)
 		ret = -1;
 	else
 		guest->state = guest_stopping;
 
-	spin_unlock_critsave(&guest->lock, saved);
+	spin_unlock_critsave(&guest->state_lock, saved);
 	
 	if (ret) {
 		regs->gpregs[3] = FH_ERR_INVALID_STATE;
