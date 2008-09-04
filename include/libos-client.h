@@ -59,6 +59,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_CRIT_INT_HANDLER critical_interrupt
 #define EXC_MCHECK_HANDLER powerpc_mchk_interrupt
 #define EXC_DSI_HANDLER data_storage
+#define EXC_ISI_HANDLER inst_storage
 #define EXC_ALIGN_HANDLER reflect_trap
 #define EXC_PROGRAM_HANDLER program_trap
 #define EXC_FPUNAVAIL_HANDLER reflect_trap

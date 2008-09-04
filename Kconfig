@@ -86,6 +86,7 @@ config TLB_CACHE
 		restrictions on size and alignment of TLB1 entries, and
 		improves the handling of access holes within TLB1 entries.
 
-		The cost of this option is 64KiB per core, and the possibility
-		of some small added latency when accessing pages that
-		the guest believes are pinned to TLB1.
+		The cost of this option with the default cache size is
+		256KiB per core, and the possibility of some small added
+		latency when accessing pages that the guest believes are
+		pinned to TLB1.

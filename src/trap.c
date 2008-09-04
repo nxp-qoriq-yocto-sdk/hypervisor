@@ -39,6 +39,7 @@
 #include <vpic.h>
 #include <vmpic.h>
 #include <greg.h>
+#include <paging.h>
 
 void program_trap(trapframe_t *regs)
 {
@@ -209,11 +210,26 @@ static void abort_guest_access(trapframe_t *regs, int stat)
 void data_storage(trapframe_t *regs)
 {
 	/* If it's from the guest, then it was a virtualization
-	  fault.  Currently, we only use that for bad mappings. */
-	if (regs->srr1 & MSR_GS)
-		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA, mfspr(SPR_DEAR));
-	else if (mfspr(SPR_ESR) & ESR_EPID)
+	 * fault.  Currently, we only use that for bad mappings.
+	 */
+	if (regs->srr1 & MSR_GS) {
+		int store = mfspr(SPR_ESR) & ESR_ST;
+		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA | (store ? MCSR_ST : MCSR_LD),
+		               mfspr(SPR_DEAR));
+	} else if (mfspr(SPR_ESR) & ESR_EPID){ 
 		abort_guest_access(regs, GUESTMEM_TLBERR);
+	} else {
+		reflect_trap(regs);
+	}
+}
+
+void inst_storage(trapframe_t *regs)
+{
+	/* If it's from the guest, then it was a virtualization
+	 * fault.  Currently, we only use that for bad mappings.
+	 */
+	if (regs->srr1 & MSR_GS)
+		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA | MCSR_IF, regs->srr0);
 	else
 		reflect_trap(regs);
 }
@@ -224,13 +240,28 @@ void tlb_miss(trapframe_t *regs)
 
 #ifdef CONFIG_TLB_CACHE
 	if (likely(regs->srr1 & MSR_GS)) {
-		register_t dear = itlb ? regs->srr0 : mfspr(SPR_DEAR);
+		register_t vaddr = itlb ? regs->srr0 : mfspr(SPR_DEAR);
 		register_t mas1, mas2;
-		int space = itlb ? (regs->srr1 & MSR_IS) >> 3 :
-		                   (regs->srr1 & MSR_DS) >> 2;
+		int pid = mfspr(SPR_PID);
+		int space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
+		                   (regs->srr1 & MSR_DS) >> 4;
 
-		mtspr(SPR_MAS6, (mfspr(SPR_PID) << MAS6_SPID_SHIFT) | space);
-		asm volatile("tlbsx 0, %0" : : "r" (dear));
+		int ret = guest_tlb1_miss(vaddr, space, pid);
+
+		if (ret == TLB_MISS_HANDLED)
+			return;
+
+		if (ret == TLB_MISS_MCHECK) {
+			int store = mfspr(SPR_ESR) & ESR_ST;
+			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA |
+			                     (store ? MCSR_ST : MCSR_LD), vaddr);
+			return;
+		};
+
+		assert(ret == TLB_MISS_REFLECT);
+
+		mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
+		asm volatile("tlbsx 0, %0" : : "r" (vaddr));
 		
 		mas1 = mfspr(SPR_MAS1);
 		assert(!(mas1 & MAS1_VALID));
@@ -238,11 +269,14 @@ void tlb_miss(trapframe_t *regs)
 		
 		mas2 = mfspr(SPR_MAS2);
 		mas2 &= MAS2_EPN;
-		mas2 |= dear & MAS2_EPN;
+		mas2 |= vaddr & MAS2_EPN;
 		mtspr(SPR_MAS2, mas2);
 
 		mtspr(SPR_GESR, mfspr(SPR_ESR)); 
-		mtspr(SPR_GDEAR, dear);
+
+		if (!itlb)
+			mtspr(SPR_GDEAR, vaddr);
+
 		reflect_trap(regs);
 		return;
 	}

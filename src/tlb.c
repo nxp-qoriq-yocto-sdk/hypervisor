@@ -40,37 +40,6 @@
  */
 static int tlb1_reserved = BASE_TLB_ENTRY;
 
-static int alloc_tlb1(unsigned int entry)
-{
-	gcpu_t *gcpu = get_gcpu();
-	int idx = 0;
-	int i = 0;
-
-	do {
-		while (~gcpu->tlb1_inuse[i]) {
-			int bit = count_lsb_zeroes(~gcpu->tlb1_inuse[i]);
-
-			if (idx + bit >= tlb1_reserved)
-				return -1;
-			
-			gcpu->tlb1_inuse[i] |= 1UL << bit;
-			gcpu->tlb1_map[entry][i] |= 1UL << bit;
-
-			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-			         "tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
-			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-			         "using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
-
-			return idx + bit;
-		}
-
-		idx += LONG_BITS;
-		i++;
-	} while (idx < TLB1_SIZE);
-
-	return -1;
-}
-
 static void free_tlb1(unsigned int entry)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -98,6 +67,49 @@ static void free_tlb1(unsigned int entry)
 	} while (idx < TLB1_SIZE);
 
 	gcpu->gtlb1[entry].mas1 &= ~MAS1_VALID;
+}
+
+static int alloc_tlb1(unsigned int entry, int evict)
+{
+	gcpu_t *gcpu = get_gcpu();
+	int idx = 0;
+	int i = 0;
+
+	do {
+		while (~gcpu->tlb1_inuse[i]) {
+			int bit = count_lsb_zeroes(~gcpu->tlb1_inuse[i]);
+
+			if (idx + bit >= tlb1_reserved)
+				goto none_avail;
+			
+			gcpu->tlb1_inuse[i] |= 1UL << bit;
+			gcpu->tlb1_map[entry][i] |= 1UL << bit;
+
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
+
+			return idx + bit;
+		}
+
+		idx += LONG_BITS;
+		i++;
+	} while (idx < TLB1_SIZE);
+
+none_avail:
+	if (evict) {
+		i = gcpu->evict_tlb1++;
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+		         "alloc_tlb1: evicting entry %d\n", i);
+		
+		if (gcpu->evict_tlb1 >= tlb1_reserved)
+			gcpu->evict_tlb1 = 0;
+
+		return i;
+	}
+
+	return -1;
 }
 
 #ifdef CONFIG_TLB_CACHE
@@ -152,6 +164,57 @@ int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp,
 
 		if (((tag.tag ^ set->tag[i].tag) & mask.tag) == 0) {
 			*way = i;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Check for a TLB0 cache entry that conflicts with a new TLB1 entry.
+ *
+ * @param[in]  epn   Effective page number
+ * @param[in]  tsize Size of the TLB1 mapping
+ * @param[in]  pid   PID of mapping
+ * @param[in]  space zero if AS0, 1 if AS1
+ * @return non-zero if a conflicting entry was found
+ */
+int check_tlb1_conflict(uintptr_t epn, int tsize, int pid, int space)
+{
+ 	uintptr_t pages = tsize_to_pages(tsize);
+ 	int mask = (1 << cpu->client.tlbcache_bits) - 1;
+	int cache_entries = min(pages, cpu->client.tlbcache_bits);
+	int index = epn & mask;
+	int end = index + cache_entries;
+
+	tlbcset_t *set = &cpu->client.tlbcache[index];
+	
+	uintptr_t tag_start = epn >> cpu->client.tlbcache_bits;
+	uintptr_t tag_end = (epn + pages - 1) >> cpu->client.tlbcache_bits;
+
+	for (; index < end; set++, index++) {
+		int way;
+
+		for (way = 0; way < TLBC_WAYS; way++) {
+			if (!set->tag[way].valid)
+				continue;
+
+			if (set->tag[way].vaddr < tag_start ||
+			    set->tag[way].vaddr > tag_end)
+				continue;
+
+			if (pid != 0 && pid != set->tag[way].pid)
+				continue;
+
+			if (space != set->tag[way].space)
+				continue;
+
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "check_tlb1_conflict: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
+			         set->tag[way].tag, set->entry[way].mas3,
+			         set->entry[way].pad, way);
+
 			return 1;
 		}
 	}
@@ -223,6 +286,133 @@ static void guest_inv_tlb0_va(register_t va, int pid)
 		set->tag[way].valid = 0;
 }
 
+static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
+                              register_t mas3flags, unsigned long rpn, register_t mas8)
+{
+	tlbcset_t *set;
+	tlbcentry_t *entry;
+	uintptr_t vaddr = mas2 & MAS2_EPN;
+	tlbctag_t tag = make_tag(vaddr, MAS1_GETTID(mas1),
+	                         (mas1 & MAS1_TS) >> MAS1_TS_SHIFT);
+	int way, ret;
+
+	assert(!(mas0 & MAS0_TLBSEL1));
+
+	ret = find_gtlb_entry(vaddr, tag, &set, &way, 0);
+	if (ret && (mas1 & MAS1_VALID) &&
+	    unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "existing: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
+		         set->tag[way].tag, set->entry[way].mas3,
+		         set->entry[way].pad, way);
+
+		return ERR_BUSY;
+	}
+
+	way = MAS0_GET_TLB0ESEL(mas0);
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "setting TLB0 for 0x%08lx (%#lx), way %d\n", vaddr, rpn, way);
+
+	/* If we're replacing a valid entry, invalidate it. */
+	if (set->tag[way].valid) {
+		int tagshift = cpu->client.tlbcache_bits + PAGE_SHIFT;
+		register_t mask = (1 << tagshift) - 1;
+		register_t oldvaddr = (vaddr & mask) |
+		                      (set->tag[way].vaddr << tagshift);
+
+		set->tag[way].valid = 0;
+		mtspr(SPR_MAS6, set->tag[way].pid << MAS6_SPID_SHIFT);
+		tlb_inv_addr(oldvaddr);
+	}
+
+	entry = &set->entry[way];
+	entry->mas2 = mas2;
+	entry->mas3 = (rpn << PAGE_SHIFT) | mas3flags;
+	entry->mas7 = rpn >> (32 - PAGE_SHIFT);
+	entry->tsize = 1;
+	entry->mas8 = mas8 >> 30;
+
+	set->tag[way] = tag;
+	return 0;
+}
+
+/** Try to handle a TLB miss with the guest TLB1 array.
+ *
+ * @param[in] vaddr Virtual (effective) faulting address.
+ * @param[in] space 1 if the fault should be filled from AS1, 0 if from AS0.
+ * @param[in] pid The value of SPR_PID.
+ * @return TLB_MISS_REFLECT, TLB_MISS_HANDLED, or TLB_MISS_MCHECK
+ */
+int guest_tlb1_miss(register_t vaddr, int space, int pid)
+{
+	gcpu_t *gcpu = get_gcpu();
+	unsigned long epn = vaddr >> PAGE_SHIFT;
+	int i;
+	
+	for (i = 0; i < TLB1_GSIZE; i++) {
+		tlb_entry_t *entry = &gcpu->gtlb1[i];
+		unsigned long entryepn = entry->mas2 >> PAGE_SHIFT;
+		unsigned long grpn, rpn, baserpn, attr;
+		int entrypid = MAS1_GETTID(entry->mas1);
+		int tsize = MAS1_GETTSIZE(entry->mas1);
+		int mapsize, mappages, index;
+		
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+		         "checking %x/%lx/%lx for %lx/%d/%d\n",
+		         i, entry->mas1, entry->mas2, vaddr, space, pid);
+
+		if (!(entry->mas1 & MAS1_VALID))
+			continue;
+		if ((space << MAS1_TS_SHIFT) != (entry->mas1 & MAS1_TS))
+			continue;
+		if (pid && entrypid && pid != entrypid)
+			continue;
+		if (entryepn > epn)
+			continue;
+		if (entryepn + tsize_to_pages(tsize) <= epn)
+			continue;
+
+		grpn = (entry->mas3 >> PAGE_SHIFT) | (entry->mas7 << (32 - PAGE_SHIFT));
+		grpn += epn - entryepn;
+		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
+
+		if (unlikely(!(attr & PTE_VALID)))
+			return TLB_MISS_MCHECK;
+
+		tsize = min(tsize, attr >> PTE_SIZE_SHIFT);
+		baserpn = rpn & ~(tsize_to_pages(tsize) - 1);
+
+		mapsize = max_page_tsize(baserpn, tsize);
+		mappages = tsize_to_pages(mapsize);
+		
+		rpn &= ~(mappages - 1);
+		epn &= ~(mappages - 1);
+
+		disable_critint();
+		save_mas(gcpu);
+
+		index = alloc_tlb1(i, 1);
+
+		tlb1_set_entry(index, epn << PAGE_SHIFT,
+		               ((phys_addr_t)rpn) << PAGE_SHIFT,
+		               mapsize, entry->mas2,
+		               entry->mas3 & ~MAS3_RPN,
+		               pid, space, MAS8_GTS);
+
+		restore_mas(gcpu);
+		enable_critint();
+
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+		         "guest_tlb1_miss: inserting %d %lx %lx %d %lx %lx %d %d\n",
+		         index, epn, rpn, mapsize, entry->mas2,
+		         entry->mas3 & ~MAS3_RPN, pid, space);
+		return TLB_MISS_HANDLED;
+	}
+
+	return TLB_MISS_REFLECT;
+}
+
 void dtlb_miss_fast(void);
 void itlb_miss_fast(void);
 
@@ -244,7 +434,6 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long mas2flags, unsigned long mas3flags)
 {
 	gcpu_t *gcpu = get_gcpu();
-	guest_t *guest = gcpu->guest;
 	unsigned int size = (mas1 >> MAS1_TSIZE_SHIFT) & 15;
 	unsigned long size_pages = tsize_to_pages(size);
 	unsigned long end = epn + size_pages;
@@ -262,7 +451,10 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 	if (!(mas1 & MAS1_VALID))
 		return;
-	
+
+#ifndef CONFIG_TLB_CACHE
+	guest_t *guest = gcpu->guest;
+
 	while (epn < end) {
 		int size = max_page_size(epn, end - epn);
 
@@ -270,11 +462,8 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
 
 		/* If there's no valid mapping, try again at the next page. Note
-		 * that this searching can cause latency.  If you need to do
-		 * dynamic TLB1 writes for large pages that include unmapped
-		 * guest physical regions, and care about latency, use the
-		 * paravirtualized interface.
-
+		 * that this can be slow.  
+       *
 		 * Unfortunately, we'll have to reflect a TLB miss rather than
 		 * a machine check for accesses to these mapping holes,
 		 * as TLB1 entries are a limited resource that we don't want
@@ -296,7 +485,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		size = min(size, attr >> PTE_SIZE_SHIFT);
 
-		int real_entry = alloc_tlb1(entry);
+		int real_entry = alloc_tlb1(entry, 0);
 		if (real_entry < 0) {
 			printf("Out of TLB1 entries!\n");
 			printf("entry %d, base 0x%lx, size 0x%llx\n",
@@ -317,6 +506,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
+#endif
 }
 
 static void guest_inv_tlb1(register_t va, int pid, int flags, int global)
@@ -375,63 +565,20 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 }
 
 int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
-                   register_t mas3, unsigned long rpn, register_t mas8)
+                   register_t mas3flags, unsigned long rpn, register_t mas8)
 {
 #ifndef CONFIG_TLB_CACHE
 	mtspr(SPR_MAS0, mas0);
 	mtspr(SPR_MAS1, mas1);
 	mtspr(SPR_MAS2, mas2);
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3);
+	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3flags);
 	mtspr(SPR_MAS8, mas8);
 	asm volatile("tlbwe" : : : "memory");
-#else
-	tlbcset_t *set;
-	tlbcentry_t *entry;
-	uintptr_t vaddr = mas2 & MAS2_EPN;
-	tlbctag_t tag = make_tag(vaddr, MAS1_GETTID(mas1),
-	                         (mas1 & MAS1_TS) >> MAS1_TS_SHIFT);
-	int way, ret;
-
-	ret = find_gtlb_entry(vaddr, tag, &set, &way, 0);
-	if (ret && (mas1 & MAS1_VALID) &&
-	    unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
-		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-		         "existing: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
-		         set->tag[way].tag, set->entry[way].mas3,
-		         set->entry[way].pad, way);
-
-		return ERR_BUSY;
-	}
-
-	way = MAS0_GET_TLB0ESEL(mas0);
-
-	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-	         "setting TLB0 for 0x%08lx (%#lx), way %d\n", vaddr, rpn, way);
-
-	/* If we're replacing a valid entry, invalidate it. */
-	if (set->tag[way].valid) {
-		int tagshift = cpu->client.tlbcache_bits + PAGE_SHIFT;
-		register_t mask = (1 << tagshift) - 1;
-		register_t oldvaddr = (vaddr & mask) |
-		                      (set->tag[way].vaddr << tagshift);
-
-		set->tag[way].valid = 0;
-		mtspr(SPR_MAS6, set->tag[way].pid << MAS6_SPID_SHIFT);
-		tlb_inv_addr(oldvaddr);
-	}
-
-	entry = &set->entry[way];
-	entry->mas2 = mas2;
-	entry->mas3 = (rpn << PAGE_SHIFT) | mas3;
-	entry->mas7 = rpn >> (32 - PAGE_SHIFT);
-	entry->tsize = MAS1_GETTSIZE(mas1);
-	entry->mas8 = mas8 >> 30;
-
-	set->tag[way] = tag;
-#endif
-
 	return 0;
+#else
+	return guest_set_tlbcache(mas0, mas1, mas2, mas3flags, rpn, mas8);
+#endif
 }
 
 void guest_reset_tlb(void)
@@ -480,7 +627,7 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 	}
 	
 	return -1;
-}                         
+}
 
 void tlb1_init(void)
 {
