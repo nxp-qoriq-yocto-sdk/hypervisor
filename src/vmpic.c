@@ -620,7 +620,7 @@ void fh_vmpic_iack(trapframe_t *regs)
 	}
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
-	         "cpu%d: iack %x %s\n", cpu->coreid, vector, v ? "HW" : "Virt");
+	         "iack %x %s\n", vector, v ? "HW" : "Virt");
 	regs->gpregs[4] = vector;
 	regs->gpregs[3] = 0;  /* success */
 }

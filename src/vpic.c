@@ -181,8 +181,7 @@ static vpic_interrupt_t *__vpic_iack(void)
 			 */
 			if (virq->pending) {
 				printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
-				         "cpu%d: vpic_iack: changed destcpu while pending\n",
-				         cpu->coreid);
+				         "vpic_iack: changed destcpu while pending\n");
 				__vpic_assert_vint(virq);
 			}
 		} 

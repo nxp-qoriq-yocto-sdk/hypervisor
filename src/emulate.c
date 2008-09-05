@@ -504,17 +504,15 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			enable_critint();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: duplicate TLB entry\n",
-			         cpu->coreid, regs->srr0);
+			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
 			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			         cpu->coreid, regs->srr0, mas0, mas1,
-			         mas2, mas3, mas7);
+			         regs->srr0, mas0, mas1, mas2, mas3, mas7);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: dup: TLB1 entry = %d, mas1 = 0x%lx,\n"
+			         "tlbwe@0x%lx: dup: TLB1 entry = %d, mas1 = 0x%lx,\n"
 			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			         cpu->coreid, regs->srr0, dup,
+			         regs->srr0, dup,
 			         gcpu->gtlb1[dup].mas1, gcpu->gtlb1[dup].mas2,
 			         gcpu->gtlb1[dup].mas3, gcpu->gtlb1[dup].mas7);
 
@@ -562,17 +560,15 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			enable_critint();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: duplicate TLB entry\n",
-			         cpu->coreid, regs->srr0);
+			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
 			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			         cpu->coreid, regs->srr0, mas0, mas1,
-			         mas2, mas3, mas7);
+			         regs->srr0, mas0, mas1, mas2, mas3, mas7);
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@%d,0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
+			         "tlbwe@0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
 			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			         cpu->coreid, regs->srr0, mfspr(SPR_MAS0),
+			         regs->srr0, mfspr(SPR_MAS0),
 			         mfspr(SPR_MAS1), mfspr(SPR_MAS2),
 			         mfspr(SPR_MAS3), mfspr(SPR_MAS7));
 
