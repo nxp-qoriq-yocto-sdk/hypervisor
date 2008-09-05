@@ -475,6 +475,18 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			tsize = MAS1_GETTSIZE(mas1);
 			pages = tsize_to_pages(tsize);
 			tlb1esel = MAS0_GET_TLB1ESEL(mas0);
+
+			if (((mas2 >> PAGE_SHIFT) & (pages - 1)) ||
+			    ((mas3 >> PAGE_SHIFT) & (pages - 1))) {
+				restore_mas(gcpu);
+				enable_critint();
+
+				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				         "tlbwe@0x%lx: misaligned: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+				         regs->srr0, mas0, mas1, mas2, mas3, mas7);
+				return 1;
+			}
 		} else {
 			/* The hardware ignores tsize in TLB0, but it's
 			 * convenient for us for it to be set properly.
