@@ -51,7 +51,12 @@ static inline void send_local_guest_doorbell(void)
 	                    (get_gcpu()->guest->lpid << 14) |
 	                    mfspr(SPR_GPIR);
 
-	asm volatile("lwsync; msgsnd %0" : : "r" (msg) : "memory");
+	/* msgsnd is ordered as a store relative to sync instructions,
+	 * but not as a cacheable store, so we need a full sync
+	 * to order with any previous stores that the doorbell handler
+	 * needs to see.
+	 */
+	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
 }
 
 /** Send critical doorbell.
@@ -64,7 +69,7 @@ static inline void send_crit_doorbell(int cpu)
 {
 	unsigned long msg = MSG_DBELL_CRIT | cpu;
 
-	asm volatile("lwsync; msgsnd %0" : : "r" (msg) : "memory");
+	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
 
 }
 
