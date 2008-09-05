@@ -55,8 +55,8 @@ static eventfp_t gevent_table[] = {
 void setevent(gcpu_t *gcpu, int event)
 {
 	/* set the event bit */
-	atomic_or(&gcpu->cdbell_pending, (1 << event));
 	smp_mbar();
+	atomic_or(&gcpu->cdbell_pending, (1 << event));
 	send_crit_doorbell(gcpu->cpu->coreid);
 
 	// TODO optimization -- could check if it's on
@@ -67,10 +67,10 @@ void setevent(gcpu_t *gcpu, int event)
 void setgevent(gcpu_t *gcpu, int event)
 {
 	/* set the event bit */
+	smp_mbar();
 	atomic_or(&gcpu->gevent_pending, (1 << event));
 	smp_mbar();
 	gcpu->cpu->ret_user_hook = 1;
-	smp_mbar();
 
 	if (gcpu->cpu != cpu)
 		send_crit_doorbell(gcpu->cpu->coreid);
@@ -94,10 +94,9 @@ void ret_to_guest(trapframe_t *frameptr)
 		/* clear the event */
 		atomic_and(&gcpu->gevent_pending, ~(1 << bit));
 
-		smp_mbar();
+		smp_lwsync();
 
 		/* invoke the function */
-		cpu->ret_user_hook = 0;
 		gevent_table[bit](frameptr);
 	}
 
@@ -117,7 +116,7 @@ void critical_doorbell_int(trapframe_t *frameptr)
 		/* clear the event */
 		atomic_and(&gcpu->cdbell_pending, ~(1 << bit));
 
-		smp_mbar();
+		smp_lwsync();
 
 		/* invoke the function */
 		event_table[bit](frameptr);

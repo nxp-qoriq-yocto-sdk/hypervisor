@@ -870,7 +870,7 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 	assert(gpir >= 0);
 
 	while (!guest->gcpus)
-		smp_mbar();
+		barrier();
 	
 	guest->gcpus[gpir] = get_gcpu();
 	get_gcpu()->gcpu_num = gpir;
@@ -940,7 +940,7 @@ static void start_guest_primary_nowait(void)
 				if (cpu->ret_user_hook)
 					break;
 
-				smp_mbar();
+				barrier();
 			}
 
 			disable_critint();
