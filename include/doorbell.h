@@ -51,7 +51,7 @@ static inline void send_local_guest_doorbell(void)
 	                    (get_gcpu()->guest->lpid << 14) |
 	                    mfspr(SPR_GPIR);
 
-	asm volatile("mbar 1; msgsnd %0" : : "r" (msg) : "memory");
+	asm volatile("lwsync; msgsnd %0" : : "r" (msg) : "memory");
 }
 
 /** Send critical doorbell.
@@ -64,7 +64,7 @@ static inline void send_crit_doorbell(int cpu)
 {
 	unsigned long msg = MSG_DBELL_CRIT | cpu;
 
-	asm volatile("mbar 1; msgsnd %0" : : "r" (msg) : "memory");
+	asm volatile("lwsync; msgsnd %0" : : "r" (msg) : "memory");
 
 }
 
