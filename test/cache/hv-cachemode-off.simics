@@ -1,0 +1,25 @@
+#
+# Script to run 8578/u-boot/ultravisor/simple-guest on simulator
+#
+
+# simple guest
+$guest_image[0]  = "cache"
+$guest_addr[0]   = 0xe8200000
+
+$kernel_image  = "hv.uImage"
+
+$dtb_image  = "hv-cachemode-off.dtb"
+
+# indicate that simics magic instructions are wanted
+$want_magic_inst = 1
+
+# uncomment to attach uart2 to network port
+#$use_uart2 = 0
+#$use_uart2_net = 1
+
+add-directory "%script%/../common" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
+
+#run-command-file "%script%/../common/hvsim.include"
+run-command-file "hvsim.include"

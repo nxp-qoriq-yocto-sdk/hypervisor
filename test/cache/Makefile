@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,18 +22,34 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami cache
+all: cache_all
 
-.PHONY: subdirs $(SUBDIRS)
+include ../Makefile.inc
 
-subdirs: $(SUBDIRS)
+CACHE_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) cache.c
+CACHE_OBJS := $(basename $(CACHE_SRCS))
+CACHE_OBJS := $(CACHE_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+CACHE_OBJS := $(CACHE_OBJS:%=bin/%)
 
-$(SUBDIRS):
-	$(MAKE) -C $@
+cache_all: bin/cache.bin bin/cache.map bin/hv-cachemode-on.dtb bin/hv-cachemode-off.dtb
 
-.PHONY: clean
+bin/cache.bin: bin/cache
+	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-clean:
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir clean; \
-	done
+bin/cache: $(CACHE_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(CACHE_OBJS) -lgcc
+
+bin/cache.map: bin/cache
+	nm -n bin/cache > $@
+
+ifneq ($(MAKECMDGOALS),clean)
+-include $(CACHE_OBJS:.o=.d)
+endif
+
+bin/hv-cachemode-on.dtb: hv-cachemode-on.dts bin/cachemode-on.dtb
+
+bin/cachemode-on.dtb: cachemode-on.dts
+
+bin/hv-cachemode-off.dtb: hv-cachemode-off.dts bin/cachemode-off.dtb
+
+bin/cachemode-off.dtb: cachemode-off.dts

@@ -697,6 +697,66 @@ static int emu_rfmci(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_dcbtls(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t addr, ct;
+
+	addr = get_ea_indexed(regs, insn);
+	ct = (insn >> 21) & 0x1f;
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+			"emulating dcbtls ct =%x, addr = %x\n", ct, addr);
+
+	/*FIXME : Add dcbtls emulation code here, right now we emulate failure*/
+	if (ct == 0)
+		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR0) |  L1CSR0_DCUL);
+
+	return 0;
+}
+
+static int emu_icbtls(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t addr, ct;
+
+	addr =  get_ea_indexed(regs, insn);
+	ct = (insn >> 21) & 0x1f;
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+			"emulating icbtls ct =%x, addr = %x\n", ct, addr);
+
+	/*FIXME : Add icbtls emulation code here, right now we emulate failure*/
+	if (ct == 0)
+		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR1) | L1CSR1_ICUL);
+
+	return 0;
+}
+
+static int emu_dcblc(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t addr, ct;
+
+	addr =  get_ea_indexed(regs, insn);
+	ct = (insn >> 21) & 0x1f;
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+			"emulating dcblc ct =%x, addr = %x\n", ct, addr);
+
+	/*FIXME : Add dcblc emulation code here*/
+
+	return 0;
+}
+
+static int emu_icblc(trapframe_t *regs, uint32_t insn)
+{
+	uint32_t addr, ct;
+
+	addr =  get_ea_indexed(regs, insn);
+	ct = (insn >> 21) & 0x1f;
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+			"emulating icblc ct =%x, addr = %x\n", ct, addr);
+
+	/*FIXME : Add icblc emulation code here*/
+
+	return 0;
+}
+
 void hvpriv(trapframe_t *regs)
 {
 	uint32_t insn, major, minor;
@@ -784,6 +844,27 @@ void hvpriv(trapframe_t *regs)
 
 		case 0x1d3:
 			fault = emu_mtspr(regs, insn);
+			break;
+
+		case 0xa6:
+			fault = emu_dcbtls(regs, insn);
+			break;
+
+		case 0x86:
+			/* FIXME: would require actual dcbtstls emulation */
+			fault = emu_dcbtls(regs, insn);
+			break;
+
+		case 0x1d6:
+			fault = emu_icbtls(regs, insn);
+			break;
+
+		case 0x186:
+			fault = emu_dcblc(regs, insn);
+			break;
+
+		case 0xd6:
+			fault = emu_icblc(regs, insn);
 			break;
 		}
 		

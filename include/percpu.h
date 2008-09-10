@@ -125,6 +125,8 @@ typedef struct guest {
 	stub_ops_t *stub_ops;
 	uint32_t state_lock, inv_lock;
 	gstate_t state;
+
+	int guest_cache_lock;
 } guest_t;
 
 #define MAX_PARTITIONS 8

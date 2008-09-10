@@ -52,6 +52,8 @@ unsigned long last_lpid;
 
 #define MAX_PATH 256
 
+#define GUEST_CACHE_LOCK_ENABLE 1
+
 static int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 {
 	unsigned int i, vcpu_base = 0;
@@ -711,7 +713,7 @@ static int process_guest_devtree(guest_t *guest, int partition,
                                  const uint32_t *cpulist,
                                  int cpulist_len)
 {
-	int ret;
+	int ret, len;
 	uint32_t gfdt_size;
 	const void *guest_origtree;
 	const uint32_t *prop;
@@ -783,6 +785,11 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	ret = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
 	if (ret == -FDT_ERR_NOTFOUND)
 		ret = fdt_add_subnode(guest->devtree, 0, "hypervisor");
+	else {
+		prop = fdt_getprop(guest->devtree, ret, "fsl,hv-guest-cache-lock", &len);
+		if (prop)
+			guest->guest_cache_lock = GUEST_CACHE_LOCK_ENABLE;
+	}
 	if (ret < 0)
 		goto fail;
 	ret = fdt_setprop(guest->devtree, ret, "fsl,hv-partition-label",
@@ -881,6 +888,12 @@ static void guest_core_init(guest_t *guest)
 {
 	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
 	mtspr(SPR_PID, 0);
+
+	if (guest->guest_cache_lock != GUEST_CACHE_LOCK_ENABLE) {
+		isync();
+		mtspr(SPR_MSRP, mfspr(SPR_MSRP) | MSRP_UCLEP);
+		isync();
+	}
 }
 
 static void start_guest_primary_nowait(void)

@@ -229,6 +229,12 @@ test-pmr: bin/hv.uImage test/pmr
 test-dma: bin/hv.uImage test/dma
 	$(SIMICS) test/dma/hv-dma.simics
 
+test-cachemode-on: bin/hv.uImage test/cache
+	$(SIMICS) test/cache/hv-cachemode-on.simics 
+
+test-cachemode-off: bin/hv.uImage test/cache
+	$(SIMICS) test/cache/hv-cachemode-on.simics 
+
 demo: bin/hv.uImage test/linux
 	./tools/mux_server/mux_server localhost:9124 9000 9001 &
 	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
