@@ -59,8 +59,11 @@
 	STORE	%r4, LONGBYTES*1(%r2)
 	STORE	%r5, LONGBYTES*2(%r2)
 	STORE	%r6, LONGBYTES*3(%r2)
+	li	%r5, MSR_ME
 	STORE	%r7, LONGBYTES*4(%r2)
 	li	%r6, 1
+
+	mtmsr	%r5			// disable critints
 
 	mfcr	%r4
 	rlwinm	%r5, %r3, 0, 31		// r5 = index bits from SPRG3
