@@ -542,22 +542,48 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 	int global = ivax & TLBIVAX_INV_ALL;
 	register_t va = ivax & TLBIVAX_VA;
 
-#ifdef CONFIG_TLB_CACHE
 	if (flags & INV_TLB0) {
+#ifdef CONFIG_TLB_CACHE
 		if (global)
 			guest_inv_tlb0_all(pid);
 		else
 			guest_inv_tlb0_va(va, pid);
-	}
 #endif
 
-	if (global) {
-		if (pid < 0)
-			tlb_inv_lpid();
-		else
-			tlb_inv_pid();
-	} else {
-		tlb_inv_addr(va);
+		if (global) {
+			if (pid < 0)
+				tlb_inv_lpid();
+			else
+				tlb_inv_pid();
+		} else {
+			if (pid < 0) {
+				/* tlbilxva requires a search PID, but tlbivax
+				 * doesn't provide one, so we read each TLB0 way
+				 * to see if there's something to shoot down.
+				 */
+
+				register_t mas1;
+				int ways = mfspr(SPR_TLB0CFG) & TLBCFG_NENTRY_MASK;
+				int way;
+
+				mtspr(SPR_MAS2, va);
+
+				for (way = 0; way < ways; way++) {
+					mtspr(SPR_MAS0, MAS0_TLBSEL0 | MAS0_ESEL(way));
+					asm volatile("tlbre");
+					mas1 = mfspr(SPR_MAS1);
+
+					if (mas1 & MAS1_VALID) {
+						mtspr(SPR_MAS6, mas1 & MAS1_TID_MASK);
+						tlb_inv_addr(va);
+					}
+				}
+			} else {
+				assert((mfspr(SPR_MAS6) & MAS6_SPID_MASK) ==
+				       (pid << MAS6_SPID_SHIFT));
+				tlb_inv_addr(va);
+			}
+		}
 	}
 
 	if (flags & INV_TLB1)
