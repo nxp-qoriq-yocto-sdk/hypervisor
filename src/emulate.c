@@ -340,7 +340,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	tlbcset_t *set;
 	int way;
 
-	if (find_gtlb_entry(va, tag, &set, &way, 0)) {
+	if (find_gtlb_entry(va, tag, &set, &way)) {
 		gtlb0_to_mas(set - cpu->client.tlbcache, way);
 		enable_critint();
 		return 0;
