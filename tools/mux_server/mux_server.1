@@ -1,0 +1,39 @@
+.TH MUX_SERVER "11" "September 2008" "mux_server" "User Commands"
+.SH NAME
+mux_server \- Freescale Embedded Hypervisor byte channel MUX server
+.SH SYNOPSIS
+\fBmux_server\fR target port [ port ... ]
+.br
+.SH DESCRIPTION
+.PP
+The hypervisor supports multiplexed serial communications via byte channels.
+In the master device tree each byte channel that is to be multiplexed specifies
+a channel number in the definition of the byte channel end point.
+\fImux_server\fR is a Linux-based utility provided to support multiplexing and
+demultiplexing services.  \fImux_server\fR runs on a host system and attaches
+to the target system via a serial or network communications channel.
+.SH OPTIONS
+.TP
+\fBtarget\fR
+The target machine that \fImux_server\fR is providing mux and demux services to.
+This would typically be a serial port (e.g. /dev/ttys0) or a
+hostname:port in the case of network based connection to the target.
+.TP
+\fBport\fR
+One or more network port numbers on the host running \fImux_server\fR which
+applications use to connect to a channel.  The port numbers listed correspond
+to channel numbers, starting with channel 0.  That is, the first port connects
+to channel 0, second port to channel 1, etc.
+.SH EXAMPLES
+.TP
+.B mux_server localhost:9124 8000 8001
+Attach to a target at localhost:9124 and expose mux channel 0 on port 8000
+and mux channel 1 on port 8001.
+.SH COPYRIGHT
+Copyright \(co 2008 Freescale Semiconductor
+.br
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+The full documentation for \fImux_server\fR can be found in the Freescale P4080
+Embedded Hypervisor Software User's Manual

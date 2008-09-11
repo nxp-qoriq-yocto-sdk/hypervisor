@@ -1,0 +1,64 @@
+.TH PARTMAN "11" "September 2008" "partman" "User Commands"
+.SH NAME
+partman \- manage a Freescale Embedded Hypervisor partition
+.SH SYNOPSIS
+\fBpartman\fR [ \fB\-v\fR ]
+\fB\-s
+.br
+\fBpartman\fR [ \fB\-v\fR ] \fB\-l\fR \fB\-h\fR handle \fB\-f\fR file [ \fB\-a\fR address ]
+.br
+\fBpartman\fR [ \fB\-v\fR ] \fB\-g\fR \fB\-h\fR handle [ \fB\-f\fR file ] [ \fB\-e\fR address ] [ \fB\-a\fR address ]
+.br
+\fBpartman\fR [ \fB\-v\fR ] \fB\-x\fR \fB\-h\fR handle
+.br
+.SH DESCRIPTION
+.PP
+The Freescale Embedded Hypervisor provides a Linux-based partition management
+utility called \fIpartman\fR that works in conjunction with a partition
+management Linux kernel device driver to provide basic partition management
+services for a manager partition.
+.SH OPTIONS
+.TP
+\fB\-s\fR
+Display the status of all partitions that can be managed.
+.TP
+\fB\-l\fR
+Load an image into a partition's memory
+.TP
+\fB\-g\fR
+Start a partition.
+.TP
+\fB\-x\fR
+Stop a partition.
+.TP
+\fB\-h\fR handle
+Handle of the target partition.
+.TP
+\fB\-f\fR filename
+Name of a file to load.  If this file is an ELF image, the ELF headers will be
+parsed and PT_LOAD segments will be extracted and copied to the target
+partition in the right order.  Otherwise, the file is treated as a single
+binary blob.
+.TP
+\fB\-a\fR address
+Optional guest physical address where the image should go.  For ELF images, this
+parameter defaults to the base phsyical address in the image.  For binary
+images, the default is 0.
+.TP
+\fB\-e\fR address
+Optional guest physical address of execution entry point.  For ELF images, this
+parameter defaults to the entry point in the image.  For binary images,
+the default is 0.
+.TP
+\fB\-v\fR
+Verbose output.  Useful for debugging.
+.SH AUTHOR
+Written by Timur Tabi
+.SH COPYRIGHT
+Copyright \(co 2008 Freescale Semiconductor
+.br
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+The full documentation for \fIpartman\fR can be found in the Freescale P4080
+Embedded Hypervisor Software User's Manual
