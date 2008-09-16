@@ -423,7 +423,7 @@ int open_stdout_chardev(int node)
 		if (!q)
 			return ERR_NOMEM;
 
-		ret = queue_init(q, 2048);
+		ret = queue_init(q, 16384);
 		if (ret < 0)
 			return ret;
 
