@@ -72,6 +72,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_HCALL_HANDLER hcall
 #define EXC_EHPRIV_HANDLER hvpriv
 #define EXC_DOORBELLC_HANDLER critical_doorbell_int
+#define EXC_DEBUG_HANDLER debug_trap
 
 #define LIBOS_RET_USER_HOOK ret_to_guest
 

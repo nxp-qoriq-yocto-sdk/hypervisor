@@ -279,6 +279,14 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_SVR);
 		break;
 
+	case SPR_DBCR0:
+		*val = mfspr(SPR_DBCR0);
+		break;
+
+	case SPR_DBSR:
+		*val = gcpu->dbsr;
+		break;
+
 	default:
 		return 1;
 	}
@@ -541,6 +549,20 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 
 	case SPR_BUCSR:
 		/* no-op */
+		break;
+
+	case SPR_DBCR0:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		/* we don't want guest access to DBCR0[RST] */
+		val &= ~DBCR0_RST;
+		mtspr(SPR_DBCR0, val);
+		break;
+
+	case SPR_DBSR:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		gcpu->dbsr = val;
 		break;
 
 	default:

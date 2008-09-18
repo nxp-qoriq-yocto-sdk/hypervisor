@@ -80,6 +80,37 @@ void reflect_trap(trapframe_t *regs)
 	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE;
 }
 
+void debug_trap(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	if (!gcpu->guest->guest_debug_mode) {
+#ifdef CONFIG_GDB_STUB
+	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
+	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_int_handler 
+	    && !gcpu->guest->stub_ops->debug_int_handler(regs))
+		return;
+#endif
+		crashing = 1;
+		printf("unexpected debug exception\n");
+		dump_regs(regs);
+		stopsim();
+	}
+ 
+	gcpu->dsrr0 = regs->srr0;
+	gcpu->dsrr1 = regs->srr1;
+
+	gcpu->dbsr = mfspr(SPR_DBSR);
+
+	/*
+	 * Prevent recursive debug interrupts by clearing debug 
+	 * events in DBSR 
+	 */
+	mtspr(SPR_DBSR, mfspr(SPR_DBSR) | DBSR_TRAP); 
+	
+	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DEBUG];
+	regs->srr1 &= MSR_GS | MSR_DE | MSR_UCLE;
+}
+
 void guest_doorbell(trapframe_t *regs)
 {
 	unsigned long gsrr1 = mfspr(SPR_GSRR1);

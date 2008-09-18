@@ -757,6 +757,20 @@ static int emu_icblc(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_rfdi(trapframe_t *regs, uint32_t insn)
+{
+	gcpu_t *gcpu = get_gcpu();
+
+	if (!gcpu->guest->guest_debug_mode)
+		return 1;
+
+	regs->srr0 = gcpu->dsrr0;
+	regs->srr1 = (regs->srr1 & MSR_HVPRIV) | (gcpu->dsrr1 & ~MSR_HVPRIV) |\
+			MSR_DE;
+
+	return 0;
+}
+
 void hvpriv(trapframe_t *regs)
 {
 	uint32_t insn, major, minor;
@@ -797,6 +811,12 @@ void hvpriv(trapframe_t *regs)
 
 		case 0x026:
 			if (unlikely(emu_rfmci(regs, insn)))
+				goto fault;
+
+			return;
+
+		case 0x027:
+			if (unlikely(emu_rfdi(regs, insn)))
 				goto fault;
 
 			return;

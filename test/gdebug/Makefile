@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,19 +22,27 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami \
-		cache gdebug
+all: gdebug_all
 
-.PHONY: subdirs $(SUBDIRS)
+include ../Makefile.inc
 
-subdirs: $(SUBDIRS)
+GDEBUG_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdebug.c
+GDEBUG_OBJS := $(basename $(GDEBUG_SRCS))
+GDEBUG_OBJS := $(GDEBUG_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+GDEBUG_OBJS := $(GDEBUG_OBJS:%=bin/%)
 
-$(SUBDIRS):
-	$(MAKE) -C $@
+gdebug_all: bin/gdebug.bin bin/hv-gdebug.dtb
 
-.PHONY: clean
+bin/gdebug.bin: bin/gdebug
+	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-clean:
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir clean; \
-	done
+bin/gdebug: $(GDEBUG_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDEBUG_OBJS) -lgcc
+
+ifneq ($(MAKECMDGOALS),clean)
+-include $(GDEBUG_OBJS:.o=.d)
+endif
+
+bin/hv-gdebug.dtb: hv-gdebug.dts bin/gdebug.dtb
+
+bin/gdebug.dtb: gdebug.dts

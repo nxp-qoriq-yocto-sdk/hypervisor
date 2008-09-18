@@ -786,10 +786,24 @@ static int process_guest_devtree(guest_t *guest, int partition,
 	if (ret == -FDT_ERR_NOTFOUND)
 		ret = fdt_add_subnode(guest->devtree, 0, "hypervisor");
 	else {
+		/* guest cache lock mode */
 		prop = fdt_getprop(guest->devtree, ret, "fsl,hv-guest-cache-lock", &len);
 		if (prop)
 			guest->guest_cache_lock = GUEST_CACHE_LOCK_ENABLE;
+
+		/* guest debug mode */
+		prop = fdt_getprop(guest->devtree, ret, 
+				"fsl,hv-guest-debug", &len);
+		if (prop)
+			guest->guest_debug_mode = 1;
+		else {
+			guest->guest_debug_mode = 0;
+			isync();
+			mtspr(SPR_MSRP, mfspr(SPR_MSRP) | MSRP_DEP);
+			isync();
+		}
 	}
+
 	if (ret < 0)
 		goto fail;
 	ret = fdt_setprop(guest->devtree, ret, "fsl,hv-partition-label",

@@ -118,6 +118,9 @@ typedef struct guest {
 
 	/** Offset to partition node in main device tree. */
 	int partition;
+
+	/** guest debug mode **/
+	int guest_debug_mode;
 	
 	/** #address-cells and #size-cells at root of guest tree */
 	uint32_t naddr, nsize;
@@ -170,6 +173,7 @@ typedef struct gcpu {
 	unsigned long gdbell_pending;
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;
+	uint32_t dbsr;
 	register_t ivpr;
 	register_t ivor[38];
 	register_t sprg[6]; /* Guest SPRG4-9 */
