@@ -273,16 +273,20 @@ void shell_init(void)
 
 static void print_aliases(shell_t *shell, command_t *cmd)
 {
+	int first = 1;
 	if (cmd->aliases) {
 		const char **a = cmd->aliases;
-		qprintf(shell->out, "  aliases: ");
 		
+		qprintf(shell->out, "[");
 		while (*a) {
-			qprintf(shell->out, "%s ", *a);
+			if (!first) {
+				qprintf(shell->out, ",");
+			} else
+				first = 0;
+			qprintf(shell->out, "%s", *a);
 			a++;
 		}
-		
-		qprintf(shell->out, "\n");
+		qprintf(shell->out, "]");
 	}
 }
 
@@ -298,8 +302,9 @@ static void help_fn(shell_t *shell, char *args)
 
 		for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 			cmd = *i;
-			qprintf(shell->out, "%s - %s\n", cmd->name, cmd->shorthelp);
+			qprintf(shell->out, " %s ", cmd->name);
 			print_aliases(shell, cmd);
+			qprintf(shell->out, " - %s\n",cmd->shorthelp);
 		}
 		
 		return;
@@ -312,8 +317,9 @@ static void help_fn(shell_t *shell, char *args)
 		return;
 	}
 	
-	qprintf(shell->out, "%s - %s\n", cmd->name, cmd->shorthelp);
+	qprintf(shell->out, "%s - %s (", cmd->name, cmd->shorthelp);
 	print_aliases(shell, cmd);
+	qprintf(shell->out, ")\n");
 
 	if (cmd->longhelp)
 		qprintf(shell->out, "\n%s\n", cmd->longhelp);
@@ -322,6 +328,7 @@ static void help_fn(shell_t *shell, char *args)
 static command_t help = {
 	.name = "help",
 	.action = help_fn,
+	.aliases = (const char *[]){ "?", NULL },
 	.shorthelp = "Print command usage information",
 };
 shell_cmd(help);
@@ -334,6 +341,7 @@ static void version_fn(shell_t *shell, char *args)
 static command_t version = {
 	.name = "version",
 	.action = version_fn,
+	.aliases = (const char *[]){ "v", NULL },
 	.shorthelp = "Print the hypervisor version",
 };
 shell_cmd(version);
@@ -557,7 +565,7 @@ static int print_device_tree(void *fdt, shell_t *shell)
 	return 0;
 }
 
-static void pdt_fn(shell_t *shell, char *args)
+static void gdt_fn(shell_t *shell, char *args)
 {
 	char *numstr, *cmdstr;
 	unsigned int num;
@@ -569,7 +577,7 @@ static void pdt_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr || !cmdstr) {
-		qprintf(shell->out, "Usage: partition-device-tree <cmd> <number>\n");
+		qprintf(shell->out, "Usage: guest-device-tree <cmd> <number>\n");
 		return;
 	}
 
@@ -587,15 +595,15 @@ static void pdt_fn(shell_t *shell, char *args)
 	}
 }
 
-static command_t pdt = {
-	.name = "partition-device-tree",
-	.aliases = (const char *[]){ "pdt", NULL },
-	.action = pdt_fn,
-	.shorthelp = "Partition device tree operation",
+static command_t gdt = {
+	.name = "guest-device-tree",
+	.aliases = (const char *[]){ "gdt", NULL },
+	.action = gdt_fn,
+	.shorthelp = "Guest device tree operation",
 	.longhelp = "  Usage: partition-device-tree <cmd> <partition number>\n\n"
 	            "  currently only print command is supported.",
 };
-shell_cmd(pdt);
+shell_cmd(gdt);
 
 static void mdt_fn(shell_t *shell, char *args)
 {
