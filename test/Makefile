@@ -24,7 +24,7 @@
 #
 
 SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami \
-		cache gdebug
+		cache gdebug mcheck
 
 .PHONY: subdirs $(SUBDIRS)
 
