@@ -268,9 +268,11 @@ void inst_storage(trapframe_t *regs)
 void tlb_miss(trapframe_t *regs)
 {
 	int itlb = regs->exc == EXC_ITLB;
+	int guest = likely(regs->srr1 & MSR_GS);
+	int epid = !itlb && (mfspr(SPR_ESR) & ESR_EPID);
 
 #ifdef CONFIG_TLB_CACHE
-	if (likely(regs->srr1 & MSR_GS)) {
+	if (guest || epid) {
 		register_t vaddr = itlb ? regs->srr0 : mfspr(SPR_DEAR);
 		register_t mas1, mas2;
 		int pid = mfspr(SPR_PID);
@@ -282,7 +284,7 @@ void tlb_miss(trapframe_t *regs)
 		if (ret == TLB_MISS_HANDLED)
 			return;
 
-		if (ret == TLB_MISS_MCHECK) {
+		if (ret == TLB_MISS_MCHECK && !epid) {
 			int store = mfspr(SPR_ESR) & ESR_ST;
 			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA |
 			                     (store ? MCSR_ST : MCSR_LD), vaddr);
@@ -291,31 +293,30 @@ void tlb_miss(trapframe_t *regs)
 
 		assert(ret == TLB_MISS_REFLECT);
 
-		mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
-		asm volatile("tlbsx 0, %0" : : "r" (vaddr));
+		if (guest) {
+			mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
+			asm volatile("tlbsx 0, %0" : : "r" (vaddr));
 		
-		mas1 = mfspr(SPR_MAS1);
-		assert(!(mas1 & MAS1_VALID));
-		mtspr(SPR_MAS1, mas1 | MAS1_VALID);
+			mas1 = mfspr(SPR_MAS1);
+			assert(!(mas1 & MAS1_VALID));
+			mtspr(SPR_MAS1, mas1 | MAS1_VALID);
 		
-		mas2 = mfspr(SPR_MAS2);
-		mas2 &= MAS2_EPN;
-		mas2 |= vaddr & MAS2_EPN;
-		mtspr(SPR_MAS2, mas2);
+			mas2 = mfspr(SPR_MAS2);
+			mas2 &= MAS2_EPN;
+			mas2 |= vaddr & MAS2_EPN;
+			mtspr(SPR_MAS2, mas2);
 
-		mtspr(SPR_GESR, mfspr(SPR_ESR)); 
+			mtspr(SPR_GESR, mfspr(SPR_ESR)); 
 
-		if (!itlb)
-			mtspr(SPR_GDEAR, vaddr);
-
-		reflect_trap(regs);
-		return;
+			if (!itlb)
+				mtspr(SPR_GDEAR, vaddr);
+		}
 	}
 #else
 	assert(!(regs->srr1 & MSR_GS));
 #endif
 
-	if (!itlb && mfspr(SPR_ESR) & ESR_EPID)
+	if (epid && !guest)
 		abort_guest_access(regs, GUESTMEM_TLBMISS);
 	else
 		reflect_trap(regs);
