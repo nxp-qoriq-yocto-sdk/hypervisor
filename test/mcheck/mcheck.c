@@ -37,7 +37,7 @@ void init(unsigned long devtree_ptr);
 
 int irq;
 extern void *fdt;
-volatile int exception;
+volatile int data_exception, inst_exception;
 
 void mcheck_interrupt(trapframe_t *frameptr)
 {
@@ -45,13 +45,23 @@ void mcheck_interrupt(trapframe_t *frameptr)
 #ifdef DEBUG
 	printf("machine check interrupt\n");
 #endif
-	exception++;
-	frameptr->srr0 += 4;
+	if (mfspr(SPR_MCSR) & MCSR_ST) {
+		data_exception++;
+		mtspr(SPR_MCSR, mfspr(SPR_MCSR));
+		frameptr->srr0 += 4;
+	}
+
+	if (mfspr(SPR_MCSR) & MCSR_IF) {
+		inst_exception++;
+		mtspr(SPR_MCSR, mfspr(SPR_MCSR));
+		frameptr->srr0 = frameptr->lr;
+	}
 }
 
 void start(unsigned long devtree_ptr)
 {
 	char *vaddr;
+	void (*func)(void);
 
 	init(devtree_ptr);
 
@@ -70,8 +80,18 @@ void start(unsigned long devtree_ptr)
 	tlb1_set_entry(1, (unsigned long)vaddr, 0x20000000, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
 	*vaddr = 'a';
 
-	if (exception)
-		printf("Machine check exception generated -- PASSED\n");
+	if (data_exception)
+		printf("Machine check exception generated for illegal data address -- PASSED\n");
+	else
+		printf("Machine check - data test --- FAILED\n");
+
+	func = (void (*) (void)) vaddr;
+	func();
+
+	if (inst_exception)
+		printf("Machine check exception generated for illegal instruction address-- PASSED\n");
+	else
+		printf("Machine check - illegal instruction test -- FAILED\n");
 
 	printf("Test Complete\n");
 }

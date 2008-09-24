@@ -287,7 +287,7 @@ void tlb_miss(trapframe_t *regs)
 		if (ret == TLB_MISS_MCHECK && guest) {
 			int store = mfspr(SPR_ESR) & ESR_ST;
 			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA |
-			                     (store ? MCSR_ST : MCSR_LD), vaddr);
+			                     (itlb ? MCSR_IF : (store ? MCSR_ST : MCSR_LD)), vaddr);
 			return;
 		};
 
