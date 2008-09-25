@@ -707,108 +707,60 @@ static int process_partition_handles(guest_t *guest)
 	return 0;
 }
 
-static int process_guest_devtree(guest_t *guest, int partition,
-                                 const uint32_t *cpulist,
-                                 int cpulist_len)
+static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
+                                    int len)
 {
-	int ret, len;
-	uint32_t gfdt_size;
-	const void *guest_origtree;
-	const uint32_t *prop;
+	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
+	assert(gpir >= 0);
 
-	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
-	if (!guest_origtree) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest missing property fsl,hv-dtb\n");
-		goto fail;
-	}
-
-	ret = get_addr_format_nozero(guest_origtree, 0,
-	                             &guest->naddr, &guest->nsize);
-	if (ret < 0)
-		goto fail;
-
-	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
-	if (!prop) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest missing property fsl,hv-dtb-window\n");
-		goto fail;
-	}
-	if (ret != (guest->naddr + guest->nsize) * 4) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest has invalid property len for fsl,hv-dtb-window\n");
-		ret = ERR_BADTREE;
-		goto fail;
-	}
-
-	guest->dtb_gphys = int_from_tree(&prop, guest->naddr);
-	gfdt_size = int_from_tree(&prop, guest->nsize);
-
-	gfdt_size += ret;
+	while (!guest->gcpus)
+		barrier();
 	
-	guest->devtree = alloc(gfdt_size, 16);
-	if (!guest->devtree) {
-		ret = ERR_NOMEM;
-		goto fail;
+	guest->gcpus[gpir] = get_gcpu();
+	get_gcpu()->gcpu_num = gpir;
+	return gpir;
+}
+
+/* Process configuration options in the hypervisor's
+ * chosen and hypervisor nodes.
+ */
+static int partition_config(guest_t *guest)
+{
+	const uint32_t *prop;
+	int hv, ret, len;
+	
+	hv = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
+	if (hv < 0)
+		hv = fdt_add_subnode(guest->devtree, 0, "hypervisor");
+	if (hv < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "Couldn't create hypervisor node: %d\n", hv);
+		return hv;
 	}
-
-	ret = fdt_open_into(guest_origtree, guest->devtree, gfdt_size);
-	if (ret < 0)
-		goto fail;
-
-	ret = fdt_setprop(guest->devtree, 0, "fsl,hv-version",
-	                  hv_version, 16);
-	if (ret < 0)
-		goto fail;
-
-	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
-	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
-	if (!guest->gphys || !guest->gphys_rev) {
-		ret = ERR_NOMEM;
-		goto fail;
-	}
-
-	ret = create_guest_spin_table(guest, cpulist, cpulist_len);
-	if (ret < 0)
-		goto fail;
-
-	ret = map_guest_reg_all(guest, partition);
-	if (ret < 0)
-		goto fail;
-
-	ret = process_partition_handles(guest);
-	if (ret < 0)
-		goto fail;
-
-	ret = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
-	if (ret == -FDT_ERR_NOTFOUND)
-		ret = fdt_add_subnode(guest->devtree, 0, "hypervisor");
-	if (ret < 0)
-		goto fail;
 
 	/* guest cache lock mode */
-	prop = fdt_getprop(guest->devtree, ret, "fsl,hv-guest-cache-lock", &len);
+	prop = fdt_getprop(guest->devtree, hv, "fsl,hv-guest-cache-lock", &len);
 	if (prop)
 		guest->guest_cache_lock = 1;
 
 	/* guest debug mode */
-	prop = fdt_getprop(guest->devtree, ret, "fsl,hv-guest-debug", &len);
+	prop = fdt_getprop(guest->devtree, hv, "fsl,hv-guest-debug", &len);
 	if (prop)
 		guest->guest_debug_mode = 1;
 
-	ret = fdt_setprop(guest->devtree, ret, "fsl,hv-partition-label",
+	if (mpic_coreint) {
+		ret = fdt_setprop(guest->devtree, hv,
+		                  "fsl,hv-pic-coreint", NULL, 0);
+		if (ret < 0)
+			return ret;
+	}
+
+	ret = fdt_setprop(guest->devtree, hv, "fsl,hv-partition-label",
 	                  guest->name, strlen(guest->name) + 1);
-	if (ret)
-		goto fail;
+	if (ret < 0)
+		return ret;
 
 	return 0;
-
-fail:
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "error %d (%s) building guest device tree for %s\n",
-		ret, fdt_strerror(ret), guest->name);
-
-	return ret;
 }
 
 uint32_t start_guest_lock;
@@ -872,20 +824,6 @@ guest_t *node_to_partition(int partition)
 	
 	spin_unlock(&start_guest_lock);
 	return &guests[i];
-}
-
-static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
-                                    int len)
-{
-	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
-	assert(gpir >= 0);
-
-	while (!guest->gcpus)
-		barrier();
-	
-	guest->gcpus[gpir] = get_gcpu();
-	get_gcpu()->gcpu_num = gpir;
-	return gpir;
 }
 
 static void guest_core_init(guest_t *guest)
@@ -1221,25 +1159,117 @@ int start_guest(guest_t *guest)
 	return ret;
 }
 
-/* Process configuration options in the hypervisor's
- * chosen and hypervisor nodes.
- */
-static void partition_config(guest_t *guest)
+static int init_guest_primary(guest_t *guest, int partition,
+                              const uint32_t *cpus, int cpus_len)
 {
-	int hv;
-	
-	hv = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
-	if (hv < 0)
-		hv = fdt_add_subnode(guest->devtree, 0, "hypervisor");
-	if (hv < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "Couldn't create hypervisor node: %d\n", hv);
-		return;
+	int ret;
+	uint32_t gfdt_size;
+	const void *guest_origtree;
+	const uint32_t *prop;
+	int gpir;
+
+	/* count number of cpus for this partition and alloc data struct */
+	guest->cpucnt = count_cpus(cpus, cpus_len);
+	guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
+	if (!guest->gcpus) {
+		ret = ERR_NOMEM;
+		goto fail;
 	}
 
-	if (mpic_coreint)
-		fdt_setprop(guest->devtree, hv, "fsl,hv-pic-coreint",
-		            NULL, 0);
+	gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
+	assert(gpir == 0);
+
+	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
+	if (!guest_origtree) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest missing property fsl,hv-dtb\n");
+		goto fail;
+	}
+
+	ret = get_addr_format_nozero(guest_origtree, 0,
+	                             &guest->naddr, &guest->nsize);
+	if (ret < 0)
+		goto fail;
+
+	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
+	if (!prop) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest missing property fsl,hv-dtb-window\n");
+		goto fail;
+	}
+	if (ret != (guest->naddr + guest->nsize) * 4) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest has invalid property len for fsl,hv-dtb-window\n");
+		ret = ERR_BADTREE;
+		goto fail;
+	}
+
+	guest->dtb_gphys = int_from_tree(&prop, guest->naddr);
+	gfdt_size = int_from_tree(&prop, guest->nsize);
+
+	gfdt_size += ret;
+	
+	guest->devtree = alloc(gfdt_size, 16);
+	if (!guest->devtree) {
+		ret = ERR_NOMEM;
+		goto fail;
+	}
+
+	ret = fdt_open_into(guest_origtree, guest->devtree, gfdt_size);
+	if (ret < 0)
+		goto fail;
+
+	ret = fdt_setprop(guest->devtree, 0, "fsl,hv-version",
+	                  hv_version, 16);
+	if (ret < 0)
+		goto fail;
+
+	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
+	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
+	if (!guest->gphys || !guest->gphys_rev) {
+		ret = ERR_NOMEM;
+		goto fail;
+	}
+
+	ret = create_guest_spin_table(guest, cpus, cpus_len);
+	if (ret < 0)
+		goto fail;
+
+	ret = process_partition_handles(guest);
+	if (ret < 0)
+		goto fail;
+
+	ret = partition_config(guest);
+	if (ret < 0)
+		goto fail;
+
+#ifdef CONFIG_BYTE_CHAN
+	byte_chan_partition_init(guest);
+#endif
+#ifdef CONFIG_IPI_DOORBELL
+	send_dbell_partition_init(guest);
+	recv_dbell_partition_init(guest);
+#endif
+
+	vmpic_partition_init(guest);
+
+	ret = map_guest_reg_all(guest, partition);
+	if (ret < 0)
+		goto fail;
+
+#ifdef CONFIG_PAMU
+	pamu_partition_init(guest);
+#endif
+
+	start_guest_primary();
+	return 0;
+
+fail:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "error %d (%s) building guest device tree for %s\n",
+	         ret, fdt_strerror(ret), guest->name);
+
+	return ret;
 }
 
 __attribute__((noreturn)) void init_guest(void)
@@ -1248,7 +1278,7 @@ __attribute__((noreturn)) void init_guest(void)
 	int pir = mfspr(SPR_PIR);
 	const uint32_t *cpus = NULL, *prop;
 	guest_t *guest = NULL, *temp_guest;
-	int gpir, len, cpus_len = 0;
+	int len, cpus_len = 0;
 	
 	while (1) {
 		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
@@ -1295,39 +1325,12 @@ __attribute__((noreturn)) void init_guest(void)
 
 	if (pir == cpus[0]) {
 		/* Boot CPU */
-		/* count number of cpus for this partition and alloc data struct */
-		guest->cpucnt = count_cpus(cpus, cpus_len);
-		guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
-		if (!guest->gcpus)
-			goto nomem;
-
-		gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
-		assert(gpir == 0);
-		
-		ret = process_guest_devtree(guest, partition, cpus, cpus_len);
-		if (ret < 0)
-			goto wait;
-
-		partition_config(guest);
-
-#ifdef CONFIG_BYTE_CHAN
-		byte_chan_partition_init(guest);
-#endif
-#ifdef CONFIG_IPI_DOORBELL
-		send_dbell_partition_init(guest);
-		recv_dbell_partition_init(guest);
-#endif
-
-		vmpic_partition_init(guest);
-#ifdef CONFIG_PAMU
-		pamu_partition_init(guest);
-#endif
-		start_guest_primary();
+		init_guest_primary(guest, partition, cpus, cpus_len);
 	} else {
-		gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
+		register_gcpu_with_guest(guest, cpus, cpus_len);
 	}
 
-wait: {
+wait:	{
 		/* Like wait_for_gevent(), but without a
 		 * stack frame to return on.
 		 */
@@ -1337,18 +1340,13 @@ wait: {
 		cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
 
 		get_gcpu()->waiting_for_gevent = 1;
-	
+
 		asm volatile("mtsrr0 %0; mtsrr1 %1; mr %%r1, %2; rfi" : :
 		             "r" (wait_for_gevent_loop),
 		             "r" (mfmsr() | MSR_CE),
 		             "r" (new_r1) : "memory");
 		BUG();
-	}	
-
-nomem:
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "out of memory in start_guest\n");
-	goto wait;
+	}
 } 
 
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
