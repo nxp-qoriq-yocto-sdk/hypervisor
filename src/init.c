@@ -374,8 +374,4 @@ static void core_init(void)
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
 	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD | EHCSR_DGTMI);
 #endif
-
- 	isync();
- 	mtspr(SPR_MSRP, mfspr(SPR_MSRP) & ~MSR_PMM);
- 	isync();
 }
