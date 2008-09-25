@@ -721,6 +721,27 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 	return gpir;
 }
 
+int restart_guest(guest_t *guest)
+{
+	int ret = 0;
+	unsigned int i;
+
+	spin_lock(&guest->state_lock);
+
+	if (guest->state != guest_running)
+		ret = ERR_INVALID;
+	else
+		guest->state = guest_stopping;
+
+	spin_unlock(&guest->state_lock);
+
+	if (!ret)
+		for (i = 0; i < guest->cpucnt; i++)
+			setgevent(guest->gcpus[i], GEV_RESTART);
+
+	return ret;
+}
+
 /* Process configuration options in the hypervisor's
  * chosen and hypervisor nodes.
  */

@@ -90,8 +90,6 @@ static void unimplemented(trapframe_t *regs)
 
 static void fh_partition_restart(trapframe_t *regs)
 {
-	unsigned int i;
-	int ret = 0;
 	guest_t *guest;
 	
 	guest = handle_to_guest(regs->gpregs[3]);
@@ -100,24 +98,7 @@ static void fh_partition_restart(trapframe_t *regs)
 		return;
 	}
 	
-	spin_lock(&guest->state_lock);
-
-	if (guest->state != guest_running)
-		ret = -1;
-	else
-		guest->state = guest_stopping;
-
-	spin_unlock(&guest->state_lock);
-	
-	if (ret) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
-		return;
-	}
-
-	for (i = 0; i < guest->cpucnt; i++)
-		setgevent(guest->gcpus[i], GEV_RESTART);
-
-	regs->gpregs[3] = 0;
+	regs->gpregs[3] = restart_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
 void restart_core(trapframe_t *regs)
