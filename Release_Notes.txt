@@ -2,9 +2,9 @@
 -------------------------------------------------------
 Topaz Hypervisor Release Notes
 
-Topaz Version: 0.2
-Revsion: 0.2-rc13
-Date: 8/29/2008
+Topaz Version: 0.3
+Revsion: 0.3-rc1
+Date: 9/26/2008
 
 -------------------------------------------------------
 Contents
@@ -23,160 +23,26 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.2-rc13
-      -is compatible with Simics 8578 3.2.35 and later
+   -Topaz 0.3-rc1
+      -is compatible with Simics P4080 4.0.18 / 4.0.pre3
+       and later
       -requires version 1.2.0-rc1 or newer of the
        device tree compiler (DTC).
-      -requires libos tag v0.2-rc13
+      -requires libos tag v0.3-rc1
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -Topaz 0.2-rc13 bug fixes and changes
-      -bug 1947 PAMU1 with CAAM not working
-
-   -Topaz 0.2-rc12 bug fixes and changes
-      -some unit test updates-- added fman+linux scenario
-      -support guest device trees with non-zero liodns and
-       ppid values
-
-   -Topaz 0.2-rc11 bug fixes and changes
-      -bug 1888-- return value check in gdb stub was wrong
-      -bug 1900-- copy cpu node frequencies from hypervisor device
-       tree to guest device tree
-      -bug 1864-- invalid CPU numbers in fsl,hv-cpus is not 
-       handled
-      -bug 1912-- support #size-cells=2
-      -bug 1910-- gdb stub does not support ctrl-c
-      -bug 1892-- partman does not support loading at non zero
-       offsets
-      -bug 1914-- delete -r from partman
-      -partman has a -v option for more verbose output
-      -updated Linux and u-boot images in unit tests
-
-   -Topaz 0.2-rc10 bug fixes and changes
-      -check for negative and free handles (bug 1839)
-      -image load table gets entry point from first ELF image
-       (bug 1824)
-      -print error when core is referenced by multiple partitions
-      -improved logging for guest device tree processing (bug 1803)
-      -partman tool has improved error handling-- note requires
-       new Linux kernel driver
-      -gdb stub supports debugging from 1st instruction of guest
-      -support fsl,hv-map-ranges property
-      -improved error checking for partman (bug 1766)
-      -added partition label support-- "label" property on 
-       partition node let's guests identify themselves through
-       the guest device tree.  This property is also displayed
-       on partman -s.
-      -implement entry-point in FH_PARTITION_START (bug 1880)
-
-   -Topaz 0.2-rc9 bug fixes and changes
-      -increased number of handles supported-- fixes bugs
-       1811 and 1826
-      -support for mapping all 128MB of flash
-      -bug 1784- build issue when no gdb stub
-      -bug 1785- build issue when no pamu
-      -implement missing tlbilx emulation
-      -allow write to TLB0 when MAS1 valid bit is 0 (bug 1650)
-      -pamu is now enabled using GUTS PAMUBYPENR
-      -workaround in simics script to fix QMAN FDQ transactions
-       accessing portal DLIODNs instead of QMAN_LIODNR-- this
-       should be fixed in Simics
-      -cleanup in Linux unit tests so Qman/Bman driver self 
-       tests can run
-      -simics script-- simics workaround for qman-- disasble
-       delays
-      -only map reg properties that are on a simple-bus (bug 1805)
-      -Multi-core support added to GDB stub-- supports multiple 
-       instances of gdb attached to different partitions
-      -PAMU driver uses compatible of "fsl,p4080-guts" for GUTs
-       instead of the old 8572 compatible value
-
-   -Topaz 0.2-rc8 bug fixes and changes
-      -PAMU PAACE entries are enabled by default
-      -support for Simics 8578 3.2.35 model
-      -bug 1648 is fixed: tlb0 bad read entry caused assertion
-      -bug 1557 is fixed: tlbsx emulation bug
-      -gdb stub breakpoint and single step support
-      -bug 1677 is fixed: vmpic get/set mask give inconsistent results
-      -bug 1765 is fixed: partman crash on bad option
-      -pamu handle property names now have hv- prefix-- to
-       fsl,hv-liodn-handle and fsl,hv-ppid-handle
-      -bug 1499 is fixed: sc 1 call in user mode
-
-   -Topaz 0.2-rc7 bug fixes and changes
-      -bug 1625-- HID0[TBEN] bit is removed
-      -PAMU/LIODN property process and handle allocation
-      -FH_DMA_MAP_PPID_LIODN hcall
-      -updated u-boot image
-      -bug 1694-- root level "compatible" property clean up
-      -bugs 1638 and 1639 are closed with a Topaz spec 
-       update (0.792)
-
-   -Topaz 0.2-rc6 bug fixes and changes
-      -treat missing endpoints (byte-channels, doorbells)
-       as fatal only for the current node
-      -cleanup copyright header in source files
-      -implement gdb G,m,M,p,P packets in the gdb stub
-      -image updates for new u-boot
-      -all references in hypervisor source, libos, and device
-       trees to 8578 are renamed to p4080
-      -ELF entry point handling (bug 1544) is fixed
-      -convert DTS files to v1 (bug 1319) is fixed
-      -bug 1574 is fixed-- coreint returns error on iack
-      -misc unit test cleanup
-      -bugs 1636, 1635, 1638, 1639 are Topaz spec issues and
-       are fixed in 0.791 of the Topaz spec
-
-   -Topaz 0.2-rc5 bug fixes and changes
-      -Platform name in device tree changed from 8578 to p4080.
-      -Improved ePAPR compliance
-      -partman device tree fixes
-      -The rootfs is no longer automatically updated with
-       partman when building the Linux test, as this requires
-       root access and has problems with root-squashed NFS.
-      -Byte channel mux channels are range-checked.
-      -Data path initialization is removed.
-      -Fixed inverted return codes in guest register accessor.
-      -POSIX error codes are used where appropriate.
-      -Added FH_DMA_LIODN_GET hcall.
-      -Added doxygen comments to hcalls.h.
-      -Fixed a bug in strncpy() and strncat() that would
-       call memset() with a length of -1.
-
-   -Topaz 0.2-rc4 bug fixes and changes
-      -r7 is now set to the size of the IMA (fixes bug 1543)
-      -tlbivax functionality updates (bug 1527)
-      -implement guest spr accesses for gdb stub (bug 1535)
-      -MSR[CE] is set on secondary core (bug 1545) 
-      -enble PMR access
-      -"partman -s" now displays the partition name
-      -Invalidate TLB1 entries in the guest array, not just
-       the real one.
-      -Reset VMPIC interrupts when a guest allocates them
-      -tlbivax: invalidate TLB1 entries
-
-   -Topaz 0.2-rc3
-      -bug 1498 fixed
-      -return invalid state rather than failed for start/stop hcalls. Fixes
-       bugs 1522, 1523, 1524, 1526
-      -don't set r3 in abort_guest_access unless an extable match is found.
-      -gdb stub now has the ability to read some registers
-       (registers with the value 0xdeadbeef are unimplemented)
-      -the fsl,entry-cpu property is removed from the Topaz 0.78 spec 
-       (resolves bugs 1495, 1496, 1497)
-
-   -Topaz 0.2-rc2
-      -removed CROSS_COMPILE from Makefiles
-      -bug 1494 fixed - update fsl,hv-cpus property name
-      -bug 1504 fixed - byte-channel TX interrupts hooked up to RX ints
-      -bug 1500 fixed - set GESR[PIL] when reflecting illegal instruction
-      -raise privileged instruction exception when guest user mode hcall is
-       performed
-      -unset GCPU_PEND_VIRQ when iacking a virq
-      -cleaned up gdb stub is committed
-      -build infrastructure for gdb stub
+   -Topaz 0.3-rc1 bug fixes and changes from 0.2
+      -guest cache lock mode is now supported as per
+      the Topaz spec
+      -TLB cache-- TLB0 and TLB1 are both fully virtualized
+       (CONFIG_TLB_CACHE)
+      -master and guest device printing support at the
+       HV console
+      -guest machine check cleanup and unit test
+      -initial guest debug mode support-- trap instruction
+       debug trap is implemented
 
 -------------------------------------------------------
 4.  Limitations
@@ -186,14 +52,9 @@ Contents
  B. CPU Feature Limitations
 
    -MMU
-      -invalid MMU mappings are permitted to be written into
-       the TLB, and a machine check will occur on access to
-       the mapping--  this is not implemented for TLB1.  Access
-       to invalid TLB1 mappings will result in another TLB miss.
       -If the guest-to-real address mapping is sufficiently
        misaligned, TLB1 entries can be depleted, causing
        a hypervisor panic.
-      -tlbre of TLB0 is not supported
 
    -physical addresses greater than 32 bits are not supported
 
@@ -201,9 +62,7 @@ Contents
       -support for the CPU performance interrupt is not implemented
 
    -CPU core Debug support
-      -CPU debug support is not implemented including all debug
-       registers and interrupts
-      -writes to debug SPRs are ignored
+      -IAC,DAC,IRPT support is not present
 
    -Cache control
       -the following cache control registers are not implemented
@@ -227,12 +86,6 @@ Contents
    -Power management
       -support for the MSR[WE] power management bit is not
        implemented
-
-   -"Guest debug mode" as defined by the Topaz spec is not
-    implemented
-
-   -"Guest cache lock mode" as defined by the Topaz spec is not
-    implemented
 
  C. p4080 Platform Features
 
