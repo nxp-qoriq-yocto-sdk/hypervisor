@@ -60,12 +60,12 @@ if not defined memory_megs   {$memory_megs   = 2048}
 if not defined cpu_cores     {$cpu_cores     = 8}
 ###
 
-load-module mpc8578-components
+load-module p4080-components
 load-module memory-components
 load-module std-components
 load-module phy-components
 
-$system = (create-simple-MPC8578-board cpu_cores = $cpu_cores
+$system = (create-simple-P4080-board cpu_cores = $cpu_cores
                                        sysclk_frequency = $sysclk_frequency
                                        cpu_frequency = $freq_mhz)
 
