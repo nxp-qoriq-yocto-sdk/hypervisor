@@ -27,12 +27,24 @@
 #define LIBOS_CLIENT_H
 
 #define BASE_TLB_ENTRY 60 /**< TLB entry used for initial mapping */
-#define PHYSBASE 0x40000000 /**< Virtual base of physical address space */
+#define PHYSBASE 0x40000000 /**< Virtual base of large page physical mapping */
+#define PHYSMAPSIZE TLB_TSIZE_256M
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
 
 #ifndef _ASM
+
+#include <stdint.h>
+
+extern uint64_t bigmap_phys;
+
+#define HAVE_VIRT_TO_PHYS
+static inline uint64_t virt_to_phys(void *ptr)
+{
+	return (uintptr_t)ptr - PHYSBASE + bigmap_phys;
+}
+
 typedef struct {
 	/** Fast exception save area
 	 * The entire cache line will be clobbered.  This may not be used

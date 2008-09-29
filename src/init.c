@@ -68,6 +68,7 @@ static phys_addr_t mem_end;
 unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
 extern char _end;
+uint64_t bigmap_phys;
 
 static void exclude_memrsv(void)
 {

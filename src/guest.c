@@ -411,7 +411,7 @@ static int create_guest_spin_table(guest_t *guest,
 		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)guest->spintbl + i ) :
 		             "memory");
 
-	rpn = ((phys_addr_t)(unsigned long)guest->spintbl - PHYSBASE) >> PAGE_SHIFT;
+	rpn = virt_to_phys(guest->spintbl) >> PAGE_SHIFT;
 
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
