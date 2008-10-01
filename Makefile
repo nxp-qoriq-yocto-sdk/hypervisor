@@ -22,10 +22,8 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-export LIBOS_DIR := ../libos/lib
-export LIBOS_INC := ../libos/include
-
-$(shell ln -sfn $(LIBOS_DIR) libos)
+export LIBOS_DIR := libos/lib
+export LIBOS_INC := libos/include
 
 export VERSION=0
 export SUBVERSION=3
@@ -61,7 +59,6 @@ clean:
 	find * -name bin | xargs rm -rf
 	rm -rf include/config
 	rm -f dts/*.dtb
-	rm -f libos
 
 .PHONY: distclean
 distclean: clean

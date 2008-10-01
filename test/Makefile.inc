@@ -25,8 +25,8 @@
 DTC_DIR := ../../../dtc
 DTC := $(DTC_DIR)/dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
-LIBOS_DIR := ../../../libos/lib
-LIBOS_INC := ../../../libos/include
+LIBOS_DIR := ../../libos/lib
+LIBOS_INC := ../../libos/include
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := libos-client.h
 COMMON_DIR := ../common

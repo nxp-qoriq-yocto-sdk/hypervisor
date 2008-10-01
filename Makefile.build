@@ -25,7 +25,7 @@
 SIMICS=simics
 DTC_DIR := ../dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
-LIBOS_INC := ../libos/include
+LIBOS_INC := libos/include
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := include/libos-client.h
 

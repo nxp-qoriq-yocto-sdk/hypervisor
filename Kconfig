@@ -22,7 +22,7 @@ config HV_MINOR_VERSION
 	int
 	default SUBVERSION
 
-source "libos/Kconfig"
+source "libos/lib/Kconfig"
 
 config LIBOS_DEPS
 	bool

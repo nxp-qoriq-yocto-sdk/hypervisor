@@ -1,0 +1,3 @@
+[submodule "libos"]
+	path = libos
+	url = ../libos.git
