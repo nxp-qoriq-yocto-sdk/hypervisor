@@ -64,7 +64,7 @@ void reflect_trap(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
-		crashing = 1;
+		set_crashing();
 		printf("unexpected trap in hypervisor\n");
 		dump_regs(regs);
 		stopsim();
@@ -90,7 +90,7 @@ void debug_trap(trapframe_t *regs)
 	    && !gcpu->guest->stub_ops->debug_int_handler(regs))
 		return;
 #endif
-		crashing = 1;
+		set_crashing();
 		printf("unexpected debug exception\n");
 		dump_regs(regs);
 		stopsim();
