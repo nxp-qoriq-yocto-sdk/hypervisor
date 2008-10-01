@@ -22,7 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-DTC_DIR := ../../../dtc
+DTC_DIR := ../../dtc
 DTC := $(DTC_DIR)/dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../libos/lib
