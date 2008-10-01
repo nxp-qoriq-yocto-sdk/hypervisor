@@ -49,17 +49,15 @@
 
 static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 {
-	connected_bc_t* bc = mux->first_bc;
+	connected_bc_t *bc = mux->first_bc;
 	
-	while(bc)
-	{
-		if(bc->num == id)
+	while (bc) {
+		if (bc->num == id)
 			return bc;
-		else
-		{
-			bc = bc->next;
-		}
+
+		bc = bc->next;
 	}
+
 	return NULL;
 }
 
@@ -99,7 +97,8 @@ static void mux_get_data(queue_t *q)
 					notify = NULL;
 				}
 				
-				mux->current_rx_bc = channel_find(mux, ch-CHAN0_MUX_CHAR);
+				mux->current_rx_bc =
+					channel_find(mux, ch - CHAN0_MUX_CHAR);
 				printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
 					"mux_get_data: switched to channel '%d' (%p)\n",
 					ch-CHAN0_MUX_CHAR, mux->current_rx_bc);
@@ -158,7 +157,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 
 	if (queue_empty(cbc->byte_chan->rx))
 		return 0;
-
+ 
 	sent = mux_tx_switch(mux, cbc);
 	if (sent < 0)
 		return -1;
@@ -234,14 +233,18 @@ static void mux_send_data_push(queue_t *q)
 {
 	connected_bc_t *cbc = q->consumer;
 	mux_complex_t *mux = cbc->mux_complex;
+	int lock = !unlikely(cpu->crashing);
+	register_t saved = disable_critint_save();
 
-	if (spin_lock_held(&cbc->byte_chan->tx_lock)) {
-		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
-			"mux_send_data_push: bcmux recursion detected\n");
-		return;
+	if (lock) {
+		if (spin_lock_held(&mux->byte_chan->tx_lock)) {
+			printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+				"mux_send_data_push: bcmux recursion detected\n");
+			return;
+		}
+
+		spin_lock(&mux->byte_chan->tx_lock);
 	}
-	
-	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
 
 	int ret = __mux_send_data(mux, cbc);
 	if (ret > 0)
@@ -249,11 +252,11 @@ static void mux_send_data_push(queue_t *q)
 	else if (ret < 0)
 		/* If we ran out of space, arm the pull callback. */
 		mux->byte_chan->tx->space_avail = mux_send_data_pull;
-	else
-		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
-			"mux_send_data_push: no data\n");
 	
-	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+	if (lock)
+		spin_unlock(&mux->byte_chan->tx_lock);
+
+	restore_critint(saved);
 }
 
 /** Create a byte channel multiplexer.
@@ -318,7 +321,8 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	handle->tx->space_avail = NULL;
 	handle->rx->data_avail = mux_send_data_push;
 
-	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
+	register_t saved = spin_lock_critsave(&mux->byte_chan->rx_lock);
+	spin_lock(&mux->byte_chan->tx_lock);
 	
 	if (mux->first_bc == NULL) {
 		mux->first_bc = cbc;
@@ -333,7 +337,8 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	
 	mux->num_of_channels++;
 
-	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+	spin_unlock(&mux->byte_chan->tx_lock);
+	spin_unlock_critsave(&mux->byte_chan->rx_lock, saved);
 	return 0;
 }
 
