@@ -1091,18 +1091,14 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 	guest_reset_tlb();
 
-	for (i = 0; i < MAX_HANDLES; i++) {
-		handle_t *h = guest->handles[i];
-
-		if (h && h->ops && h->ops->reset)
-			h->ops->reset(h);
-	}
-
-	mpic_reset_core();
-	memset(&gcpu->gdbell_pending, 0,
-	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
-
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
+		for (i = 0; i < MAX_HANDLES; i++) {
+			handle_t *h = guest->handles[i];
+
+			if (h && h->ops && h->ops->reset)
+				h->ops->reset(h);
+		}
+
 		if (restart) {
 			guest->state = guest_starting;
 			setgevent(guest->gcpus[0], GEV_START_WAIT);
@@ -1110,6 +1106,10 @@ void do_stop_core(trapframe_t *regs, int restart)
 			guest->state = guest_stopped;
 		}
 	}
+
+	mpic_reset_core();
+	memset(&gcpu->gdbell_pending, 0,
+	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
 	wait_for_gevent(regs);
 }
