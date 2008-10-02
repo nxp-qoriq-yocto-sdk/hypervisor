@@ -23,7 +23,7 @@
 #
 
 SIMICS=simics
-DTC_DIR := ../dtc
+DTC_DIR := dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_INC := libos/include
 LIBOS_BIN := bin/libos
