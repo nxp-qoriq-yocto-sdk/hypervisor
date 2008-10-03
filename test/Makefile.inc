@@ -26,7 +26,6 @@ DTC_DIR := ../../dtc
 DTC := $(DTC_DIR)/dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../libos/lib
-LIBOS_INC := ../../libos/include
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := libos-client.h
 COMMON_DIR := ../common
@@ -35,8 +34,8 @@ COMMON_SRCS := common/init.c
 CC=$(CROSS_COMPILE)gcc
 GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -I. -I../common -Iinclude -I$(LIBFDT_DIR) -I$(LIBOS_INC) -g \
-        -std=gnu99  -include $(LIBOS_CLIENT_H)
+        -I. -I../common -Iinclude -I$(LIBFDT_DIR) -I../../libos/include \
+	-I../../libos/include-libc -g -std=gnu99  -include $(LIBOS_CLIENT_H)
 
 CC_OPTS_C= -Wall \
   -Wundef \
@@ -64,13 +63,20 @@ MKDIR=mkdir -p
 
 include $(LIBFDT_DIR)/Makefile.libfdt
 
-CONFIG_LIBOS_QUEUE=y
+CONFIG_LIBOS_INIT=y
+CONFIG_LIBOS_MP=y
 CONFIG_LIBOS_NS16550=y
+CONFIG_LIBOS_EXCEPTION=y
+CONFIG_LIBOS_SIMPLE_ALLOC=y
+CONFIG_LIBOS_FSL_BOOKE_TLB=y
+CONFIG_LIBOS_ALLOC_IMPL=y
+CONFIG_LIBOS_VIRT_ALLOC=y
+CONFIG_LIBOS_CONSOLE=y
+CONFIG_LIBOS_LIBC=y
+
 include $(LIBOS_DIR)/Makefile.libos
 
-LIBOS_SRCS := $(LIBOS_STARTUP) $(LIBOS_FSL_BOOKE_TLB) $(LIBOS_EXCEPTION) \
-	$(LIBOS_LIB) $(LIBOS_CONSOLE) $(LIBOS_HCALL) \
-	$(LIBOS_MPIC) $(LIBOS_MP) $(libos-src-y)
+LIBOS_SRCS := $(libos-src-first-y) $(libos-src-early-y) $(libos-src-y)
 
 ####################
 
