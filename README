@@ -1,39 +1,12 @@
- 
-----------------------------------------------------------
-Cross Build Tools
-
-500mc develoment environment-- install the e500mc cross build tools with ltib)
-
-    * the bin directory to the tools must be in your path
-    * like the Linux kernel you must set the CROSS_COMPILE
-      environment variable with the prefix of the tools you are using
-          $ export CROSS_COMPILE=powerpc-linux-gnu- 
+Freescale Embedded Hypervisor README 
+Copyright (C) 2008 Freescale Semiconductor, Inc.
 
 ----------------------------------------------------------
-Getting, building the hypervisor
+Building the hypervisor
 
-    * prerequisites are dtc (device tree compiler), libfdt, and
-      libos libraries
-          o recommended location to put these libraries is at the same
-            level as the hypervisor source.
-            i.e. your directory structure should look something like:
-                hv
-                dtc
-                dtc/libfdt
-                libos
-
-    * dtc & libfdt
-          o export http_proxy=http://wwwgate0.freescale.net:1080/
-          o git-clone http://www.jdl.com/software/dtc.git dtc
-          o build dtc
-                $ cd dtc
-                $ make 
-          o libos
-                $ git-clone git://auslxsc02.mtwk.freescale.net/git/libos.git libos 
-    * to get the hypervisor
-          $ git clone git://auslxsc02.mtwk.freescale.net/ultravisor.git hv 
     * to build the hypervisor
           o cd hv
+          o git submodule update --init
           o make allyesconfig
           o make 
     * to build the tests
@@ -50,7 +23,7 @@ Source tree directory structure
    dtc/libfdt		The libfdt library for device tree processing
    libos/include        libos library includes
    libos/lib            libos library source
-   hv/src               hypervisor source
+   src                  hypervisor source
    include              hypervisor includes
    tools                misc tools
    tools/mux_server     The UART multiplexer-- runs on a host system
