@@ -144,6 +144,7 @@ extern unsigned long last_lpid;
 #define GCPU_PEND_FIT      0x00000010 /* FIT event pending */
 #define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
+#define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
@@ -180,6 +181,7 @@ typedef struct gcpu {
 	register_t mas0, mas1, mas2, mas3, mas6, mas7;
 	uint32_t timer_flags;
 	int evict_tlb1;
+	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
 	
 	unsigned int stats[num_gcpu_stats];
 	void *debug_stub_data;

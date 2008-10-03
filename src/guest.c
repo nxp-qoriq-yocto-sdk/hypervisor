@@ -721,6 +721,27 @@ static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
 	return gpir;
 }
 
+int restart_guest(guest_t *guest)
+{
+	int ret = 0;
+	unsigned int i;
+
+	spin_lock(&guest->state_lock);
+
+	if (guest->state != guest_running)
+		ret = ERR_INVALID;
+	else
+		guest->state = guest_stopping;
+
+	spin_unlock(&guest->state_lock);
+
+	if (!ret)
+		for (i = 0; i < guest->cpucnt; i++)
+			setgevent(guest->gcpus[i], GEV_RESTART);
+
+	return ret;
+}
+
 /* Process configuration options in the hypervisor's
  * chosen and hypervisor nodes.
  */
@@ -829,6 +850,13 @@ guest_t *node_to_partition(int partition)
 static void guest_core_init(guest_t *guest)
 {
 	register_t msrp = 0;
+
+	/* Reset the timer control register, reset the watchdog state, and
+	 * clear all pending timer interrupts.  This ensures that timers won't
+	 * carry over a partition restart.
+	 */
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_TSR, TSR_ENW | TSR_DIS | TSR_FIS | TSR_WIS);
 
 	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
 	mtspr(SPR_PID, 0);

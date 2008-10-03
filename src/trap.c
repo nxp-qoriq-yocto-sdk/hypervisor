@@ -177,7 +177,12 @@ no_virq:
  *
  * This function is called whenever the hypervisor receives a critical
  * doorbell exception.  This happens when the hypervisor itself executes a
- * msgsnd instruction where the message type is G_DBELL_CRIT.
+ * msgsnd instruction where the message type is G_DBELL_CRIT, which is what
+ * send_local_crit_guest_doorbell() does.
+ *
+ * This function isn't called right away, though.  It is called when both
+ * MSR[GS] and MSR[CE] become set.  This is how we can detect when the guest
+ * enables MSR[CE].
  *
  * Note that there is no regs->csrr0 or regs->csrr1.  The exception handler
  * prologue and epilogue (in exception.S) uses regs->srr0 and regs->srr1 to
@@ -186,6 +191,13 @@ no_virq:
 void guest_critical_doorbell(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
+
+	if (gcpu->gdbell_pending & GCPU_PEND_WATCHDOG) {
+		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_WATCHDOG);
+
+		reflect_watchdog(gcpu, regs);
+		return;
+	}
 
 	if (gcpu->gdbell_pending & GCPU_PEND_MSGSNDC) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSNDC);
