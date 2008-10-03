@@ -59,6 +59,25 @@ static inline void send_local_guest_doorbell(void)
 	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
 }
 
+/** Send local critical guest doorbell.
+ *
+ *  Sends a guest critical doorbell to the current cpu.
+ *
+ */
+static inline void send_local_crit_guest_doorbell(void)
+{
+	unsigned long msg = MSG_GBELL_CRIT |
+	                    (get_gcpu()->guest->lpid << 14) |
+	                    mfspr(SPR_GPIR);
+
+	/* msgsnd is ordered as a store relative to sync instructions,
+	 * but not as a cacheable store, so we need a full sync
+	 * to order with any previous stores that the doorbell handler
+	 * needs to see.
+	 */
+	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
+}
+
 /** Send critical doorbell.
  *
  *  Always for hypervisor internal use only so
