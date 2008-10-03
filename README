@@ -6,7 +6,8 @@ Building the hypervisor
 
     * to build the hypervisor
           o cd hv
-          o git submodule update --init
+          o git submodule init
+          o git submodule update
           o make allyesconfig
           o make 
     * to build the tests

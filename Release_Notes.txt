@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc1
-Date: 9/26/2008
+Revsion: 0.3-rc2
+Date: 10/3/2008
 
 -------------------------------------------------------
 Contents
@@ -25,13 +25,22 @@ Contents
 
    -Topaz 0.3-rc1
       -is compatible with Simics P4080 4.0.18 / 4.0.pre3
-       and later
-      -requires version 1.2.0-rc1 or newer of the
-       device tree compiler (DTC).
-      -requires libos tag v0.3-rc1
+       and P4080 4.0.19 / 4.0.pre4
+      -it is not compatible with P4080 4.0.20 / 4.0.pre5
+
+   -in sync with Embedded Hypervisor Architecture specifciation
+    0.81
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc2 bug fixes and changes
+      -guest watchdog support is implemented (see limitations
+       below)
+      -libos and dts are now submodules and do not need to
+       be cloned separately from the hypervisor
+      -bug 2129-- hypervisor console not working on byte-channel
+       on a mux
 
    -Topaz 0.3-rc1 bug fixes and changes from 0.2
       -guest cache lock mode is now supported as per
@@ -63,6 +72,9 @@ Contents
 
    -CPU core Debug support
       -IAC,DAC,IRPT support is not present
+
+   -guest watchdog does not support the partition management
+    interrupts
 
    -Cache control
       -the following cache control registers are not implemented
