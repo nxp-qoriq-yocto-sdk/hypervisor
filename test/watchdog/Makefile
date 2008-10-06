@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,19 +22,39 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami \
-		cache gdebug mcheck watchdog
+#
+# Copyright © 2007 Freescale Semiconductor, Inc
+#
+# The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
+#
 
-.PHONY: subdirs $(SUBDIRS)
+all: watchdog_all
 
-subdirs: $(SUBDIRS)
+include ../Makefile.inc
 
-$(SUBDIRS):
-	$(MAKE) -C $@
+####################
+# watchdog
 
-.PHONY: clean
+WATCHDOG_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) watchdog.c
+WATCHDOG_OBJS := $(basename $(WATCHDOG_SRCS))
+WATCHDOG_OBJS := $(WATCHDOG_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
+WATCHDOG_OBJS := $(WATCHDOG_OBJS:%=bin/%)
 
-clean:
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir clean; \
-	done
+watchdog_all: bin/watchdog.bin bin/watchdog.map bin/hv-watchdog-1p.dtb
+
+bin/watchdog.bin: bin/watchdog
+	$(CROSS_COMPILE)objcopy -O binary $< $@
+
+bin/watchdog: $(WATCHDOG_OBJS)
+	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(WATCHDOG_OBJS) -lgcc
+
+bin/watchdog.map: bin/watchdog
+	nm -n bin/watchdog > $@
+
+ifneq ($(MAKECMDGOALS),clean)
+-include $(WATCHDOG_OBJS:.o=.d)
+endif
+
+bin/hv-watchdog-1p.dtb: hv-watchdog-1p.dts bin/watchdog-p1.dtb
+
+bin/watchdog-p1.dtb: watchdog-p1.dts

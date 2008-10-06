@@ -239,6 +239,9 @@ test-gdebug: bin/hv.uImage test/gdebug
 test-mcheck: bin/hv.uImage test/mcheck
 	$(SIMICS) test/mcheck/hv-mcheck.simics
 
+test-watchdog: bin/hv.uImage test/watchdog
+	$(SIMICS) test/watchdog/hv-watchdog.simics
+
 demo: bin/hv.uImage test/linux
 	./tools/mux_server/mux_server localhost:9124 9000 9001 &
 	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
