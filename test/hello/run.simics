@@ -22,30 +22,20 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-all: hello_all
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
+$use_uart1 = 1
 
-include ../Makefile.inc
+$guest_image[0] = "hello"
+$guest_addr[0]  = 0xe8200000
 
-HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) hello.c
-HELLO_OBJS := $(basename $(HELLO_SRCS))
-HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
+$kernel_image  = "hv.uImage"
+$dev_tree_blob  = "hv-hello-1p.dtb"
 
-hello_all: bin/hello.bin bin/hello.map bin/hv.dtb
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
+add-directory "%script%/../../bin" -prepend
+add-directory "%script%/bin" -prepend
 
-bin/hello.bin: bin/hello
-	$(CROSS_COMPILE)objcopy -O binary $< $@
-
-bin/hello: $(HELLO_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(HELLO_OBJS) -lgcc
-
-bin/hello.map: bin/hello
-	nm -n bin/hello > $@
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(HELLO_OBJS:.o=.d)
-endif
-
-bin/hv.dtb: hv.dts bin/p1.dtb
-
-bin/p1.dtb: p1.dts
+run-command-file "boot.simics"
