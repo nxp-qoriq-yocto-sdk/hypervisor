@@ -572,9 +572,9 @@ int conf_split_config(void)
 	res = 0;
 	for_all_symbols(i, sym) {
 		int trunc = O_TRUNC;
-	
+
 		sym_calc_value(sym);
-		if ((sym->flags & SYMBOL_AUTO) || !sym->name)
+		if ((sym->flags & SYMBOL_AUTO) || !sym->name || sym->type == S_UNKNOWN)
 			continue;
 		if (sym->flags & SYMBOL_WRITE) {
 			if (sym->flags & SYMBOL_DEF_AUTO) {
