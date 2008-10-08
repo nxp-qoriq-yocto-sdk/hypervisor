@@ -309,6 +309,7 @@ typedef enum token
 	get_section_offsets,
 	supported_features,
 	qxfer,
+	detach,
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -338,6 +339,7 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "qOffsets", get_section_offsets },
 	{ "qSupported", supported_features },
 	{ "qXfer", qxfer },
+	{ "D", detach },
 };
 
 /* Aux */
@@ -382,6 +384,7 @@ static inline uint32_t scan_num(uint8_t **buffer, char c);
 static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
 static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
+static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table);
 static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
 static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint);
@@ -933,6 +936,23 @@ static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table)
 		TRACE("\tEmpty.");
 }
 
+static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table)
+{
+	uint32_t index;
+	breakpoint_t *breakpoint = NULL;
+	if (breakpoint_table == NULL)
+		return;
+	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
+		if (breakpoint_table[index].taken) {
+			breakpoint = &breakpoint_table[index];
+			TRACE("Forcefully clearing breakpoint at addr: 0x%p.", breakpoint->addr);
+			TRACE("Writing back original insn: 0x%x at address: 0x%p", breakpoint->orig_insn, breakpoint->addr);
+			guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
+			memset(breakpoint, 0, sizeof(breakpoint_table[0]));
+		}
+	}
+}
+
 static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr)
 {
 	uint32_t index;
@@ -1476,6 +1496,17 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 				"Got stop reply packet: '?'\n");
 			pkt_cat_string(stub->rsp, "S");
 			pkt_write_hex_byte_update_cur(stub->rsp, 2);
+			break;
+
+		case detach:
+			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "Got 'D' packet.\n");
+			dump_breakpoint_table(stub->breakpoint_table);
+			clear_all_breakpoints(stub->breakpoint_table);
+			dump_breakpoint_table(stub->breakpoint_table);
+			TRACE("Returning to guest on a detach.");
+			pkt_cat_string(stub->rsp, "OK");
+			transmit_response(stub);
+			goto return_to_guest;
 			break;
 
 		default:
