@@ -208,7 +208,7 @@ void watchdog_trap(trapframe_t *regs)
 		 * will be called.  Since GCPU_PEND_WATCHDOG is set, we'll send
 		 * another watchdog interrupt to the guest.
 		 */
-		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_WATCHDOG);
+		atomic_or(&gcpu->crit_gdbell_pending, GCPU_PEND_WATCHDOG);
 		send_local_crit_guest_doorbell();
 	}
 }
@@ -251,14 +251,14 @@ void set_tcr(uint32_t val)
 		 * there's a pending watchdog interrupt.
 		 */
 		if (gcpu->watchdog_timeout) {
-			atomic_or(&gcpu->gdbell_pending, GCPU_PEND_WATCHDOG);
+			atomic_or(&gcpu->crit_gdbell_pending, GCPU_PEND_WATCHDOG);
 			send_local_crit_guest_doorbell();
 		}
 	} else
 		/* If the guest disables watchodog interrupts, then we
 		 * obviously should not send one.
 		 */
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_WATCHDOG);
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
 
 	/* Once the guest has enabled watchdog support (by programming something
 	 * other than zero into TRC[WRC], we keep watchdog interrupts enabled
@@ -297,7 +297,7 @@ void set_tsr(uint32_t tsr)
 	}
 
 	if (tsr & TSR_WIS) {
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_WATCHDOG);
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
 
 		/* If the guest is resetting the watchdog, then we no longer
 		 * emulate the second timeout.

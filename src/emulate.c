@@ -71,9 +71,6 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
-	/* Critical doorbells have their own bit flag */
-	unsigned long flag = type ? GCPU_PEND_MSGSNDC : GCPU_PEND_MSGSND;
-
 	/*
 	 * DBELL (0) becomes G_DBELL (2), and DBELL_CRIT (1) becomes
 	 * G_DBELL_CRIT (2).  The quickest way to make that change is to set bit
@@ -85,8 +82,12 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	if (msg & 0x04000000) {
 		/* Tell each core that it needs to reflect a msgsnd doorbell
 		   exception. */
-		for (unsigned int i = 0; i < guest->cpucnt; i++)
-			atomic_or(&guest->gcpus[i]->gdbell_pending, flag);
+		if (type)
+			for (unsigned int i = 0; i < guest->cpucnt; i++)
+				atomic_or(&guest->gcpus[i]->crit_gdbell_pending, GCPU_PEND_MSGSNDC);
+		else
+			for (unsigned int i = 0; i < guest->cpucnt; i++)
+				atomic_or(&guest->gcpus[i]->gdbell_pending, GCPU_PEND_MSGSND);
 	} else {
 		unsigned int pir = msg & 0x3fff;
 
@@ -97,7 +98,10 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 		}
 
 		gcpu_t *gcpu = guest->gcpus[pir];
-		atomic_or(&gcpu->gdbell_pending, flag);
+		if (type)
+			atomic_or(&gcpu->crit_gdbell_pending, GCPU_PEND_MSGSNDC);
+		else
+			atomic_or(&gcpu->gdbell_pending, GCPU_PEND_MSGSND);
 	}
 
 	/* Clear the reserved bits and oerwrite the LPIDTAG field with
@@ -138,13 +142,14 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
-	/* Critical doorbells have their own bit flag */
-	unsigned long flag = type ? ~GCPU_PEND_MSGSNDC : ~GCPU_PEND_MSGSND;
-
 	/* Check for broadcast */
 	if (msg & 0x04000000) {
-		for (unsigned int i = 0; i < guest->cpucnt; i++)
-			atomic_and(&guest->gcpus[i]->gdbell_pending, flag);
+		if (type)
+			for (unsigned int i = 0; i < guest->cpucnt; i++)
+				atomic_and(&guest->gcpus[i]->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
+		else
+			for (unsigned int i = 0; i < guest->cpucnt; i++)
+				atomic_and(&guest->gcpus[i]->gdbell_pending, ~GCPU_PEND_MSGSND);
 	} else {
 		unsigned int pir = msg & 0x3fff;
 
@@ -155,7 +160,10 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 		}
 
 		gcpu_t *gcpu = guest->gcpus[pir];
-		atomic_and(&gcpu->gdbell_pending, flag);
+		if (type)
+			atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
+		else
+			atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSND);
 	}
 
 	return 0;
