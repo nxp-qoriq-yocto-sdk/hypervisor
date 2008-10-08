@@ -173,7 +173,7 @@ test-gdb: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb.simics
 
 test-hello: bin/hv.uImage test/hello
-	$(SIMICS) test/hello/hv-hello.simics
+	$(SIMICS) test/hello/run.simics
 
 test-msgsnd: bin/hv.uImage test/msgsnd
 	$(SIMICS) test/msgsnd/hv-msgsnd.simics

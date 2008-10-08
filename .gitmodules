@@ -4,3 +4,6 @@
 [submodule "dtc"]
 	path = dtc
 	url = ../dtc.git
+[submodule "test/sim"]
+	path = test/sim
+	url = git://auslxsc02.mtwk.freescale.net/git/e500mc/sim.git
