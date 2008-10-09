@@ -23,7 +23,7 @@
 #
 
 DTC_DIR := ../../dtc
-DTC := $(DTC_DIR)/dtc
+DTC := dtc
 LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_DIR := ../../libos/lib
 LIBOS_BIN := bin/libos
