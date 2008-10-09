@@ -130,8 +130,7 @@ none_avail:
  * is the responsibility of the caller.
  */
 
-int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp,
-                    int *way, int ignorespace)
+int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp, int *way)
 {
 	tlbcset_t *set;
 	tlbctag_t mask;
@@ -139,13 +138,10 @@ int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp,
 	int i;
 	
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
-	         "find vaddr %lx tag %lx ignorespace %d\n",
-	         vaddr, tag.tag, ignorespace);
+	         "find vaddr %lx tag %lx\n", vaddr, tag.tag);
 
 	mask.tag = ~0UL;
 	mask.pid = 0;
-	if (ignorespace)
-		mask.space = 0;
 	
 	index = vaddr >> PAGE_SHIFT;
 	index &= (1 << cpu->client.tlbcache_bits) - 1;
@@ -276,14 +272,38 @@ static void guest_inv_tlb0_all(int pid)
 				set[i].tag[j].valid = 0;
 }
 
-static void guest_inv_tlb0_va(register_t va, int pid)
+static void guest_inv_tlb0_va(register_t vaddr, int pid)
 {
 	tlbcset_t *set;
-	tlbctag_t tag = make_tag(va, pid < 0 ? 0 : pid, 0);
-	int way;
+	tlbctag_t tag = make_tag(vaddr, pid < 0 ? 0 : pid, 0);
+	tlbctag_t mask;
+	int index;
+	int i;
+	
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+	         "inv vaddr %lx pid %d\n", vaddr, pid);
 
-	if (find_gtlb_entry(va, tag, &set, &way, 1))
-		set->tag[way].valid = 0;
+	mask.tag = ~0UL;
+	mask.space = 0;
+	
+	if (pid < 0)
+		mask.pid = 0;
+	
+	index = vaddr >> PAGE_SHIFT;
+	index &= (1 << cpu->client.tlbcache_bits) - 1;
+
+	set = &cpu->client.tlbcache[index];
+
+	for (i = 0; i < TLBC_WAYS; i++) {
+		int pid = set->tag[i].pid;
+
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
+		         "inv pid %d tag.pid %d set->tag %lx mask %lx\n",
+		         pid, tag.pid, set->tag[i].tag, mask.tag);
+
+		if (((tag.tag ^ set->tag[i].tag) & mask.tag) == 0)
+			set->tag[i].valid = 0;
+	}
 }
 
 static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
@@ -298,7 +318,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
 
 	assert(!(mas0 & MAS0_TLBSEL1));
 
-	ret = find_gtlb_entry(vaddr, tag, &set, &way, 0);
+	ret = find_gtlb_entry(vaddr, tag, &set, &way);
 	if (ret && (mas1 & MAS1_VALID) &&
 	    unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
