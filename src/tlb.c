@@ -236,7 +236,8 @@ void gtlb0_to_mas(int index, int way)
 	mtspr(SPR_MAS0, MAS0_ESEL(way));
 	mtspr(SPR_MAS1, MAS1_VALID |
 	                (set->tag[way].pid << MAS1_TID_SHIFT) |
-	                (set->tag[way].space << MAS1_TS_SHIFT));
+	                (set->tag[way].space << MAS1_TS_SHIFT) |
+	                (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT));
 	mtspr(SPR_MAS2, (set->tag[way].vaddr << (PAGE_SHIFT + bits)) |
 	                (index << PAGE_SHIFT) |
 	                set->entry[way].mas2);

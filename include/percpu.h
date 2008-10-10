@@ -172,6 +172,7 @@ typedef struct gcpu {
 	 * insert new fields before gdbell_pending.
 	 */
 	unsigned long gdbell_pending;
+	unsigned long crit_gdbell_pending;
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;
 	uint32_t dbsr;

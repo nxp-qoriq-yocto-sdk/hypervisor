@@ -40,6 +40,7 @@
 #include <vmpic.h>
 #include <greg.h>
 #include <paging.h>
+#include <doorbell.h>
 
 void program_trap(trapframe_t *regs)
 {
@@ -137,17 +138,17 @@ void guest_doorbell(trapframe_t *regs)
 		
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_EXT_INT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		return;
+		goto check_flags;
 	}
-
 no_virq:
+
 	/* Then, check for a FIT. */
 	if (gcpu->gdbell_pending & GCPU_PEND_FIT) {
 		run_deferred_fit();
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_FIT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		return;
+		goto check_flags;
 	}
 
 	/* Then, check for a decrementer. */
@@ -156,20 +157,31 @@ no_virq:
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		return;
+		goto check_flags;
 	}
-
-	if (gcpu->gdbell_pending & GCPU_PEND_TCR_FIE)
-		enable_tcr_fie();
-	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
-		enable_tcr_die();
 
 	if (gcpu->gdbell_pending & GCPU_PEND_MSGSND) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSND);
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELL];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		return;
+		goto check_flags;
 	}
+
+	if (gcpu->gdbell_pending & GCPU_PEND_TCR_FIE)
+		enable_tcr_fie();
+
+	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
+		enable_tcr_die();
+
+	return;
+
+check_flags:
+	/* Are there still any pending doorbells?  If so, then we need to
+	 * issue another guest doorbell so that we return to this function to
+	 * process them.
+	 */
+	if (gcpu->gdbell_pending)
+		send_local_guest_doorbell();
 }
 
 /**
@@ -192,15 +204,15 @@ void guest_critical_doorbell(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 
-	if (gcpu->gdbell_pending & GCPU_PEND_WATCHDOG) {
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_WATCHDOG);
+	if (gcpu->crit_gdbell_pending & GCPU_PEND_WATCHDOG) {
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
 
 		reflect_watchdog(gcpu, regs);
-		return;
+		goto check_flags;
 	}
 
-	if (gcpu->gdbell_pending & GCPU_PEND_MSGSNDC) {
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSNDC);
+	if (gcpu->crit_gdbell_pending & GCPU_PEND_MSGSNDC) {
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
 
 		/*
 		 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
@@ -213,8 +225,18 @@ void guest_critical_doorbell(trapframe_t *regs)
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELLC];
 		regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		return;
+		goto check_flags;
 	}
+
+	return;
+
+check_flags:
+	/* Are there still any pending doorbells?  If so, then we need to
+	 * issue another guest doorbell so that we return to this function to
+	 * process them.
+	 */
+	if (gcpu->crit_gdbell_pending)
+		send_local_crit_guest_doorbell();
 }
 
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)

@@ -17,6 +17,7 @@ files="test/hello/hv-hello.simics \
 	test/pmr/hv-pmr.simics \
 	test/fit/hv-fit.simics \
 	test/mcheck/hv-mcheck.simics \
+	test/watchdog/hv-watchdog.simics \
 	test/gdebug/gdebug.simics"
 
 for i in $files
