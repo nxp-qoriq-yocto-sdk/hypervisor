@@ -39,6 +39,11 @@
 #define MINFPR 0
 #define MAXFPR 31
 
+#define set_spr_val(spr, val, mask)\
+do {\
+	mtspr(spr, (mfspr(spr) & ~(mask))  | ((val) & (mask)));\
+} while(0)
+
 int read_gspr(trapframe_t *regs, int spr, register_t *val);
 int write_gspr(trapframe_t *regs, int spr, register_t val);
 

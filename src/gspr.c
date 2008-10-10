@@ -263,6 +263,22 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_L1CSR1);
 		break;
 
+	case SPR_L1CSR2:
+		*val = mfspr(SPR_L1CSR2);
+		break;
+
+	case SPR_L1CSR3:
+		*val = mfspr(SPR_L1CSR3);
+		break;
+
+	case SPR_L2CSR0:
+		*val = mfspr(SPR_L2CSR0);
+		break;
+
+	case SPR_L2CSR1:
+		*val = mfspr(SPR_L2CSR1);
+		break;
+
 	case SPR_MMUCSR0:
 		*val = 0;
 		break;
@@ -301,6 +317,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 int write_gspr(trapframe_t *regs, int spr, register_t val)
 {
 	gcpu_t *gcpu = get_gcpu();
+	register_t mask = 0;
 
 	switch (spr) {
 	case SPR_XER:
@@ -529,13 +546,23 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_L1CSR0:
-		val &= L1CSR0_DCBZ32;
-		val |= mfspr(SPR_L1CSR0) & ~L1CSR0_DCBZ32;
-		mtspr(SPR_L1CSR0, val);
+		mask = L1CSR0_DCBZ32 | L1CSR0_DCUL;
+		if (gcpu->guest->guest_cache_lock)
+			mask |= L1CSR0_DCSLC | L1CSR0_DCLO | L1CSR0_DCLFC;
+		set_spr_val(SPR_L1CSR0, val, mask);
 		break;
 
 	case SPR_L1CSR1:
-		/* no-op */
+		mask = L1CSR1_ICUL;
+		if (gcpu->guest->guest_cache_lock)
+			mask |= L1CSR1_ICSLC | L1CSR1_ICLO | L1CSR1_ICLFC;
+		set_spr_val(SPR_L1CSR1, val, mask);
+		break;
+
+	case SPR_L2CSR0:
+		if (gcpu->guest->guest_cache_lock)
+			mask = L2CSR0_L2LFC | L2CSR0_L2FCID | L2CSR0_L2SLC | L2CSR0_L2LO;
+		set_spr_val(SPR_L2CSR0, val, mask);
 		break;
 
 	case SPR_MMUCSR0:

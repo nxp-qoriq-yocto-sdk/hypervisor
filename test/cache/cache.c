@@ -64,6 +64,7 @@ void start(unsigned long devtree_ptr)
 	printf("cache lock result = %x\n", status);
 #endif
 	if (status & L1CSR0_DCUL) {
+		mtspr(SPR_L1CSR0, status & ~L1CSR0_DCUL);
 		printf(" > did dcbtls, failed: ");
 		if (!guest_cache_lock_mode)
 			printf("PASSED\n");
