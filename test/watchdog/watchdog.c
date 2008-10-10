@@ -140,7 +140,27 @@ int test4(void)
 
 int test5(void)
 {
-	printf("> set watchdog, wait thrice, check for reboot\n\n");
+	printf("> set watchdog, wait thrice, check for no reboot: FAILED");
+
+	watchdog = 0;
+	enable_critint();
+	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT));
+	wait_for_timeout(TIMEOUT);
+	wait_for_timeout(TIMEOUT);
+	wait_for_timeout(TIMEOUT);
+
+	delay();
+
+	// TSR[WRS] should be 0
+        return (mfspr(SPR_TSR) & TSR_WRS) != 0;
+}
+
+int test6(void)
+{
+	printf("> set timeout reset, set watchdog, wait thrice, check for reboot: PASSED");
+
+	mtspr(SPR_TCR, TCR_WRC_RESET);
 
 	watchdog = 0;
 	enable_critint();
@@ -160,9 +180,9 @@ void start(void)
 
 	init();
 
-	printf("Watchdog test\n");
+	printf("\n\nWatchdog test\n");
 
-	mtspr(SPR_TCR, TCR_WRC_RESET);
+	mtspr(SPR_TCR, TCR_WRC_NOP);
 
 	if (test1())
 		printf("PASSED\n");
@@ -193,10 +213,14 @@ void start(void)
 	mtspr(SPR_TCR, TCR_WP_SET(0));
 
 	test5();
-	printf("FAILED\n");
+	printf("\010\010\010\010\010\010PASSED\n");
+	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+	mtspr(SPR_TCR, TCR_WP_SET(0));
+
+	test6();
+	printf("\010\010\010\010\010\010FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 	mtspr(SPR_TCR, TCR_WP_SET(0));
 
 	printf("Test Complete\n");
-
 }
