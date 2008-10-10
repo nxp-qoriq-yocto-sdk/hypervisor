@@ -9,7 +9,7 @@ $use_uart3 = 1
 
 # simple guest
 $guest_image[0]  = "gdb-hello"
-$guest_addr[0]   = 0xe8200000
+$guest_addr[0]   = 0x00200000
 
 $kernel_image  = "hv.uImage"
 

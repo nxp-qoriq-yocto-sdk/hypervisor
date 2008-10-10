@@ -5,7 +5,7 @@
 $use_uart1 = 1
 
 $guest_image[0]  = "watchdog"
-$guest_addr[0]   = 0xe8200000
+$guest_addr[0]   = 0x00200000
 
 $kernel_image  = "hv.uImage"
 

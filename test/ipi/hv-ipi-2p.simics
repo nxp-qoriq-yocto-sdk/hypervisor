@@ -6,11 +6,11 @@ $use_uart1 = 1
 
 # simple guest
 $guest_image[0]  = "ipi"
-$guest_addr[0]   = 0xe8200000
+$guest_addr[0]   = 0x00200000
 
 
 $guest_image[1]  = "ipi1"
-$guest_addr[1]   = 0xe8300000
+$guest_addr[1]   = 0x00300000
 
 $kernel_image  = "hv.uImage"
 
