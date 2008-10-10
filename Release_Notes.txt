@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc2
-Date: 10/3/2008
+Revsion: 0.3-rc3
+Date: 10/10/2008
 
 -------------------------------------------------------
 Contents
@@ -23,16 +23,33 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc1
-      -is compatible with Simics P4080 4.0.18 / 4.0.pre3
-       and P4080 4.0.19 / 4.0.pre4
-      -it is not compatible with P4080 4.0.20 / 4.0.pre5
+   -Topaz 0.3-rc3
+      -is compatible with P4080 4.0.20 / 4.0.pre5
+      -the unit tests are not compatible with earlier versions
+       of simics due a model change with respect to flash
 
    -in sync with Embedded Hypervisor Architecture specifciation
     0.81
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc3 bug fixes and changes
+      -L1 and L2 cache control register access is now
+       supported (as per 0.81 Topaz spec)-- a few L2
+       registers are still missing
+      -TLB cache bug is fixed that resulted in segmentation
+       faults in Linux
+      -bug 2166 (TLB search not giving proper tsize for TLB0)
+       is fixed
+      -bug 2167 (Compilation error on changing PHYSMAPSIZE
+        macro used in head.S) is fixed
+      -bug 2152 - update to unit tests to run with new 
+       Simics model
+      -fix handling of multiple pending guest doorbells
+      -sim.git is now a submodule of the hypervisor and
+       will be used as basis for the unit tests-- u-boot
+       and boot.simics will come from here
 
    -Topaz 0.3-rc2 bug fixes and changes
       -guest watchdog support is implemented (see limitations
