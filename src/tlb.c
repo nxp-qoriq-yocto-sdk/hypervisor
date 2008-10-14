@@ -320,7 +320,11 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
 	assert(!(mas0 & MAS0_TLBSEL1));
 
 	ret = find_gtlb_entry(vaddr, tag, &set, &way);
-	if (ret && (mas1 & MAS1_VALID) &&
+
+	if (unlikely(!(mas1 & MAS1_VALID)))
+		tag.valid = 0;
+
+	if (ret && tag.valid &&
 	    unlikely(way != MAS0_GET_TLB0ESEL(mas0))) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "existing: tag 0x%08lx entry 0x%08x 0x%08x way %d\n",
