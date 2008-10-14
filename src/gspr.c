@@ -279,6 +279,58 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_L2CSR1);
 		break;
 
+	case SPR_L2ERRDIS:
+		*val = mfspr(SPR_L2ERRDIS);
+		break;
+
+	case SPR_L2ERRDET:
+		*val = mfspr(SPR_L2ERRDET);
+		break;
+
+	case SPR_L2ERRINTEN:
+		*val = mfspr(SPR_L2ERRINTEN);
+		break;
+
+	case SPR_L2ERRCTL:
+		*val = mfspr(SPR_L2ERRCTL);
+		break;
+
+	case SPR_L2ERRATTR:
+		*val = mfspr(SPR_L2ERRATTR);
+		break;
+
+	case SPR_L2ERRADDR:
+		*val = mfspr(SPR_L2ERRADDR);
+		break;
+
+	case SPR_L2ERREADDR:
+		*val = mfspr(SPR_L2ERREADDR);
+		break;
+
+	case SPR_L2CAPTDATAHI:
+		*val = mfspr(SPR_L2CAPTDATAHI);
+		break;
+
+	case SPR_L2CAPTDATALO:
+		*val = mfspr(SPR_L2CAPTDATALO);
+		break;
+
+	case SPR_L2CAPTECC:
+		*val = mfspr(SPR_L2CAPTECC);
+		break;
+
+	case SPR_L2ERRINJCTL:
+		*val = mfspr(SPR_L2ERRINJCTL);
+		break;
+
+	case SPR_L2ERRINJLO:
+		*val = mfspr(SPR_L2ERRINJLO);
+		break;
+
+	case SPR_L2ERRINJHI:
+		*val = mfspr(SPR_L2ERRINJHI);
+		break;
+
 	case SPR_MMUCSR0:
 		*val = 0;
 		break;
