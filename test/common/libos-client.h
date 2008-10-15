@@ -24,52 +24,19 @@
  */
 
 
+#ifndef LIBOS_CLIENT_H
+#define LIBOS_CLIENT_H
 
-#include <libos/libos.h>
-#include <libos/hcalls.h>
-#include <libos/core-regs.h>
-#include <libos/trapframe.h>
-#include <libos/bitops.h>
-#include <libfdt.h>
+#define CCSRBAR_VA 0xfe000000
 
-void init(unsigned long devtree_ptr);
+#define PHYSBASE 0x20000000
+#define BASE_TLB_ENTRY 15
 
-int irq;
-extern void *fdt;
+#ifndef _ASM
+typedef int client_cpu_t;
+#endif
 
-void ext_int_handler(trapframe_t *frameptr)
-{
-	unsigned int vector;
-	fh_vmpic_iack(&vector);
-	printf("ext int %d\n",vector);
-	fh_vmpic_eoi(irq);
+#define EXC_DECR_HANDLER dec_handler
+#define EXC_EXT_INT_HANDLER ext_int_handler
 
-}
-
-void start(unsigned long devtree_ptr)
-{
-	uint32_t status;
-	char *str;
-	uint32_t handle;
-	int node = -1;
-	int len;
-
-	init(devtree_ptr);
-
-	node = fdt_path_offset(fdt, "/hypervisor/handles/byte-channel0");
-	if (node < 0) {
-		printf("0 device tree error %d\n",node);
-		return;
-	}
-	const int *prop = fdt_getprop(fdt, node, "reg", &len);
-	if (prop) {
-		handle = *prop;	
-	} else {
-		printf("device tree error\n");
-		return;
-	}
-
-	str = "hello world\r\n";
-	status = fh_byte_channel_send(handle, strlen(str), str);
-
-}
+#endif

@@ -28,22 +28,21 @@
 # emit_td uses the register information in GDB_REG_DEFS_H to generate
 # E500MC_DATA_H. e500mc-xml-dump emits out the XML target description.
 
-HEADERS_DIR = include
+HEADERS_DIR = $(src)include
 GEN_HEADERS_DIR = bin/include
-GEN_FILES_DIR = bin
 
 GDB_REG_DEFS_H := $(HEADERS_DIR)/gdb-register-defs.h
 E500MC_DATA_H := $(GEN_HEADERS_DIR)/e500mc-data.h
 
 EMIT_TD_C := $(TDGEN_DIR)/emit_td.c
-EMIT_TD := $(GEN_FILES_DIR)/emit_td
+EMIT_TD := bin/emit_td
 
 E500MC_XML_DUMP_C := $(TDGEN_DIR)/e500mc-xml-dump.c
-E500MC_XML_DUMP := $(GEN_FILES_DIR)/e500mc-xml-dump
+E500MC_XML_DUMP := bin/e500mc-xml-dump
 
-POWER_CORE_XML := $(GEN_FILES_DIR)/power-core.xml
-POWER_FPU_XML := $(GEN_FILES_DIR)/power-fpu.xml
-POWERPC_E500MC_XML := $(GEN_FILES_DIR)/powerpc-e500mc.xml
+POWER_CORE_XML := bin/power-core.xml
+POWER_FPU_XML := bin/power-fpu.xml
+POWERPC_E500MC_XML := bin/powerpc-e500mc.xml
 
 $(EMIT_TD) : $(EMIT_TD_C) $(GDB_REG_DEFS_H)
 	$(HOSTCC) $(HOSTCC_OPTS) $(HOSTCC_OPTS_C) -o $@ $<

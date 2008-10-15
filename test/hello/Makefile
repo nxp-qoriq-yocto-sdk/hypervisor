@@ -22,30 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-all: hello_all
+test := hello
+dir := $(src)test/$(test)/
 
-include ../Makefile.inc
-
-HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) hello.c
-HELLO_OBJS := $(basename $(HELLO_SRCS))
-HELLO_OBJS := $(HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-HELLO_OBJS := $(HELLO_OBJS:%=bin/%)
-
-hello_all: bin/hello.bin bin/hello.map bin/hv.dtb
-
-bin/hello.bin: bin/hello
-	$(CROSS_COMPILE)objcopy -O binary $< $@
-
-bin/hello: $(HELLO_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(HELLO_OBJS) -lgcc
-
-bin/hello.map: bin/hello
-	nm -n bin/hello > $@
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(HELLO_OBJS:.o=.d)
-endif
-
-bin/hv.dtb: hv.dts bin/p1.dtb
-
-bin/p1.dtb: p1.dts
+include $(src)test/common/Makefile.inc

@@ -68,7 +68,7 @@ void process_rx_intr(uint32_t handle_num)
 	uint32_t status;
 	uint32_t rxavail;
 	uint32_t txavail;
-	int i, ret;
+	int ret;
 	char buf[BC_INT_Q_SIZE*2];
 	unsigned int cnt, count = 0;
 
@@ -185,12 +185,8 @@ void start(unsigned long devtree_ptr)
 {
 	char *str;
 	uint32_t status;
-	uint32_t save_status;
 	uint32_t rxavail;
 	uint32_t txavail;
-	int i;
-	int node = -1;
-	int len;
 	int ret;
 	int *prop;
 	int avail, bal;
