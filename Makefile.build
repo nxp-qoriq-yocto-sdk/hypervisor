@@ -239,7 +239,7 @@ test-partman-hello: bin/hv.uImage test/linux
 .PHONY: FORCE
 FORCE:
 
-test/%: bin/hv.uImage FORCE
+test-%: bin/hv.uImage FORCE
 	@$(MKDIR) test
 	@$(MAKE) -C test -f $(src)test/Makefile $*
 

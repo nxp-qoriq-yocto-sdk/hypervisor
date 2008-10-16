@@ -64,6 +64,7 @@ $(non-config): $(O)include/config/auto.conf
 
 clean:
 	rm -rf $(O)bin/
+	rm -rf $(O)test/
 	rm -rf $(O)include/config
 
 .PHONY: distclean
