@@ -1289,6 +1289,10 @@ static int init_guest_primary(guest_t *guest, int partition,
 	pamu_partition_init(guest);
 #endif
 
+	// Get the watchdog timeout options
+	prop = fdt_getprop(fdt, guest->partition, "fsl,hv-wd-mgr-notify", NULL);
+	guest->wd_notify = !!prop;
+
 	start_guest_primary();
 	return 0;
 

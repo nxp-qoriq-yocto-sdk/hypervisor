@@ -156,15 +156,32 @@ void watchdog_trap(trapframe_t *regs)
 	 * second timeout.
 	 */
 	if (gcpu->watchdog_timeout) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			"Watchdog: restarting partition\n");
+		guest_t *guest = gcpu->guest;
 
-		/* Disable the watchdog so we don't get another interrupt
-		 * while we're restarting the guest.
-		 */
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			"Watchdog: second timeout\n");
+
+		// Turn of TCR[WIE] so that watchdog_trap() isn't called again,
+		// or prevent watchdog timeout during restart of the guest
 		mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_WIE);
-		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-		restart_guest(gcpu->guest);
+
+		// Does the guest want nothing to happen?
+		if (!(gcpu->timer_flags & TCR_WRC))
+			return;
+
+		// Either we notify the manager or we restart the guest.
+		if (guest->wd_notify) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+				"Watchdog: notifying manager\n");
+
+			// FIXME: add notification here
+			// vpic_assert_vint()
+		} else {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+				"Watchdog: restarting partition\n");
+
+			restart_guest(guest);
+		}
 		return;
 	}
 

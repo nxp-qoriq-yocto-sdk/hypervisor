@@ -130,6 +130,9 @@ typedef struct guest {
 	gstate_t state;
 
 	int guest_cache_lock;
+
+	/** Watchdog notify manager partition on time-out: 0=no, 1=yes */
+	int wd_notify;
 } guest_t;
 
 #define MAX_PARTITIONS 8
