@@ -152,16 +152,13 @@ endif
 bin/hv.map: bin/hv
 	nm -n bin/hv > $@
 
-.PHONY: test-gdb-hello test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
+.PHONY: test-gdb-hello test-gdb test-msgsnd test-vmpic test-linux-1p test-linux-2p
 
 test-gdb-hello: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb-4p.simics
 
 test-gdb: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb.simics
-
-test-hello: bin/hv.uImage test/hello
-	$(SIMICS) test/hello/run.simics
 
 test-msgsnd: bin/hv.uImage test/msgsnd
 	$(SIMICS) test/msgsnd/hv-msgsnd.simics
@@ -200,9 +197,6 @@ test-ipi-coreint: bin/hv.uImage test/ipi
 
 test-fit: bin/hv.uImage test/fit
 	$(SIMICS) test/fit/hv-fit.simics
-
-test-byte-chan: bin/hv.uImage test/byte-chan
-	$(SIMICS) test/byte-chan/hv-byte_chan.simics
 
 test-whoami: bin/hv.uImage test/whoami
 	$(SIMICS) test/whoami/hv-whoami.simics
