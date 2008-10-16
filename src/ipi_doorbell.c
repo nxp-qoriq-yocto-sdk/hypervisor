@@ -38,6 +38,30 @@
 #include <vpic.h>
 #include <vmpic.h>
 
+/**
+ * send_doorbells - send a doorbell interrupt to all receivers for a doorbell
+ *
+ * returns the number of doorbell interrupts sent
+ */
+unsigned int send_doorbells(struct ipi_doorbell *dbell)
+{
+	register_t saved;
+	unsigned int count = 0;
+
+	saved = spin_lock_critsave(&dbell->dbell_lock);
+	if (dbell->recv_head) {
+		guest_recv_dbell_list_t *receiver = dbell->recv_head;
+		while (receiver) {
+			vpic_assert_vint(receiver->guest_vint);
+			receiver = receiver->next;
+			count++;
+		}
+	}
+	spin_unlock_critsave(&dbell->dbell_lock, saved);
+
+	return count;
+}
+
 void create_doorbells(void)
 {
 	int off = -1, ret;

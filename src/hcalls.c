@@ -379,11 +379,8 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 #ifdef CONFIG_IPI_DOORBELL
 static void fh_partition_send_dbell(trapframe_t *regs)
 {
-	register_t saved;
 	guest_t *guest = get_gcpu()->guest;
 	ipi_doorbell_handle_t *db_handle;
-	struct ipi_doorbell *dbell;
-	guest_recv_dbell_list_t *tmp;
 
 	unsigned int handle = regs->gpregs[3];
 
@@ -399,23 +396,7 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 		return;
 	}
 
-	dbell = db_handle->dbell;
-
-	saved = spin_lock_critsave(&dbell->dbell_lock);
-	if (dbell->recv_head == NULL) {
-		spin_unlock_critsave(&dbell->dbell_lock, saved);
-		regs->gpregs[3] = FH_ERR_CONFIG;
-		return;
-	} else {
-		tmp =  dbell->recv_head;
-		while (tmp) {
-			vpic_assert_vint(tmp->guest_vint);
-			tmp = tmp->next;
-		}
-	}
-	spin_unlock_critsave(&dbell->dbell_lock, saved);
-
-	regs->gpregs[3] = 0;  /* success */
+	regs->gpregs[3] = send_doorbells(db_handle->dbell) ? 0 : FH_ERR_CONFIG;
 }
 #else
 #define fh_partition_send_dbell unimplemented

@@ -197,6 +197,24 @@
 		};
 	};
 
+	doorbells {
+		doorbell@0 {
+			// part2 state change notification
+			// in the future, the HV will create this node automatically
+			compatible = "fsl,hv-doorbell";
+		};
+		doorbell@1 {
+			// part2 watchdog expiration notification
+			// in the future, the HV will create this node automatically
+			compatible = "fsl,hv-doorbell";
+		};
+		doorbell@2 {
+			// part2 reset request
+			// in the future, the HV will create this node automatically
+			compatible = "fsl,hv-doorbell";
+		};
+	};
+
 	partitions {
 		part1 {
 			compatible = "fsl,hv-partition";

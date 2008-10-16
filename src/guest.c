@@ -636,6 +636,79 @@ static const uint32_t hv_version[4] = {
 	FH_API_COMPAT_VERSION
 };
 
+/**
+ * lookup_doorbell - return the doorbell object from a special doorbell property
+ *
+ * returns NULL if there is no special doorbell property or if there was an
+ * error trying to locate the doorbell object.
+ */
+static struct ipi_doorbell *lookup_doorbell(const char *compatible,
+	guest_t *guest, int offset, struct ipi_doorbell *current)
+{
+	const char *path;
+	struct ipi_doorbell *dbell;
+
+	// Look for the doorbell receive handle node via its 'compatible' property
+	offset = fdt_node_offset_by_compatible(guest->devtree, offset, compatible);
+	if (offset < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL, // LOGLEVEL_DEBUG,
+			"%s: guest %s, no %s doorbell\n", __func__, guest->name, compatible);
+		return NULL;
+	}
+
+	// Make sure this node really is a doorbell receive handle.
+	if (fdt_node_check_compatible(guest->devtree, offset, "fsl,hv-doorbell-receive-handle")) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: guest %s, %s node is not a doorbell receive handle\n",
+			__func__, guest->name, compatible);
+		return NULL;
+	}
+
+	// Get the path of the master doorbell node for this doorbell receive
+	// handle.  This could be an alias.
+	path = fdt_getprop(guest->devtree, offset, "fsl,endpoint", NULL);
+	if (!path) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: guest %s, no endpoint property for %s doorbell receive handle\n",
+			__func__, guest->name, compatible);
+		return NULL;
+	}
+
+	// Get the offset of the doorbell node in the master device tree.
+	offset = lookup_alias(fdt, path);
+	if (offset < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: guest %s, endpoint %s does not exist\n",
+			__func__, guest->name, path);
+		return NULL;
+	}
+
+	// Convert the offset to a doorbell object
+	dbell = ptr_from_node(fdt, offset, "doorbell");
+	if (!dbell) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			 "%s: guest %s, no doorbell object for endpoint %s\n",
+			__func__, guest->name, path);
+		return NULL;
+	}
+
+	// If 'current' is non-zero, then this is not the first manager for
+	// this partition, and the previous manager(s) have already defined
+	// a doorbell for this event.  If so, we need to make sure that this
+	// new manager is using the same doorbell.
+	if (current && (dbell != current)) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: guest %s, %s is already defined for a different doorbell\n",
+			__func__, guest->name, compatible);
+		return current;
+	}
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG, "%s: guest %s, found %s doorbell\n",
+		__func__, guest->name, compatible);
+
+	return dbell;
+}
+
 static int process_partition_handles(guest_t *guest)
 {
 	int off = -1;
@@ -702,6 +775,20 @@ static int process_partition_handles(guest_t *guest)
 		                  target_guest->name, strlen(target_guest->name) + 1);
 		if (ret)
 			return ret;
+
+		// Check for special doorbells.
+
+		target_guest->dbell_state_change =
+			lookup_doorbell("fsl,hv-state-change-doorbell", guest, off,
+				target_guest->dbell_state_change);
+
+		target_guest->dbell_watchdog_expiration =
+			lookup_doorbell("fsl,hv-watchdog-expiration-doorbell", guest, off,
+				target_guest->dbell_watchdog_expiration);
+
+		target_guest->dbell_restart_request =
+			lookup_doorbell("fsl,hv-reset-request-doorbell", guest, off,
+				target_guest->dbell_restart_request);
 	}
 
 	return 0;

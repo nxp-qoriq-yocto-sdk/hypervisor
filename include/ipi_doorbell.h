@@ -42,6 +42,7 @@ typedef struct ipi_doorbell_handle {
 } ipi_doorbell_handle_t;
 
 /* Prototypes for functions in ipi_doorbell.c */
+unsigned int send_doorbells(struct ipi_doorbell *dbell);
 void create_doorbells(void);
 void send_dbell_partition_init(guest_t *guest);
 void recv_dbell_partition_init(guest_t *guest);

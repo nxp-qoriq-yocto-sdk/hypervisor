@@ -47,6 +47,7 @@ struct guest;
 #define MAX_HANDLES 1024
 
 struct handle;
+struct ipi_doorbell;
 
 /** General handle operations that many types of handle will implement.
  * Any member may be NULL.
@@ -133,6 +134,22 @@ typedef struct guest {
 
 	/** Watchdog notify manager partition on time-out: 0=no, 1=yes */
 	int wd_notify;
+
+	/** The doorbell handle to use to signal a state change in the
+	 *  this partition.  The receivers are the managers of this partition.
+	 */
+	struct ipi_doorbell *dbell_state_change;
+
+	/** The doorbell handle to use to signal the expiration of
+	 *  watchdog in this partition.  The receivers are the managers of
+	 *  this partition.
+	 */
+	struct ipi_doorbell *dbell_watchdog_expiration;
+
+	/** The doorbell handle to use to request a restart of
+	 *  this partition.  The receivers are the managers of this partition.
+	 */
+	struct ipi_doorbell *dbell_restart_request;
 } guest_t;
 
 #define MAX_PARTITIONS 8

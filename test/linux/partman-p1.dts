@@ -1,5 +1,7 @@
 /dts-v1/;
 
+// Guest device tree for the manager partition
+
 / {
 	compatible = "fsl,hv-platform-p4080";
 	model = "fsl,hv-partman";
@@ -96,10 +98,34 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "fsl,hv-handles";
+			interrupt-parent = <&vmpic>;
 			
 			partition@1 {
 				compatible = "fsl,hv-partition-handle";
 				fsl,endpoint = "/partitions/part2";
+
+				doorbell@0 {
+					// receive doorbell for state changes
+					// in the future, the HV will create this node automatically
+					compatible = "fsl,hv-state-change-doorbell",
+						"fsl,hv-doorbell-receive-handle";
+					fsl,endpoint = "/doorbells/doorbell@0";
+				};
+				doorbell@1 {
+					// receive doorbell for watchdog expiration
+					// in the future, the HV will create this node automatically
+					compatible = "fsl,hv-watchdog-expiration-doorbell",
+						"fsl,hv-doorbell-receive-handle";
+					fsl,endpoint = "/doorbells/doorbell@1";
+				};
+				doorbell@2 {
+					// receive doorbell for state changes
+					// in the future, the HV will create this node automatically
+					compatible = "fsl,hv-reset-request-doorbell",
+						"fsl,hv-doorbell-receive-handle";
+					fsl,endpoint = "/doorbells/doorbell@2";
+				};
+
 			};
 		};
 	};
