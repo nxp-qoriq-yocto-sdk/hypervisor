@@ -43,6 +43,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/mman.h>
 
 /*
@@ -741,12 +742,81 @@ static int cmd_restart(struct parameters *p)
 	return ret;
 }
 
+/**
+ * verify_dev - verify that the management driver is loaded and /dev/fsl-hv is correct
+ *
+ * This function shouldn't be neccessary, but too many people are having
+ * problems with their root file systems, so here we try to help them out.
+ *
+ * returns 0 if it isn't, 1 if it's okay
+ */
+int verify_dev(void)
+{
+	struct stat statbuf;
+	int ret;
+	FILE *f;
+	unsigned int major, minor;
+
+	f = fopen("/sys/class/misc/fsl-hv/dev", "r");
+	if (!f) {
+		printf("Freescale HV management driver has not been loaded.\n");
+		printf("Please load the driver or rebuild the kernel with this driver enabled.\n");
+		return 0;
+	}
+	ret = fscanf(f, "%u:%u", &major, &minor);
+	if ((ret != 2) || (major == 0)) {
+		printf("Could not read the sysfs entry for the HV management driver.\n");
+		return 0;
+	}
+	fclose(f);
+
+	if (stat("/dev/fsl-hv", &statbuf))
+	{
+		switch (errno) {
+		case EACCES:
+			printf("Permissions on /dev/fsl-hv are incorrect.  As root, try this:\n");
+			printf("chmod a+rw /dev/fsl-hv\n");
+			printf("and try partman again\n");
+			return 0;
+		case ENOENT:
+			printf("/dev/fsl-hv does not exist.  Please check your root file system.\n");
+			printf("As a temporary fix, do this as root:\n");
+			printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+			return 0;
+		default:
+			printf("Something is wrong with /dev/fsl-hv (errno=%i).\n", errno);
+			return 0;
+		}
+	}
+
+	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
+		printf("/dev/fsl-hv is not a character device.  Please check your root file system.\n");
+		printf("As a temporary fix, do this as root:\n");
+		printf("rm -f /dev/fsl-hv\n");
+		printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		return 0;
+	}
+
+	if ((major(statbuf.st_rdev) != major) || (minor(statbuf.st_rdev) != minor)) {
+		printf("Major and/or minor number of /dev/fsl-hv are wrong.\n");
+		printf("Please check your root file system.  As a temporary fix, do this as root:\n");
+		printf("rm -f /dev/fsl-hv\n");
+		printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		return 0;
+	}
+
+	return 1;
+}
+
 int main(int argc, char *argv[])
 {
 	enum command cmd = e_none;
 	struct parameters p;
 	int c;
 	int ret = 0;
+
+	if (!verify_dev())
+		return 1;
 
 	memset(&p, 0, sizeof(p));
 
