@@ -226,7 +226,7 @@
 			compatible = "fsl,hv-partition";
 			label = "linux p1";
 			fsl,hv-cpus = <0 2>;
-			fsl,hv-dtb = /incbin/("bin/linux-p1.dtb");
+			fsl,hv-dtb = /incbin/("linux-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x20000000 0 0x20000000>; // gphys:0x0 phys:0x20000000 size:512MB
 			fsl,hv-load-image-table = <0 0xe8100000 0 0 0 0
 			                           0 0xe8600000 0 0x01300000 0 0x00800000>;
@@ -237,7 +237,7 @@
 			compatible = "fsl,hv-partition";
 			label = "linux p2";
 			fsl,hv-cpus = <2 4>;
-			fsl,hv-dtb = /incbin/("bin/linux-p2.dtb");
+			fsl,hv-dtb = /incbin/("linux-p2.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x40000000 0 0x04000000>; // gphys:0x0 phys:0x40000000 size:64MB
 			fsl,hv-load-image-table = <0 0xe8800000 0 0 0 0
 			                           0 0xe8d00000 0 0x01300000 0 0x00800000>;

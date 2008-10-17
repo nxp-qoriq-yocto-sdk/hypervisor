@@ -152,8 +152,6 @@ endif
 bin/hv.map: bin/hv
 	nm -n bin/hv > $@
 
-.PHONY: test-gdb-hello test-gdb test-msgsnd test-vmpic test-linux-1p test-linux-2p
-
 test-gdb-hello: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb-4p.simics
 
@@ -168,23 +166,6 @@ test-vmpic: bin/hv.uImage test/vmpic
 
 test-vmpic-coreint: bin/hv.uImage test/vmpic
 	$(SIMICS) test/vmpic/hv-vmpic-coreint.simics
-
-test-linux-1p: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-1p.simics
-
-test-linux-fman: bin/hv.uImage test/linux
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(SIMICS) -e '$$create_fman=TRUE' test/linux/hv-linux-fman.simics
-
-test-linux-intmap: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-intmap.simics
-
-test-partman: bin/hv.uImage test/linux
-	@$(MKDIR) bin/test/linux
-	$(MAKE) -C bin/test/linux -f $(src)test/linux/Makefile rootfs
-	$(SIMICS) test/linux/hv-partman.simics
-
-test-linux-2p: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-2p.simics
 
 test-ipi-1p: bin/hv.uImage test/ipi
 	$(SIMICS) test/ipi/hv-ipi.simics

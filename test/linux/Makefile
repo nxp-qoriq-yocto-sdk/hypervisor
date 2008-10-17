@@ -30,81 +30,55 @@
 # The env var $CROSS_COMPILE should be set to powerpc-unknown-linux-gnu-
 #
 
-all: dtbs
+test := linux
+dir := $(testdir)$(test)/
 
-NO_LIBOS=y
-include ../Makefile.inc
+$(test)-dts := $(wildcard $(dir)*.dts)
+$(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
+$(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
+$(test)-part-dts := $(filter-out bin/$(test)/hv-%.dts,$($(test)-bin-dts))
 
-.PHONY: dtbs mount umount rootfs
+$(test)-hv-dtb := $($(test)-hv-dts:%.dts=%.dtb)
+$(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
-dtbs: bin/hv-linux-1p.dtb bin/hv-linux-2p.dtb bin/hv-linux-intmap.dtb bin/hv-partman.dtb \
-      bin/hv-demo.dtb bin/hv-hello.dtb bin/hv-linux-fman.dtb
+$($(test)-hv-dts): $($(test)-part-dtb)
 
-bin/hv-linux-1p.dtb: bin/linux-p1.dtb hv-linux-1p.dts
+bin/$(test)/hv-linux-fman.dtb: bin/common/p4080master.dts
 
-bin/hv-linux-fman.dtb: bin/linux-fman-p1.dtb hv-linux-fman.dts ../common/p4080master.dts
+include $(src)tools/partman/Makefile
 
-bin/hv-linux-intmap.dtb: bin/linux-intmap.dtb hv-linux-intmap.dts
+.PHONY: $(test)
+$(test): $($(test)-hv-dtb)
 
-bin/hv-linux-2p.dtb: bin/linux-p2.dtb bin/linux-p1.dtb hv-linux-2p.dts
+$(test)-run-%: $(test)
+	$(SIMICS) $(dir)$*.simics
 
-bin/hv-partman.dtb: bin/partman-p2.dtb bin/partman-p1.dtb hv-partman.dts
+define mount
+	$(call show,mount: bin/linux/$(1))
+	$(V)mkdir -p bin/linux/$(1)
+	$(V)gunzip < $(testdir)linux/$(1).ext2.gz > bin/linux/$(1).ext2
+	$(V)sudo mount -t ext2 -o rw,loop bin/linux/$(1).ext2 bin/linux/$(1)
+endef
 
-bin/hv-demo.dtb: bin/demo-p2.dtb bin/demo-p1.dtb hv-demo.dts
-
-bin/hv-hello.dtb: bin/hello-p2.dtb bin/partman-p1.dtb hv-hello.dts
-
-../../tools/partman/bin/partman: ../../tools/partman/partman.c
-	make -C ../../tools/partman
-
-# Mount rootfs2.ext.gz into the bin directory
-mount2:
-	cp -f rootfs.ext2.gz bin/rootfs2.ext2.gz
-	gunzip -f bin/rootfs2.ext2.gz
-	mkdir -p bin/rootfs
-	sudo mount -t ext2 -o rw,loop bin/rootfs2.ext2 bin/rootfs
-
-# Unmount the rootfs, saving all changes
-umount2:
-	sudo umount -d bin/rootfs
-	rmdir bin/rootfs
-	gzip bin/rootfs2.ext2
-
-# Mount rootfs3.ext.gz into the bin directory
-mount3:
-	cp -f rootfs.ext2.gz bin/rootfs3.ext2.gz
-	gunzip -f bin/rootfs3.ext2.gz
-	mkdir -p bin/rootfs
-	sudo mount -t ext2 -o rw,loop bin/rootfs3.ext2 bin/rootfs
-
-# Unmount the rootfs, saving all changes
-umount3:
-	sudo umount -d bin/rootfs
-	rmdir bin/rootfs
-	gzip bin/rootfs3.ext2
-
-# Mount rootfs.ext.gz into the bin directory
-mount:
-	gunzip rootfs.ext2.gz
-	mkdir -p bin/rootfs
-	sudo mount -t ext2 -o rw,loop rootfs.ext2 bin/rootfs
-
-# Unmount the rootfs, saving all changes
-umount:
-	sudo umount -d bin/rootfs
-	rmdir bin/rootfs
-	gzip rootfs.ext2
+define unmount
+	$(call show,unmount: $(1))
+	$(V)sudo umount -d $(1)
+	$(V)gzip -f $(1).ext2
+endef
 
 # Add vmlinux and partman to the rootfs
-rootfs: vmlinux ../../tools/partman/bin/partman
-	make mount2
-	sudo cp -u ../../tools/partman/bin/partman bin/rootfs/bin
-	sudo cp -u vmlinux bin/rootfs/
-	sudo cp -u rootfs.ext2.gz bin/rootfs/
-	make umount2
+bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.gz
+	$(call mount,rootfs-partman)
+	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
+	sudo cp -af $(testdir)linux/vmlinux bin/linux/rootfs-partman/
+	sudo cp -af $(testdir)linux/rootfs.ext2.gz bin/linux/rootfs-partman/
+	$(call unmount,bin/linux/rootfs-partman)
 
-rootfs3: ../../tools/partman/bin/partman
-	make mount3
-	sudo cp -u ../../tools/partman/bin/partman bin/rootfs/bin
-	sudo cp -u hello bin/rootfs/
-	make umount3
+bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(dir)rootfs-hello.ext2.gz
+	$(call mount,rootfs-hello)
+	sudo cp -af bin/linux/partman bin/linux/rootfs-hello/bin/
+	sudo cp -af $(testdir)linux/hello bin/linux/rootfs-hello/
+	$(call unmount,bin/linux/rootfs-hello)
+
+$(test)-run-partman $(test)-run-demo: bin/$(test)/rootfs-partman.ext2.gz
+$(test)-run-hello: bin/$(test)/rootfs-hello.ext2.gz

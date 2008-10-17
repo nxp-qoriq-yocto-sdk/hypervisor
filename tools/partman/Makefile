@@ -21,14 +21,8 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CC=$(CROSS_COMPILE)gcc
-
-all: bin/partman
-
-bin/partman: partman.c
-	@mkdir -p `dirname $@`
-	$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
-	$(CROSS_COMPILE)strip $@
-
-clean:
-	rm -rf bin
+bin/linux/partman: $(src)tools/partman/partman.c
+	@mkdir -p $(@D)
+	$(call show,build $<)
+	$(V)$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
+	$(V)$(CROSS_COMPILE)strip $@

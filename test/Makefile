@@ -41,7 +41,7 @@ config:
 else
 
 #SUBDIRS = $(wildcard $(src)*)
-SUBDIRS = hello byte-chan
+SUBDIRS = hello byte-chan linux
 
 include include/config/auto.conf
 
