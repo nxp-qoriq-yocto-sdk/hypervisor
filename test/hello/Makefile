@@ -23,6 +23,6 @@
 #
 
 test := hello
-dir := $(src)test/$(test)/
+dir := $(testdir)$(test)/
 
-include $(src)test/common/Makefile.inc
+include $(testdir)common/Makefile.inc
