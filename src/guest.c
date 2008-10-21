@@ -43,6 +43,7 @@
 #include <devtree.h>
 #include <errors.h>
 #include <elf.h>
+#include <uimage.h>
 #include <events.h>
 #include <doorbell.h>
 #include <gdb-stub.h>
@@ -536,6 +537,7 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
                                  phys_addr_t guest_phys, size_t length,
                                  register_t *entry)
 {
+	int ret;
 	void *image = map_flash(image_phys);
 	if (!image) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -550,7 +552,11 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
 		return load_elf(guest, image, length, guest_phys, entry);
 	}
 
-	/* It's not an ELF image, so it must be a binary. */
+	ret = load_uimage(guest, image, length, guest_phys, entry);
+	if (ret != ERR_UNHANDLED)
+		return ret;
+
+	/* Neither an ELF image nor uImage, so it must be a binary. */
 
 	if (!length || (length == (size_t) -1)) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
