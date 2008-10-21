@@ -13,16 +13,17 @@ $use_uart1_net = 1
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
-$guest_image[1]  = "bin/rootfs3.ext2.gz"
+$guest_image[1]  = "rootfs-hello.ext2.gz"
 $guest_addr[1]   = 0x00800000
 
 $kernel_image  = "hv.uImage"
 
 $dtb_image  = "hv-hello.dtb"
 
-add-directory "%script%/../common" -prepend
-add-directory "%script%/../../bin" -prepend
-add-directory "%script%/bin" -prepend
 add-directory "%script%" -prepend
+add-directory "%script%/../common" -prepend
+add-directory "../bin" -prepend
+add-directory "bin" -prepend
+add-directory "bin/linux" -prepend
 
 run-command-file "hvsim.include"                                                                 

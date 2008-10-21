@@ -168,15 +168,6 @@
 			interrupt-parent = <&mpic>;
 		};
 
-		uart3: serial@11d600 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <0x11d600 0x100>;
-			clock-frequency = <0>;
-			interrupts = <37 2>;
-			interrupt-parent = <&mpic>;
-		};
-
 		global-utilities@e0000 {	//global utilities block
 			compatible = "fsl,p4080-guts";
 			reg = <0xe0000 0x1000>;
@@ -222,7 +213,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 2>;
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
-			fsl,hv-dtb = /incbin/("bin/byte_chan-p1.dtb");
+			fsl,hv-dtb = /incbin/("p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 		};

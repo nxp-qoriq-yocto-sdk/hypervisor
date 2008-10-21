@@ -5,74 +5,75 @@
 PHONY += oldconfig xconfig gconfig menuconfig config silentoldconfig update-po-config
 HOSTCC := cc
 HOSTCXX := c++
-HOSTCFLAGS := -O2 -DPROJECT=\"Topaz\" -DPROJECTADJ=\"Topaz\" -I"$(obj)"
+HOSTCFLAGS := -O2 -DPROJECT=\"Topaz\" -DPROJECTADJ=\"Topaz\" -I.
 CONFIG_SHELL := sh
 MKDIR := mkdir -p
 
-Kconfig := $(srctree)/Kconfig
+Kconfig := $(src)Kconfig
+kcsrc := $(src)kconfig/
 
-xconfig: $(obj)/qconf
-	@$(MKDIR) $(srctree)/include/config
+xconfig: bin/qconf
+	@$(MKDIR) include/config
 	$< $(Kconfig)
 
-gconfig: $(obj)/gconf
-	@$(MKDIR) $(srctree)/include/config
+gconfig: bin/gconf
+	@$(MKDIR) include/config
 	$< $(Kconfig)
 
-menuconfig: $(obj)/mconf
-	@$(MKDIR) $(srctree)/include/config
+menuconfig: bin/mconf
+	@$(MKDIR) include/config
 	$< $(Kconfig)
 
-config: $(obj)/conf
-	@$(MKDIR) $(srctree)/include/config
+config: bin/conf
+	@$(MKDIR) include/config
 	$< $(Kconfig)
 
-oldconfig: $(obj)/conf
-	@$(MKDIR) $(srctree)/include/config
+oldconfig: bin/conf
+	@$(MKDIR) include/config
 	$< -o $(Kconfig)
 
-silentoldconfig: $(obj)/conf
-	@$(MKDIR) $(srctree)/include/config
+silentoldconfig: bin/conf
+	@$(MKDIR) include/config
 	$< -s $(Kconfig)
 
 # Create new linux.pot file
 # Adjust charset to UTF-8 in .po file to accept UTF-8 in Kconfig files
 # The symlink is used to repair a deficiency in arch/um
-update-po-config: $(obj)/kxgettext $(obj)/gconf.glade.h
+update-po-config: bin/kxgettext bin/gconf.glade.h
 	$(Q)echo "  GEN config"
 	$(Q)xgettext --default-domain=linux              \
 	    --add-comments --keyword=_ --keyword=N_      \
 	    --from-code=UTF-8                            \
 	    --files-from=scripts/kconfig/POTFILES.in     \
-	    --output $(obj)/config.pot
-	$(Q)sed -i s/CHARSET/UTF-8/ $(obj)/config.pot
+	    --output bin/config.pot
+	$(Q)sed -i s/CHARSET/UTF-8/ bin/config.pot
 	$(Q)ln -fs Kconfig.i386 arch/um/Kconfig.arch
 	$(Q)(for i in `ls arch/`;                        \
 	    do                                           \
 		echo "  GEN $$i";                        \
-		$(obj)/kxgettext arch/$$i/Kconfig        \
-		     >> $(obj)/config.pot;               \
+		bin/kxgettext arch/$$i/Kconfig        \
+		     >> bin/config.pot;               \
 	    done )
-	$(Q)msguniq --sort-by-file --to-code=UTF-8 $(obj)/config.pot \
-	    --output $(obj)/linux.pot
+	$(Q)msguniq --sort-by-file --to-code=UTF-8 bin/config.pot \
+	    --output bin/linux.pot
 	$(Q)rm -f arch/um/Kconfig.arch
-	$(Q)rm -f $(obj)/config.pot
+	$(Q)rm -f bin/config.pot
 
 PHONY += randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: $(obj)/conf
+randconfig: bin/conf
 	$< -r $(Kconfig)
 
-allyesconfig: $(obj)/conf
+allyesconfig: bin/conf
 	$< -y $(Kconfig)
 
-allnoconfig: $(obj)/conf
+allnoconfig: bin/conf
 	$< -n $(Kconfig)
 
-allmodconfig: $(obj)/conf
+allmodconfig: bin/conf
 	$< -m $(Kconfig)
 
-defconfig: $(obj)/conf
+defconfig: bin/conf
 ifeq ($(KBUILD_DEFCONFIG),)
 	$< -d $(Kconfig)
 else
@@ -80,7 +81,7 @@ else
 	$(Q)$< -D arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
 endif
 
-%_defconfig: $(obj)/conf
+%_defconfig: bin/conf
 	$(Q)$< -D arch/$(SRCARCH)/configs/$@ $(Kconfig)
 
 # Help text used by make help
@@ -98,7 +99,7 @@ help:
 	@echo  '  allnoconfig	  - New config where all options are answered with no'
 
 # lxdialog stuff
-check-lxdialog  := $(srctree)/$(src)/lxdialog/check-lxdialog.sh
+check-lxdialog  := $(kcsrc)lxdialog/check-lxdialog.sh
 
 # Use recursively expanded variables so we do not call gcc unless
 # we really need to do so. (Do not call gcc as part of make mrproper)
@@ -106,11 +107,11 @@ HOST_EXTRACFLAGS = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ccflags)
 HOST_LOADLIBES   = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ldflags $(HOSTCC))
 HOST_EXTRACFLAGS += -DLOCALE
 
-$(obj)/%.o: $(src)/%.c
+bin/%.o: $(kcsrc)%.c
 	@$(MKDIR) $(@D)
 	$(HOSTCC) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $< -o $@
 
-$(obj)/%.o: $(src)/%.cc
+bin/%.o: $(kcsrc)%.cc
 	@$(MKDIR) $(@D)
 	$(HOSTCXX) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $< -o $@
 
@@ -129,16 +130,16 @@ lxdialog := lxdialog/checklist.o lxdialog/util.o lxdialog/inputbox.o
 lxdialog += lxdialog/textbox.o lxdialog/yesno.o lxdialog/menubox.o
 
 conf-objs	:= conf.o zconf.tab.o
-$(obj)/conf: $(conf-objs:%=$(obj)/%)
+bin/conf: $(conf-objs:%=bin/%)
 	$(HOSTCC) $^ -o $@
 
 mconf-objs	:= mconf.o zconf.tab.o $(lxdialog)
-mconf-objs	:= $(mconf-objs:%=$(obj)/%)
-$(obj)/mconf: $(obj)/dochecklxdialog $(mconf-objs)
+mconf-objs	:= $(mconf-objs:%=bin/%)
+bin/mconf: bin/dochecklxdialog $(mconf-objs)
 	$(HOSTCC) $(mconf-objs) $(HOST_LOADLIBES) -o $@
 
 kxgettext-objs	:= kxgettext.o zconf.tab.o
-$(obj)/kxgettext: $(kxgettext-objs:%=$(obj)/%)
+bin/kxgettext: $(kxgettext-objs:%=bin/%)
 	$(HOSTCC) $^ -o $@
 
 hostprogs-y := conf qconf gconf kxgettext
@@ -169,41 +170,41 @@ clean-files     += mconf qconf gconf
 clean-files     += config.pot linux.pot
 
 # Check that we have the required ncurses stuff installed for lxdialog (menuconfig)
-PHONY += $(obj)/dochecklxdialog
-$(obj)/dochecklxdialog:
+PHONY += bin/dochecklxdialog
+bin/dochecklxdialog:
 	$(Q)$(CONFIG_SHELL) $(check-lxdialog) -check $(HOSTCC) $(HOST_EXTRACFLAGS) $(HOST_LOADLIBES)
 
 # generated files seem to need this to find local include files
-$(obj)/lex.zconf.o: $(obj)/lex.zconf.c
+bin/lex.zconf.o: bin/lex.zconf.c
 	@$(MKDIR) $(@D)
-	$(HOSTCC) $(HOSTCFLAGS) -c -I$(src) $(HOST_EXTRACFLAGS) $< -o $@
+	$(HOSTCC) $(HOSTCFLAGS) -c -I$(kcsrc) $(HOST_EXTRACFLAGS) $< -o $@
 
-$(obj)/zconf.tab.o: $(obj)/zconf.tab.c
-	$(HOSTCC) $(HOSTCFLAGS) -c -I$(src) $(HOST_EXTRACFLAGS) $< -o $@
+bin/zconf.tab.o: bin/zconf.tab.c
+	$(HOSTCC) $(HOSTCFLAGS) -c -I$(kcsrc) $(HOST_EXTRACFLAGS) $< -o $@
 
 
-$(obj)/qconf.o: $(src)/qconf.cc
+bin/qconf.o: $(kcsrc)/qconf.cc
 	@$(MKDIR) $(@D)
 	$(HOSTCXX) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) $(KC_QT_CFLAGS) -D LKC_DIRECT_LINK $< -o $@
 
-$(obj)/qconf: $(qconf-objs:%=$(obj)/%) $(obj)/.tmp_qtcheck
-	$(HOSTCXX) $(KC_QT_LIBS) -ldl $(qconf-objs:%=$(obj)/%) -o $@
+bin/qconf: $(qconf-objs:%=bin/%) bin/.tmp_qtcheck
+	$(HOSTCXX) $(KC_QT_LIBS) -ldl $(qconf-objs:%=bin/%) -o $@
 
-$(obj)/gconf.o: $(src)/gconf.c
+bin/gconf.o: $(kcsrc)/gconf.c
 	@$(MKDIR) $(@D)
 	$(HOSTCC) $(HOSTCFLAGS) -c $(HOST_EXTRACFLAGS) -D LKC_DIRECT_LINK \
 	`pkg-config --cflags gtk+-2.0 gmodule-2.0 libglade-2.0` $< -o $@
 
-$(obj)/gconf: $(gconf-objs:%=$(obj)/%)
+bin/gconf: $(gconf-objs:%=bin/%)
 	$(HOSTCC) `pkg-config --libs gtk+-2.0 gmodule-2.0 libglade-2.0` \
 	$^ -o $@
 
 ifeq ($(qconf-target),1)
-$(obj)/.tmp_qtcheck: $(src)/Makefile
--include $(obj)/.tmp_qtcheck
+bin/.tmp_qtcheck: $(kcsrc)/Makefile
+-include bin/.tmp_qtcheck
 
 # QT needs some extra effort...
-$(obj)/.tmp_qtcheck:
+bin/.tmp_qtcheck:
 	@$(MKDIR) $(@D)
 	@set -e; echo "  CHECK   qt"; dir=""; pkg=""; \
 	pkg-config --exists qt 2> /dev/null && pkg=qt; \
@@ -246,13 +247,13 @@ $(obj)/.tmp_qtcheck:
 	echo "KC_QT_MOC=$$moc" >> $@
 endif
 
-$(obj)/gconf.o: $(obj)/.tmp_gtkcheck
+bin/gconf.o: bin/.tmp_gtkcheck
 
 ifeq ($(gconf-target),1)
--include $(obj)/.tmp_gtkcheck
+-include bin/.tmp_gtkcheck
 
 # GTK needs some extra effort, too...
-$(obj)/.tmp_gtkcheck:
+bin/.tmp_gtkcheck:
 	@$(MKDIR) $(@D)
 	@if `pkg-config --exists gtk+-2.0 gmodule-2.0 libglade-2.0`; then		\
 		if `pkg-config --atleast-version=2.0.0 gtk+-2.0`; then			\
@@ -273,25 +274,25 @@ $(obj)/.tmp_gtkcheck:
 	fi
 endif
 
-$(obj)/zconf.tab.o: $(obj)/lex.zconf.c $(obj)/zconf.hash.c
+bin/zconf.tab.o: bin/lex.zconf.c bin/zconf.hash.c
 
-$(obj)/kconfig_load.o: $(obj)/lkc_defs.h
+bin/kconfig_load.o: bin/lkc_defs.h
 
-$(obj)/qconf.o: $(obj)/qconf.moc $(obj)/lkc_defs.h
+bin/qconf.o: bin/qconf.moc bin/lkc_defs.h
 
-$(obj)/gconf.o: $(obj)/lkc_defs.h
+bin/gconf.o: bin/lkc_defs.h
 
-$(obj)/%.moc: $(src)/%.h
+bin/%.moc: $(kcsrc)/%.h
 	@$(MKDIR) $(@D)
 	$(KC_QT_MOC) -i $< -o $@
 
-$(obj)/lkc_defs.h: $(src)/lkc_proto.h
+bin/lkc_defs.h: $(kcsrc)/lkc_proto.h
 	@$(MKDIR) $(@D)
 	sed < $< > $@ 's/P(\([^,]*\),.*/#define \1 (\*\1_p)/'
 
 # Extract gconf menu items for I18N support
-$(obj)/gconf.glade.h: $(obj)/gconf.glade
-	intltool-extract --type=gettext/glade $(obj)/gconf.glade
+bin/gconf.glade.h: bin/gconf.glade
+	intltool-extract --type=gettext/glade bin/gconf.glade
 
 ###
 # The following requires flex/bison/gperf
@@ -301,9 +302,9 @@ $(obj)/gconf.glade.h: $(obj)/gconf.glade
 
 ifdef LKC_GENPARSER
 
-$(obj)/zconf.tab.c: $(src)/zconf.y
-$(obj)/lex.zconf.c: $(src)/zconf.l
-$(obj)/zconf.hash.c: $(src)/zconf.gperf
+bin/zconf.tab.c: $(kcsrc)/zconf.y
+bin/lex.zconf.c: $(kcsrc)/zconf.l
+bin/zconf.hash.c: $(kcsrc)/zconf.gperf
 
 %.tab.c: %.y
 	bison -l -b $* -p $(notdir $*) $<
@@ -318,7 +319,7 @@ lex.%.c: %.l
 	cp $@ $@_shipped
 
 else
-$(obj)/%:: $(src)/%_shipped
+bin/%:: $(kcsrc)/%_shipped
 	cp -af $< $@
 endif
 

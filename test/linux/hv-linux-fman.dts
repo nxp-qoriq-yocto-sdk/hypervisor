@@ -30,7 +30,7 @@
 		part1 {
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 4>;
-			fsl,hv-dtb = /incbin/("bin/linux-fman-p1.dtb");
+			fsl,hv-dtb = /incbin/("linux-fman-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x10000000 0 0x10000000>;
 			fsl,hv-load-image-table = <0 0xe8100000 0 0x00000000 0 0x000000
 						   0 0xe8600000 0 0x01300000 0 0x400000>;

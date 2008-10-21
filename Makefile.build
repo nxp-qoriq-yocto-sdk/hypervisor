@@ -22,28 +22,32 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SIMICS=simics
-DTC_DIR := dtc
-LIBFDT_DIR := $(DTC_DIR)/libfdt
+export SIMICS=simics
+export MKDIR=mkdir -p
+export DTC := dtc
+
+export DTC_DIR := $(src)dtc
+export LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_BIN := bin/libos
-LIBOS_CLIENT_H := include/libos-client.h
+LIBOS_CLIENT_H := $(src)include/libos-client.h
+export libos := $(src)libos/
 
-CC=$(CROSS_COMPILE)gcc
+export CC=$(CROSS_COMPILE)gcc
 #CC_OPTS=-m32 -nostdinc -Wa,-me500
-GCCINCDIR := $(shell $(CC) -print-file-name=include)
+export GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -Iinclude -Ibin/include -I$(LIBFDT_DIR) -Ilibos/include \
-	 -Ilibos/include-libc -g -std=gnu99  -include $(LIBOS_CLIENT_H)
+        -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
+        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H)
 
-CC_OPTS_NODEP := -include config/autoconf.h
+export CC_OPTS_NODEP := -include include/config/autoconf.h
 
-CC_OPTS_C= -Wall \
+export CC_OPTS_C= -Wall \
   -Wundef \
   -Wstrict-prototypes \
   -Wno-trigraphs \
   -fno-strict-aliasing \
   -fno-common \
-  -O2 \
+  -O2 -g3 \
   -msoft-float \
   -pipe \
   -ffixed-r2 \
@@ -53,14 +57,14 @@ CC_OPTS_C= -Wall \
   -mno-string \
   -fomit-frame-pointer \
   -Werror \
-  -include include/libfdt_env.h
-CC_OPTS_ASM=-D_ASM -Ibin/src -include $(LIBOS_BIN)/assym.s
-LD=$(CROSS_COMPILE)ld
-LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
-MKDIR=mkdir -p
-KCONFIG=y
+  -include libfdt_env.h
 
-TDGEN_DIR := tools/tdgen
+export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
+export LD=$(CROSS_COMPILE)ld
+export LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
+export KCONFIG=y
+
+TDGEN_DIR := $(src)tools/tdgen
 include $(TDGEN_DIR)/Makefile.tdgen
 
 HOSTCC=gcc
@@ -74,17 +78,17 @@ HOSTCC_OPTS_C= -Wall \
   -I $(GEN_HEADERS_DIR) \
   -I $(LIBOS_INC)
 
--include include/config/auto.conf
+include include/config/auto.conf
 
 all: bin/hv.uImage bin/hv.map
 
-.PRECIOUS: bin/include/%.d
-bin/include/%.d : include/%.h
+bin/include/%.d : $(src)include/%.h
 	@$(MKDIR) $(@D)
-	@$(LIBOS_DIR)/confdep "$<" "$<" > "$@"
+	$(call show,mkdep: $<)
+	$(V)$(libos)lib/confdep $< $< > $@
 
 include $(LIBFDT_DIR)/Makefile.libfdt
-include $(LIBOS_DIR)/Makefile.libos
+include $(libos)lib/Makefile.libos
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c vmpic.c gspr.c misc.S
@@ -97,18 +101,13 @@ hv-src-$(CONFIG_SHELL) += shell.c
 hv-src-$(CONFIG_PAMU) += pamu.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 
-SRCS := $(libos-src-first-y:%=$(LIBOS_DIR)/%) \
-        $(libos-src-early-y:%=$(LIBOS_DIR)/%) \
-        $(libos-src-y:%=$(LIBOS_DIR)/%) $(hv-src-y:%=src/%) \
-        $(hv-src-early-y:%=src/%) $(LIBFDT_SRCS:%=$(LIBFDT_DIR)/%)
-
 OBJS := $(basename $(libos-src-first-y:%=libos/%) \
-        $(libos-src-early-y:%=libos/%) \
-        $(hv-src-early-y:%=%) \
-        $(libos-src-y:%=libos/%) $(hv-src-y:%=%))
-OBJS := $(OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-OBJS := $(OBJS:%=bin/%)
-HDRS := $(shell find include -path 'include/config' -prune -o -name '*.h' -print)
+                   $(libos-src-early-y:%=libos/%) \
+                   $(hv-src-early-y) \
+                   $(libos-src-y:%=libos/%) $(hv-src-y) \
+                   $(LIBFDT_SRCS:%=libfdt/%))
+OBJS := $(OBJS:%=bin/%.o)
+HDRS := $(shell cd $(src); find include -name '*.h' -print)
 
 bin/hv.uImage: bin/hv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
@@ -120,39 +119,28 @@ bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 bin/hv: include/config/auto.conf $(OBJS)
-	$(CC) $(LD_OPTS) -Wl,-Thv.lds -o $@ $(OBJS) -lgcc
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ $(OBJS) -lgcc
 
-bin/gdb-stub.d : src/gdb-stub.c bin/include/e500mc-data.h
+bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/e500mc-data.h
 
-# compile and gen dependecy file
-.PRECIOUS: bin/%.d
-bin/%.d : src/%.c
-	@$(MKDIR) $(@D)
-	@OBJ=`echo $@ | sed 's/\.d$$/\.o/'` && \
-	$(CC) -M $(CC_OPTS) $(CC_OPTS_C) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
+bin/%.d : $(src)src/%.c
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
 
-bin/%.o : src/%.c bin/%.d
-	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) -c -o "$@" $<
+bin/%.o : $(src)src/%.c bin/%.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
-bin/%.d : src/%.S $(LIBOS_BIN)/assym.s
-	@$(MKDIR) $(@D)
-	@OBJ=`echo "$@" | sed 's/\.d$$/\.o/'` && \
-	$(CC) -M $(CC_OPTS) $(CC_OPTS_ASM) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
+bin/%.d : $(src)src/%.S bin/libos/assym.s
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM))
 
-bin/%.o : src/%.S bin/%.d
-	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM) -c -o $@ $<
+bin/%.o : $(src)src/%.S bin/%.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM))
 
-.PRECIOUS: bin/libfdt/%.d
 bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
-	@$(MKDIR) $(@D)
-	@OBJ=`echo "$@" | sed 's/\.d$$/\.o/'` && \
-	$(CC) -M $(CC_OPTS) $(CC_OPTS_C) -MF "$@" -MT "$$OBJ" $< && \
-	$(LIBOS_DIR)/confdep "$<" "$$OBJ" >> "$@"
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
-	$(CC) $(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 # include the dependecy files
 ifneq ($(MAKECMDGOALS),clean)
@@ -164,16 +152,11 @@ endif
 bin/hv.map: bin/hv
 	nm -n bin/hv > $@
 
-.PHONY: test-gdb-hello test-gdb test-hello test-msgsnd test-vmpic test-linux-1p test-linux-2p
-
 test-gdb-hello: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb-4p.simics
 
 test-gdb: bin/hv.uImage test/gdb
 	$(SIMICS) test/gdb/hv-gdb.simics
-
-test-hello: bin/hv.uImage test/hello
-	$(SIMICS) test/hello/run.simics
 
 test-msgsnd: bin/hv.uImage test/msgsnd
 	$(SIMICS) test/msgsnd/hv-msgsnd.simics
@@ -183,22 +166,6 @@ test-vmpic: bin/hv.uImage test/vmpic
 
 test-vmpic-coreint: bin/hv.uImage test/vmpic
 	$(SIMICS) test/vmpic/hv-vmpic-coreint.simics
-
-test-linux-1p: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-1p.simics
-
-test-linux-fman: bin/hv.uImage test/linux
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) $(SIMICS) -e '$$create_fman=TRUE' test/linux/hv-linux-fman.simics
-
-test-linux-intmap: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-intmap.simics
-
-test-partman: bin/hv.uImage test/linux
-	make -C test/linux rootfs
-	$(SIMICS) test/linux/hv-partman.simics
-
-test-linux-2p: bin/hv.uImage test/linux
-	$(SIMICS) test/linux/hv-linux-2p.simics
 
 test-ipi-1p: bin/hv.uImage test/ipi
 	$(SIMICS) test/ipi/hv-ipi.simics
@@ -211,9 +178,6 @@ test-ipi-coreint: bin/hv.uImage test/ipi
 
 test-fit: bin/hv.uImage test/fit
 	$(SIMICS) test/fit/hv-fit.simics
-
-test-byte-chan: bin/hv.uImage test/byte-chan
-	$(SIMICS) test/byte-chan/hv-byte_chan.simics
 
 test-whoami: bin/hv.uImage test/whoami
 	$(SIMICS) test/whoami/hv-whoami.simics
@@ -253,12 +217,16 @@ test-partman-hello: bin/hv.uImage test/linux
 	xterm -e "telnet localhost 9000" &
 	simics test/linux/hv-hello.simics -e c
 
-.PHONY: FORCE test
-test/%: FORCE
-	make -C $@
+.PHONY: FORCE
+FORCE:
 
-test:
-	make -C $@
+test-%: bin/hv.uImage FORCE
+	@$(MKDIR) test
+	@$(MAKE) -C test -f $(src)test/Makefile $*
+
+test: FORCE
+	@$(MKDIR) test
+	$(MAKE) -C test -f $(src)test/Makefile
 
 lib:
 	$(SIMICS) -q -e 'echo (resolve-file "%simics%" + sim->host_arch + "-" + sim->host_os + "/lib"); quit' | tail -1

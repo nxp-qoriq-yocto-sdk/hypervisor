@@ -22,20 +22,20 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-DTC_DIR := ../../dtc
-DTC := dtc
-LIBFDT_DIR := $(DTC_DIR)/libfdt
-LIBOS_DIR := ../../libos/lib
+hello-src-y := $(src)/test/hello/
+
+LIBFDT_DIR := $(src)dtc/libfdt
+LIBOS_DIR := $(src)libos/lib
 LIBOS_BIN := bin/libos
-LIBOS_CLIENT_H := libos-client.h
-COMMON_DIR := ../common
-COMMON_SRCS := common/init.c
+COMMON_DIR := $(src)test/common
+COMMON_SRCS := $(COMMON_DIR)/init.c
 
 CC=$(CROSS_COMPILE)gcc
 GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -I. -I../common -Iinclude -I$(LIBFDT_DIR) -I../../libos/include \
-	-I../../libos/include-libc -g -std=gnu99  -include $(LIBOS_CLIENT_H)
+        -I$(srctree) -I$(srctree)../common -Ibin/include -I$(LIBFDT_DIR) \
+	-I$(LIBOS)/include -I$(LIBOS)/include-libc -g -std=gnu99 \
+	-include libos-client.h
 
 CC_OPTS_C= -Wall \
   -Wundef \
@@ -52,9 +52,8 @@ CC_OPTS_C= -Wall \
   -funit-at-a-time \
   -mno-string \
   -fomit-frame-pointer \
-  -Wno-unused \
   -Werror
-CC_OPTS_ASM=-D_ASM -Ibin/src -include $(LIBOS_BIN)/assym.s
+CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
 
 LD=$(CROSS_COMPILE)ld
 LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
@@ -81,7 +80,7 @@ LIBOS_SRCS := $(libos-src-first-y) $(libos-src-early-y) $(libos-src-y)
 ####################
 
 # compile and gen dependecy file
-bin/%.o : %.c
+bin/%.o : $(srctree)%.c
 	@$(MKDIR) `dirname $@`
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
 
@@ -94,7 +93,7 @@ bin/common/%.o : $(COMMON_DIR)/%.c
 	@$(MKDIR) `dirname $@`
 	$(CC) -MD $(CC_OPTS) $(CC_OPTS_C) -c -o $@ $<
 
-bin/%.dtb : %.dts
+bin/%.dtb : $(srctree)%.dts
 	@$(MKDIR) `dirname $@`
 	$(DTC) -p 1024 -O dtb $< -o $@
 
@@ -107,7 +106,3 @@ endif
 
 bin/example.map: bin/example
 	nm -n bin/example > $@
-
-clean:
-	rm -rf bin
-	rm -f *.dtb

@@ -1,0 +1,14 @@
+source "libos/lib/Kconfig"
+
+config LIBOS_DEPS
+	bool
+	default y
+	select LIBOS_INIT
+	select LIBOS_EXCEPTION
+	select LIBOS_LIBC
+	select LIBOS_SIMPLE_ALLOC
+	select LIBOS_FSL_BOOKE_TLB
+	select LIBOS_CONSOLE
+	select LIBOS_MP
+	select LIBOS_VIRT_ALLOC
+	select LIBOS_NS16550

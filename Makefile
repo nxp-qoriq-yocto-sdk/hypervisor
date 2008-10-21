@@ -22,45 +22,52 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-export LIBOS_DIR := libos/lib
-export LIBOS_INC := libos/include
-
 export VERSION=0
 export SUBVERSION=3
 export EXTRAVERSION=-rc3
 export LOCALVERSION := $(shell tools/setlocalversion)
 
 export PROJECTVERSION=$(VERSION).$(SUBVERSION)$(EXTRAVERSION)$(LOCALVERSION)
-export srctree=$(CURDIR)
+export src := $(CURDIR)
+override src := $(src)/
+export O := output
+override O := $(O)/
 
-.PHONY: all
+export MKDIR := mkdir -p
+export LIBOS := $(src)libos
+export LIBOS_DIR := $(LIBOS)/lib
+export LIBOS_INC := $(LIBOS)/include
+
+.PHONY: all $(wildcard test/*)
 all:
 
-.config include/config/auto.conf.cmd: ;
+$(O).config $(O)include/config/auto.conf.cmd: ;
 
--include include/config/auto.conf.cmd
+-include $(O)include/config/auto.conf.cmd
 
-include/config/auto.conf: .config include/config/auto.conf.cmd
-	@$(MAKE) -f $(srctree)/Makefile silentoldconfig
+$(O)include/config/auto.conf: $(O).config $(O)include/config/auto.conf.cmd
+	@$(MAKE) silentoldconfig
 
 .PHONY: FORCE
-config %config: FORCE
-	$(MAKE) -f kconfig/Makefile obj=bin srctree=$(CURDIR) src=kconfig $@
+help config %config: FORCE
+	@$(MKDIR) $(O)bin/
+	@$(MAKE) -C $(O) -f $(src)kconfig/Makefile $@
 
-non-config := $(filter-out %config clean distclean, $(MAKECMDGOALS))
+non-config := $(filter-out %config clean distclean help, $(MAKECMDGOALS))
 ifeq ($(MAKECMDGOALS),)
 	non-config := all
 endif
 
-$(non-config): include/config/auto.conf
-	$(MAKE) -f Makefile.build $@
+$(non-config): $(O)include/config/auto.conf
+	@$(MKDIR) $(O)bin/
+	@$(MAKE) -C $(O) -f $(src)Makefile.build $@
 
 clean:
-	find * -name bin | xargs rm -rf
-	rm -rf include/config
-	rm -f dts/*.dtb
+	rm -rf $(O)bin/
+	rm -rf $(O)test/
+	rm -rf $(O)include/config
 
 .PHONY: distclean
 distclean: clean
 	rm -f tools/mux_server/mux_server
-	rm -f .config*
+	rm -f $(O).config*

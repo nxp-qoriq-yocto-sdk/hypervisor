@@ -35,7 +35,8 @@ $dev_tree_blob  = "hv.dtb"
 
 add-directory "%script%/../sim" -prepend
 add-directory "%script%/../sim/images" -prepend
-add-directory "%script%/../../bin" -prepend
-add-directory "%script%/bin" -prepend
+add-directory "../bin" -prepend
+add-directory "bin" -prepend
+add-directory "bin/hello" -prepend
 
 run-command-file "boot.simics"

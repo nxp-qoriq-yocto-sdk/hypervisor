@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,19 +22,78 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-SUBDIRS = byte-chan dma fit gdb hello ipi linux mmu msgsnd pmr vmpic whoami \
-		cache gdebug mcheck watchdog
+testdir := $(src)test/
 
-.PHONY: subdirs $(SUBDIRS)
+ifeq ($(wildcard include/config/auto.conf.cmd),)
+goals := $(MAKECMDGOALS)
 
-subdirs: $(SUBDIRS)
+ifeq ($(goals),)
+	goals := all
+endif
 
-$(SUBDIRS):
-	$(MAKE) -C $@
+.PHONY: config 
+$(goals): config
 
-.PHONY: clean
+config:
+	@cp -f $(testdir)common/config .config
+	@$(MAKE) -f $(src)kconfig/Makefile Kconfig=$(testdir)Kconfig silentoldconfig
+	@$(MAKE) -f $(testdir)Makefile $(goals)
+else
 
-clean:
-	for dir in $(SUBDIRS); do \
-		$(MAKE) -C $$dir clean; \
-	done
+#SUBDIRS = $(wildcard $(src)*)
+SUBDIRS = hello byte-chan linux
+
+include include/config/auto.conf
+
+include $(LIBFDT_DIR)/Makefile.libfdt
+include $(libos)lib/Makefile.libos
+
+.PHONY: all $(SUBDIRS)
+all: $(SUBDIRS)
+
+LIBOS_BIN := bin/libos
+LIBOS_CLIENT_H := $(testdir)common/libos-client.h
+
+CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
+        -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
+        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H)
+
+include $(SUBDIRS:%=$(testdir)%/Makefile)
+
+#HDRS := $(shell cd $(testdir); find . -name '*.h')
+
+bin/%.d : $(testdir)%.c
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+
+bin/%.o : $(testdir)%.c bin/%.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+
+bin/%.d : $(testdir)%.S bin/libos/assym.s
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM))
+
+bin/%.o : $(testdir)%.S bin/%.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM))
+
+bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+
+bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+
+%.dtb : %.dts
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	$(V)$(DTC) -p 1024 -O dtb $< -o $@
+
+bin/%.dtb : $(testdir)%.dts
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	$(V)$(DTC) -p 1024 -O dtb $< -o $@
+
+# This is a hack to work around the lack of an include
+# search path in DTC.
+bin/%.dts : $(testdir)%.dts
+	@$(MKDIR) $(@D)
+	$(V)cp -f $< $@
+
+endif

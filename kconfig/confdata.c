@@ -587,14 +587,14 @@ int conf_split_config(void)
 				case S_TRISTATE:
 					if (sym_get_tristate_value(sym) ==
 					    sym->def[S_DEF_AUTO].tri)
-						continue;
+						trunc = 0;
 					break;
 				case S_STRING:
 				case S_HEX:
 				case S_INT:
 					if (!strcmp(sym_get_string_value(sym),
 						    sym->def[S_DEF_AUTO].val))
-						continue;
+						trunc = 0;
 					break;
 				default:
 					break;
