@@ -32,11 +32,20 @@
 
 void init(unsigned long devtree_ptr);
 extern void *fdt;
+int saved_trap_eip, saved_icmp_eip;
 
 void guest_debug_handler(trapframe_t *frameptr)
 {
-	printf("in guest debug handler, dbsr = 0x%lx\n", mfspr(SPR_DBSR));
-	frameptr->srr0 += 4;
+	switch (mfspr(SPR_DBSR)) {
+		case DBCR0_TRAP:
+			saved_trap_eip = frameptr->srr0;
+			frameptr->srr0 += 4;
+			break;
+		case DBCR0_ICMP:
+			saved_icmp_eip = frameptr->srr0;
+			/* disable single-stepping */
+			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP);
+	}
 }
 
 void start(unsigned long devtree_ptr)
@@ -45,12 +54,29 @@ void start(unsigned long devtree_ptr)
 
 	printf("Guest Debug test:\n");
 
-	/* Try to generate a "trap" debug-event */
+	/* Test notes :
+	 * Enable both TRAP & ICMP debug events, as the NIA is at a s/w trap
+	 * instruction, hence TRAP event will take precedence over
+	 * single-step, note the faulted eip at that event. After rdfi, the
+	 * next event should be ICMP, compare saved eip to our computed
+	 * value and print test results.
+	 */
+
+	mtmsr(mfmsr() & ~MSR_DE);
+	mtspr(SPR_DBCR0, DBCR0_IDM | DBCR0_TRAP | DBCR0_ICMP);
+
+	printf("Testing Trap Debug event : ");
 
 	mtmsr(mfmsr() | MSR_DE);
-	mtspr(SPR_DBCR0, DBCR0_IDM | DBCR0_TRAP);
 	
 	asm volatile ("twge %r2, %r2");
+
+	printf("Passed\n");
+
+	printf("Testing ICMP Debug event : ");
+
+	if (saved_trap_eip + 8 == saved_icmp_eip )
+		printf("Passed\n");
 	
 	printf("Test Complete\n");
 }

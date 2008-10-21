@@ -106,10 +106,10 @@ void debug_trap(trapframe_t *regs)
 	 * Prevent recursive debug interrupts by clearing debug 
 	 * events in DBSR 
 	 */
-	mtspr(SPR_DBSR, mfspr(SPR_DBSR) | DBSR_TRAP); 
+	mtspr(SPR_DBSR, mfspr(SPR_DBSR) | DBSR_TRAP | DBSR_ICMP);
 	
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DEBUG];
-	regs->srr1 &= MSR_GS | MSR_DE | MSR_UCLE;
+	regs->srr1 &= MSR_GS | MSR_UCLE;
 }
 
 void guest_doorbell(trapframe_t *regs)
