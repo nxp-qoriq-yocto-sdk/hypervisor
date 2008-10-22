@@ -307,8 +307,10 @@ static void guest_inv_tlb0_va(register_t vaddr, int pid)
 	}
 }
 
-static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
-                              register_t mas3flags, unsigned long rpn, register_t mas8)
+static int guest_set_tlbcache(register_t mas0, register_t mas1,
+                              register_t mas2, register_t mas3flags,
+                              unsigned long rpn, register_t mas8,
+                              register_t guest_mas3flags)
 {
 	tlbcset_t *set;
 	tlbcentry_t *entry;
@@ -357,6 +359,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1, register_t mas2,
 	entry->mas7 = rpn >> (32 - PAGE_SHIFT);
 	entry->tsize = 1;
 	entry->mas8 = mas8 >> 30;
+	entry->gmas3 = guest_mas3flags;
 
 	set->tag[way] = tag;
 	return 0;
@@ -453,6 +456,41 @@ void tlbcache_init(void)
 	mtspr(SPR_IVOR14, (uintptr_t)itlb_miss_fast);
 }
 #endif /* TLB cache */
+
+/** Check whether an ISI should be reflected as an ISI, or a machine check.
+ *
+ * @param[in] vaddr Virtual (effective) faulting address.
+ * @param[in] space 1 if the address is in AS1, 0 if in AS0.
+ * @param[in] pid The value of SPR_PID.
+ * @return TLB_MISS_REFLECT or TLB_MISS_MCHECK
+ */
+int guest_tlb_isi(register_t vaddr, int space, int pid)
+{
+	gcpu_t *gcpu = get_gcpu();
+	int ret = TLB_MISS_REFLECT;
+
+	disable_critint();
+	save_mas(gcpu);
+
+	mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
+	asm volatile("tlbsx 0, %0" : : "r" (vaddr));
+
+	if ((mfspr(SPR_MAS1) & MAS1_VALID) &&
+	    (mfspr(SPR_MAS8) & MAS8_VF)) {
+		ret = TLB_MISS_MCHECK;
+
+#ifdef CONFIG_TLB_CACHE
+		/* FIXME: If the original permission bit was clear, reflect an ISI
+		 * even if VF was set.  We can't detect this without the TLB cache.
+		 */
+#endif
+	}
+
+	restore_mas(gcpu);
+	enable_critint();
+	
+	return ret;
+}
 
 void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long epn, unsigned long grpn,
@@ -616,7 +654,8 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 }
 
 int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
-                   register_t mas3flags, unsigned long rpn, register_t mas8)
+                   register_t mas3flags, unsigned long rpn, register_t mas8,
+                   register_t guest_mas3flags)
 {
 #ifndef CONFIG_TLB_CACHE
 	mtspr(SPR_MAS0, mas0);
@@ -628,7 +667,8 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	asm volatile("tlbwe" : : : "memory");
 	return 0;
 #else
-	return guest_set_tlbcache(mas0, mas1, mas2, mas3flags, rpn, mas8);
+	return guest_set_tlbcache(mas0, mas1, mas2, mas3flags,
+	                          rpn, mas8, guest_mas3flags);
 #endif
 }
 

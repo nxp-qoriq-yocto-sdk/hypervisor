@@ -67,6 +67,7 @@ typedef struct tlbcentry {
 			uint32_t mas7:4;
 			uint32_t tsize:4;
 			uint32_t mas8:2; /* TGS/VF only */
+			uint32_t gmas3:6; /* guest rwx bits */
 		};
 	};
 } tlbcentry_t;

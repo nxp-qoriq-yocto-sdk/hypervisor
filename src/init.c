@@ -366,13 +366,13 @@ static void core_init(void)
 
 #ifdef CONFIG_TLB_CACHE
 	mtspr(SPR_EHCSR,
-	      EHCSR_EXTGS | EHCSR_DSIGS | EHCSR_ISIGS |
+	      EHCSR_EXTGS | EHCSR_DSIGS |
 	      EHCSR_DUVD | EHCSR_DGTMI | EHCSR_DMIUH);
 
 	tlbcache_init();
 #else
 	mtspr(SPR_EHCSR,
 	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
-	      EHCSR_DSIGS | EHCSR_ISIGS | EHCSR_DUVD | EHCSR_DGTMI);
+	      EHCSR_DSIGS | EHCSR_DUVD | EHCSR_DGTMI);
 #endif
 }

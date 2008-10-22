@@ -125,7 +125,8 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
 void guest_inv_tlb(register_t ivax, int pid, int flags);
 
 int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
-                   register_t mas3flags, unsigned long rpn, register_t mas8);
+                   register_t mas3flags, unsigned long rpn, register_t mas8,
+                   register_t guest_mas3flags);
 
 void guest_reset_tlb(void);
 void tlbsync(void);
@@ -149,6 +150,7 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 #define TLB_MISS_MCHECK  2
 
 int guest_tlb1_miss(register_t vaddr, int space, int pid);
+int guest_tlb_isi(register_t vaddr, int space, int pid);
 
 struct gcpu;
 void save_mas(struct gcpu *gcpu);

@@ -410,6 +410,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	unsigned long grpn, mas0, mas1, mas2, mas3, mas7;
+	int ret;
 
 	disable_critint();
 	save_mas(gcpu);
@@ -603,7 +604,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
 	} else {
 		unsigned long mas8 = guest->lpid | MAS8_GTS;
-		unsigned long attr;
+		unsigned long attr, gmas3;
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
 		                                &attr, PTE_PHYS_LEVELS);
 
@@ -617,10 +618,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 		}
 
+		gmas3 = mas3 & PTE_MAS3_MASK;
 		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 
-		if (unlikely(guest_set_tlb0(mas0, mas1, mas2,
-		                            mas3, rpn, mas8) == ERR_BUSY)) {
+		ret = guest_set_tlb0(mas0, mas1, mas2, mas3, rpn, mas8, gmas3);
+		if (unlikely(ret == ERR_BUSY)) {
 			restore_mas(gcpu);
 			enable_critint();
 

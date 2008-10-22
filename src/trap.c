@@ -290,13 +290,17 @@ void data_storage(trapframe_t *regs)
 
 void inst_storage(trapframe_t *regs)
 {
-	/* If it's from the guest, then it was a virtualization
-	 * fault.  Currently, we only use that for bad mappings.
-	 */
-	if (regs->srr1 & MSR_GS)
-		reflect_mcheck(regs, MCSR_MAV | MCSR_MEA | MCSR_IF, regs->srr0);
-	else
-		reflect_trap(regs);
+	if (regs->srr1 & MSR_GS) {
+		int space = (regs->srr1 & MSR_IS) >> 5;
+		int ret = guest_tlb_isi(regs->srr0, space, mfspr(SPR_PID));
+
+		if (unlikely(ret == TLB_MISS_MCHECK)) {
+			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA | MCSR_IF, regs->srr0);
+			return;
+		}
+	}
+
+	reflect_trap(regs);
 }
 
 void tlb_miss(trapframe_t *regs)
@@ -315,7 +319,7 @@ void tlb_miss(trapframe_t *regs)
 
 		int ret = guest_tlb1_miss(vaddr, space, pid);
 
-		if (ret == TLB_MISS_HANDLED)
+		if (likely(ret == TLB_MISS_HANDLED))
 			return;
 
 		if (ret == TLB_MISS_MCHECK && guest) {
@@ -325,9 +329,9 @@ void tlb_miss(trapframe_t *regs)
 			return;
 		};
 
-		assert(ret == TLB_MISS_REFLECT);
-
 		if (guest) {
+			assert(ret == TLB_MISS_REFLECT);
+
 			mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
 			asm volatile("tlbsx 0, %0" : : "r" (vaddr));
 		
