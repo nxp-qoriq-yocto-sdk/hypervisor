@@ -10,7 +10,7 @@ $guest_addr[0]   = 0x00200000
 
 $kernel_image  = "hv.uImage"
 
-$dtb_image  = "hv-mcheck.dtb"
+$dtb_image  = "hv.dtb"
 
 # indicate that simics magic instructions are wanted
 $want_magic_inst = 1
@@ -19,9 +19,9 @@ $want_magic_inst = 1
 #$use_uart2 = 0
 #$use_uart2_net = 1
 
-add-directory "%script%/../common" -prepend
-add-directory "%script%/../../bin" -prepend
-add-directory "%script%/bin" -prepend
+add-directory "%script%/../sim" -prepend
+add-directory "../bin" -prepend
+add-directory "bin" -prepend
+add-directory "bin/mcheck" -prepend
 
-#run-command-file "%script%/../common/hvsim.include"
-run-command-file "hvsim.include"
+run-command-file "%script%/../common/hvsim.include"

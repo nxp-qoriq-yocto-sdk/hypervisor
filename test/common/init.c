@@ -135,7 +135,15 @@ static void tlb1_init(void)
 		TLB_MAS3_KERN, 0, 0, 0);
 }
 
-void dec_handler(trapframe_t *frameptr)
+__attribute__((weak)) void dec_handler(trapframe_t *frameptr)
+{
+}
+
+__attribute__((weak)) void ext_int_handler(trapframe_t *frameptr)
+{
+}
+
+__attribute__((weak)) void mcheck_interrupt(trapframe_t *frameptr)
 {
 }
 

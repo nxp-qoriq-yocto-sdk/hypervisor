@@ -22,30 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-all: mcheck_all
+test := mcheck
+dir := $(testdir)$(test)/
 
-include ../Makefile.inc
-
-MCHECK_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) mcheck.c
-MCHECK_OBJS := $(basename $(MCHECK_SRCS))
-MCHECK_OBJS := $(MCHECK_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-MCHECK_OBJS := $(MCHECK_OBJS:%=bin/%)
-
-mcheck_all: bin/mcheck.bin bin/mcheck.map bin/hv-mcheck.dtb
-
-bin/mcheck.bin: bin/mcheck
-	$(CROSS_COMPILE)objcopy -O binary $< $@
-
-bin/mcheck: $(MCHECK_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(MCHECK_OBJS) -lgcc
-
-bin/mcheck.map: bin/mcheck
-	nm -n bin/mcheck > $@
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(MCHECK_OBJS:.o=.d)
-endif
-
-bin/hv-mcheck.dtb: hv-mcheck.dts bin/mcheck.dtb
-
-bin/mcheck.dtb: mcheck.dts
+include $(testdir)common/Makefile.inc

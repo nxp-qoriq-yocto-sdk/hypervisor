@@ -201,9 +201,6 @@ test-cachemode-off: bin/hv.uImage test/cache
 test-gdebug: bin/hv.uImage test/gdebug
 	$(SIMICS) test/gdebug/gdebug.simics
 
-test-mcheck: bin/hv.uImage test/mcheck
-	$(SIMICS) test/mcheck/hv-mcheck.simics
-
 test-watchdog: bin/hv.uImage test/watchdog
 	$(SIMICS) test/watchdog/hv-watchdog.simics
 
