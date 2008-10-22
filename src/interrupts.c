@@ -27,6 +27,7 @@
 #include <libos/bitops.h>
 #include <libos/interrupts.h>
 #include <libos/mpic.h>
+#include <libos/percpu.h>
 #include <errors.h>
 
 extern void trap(trapframe_t *);
@@ -38,8 +39,22 @@ void critical_interrupt(trapframe_t *frameptr)
 
 void powerpc_mchk_interrupt(trapframe_t *frameptr)
 {
-#if 0
-	printf("powerpc_mchk_interrupt: machine check interrupt!\n");
-	dump_frame(framep);
-#endif
+	register_t mcsr;
+
+	cpu->crashing++;
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"powerpc_mchk_interrupt: machine check interrupt!\n");
+	mcsr = mfspr(SPR_MCSR);
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"Machine check syndrome register = %lx\n", mcsr);
+
+	if (mcsr & MCSR_MAV)
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"Machine check %s address = %lx\n",
+			(mcsr & MCSR_MEA)? "effective" : "real",
+			 mfspr(SPR_MCAR));
+
+	dump_regs(frameptr);
+
+	cpu->crashing--;
+
+	mtspr(SPR_MCSR, mfspr(SPR_MCSR));
 }
