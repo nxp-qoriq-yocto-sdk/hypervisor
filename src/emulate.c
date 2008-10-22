@@ -690,11 +690,9 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 static int emu_rfci(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
-	register_t mask =
-		gcpu->guest->guest_debug_mode ? MSR_HVPRIV_GDEBUG : MSR_HVPRIV;
 
 	regs->srr0 = gcpu->csrr0;
-	regs->srr1 = (regs->srr1 & mask) | (gcpu->csrr1 & ~mask);
+	write_gmsr(regs, gcpu->csrr1);
 
 	return 0;
 }
@@ -702,11 +700,9 @@ static int emu_rfci(trapframe_t *regs, uint32_t insn)
 static int emu_rfmci(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
-	register_t mask =
-		gcpu->guest->guest_debug_mode ? MSR_HVPRIV_GDEBUG : MSR_HVPRIV;
 
 	regs->srr0 = gcpu->mcsrr0;
-	regs->srr1 = (regs->srr1 & mask) | (gcpu->mcsrr1 & ~mask);
+	write_gmsr(regs, gcpu->mcsrr1);
 
 	return 0;
 }

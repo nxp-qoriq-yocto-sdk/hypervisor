@@ -257,7 +257,10 @@ static inline int read_gmsr(trapframe_t *regs, register_t *val)
 
 static inline int write_gmsr(trapframe_t *regs, register_t val)
 {
-	regs->srr1 = val;
+	register_t mask =
+		get_gcpu()->guest->guest_debug_mode ? MSR_HVPRIV_GDEBUG : MSR_HVPRIV;
+
+	regs->srr1 = (regs->srr1 & mask) | (val & ~mask);
 	return 0;
 }
 
