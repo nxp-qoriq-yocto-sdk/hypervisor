@@ -51,7 +51,7 @@ include $(src)tools/partman/Makefile
 $(test): $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(dir)$*.simics
+	$(SIMICS) $(testdir)$</$*.simics
 
 define mount
 	$(call show,mount: bin/linux/$(1))
