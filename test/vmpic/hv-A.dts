@@ -148,7 +148,7 @@
 			device_type = "open-pic";
 			big-endian;
 		};
-		
+
 		uart0: serial@11c500 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
@@ -213,7 +213,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 2>;
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
-			fsl,hv-dtb = /incbin/("bin/vmpic-p1.dtb");
+			fsl,hv-dtb = /incbin/("p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 		};

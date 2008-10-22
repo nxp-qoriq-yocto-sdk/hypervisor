@@ -162,9 +162,6 @@ test-gdb: bin/hv.uImage test/gdb
 test-msgsnd: bin/hv.uImage test/msgsnd
 	$(SIMICS) test/msgsnd/hv-msgsnd.simics
 
-test-vmpic: bin/hv.uImage test/vmpic
-	$(SIMICS) test/vmpic/hv-vmpic.simics
-
 test-vmpic-coreint: bin/hv.uImage test/vmpic
 	$(SIMICS) test/vmpic/hv-vmpic-coreint.simics
 

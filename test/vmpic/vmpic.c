@@ -44,7 +44,6 @@ extern int coreint;
 void ext_int_handler(trapframe_t *frameptr)
 {
 	unsigned int vector;
-	uint8_t c;
 	int rc;
 	unsigned int mask, active;
 
@@ -99,7 +98,6 @@ void start(unsigned long devtree_ptr)
 	int ret;
 	int node;
 	const char *path;
-	const struct fdt_property *p;
 	int len;
 
 	init(devtree_ptr);
