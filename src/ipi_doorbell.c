@@ -41,12 +41,15 @@
 /**
  * send_doorbells - send a doorbell interrupt to all receivers for a doorbell
  *
- * returns the number of doorbell interrupts sent
+ * returns the number of doorbell interrupts sent, or a negative number on error
  */
-unsigned int send_doorbells(struct ipi_doorbell *dbell)
+int send_doorbells(struct ipi_doorbell *dbell)
 {
 	register_t saved;
-	unsigned int count = 0;
+	int count = 0;
+
+	if (!dbell)
+		return -ERR_INVALID;
 
 	saved = spin_lock_critsave(&dbell->dbell_lock);
 	if (dbell->recv_head) {

@@ -396,7 +396,7 @@ static void fh_partition_send_dbell(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[3] = send_doorbells(db_handle->dbell) ? 0 : FH_ERR_CONFIG;
+	regs->gpregs[3] = (send_doorbells(db_handle->dbell) > 0) ? 0 : FH_ERR_CONFIG;
 }
 #else
 #define fh_partition_send_dbell unimplemented

@@ -38,6 +38,7 @@
 #include <libos/interrupts.h>
 #include <libos/mpic.h>
 #include <events.h>
+#include <ipi_doorbell.h>
 
 void decrementer(trapframe_t *regs)
 {
@@ -174,8 +175,7 @@ void watchdog_trap(trapframe_t *regs)
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 				"Watchdog: notifying manager\n");
 
-			// FIXME: add notification here
-			// vpic_assert_vint()
+			send_doorbells(guest->dbell_watchdog_expiration);
 		} else {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 				"Watchdog: restarting partition\n");

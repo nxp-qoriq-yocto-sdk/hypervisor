@@ -1008,6 +1008,7 @@ static void start_guest_primary_nowait(void)
 	guest->active_cpus = guest->cpucnt;
 	guest->state = guest_running;
 	smp_mbar();
+	send_doorbells(guest->dbell_state_change);
 
 	for (i = 1; i < guest->cpucnt; i++) {
 		if (!guest->gcpus[i]) {
@@ -1074,12 +1075,16 @@ static void start_guest_primary(void)
 
 	ret = load_image(guest);
 	if (ret <= 0) {
-		// TODO: send signal to manager
 		guest->state = guest_stopped;
 
 		/* No hypervisor-loadable image; wait for a manager to start us. */
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		         "Guest %s waiting for manager start\n", guest->name);
+
+		// Notify the manager(s) that it needs to load images and
+		// start this guest.
+		send_doorbells(guest->dbell_restart_request);
+
 		return;
 	}
 
@@ -1225,6 +1230,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 			setgevent(guest->gcpus[0], GEV_START_WAIT);
 		} else {
 			guest->state = guest_stopped;
+			send_doorbells(guest->dbell_state_change);
 		}
 	}
 
