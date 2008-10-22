@@ -34,7 +34,7 @@ void init(unsigned long devtree_ptr);
 extern void *fdt;
 int saved_trap_eip, saved_icmp_eip;
 
-void guest_debug_handler(trapframe_t *frameptr)
+void debug_handler(trapframe_t *frameptr)
 {
 	switch (mfspr(SPR_DBSR)) {
 		case DBCR0_TRAP:

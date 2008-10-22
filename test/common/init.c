@@ -147,6 +147,10 @@ __attribute__((weak)) void mcheck_interrupt(trapframe_t *frameptr)
 {
 }
 
+__attribute__((weak)) void debug_handler(trapframe_t *frameptr)
+{
+}
+
 #if 0
 int extint_cnt = 0;;
 void ext_int_handler(trapframe_t *frameptr)

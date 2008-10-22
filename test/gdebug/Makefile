@@ -22,27 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-all: gdebug_all
+test := gdebug
+dir := $(testdir)$(test)/
 
-include ../Makefile.inc
-
-GDEBUG_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdebug.c
-GDEBUG_OBJS := $(basename $(GDEBUG_SRCS))
-GDEBUG_OBJS := $(GDEBUG_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-GDEBUG_OBJS := $(GDEBUG_OBJS:%=bin/%)
-
-gdebug_all: bin/gdebug.bin bin/hv-gdebug.dtb
-
-bin/gdebug.bin: bin/gdebug
-	$(CROSS_COMPILE)objcopy -O binary $< $@
-
-bin/gdebug: $(GDEBUG_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDEBUG_OBJS) -lgcc
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(GDEBUG_OBJS:.o=.d)
-endif
-
-bin/hv-gdebug.dtb: hv-gdebug.dts bin/gdebug.dtb
-
-bin/gdebug.dtb: gdebug.dts
+include $(testdir)common/Makefile.inc

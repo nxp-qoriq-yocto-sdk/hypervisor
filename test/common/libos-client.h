@@ -39,5 +39,6 @@ typedef int client_cpu_t;
 #define EXC_DECR_HANDLER dec_handler
 #define EXC_EXT_INT_HANDLER ext_int_handler
 #define EXC_MCHECK_HANDLER mcheck_interrupt
+#define EXC_DEBUG_HANDLER debug_handler
 
 #endif

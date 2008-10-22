@@ -198,9 +198,6 @@ test-cachemode-on: bin/hv.uImage test/cache
 test-cachemode-off: bin/hv.uImage test/cache
 	$(SIMICS) test/cache/hv-cachemode-on.simics 
 
-test-gdebug: bin/hv.uImage test/gdebug
-	$(SIMICS) test/gdebug/gdebug.simics
-
 test-watchdog: bin/hv.uImage test/watchdog
 	$(SIMICS) test/watchdog/hv-watchdog.simics
 
