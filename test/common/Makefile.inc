@@ -27,3 +27,5 @@ $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 # We cannot use $(dir) here because rule evaluation is defered.
 $(test)-run: $(test)
 	$(SIMICS) $(testdir)$</run.simics
+
+OBJS += $(test)-obj

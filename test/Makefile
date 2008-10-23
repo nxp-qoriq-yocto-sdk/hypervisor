@@ -96,4 +96,7 @@ bin/%.dts : $(testdir)%.dts
 	@$(MKDIR) $(@D)
 	$(V)cp -f $< $@
 
+-include bin/libos/libos_assym.d
+-include $(OBJS:%.o=%.d)
+
 endif
