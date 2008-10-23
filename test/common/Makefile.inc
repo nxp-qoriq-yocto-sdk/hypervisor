@@ -28,4 +28,7 @@ $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 $(test)-run: $(test)
 	$(SIMICS) $(testdir)$</run.simics
 
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics
+
 OBJS += $(test)-obj
