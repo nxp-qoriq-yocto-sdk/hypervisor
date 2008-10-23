@@ -39,7 +39,7 @@ extern void *fdt;
 
 void start(unsigned long devtree_ptr)
 {
-	uint32_t ct = 0, ra = 0;
+	uint32_t ct = 0;
 	uint32_t status;
 	char str[16] = "cache lock test";
 	char buf[16];
