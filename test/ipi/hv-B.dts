@@ -2,7 +2,7 @@
 
 / {
 	compatible = "fsl,hv-platform-p4080";
-	model = "fsl,hv-fit";
+	model = "fsl,hv-ipi-2p";
 	#address-cells = <2>;
 	#size-cells = <2>;
 
@@ -10,11 +10,7 @@
 		stdout = &uart0;
 		stdin = &uart0;
 		serial0 = &uart0;
-		serial1 = &uart1;
 		uartmux = &uartmux;
-		byte-channel0 = &bc0;
-		byte-channel1 = &bc1;
-		byte-channel2 = &bc2;
 	};
 
 	cpus {
@@ -32,8 +28,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "okay";
 		};
-
 		cpu@1 {
 			device_type = "cpu";
 			compatible = "fsl,e500mc";
@@ -45,6 +41,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@2 {
@@ -58,6 +56,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@3 {
@@ -71,6 +71,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@4 {
@@ -84,6 +86,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@5 {
@@ -97,6 +101,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@6 {
@@ -110,6 +116,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 
 		cpu@7 {
@@ -123,6 +131,8 @@
 			timebase-frequency = <8333333>;
 			bus-frequency = <66666666>;
 			clock-frequency = <66666666>;
+			status = "disabled";
+			enable-method = "spin-table";
 		};
 	};
 
@@ -148,20 +158,11 @@
 			device_type = "open-pic";
 			big-endian;
 		};
-		
+
 		uart0: serial@11c500 {
 			device_type = "serial";
 			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
 			reg = <0x11c500 0x100>;
-			clock-frequency = <0>;
-			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
-		};
-
-		uart1: serial@11c600 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <0x11c600 0x100>;
 			clock-frequency = <0>;
 			interrupts = <36 2>;
 			interrupt-parent = <&mpic>;
@@ -185,31 +186,14 @@
 
 	uartmux: uartmux {
 		compatible = "fsl,hv-byte-channel-mux";
-		fsl,phys-dev = <&uart1>;
+		fsl,real-dev = &uart3;
+		fsl,protocol = "tcp-over-ppp";
 	};
 
-	byte-channels {
-		/* bc0 here is a weird case for testing purposes.
-		 * It sets up a loopback in the mux, so that
-		 * data coming in channel 0 goes out channel 1.
-		 * bc0 is _not_ usable by a guest.
-		 */
-		bc0: byte-channel0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux &uartmux>;
-			fsl,mux-channel = <0 1>;
-		};
 
-		bc1: byte-channel1 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <2>;
-		};
-
-		bc2: byte-channel2 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <3>;
+	doorbells {
+		doorbell@0 {
+			 compatible = "fsl,hv-doorbell";
 		};
 	};
 
@@ -217,9 +201,18 @@
 		part1 {
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 2>;
+			fsl,hv-dtb = /incbin/("p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
-			fsl,hv-dtb = /incbin/("bin/fit-p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
+			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+		};
+
+		part2 {
+			compatible = "fsl,hv-partition";
+			fsl,hv-cpus = <2 2>;
+			fsl,hv-dtb = /incbin/("p2.dtb");
+			fsl,hv-physaddr-map = <0 0 0 0x21000000 0 0x04000000>;
+			fsl,hv-load-image-table = <0 0xe8300000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 		};
 	};

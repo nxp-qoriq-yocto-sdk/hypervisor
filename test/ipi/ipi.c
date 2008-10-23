@@ -130,7 +130,6 @@ int *get_handle(const char *dbell_type, const char *prop, void *fdt)
 
 int test_init(void)
 {
-	int ret;
 	int *handle_p;
 
 	handle_p_int = get_handle("fsl,hv-doorbell-receive-handle", "interrupts", fdt);

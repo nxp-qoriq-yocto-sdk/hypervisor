@@ -151,23 +151,17 @@ __attribute__((weak)) void debug_handler(trapframe_t *frameptr)
 {
 }
 
-#if 0
-int extint_cnt = 0;;
-void ext_int_handler(trapframe_t *frameptr)
+__attribute__((weak)) void fit_handler(trapframe_t *frameptr)
 {
-	uint8_t c;
-//	uint32_t x;
-
-	extint_cnt++;
-
-	printf("ext int\n");
-
-//	x = mfspr(SPR_GEPR);
-//	printf("gepr = %08lx\n",(long)x);
-
-//	c = in8((uint8_t *)(CCSRBAR_VA+0x11d500));
 }
-#endif
+
+__attribute__((weak)) void ext_doorbell_handler(trapframe_t *frameptr)
+{
+}
+
+__attribute__((weak)) void ext_critical_doorbell_handler(trapframe_t *frameptr)
+{
+}
 
 #define PAGE_SIZE 4096
 

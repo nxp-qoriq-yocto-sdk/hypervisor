@@ -37,12 +37,12 @@
 			clock-frequency = <66666666>;
 		};
 	};
-	
+
 	memory {
 		reg = <0 0 0 0x18000000>;
 		device_type = "memory";
 	};
-	
+
 	ccsr@fe000000 {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -84,12 +84,12 @@
 			#size-cells = <0>;
 			compatible = "fsl,hv-handles";
 			interrupt-parent = <&vmpic>;
-			
+
 			byte-channel0 {
 				compatible = "fsl,hv-byte-channel-handle";
 				fsl,endpoint = "byte-channel1";
 			};
-	
+
 			byte-channel1 {
 				compatible = "fsl,hv-byte-channel-handle";
 				fsl,endpoint = "byte-channel2";

@@ -102,7 +102,7 @@
 			#size-cells = <0>;
 			compatible = "fsl,hv-handles";
 			interrupt-parent = <&vmpic>;
-	
+
 			doorbell@0 {
 				compatible = "fsl,hv-doorbell-send-handle";
 				fsl,endpoint = "/doorbells/doorbell@0";

@@ -201,7 +201,7 @@
 		part1 {
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 2>;
-			fsl,hv-dtb = /incbin/("bin/ipi-p1.dtb");
+			fsl,hv-dtb = /incbin/("p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
@@ -210,7 +210,7 @@
 		part2 {
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <2 2>;
-			fsl,hv-dtb = /incbin/("bin/ipi-p2.dtb");
+			fsl,hv-dtb = /incbin/("p2.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x20000000 0 0x04000000>;
 			fsl,hv-load-image-table = <0 0xe8300000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;

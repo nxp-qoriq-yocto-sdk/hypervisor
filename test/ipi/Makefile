@@ -22,50 +22,56 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-all: ipi_all
+test := ipi
+dir := $(testdir)$(test)/
 
-include ../Makefile.inc
+# test source
+ipi-src-y := $(dir)ipi.c
 
-IPI_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) ipi.c
-IPI_OBJS := $(basename $(IPI_SRCS))
-IPI_OBJS := $(IPI_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-IPI_OBJS := $(IPI_OBJS:%=bin/%)
-IPI1_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) ipi1.c
-IPI1_OBJS := $(basename $(IPI1_SRCS))
-IPI1_OBJS := $(IPI1_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-IPI1_OBJS := $(IPI1_OBJS:%=bin/%)
+# define test and libos object files
+ipi-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(ipi-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+ipi-obj := $(ipi-obj:%=bin/%.o)
 
-ipi_all: bin/ipi.bin bin/ipi.map bin/hv-ipi-1p.dtb bin/hv-ipi-2p.dtb \
-         bin/ipi1.bin bin/ipi1.map bin/hv-ipi-coreint.dtb
+# test source
+ipi1-src-y := $(dir)ipi1.c
 
-bin/ipi.bin: bin/ipi
-	$(CROSS_COMPILE)objcopy -O binary $< $@
+# define test and libos object files
+ipi1-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(ipi1-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+ipi1-obj := $(ipi1-obj:%=bin/%.o)
 
-bin/ipi1.bin: bin/ipi1
-	$(CROSS_COMPILE)objcopy -O binary $< $@
+$(test)-dts := $(wildcard $(dir)*.dts)
+$(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
+$(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
+$(test)-part-dts := $(filter-out bin/$(test)/hv-%.dts,$($(test)-bin-dts))
 
-bin/ipi: $(IPI_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(IPI_OBJS) -lgcc
+$(test)-hv-dtb := $($(test)-hv-dts:%.dts=%.dtb)
+$(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
-bin/ipi1: $(IPI1_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(IPI1_OBJS) -lgcc
+$($(test)-hv-dts): $($(test)-part-dtb)
 
-bin/ipi.map: bin/ipi
-	nm -n bin/ipi > $@
+bin/$(test)/ipi: $(ipi-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
-bin/ipi1.map: bin/ipi1
-	nm -n bin/ipi1 > $@
+bin/$(test)/ipi1: $(ipi1-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
-ifneq ($(MAKECMDGOALS),clean)
--include $(IPI_OBJS:.o=.d) $(IPI1_OBJS:.o=.d)
-endif
+.PHONY: $(test)
+$(test): bin/$(test)/ipi bin/$(test)/ipi1 $($(test)-hv-dtb)
 
-bin/hv-ipi-1p.dtb: hv-ipi-1p.dts bin/ipi-p1.dtb
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics
 
-bin/hv-ipi-2p.dtb: hv-ipi-2p.dts bin/ipi-p1.dtb bin/ipi-p2.dtb
-
-bin/hv-ipi-coreint.dtb: hv-ipi-coreint.dts bin/ipi-p1.dtb bin/ipi-p2.dtb
-
-bin/ipi-p1.dtb: ipi-p1.dts
-
-bin/ipi-p2.dtb: ipi-p2.dts

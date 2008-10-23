@@ -153,42 +153,6 @@ endif
 bin/hv.map: bin/hv
 	nm -n bin/hv > $@
 
-test-gdb-hello: bin/hv.uImage test/gdb
-	$(SIMICS) test/gdb/hv-gdb-4p.simics
-
-test-gdb: bin/hv.uImage test/gdb
-	$(SIMICS) test/gdb/hv-gdb.simics
-
-test-msgsnd: bin/hv.uImage test/msgsnd
-	$(SIMICS) test/msgsnd/hv-msgsnd.simics
-
-test-vmpic-coreint: bin/hv.uImage test/vmpic
-	$(SIMICS) test/vmpic/hv-vmpic-coreint.simics
-
-test-ipi-1p: bin/hv.uImage test/ipi
-	$(SIMICS) test/ipi/hv-ipi.simics
-
-test-ipi-2p: bin/hv.uImage test/ipi
-	$(SIMICS) test/ipi/hv-ipi-2p.simics
-
-test-ipi-coreint: bin/hv.uImage test/ipi
-	$(SIMICS) test/ipi/hv-ipi-coreint.simics
-
-test-fit: bin/hv.uImage test/fit
-	$(SIMICS) test/fit/hv-fit.simics
-
-test-whoami: bin/hv.uImage test/whoami
-	$(SIMICS) test/whoami/hv-whoami.simics
-
-test-mmu: bin/hv.uImage test/mmu
-	$(SIMICS) test/mmu/mmu.simics
-
-test-pmr: bin/hv.uImage test/pmr
-	$(SIMICS) test/pmr/hv-pmr.simics
-
-test-watchdog: bin/hv.uImage test/watchdog
-	$(SIMICS) test/watchdog/hv-watchdog.simics
-
 demo: bin/hv.uImage test/linux
 	./tools/mux_server/mux_server localhost:9124 9000 9001 &
 	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
