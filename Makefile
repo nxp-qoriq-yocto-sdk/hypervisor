@@ -58,7 +58,7 @@ ifeq ($(MAKECMDGOALS),)
 	non-config := all
 endif
 
-$(non-config): $(O)include/config/auto.conf
+$(non-config): $(O)include/config/auto.conf FORCE
 	@$(MKDIR) $(O)bin/
 	@$(MAKE) -C $(O) -f $(src)Makefile.build $@
 
