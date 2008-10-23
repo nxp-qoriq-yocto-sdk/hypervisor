@@ -41,7 +41,7 @@ config:
 else
 
 #SUBDIRS = $(wildcard $(src)*)
-SUBDIRS = hello byte-chan linux mcheck gdebug vmpic cache
+SUBDIRS = hello byte-chan linux mcheck gdebug vmpic cache dma
 
 include include/config/auto.conf
 

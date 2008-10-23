@@ -37,12 +37,12 @@
 			clock-frequency = <66666666>;
 		};
 	};
-	
+
 	memory {
 		reg = <0 0 0 0x18000000>;
 		device_type = "memory";
 	};
-	
+
 	ccsr@fe000000 {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -72,15 +72,15 @@
 
 		dma@20000 {
 			compatible = "fsl,p4080-pamu";
-			reg = <0x20000 0x1000>; 
+			reg = <0x20000 0x1000>;
 		};
-	
+
 		dma@100000 {
 			#address-cells = <1>;
 			#size-cells = <1>;
 			compatible = "fsl,p4080-dma";
 			cell-index = <0>;
-			reg = <0x100000 0x180>; 
+			reg = <0x100000 0x180>;
 			dma-ranges = <0 0 0x10000000>;
 			fsl,liodn = <0>;
 		};
@@ -112,12 +112,12 @@
 			#size-cells = <0>;
 			compatible = "fsl,hv-handles";
 			interrupt-parent = <&vmpic>;
-			
+
 			byte-channel0 {
 				compatible = "fsl,hv-byte-channel";
 				fsl,endpoint = "byte-channel1";
 			};
-	
+
 			byte-channel1 {
 				compatible = "fsl,hv-byte-channel";
 				fsl,endpoint = "byte-channel2";

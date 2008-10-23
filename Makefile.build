@@ -186,9 +186,6 @@ test-mmu: bin/hv.uImage test/mmu
 test-pmr: bin/hv.uImage test/pmr
 	$(SIMICS) test/pmr/hv-pmr.simics
 
-test-dma: bin/hv.uImage test/dma
-	$(SIMICS) test/dma/hv-dma.simics
-
 test-watchdog: bin/hv.uImage test/watchdog
 	$(SIMICS) test/watchdog/hv-watchdog.simics
 

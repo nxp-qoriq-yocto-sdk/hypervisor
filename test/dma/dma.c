@@ -38,16 +38,6 @@ void init(unsigned long devtree_ptr);
 
 extern void *fdt;
 
-void ext_int_handler(trapframe_t *frameptr)
-{
-#if 0
-	uint16_t vector;
-	fh_vmpic_iack(&vector);
-	printf("ext int %d\n",vector);
-	fh_vmpic_eoi(irq);
-#endif
-}
-
 void dump_dev_tree(void)
 {
 	int node = -1;
@@ -64,12 +54,10 @@ void dump_dev_tree(void)
 
 int test_dma_memcpy(void)
 {
-	int ret;
 	int count = 0x100;
 	unsigned int gpa_src = 0x0;
 	unsigned int gpa_dst = 0x100;
 	unsigned char *gva_src, *gva_dst;
-	int i;
 
 	printf("DMA memcpy test begins : ");
 
@@ -100,11 +88,10 @@ void start(unsigned long devtree_ptr)
 	int node = -1;
 	int ret, len;
 	unsigned long *liodnp;
-	unsigned int true_liodn;
 
 	init(devtree_ptr);
 
-	dump_dev_tree();
+//	dump_dev_tree();
 
 	enable_extint();
 
