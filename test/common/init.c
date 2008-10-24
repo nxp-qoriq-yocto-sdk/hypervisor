@@ -167,6 +167,10 @@ __attribute__((weak)) void dtlb_handler(trapframe_t *frameptr)
 {
 }
 
+__attribute__((weak)) void watchdog_handler(trapframe_t *frameptr)
+{
+}
+
 #define PAGE_SIZE 4096
 
 extern int start_secondary_spin_table(struct boot_spin_table *table, int num,

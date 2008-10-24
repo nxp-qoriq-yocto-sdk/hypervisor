@@ -44,6 +44,7 @@ typedef int client_cpu_t;
 #define EXC_DOORBELL_HANDLER ext_doorbell_handler
 #define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
 #define EXC_DTLB_HANDLER dtlb_handler
+#define EXC_WDOG_HANDLER watchdog_handler
 
 
 #endif

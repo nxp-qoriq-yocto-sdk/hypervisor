@@ -176,8 +176,6 @@ int test6(void)
 
 void start(void)
 {
-	volatile unsigned int timeout;
-
 	init();
 
 	printf("\n\nWatchdog test\n");
