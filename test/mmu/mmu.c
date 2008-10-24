@@ -249,8 +249,6 @@ static void mmucsr_test(int secondary)
 
 static void tlbivax_inv_all(int tlb_mask)
 {
-	int val = 0;
-	
 	if (tlb_mask & 1)
 		asm volatile("tlbivax 0, %0" : :
 		             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
@@ -267,7 +265,6 @@ static void tlbivax_inv_all(int tlb_mask)
 static void tlbivax_inv(void *addr, int tlb_mask)
 {
 	register_t ea = ((register_t)addr) & ~4095;
-	int val = 0;
 	
 	if (tlb_mask & 1)
 		asm volatile("tlbivax 0, %0" : :
