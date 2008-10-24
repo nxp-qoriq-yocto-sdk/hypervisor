@@ -5,7 +5,7 @@
 # UART0 is the hypervisor
 # UART1 is Linux byte channel console
 # UART2 is Linux serial console
-$use_uart1 = 0
+$use_uart2 = 1
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
@@ -14,12 +14,13 @@ $guest_addr[1]   = 0x00600000
 
 $kernel_image  = "hv.uImage"
 
-$dtb_image  = "hv-linux-intmap.dtb"
+$dev_tree_blob  = "hv-linux-intmap.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../common" -prepend
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "hvsim.include"
+run-command-file "boot.simics"

@@ -7,7 +7,7 @@
 # UART2 is Linux partition 1
 # UART3 is Linux partition 2
 $use_uart1 = 1
-$use_uart3 = 0
+$use_uart2 = 1
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
@@ -16,12 +16,13 @@ $guest_addr[1]   = 0x00800000
 
 $kernel_image  = "hv.uImage"
 
-$dtb_image  = "hv-partman.dtb"
+$dev_tree_blob  = "hv-partman.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../common" -prepend
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "hvsim.include"                                                                 
+run-command-file "boot.simics"

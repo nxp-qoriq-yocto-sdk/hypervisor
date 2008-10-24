@@ -80,5 +80,16 @@ bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(dir)rootfs-hello.ext2.gz
 	sudo cp -af $(testdir)linux/hello bin/linux/rootfs-hello/
 	$(call unmount,bin/linux/rootfs-hello)
 
-$(test)-run-partman $(test)-run-demo: bin/$(test)/rootfs-partman.ext2.gz
+$(test)-run-partman: bin/$(test)/rootfs-partman.ext2.gz
+
 $(test)-run-hello: bin/$(test)/rootfs-hello.ext2.gz
+	../../tools/mux_server/mux_server localhost:9124 9000 &
+	xterm -e "telnet localhost 9000" &
+	$(SIMICS) $(testdir)linux/hello.simics
+
+$(test)-run-demo: bin/$(test)/rootfs-partman.ext2.gz
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
+	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
+	xterm -geometry 80x25+150+0 -title "telnet : partition 2" -e "telnet localhost 9001"  &
+	$(SIMICS) $(testdir)linux/demo.simics
+

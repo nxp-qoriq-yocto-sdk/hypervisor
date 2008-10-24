@@ -1,27 +1,42 @@
 #
-# Script to run 8578/u-boot/ultravisor/simple-guest on simulator
+# Copyright (C) 2008 Freescale Semiconductor, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+#  NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+#  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$use_uart1 = 1
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
+$use_uart2 = 1
 
-# simple guest
-$guest_image[0]  = "mcheck"
-$guest_addr[0]   = 0x00200000
+$guest_image[0] = "mcheck"
+$guest_addr[0]  = 0x00200000
 
 $kernel_image  = "hv.uImage"
-
-$dtb_image  = "hv.dtb"
-
-# indicate that simics magic instructions are wanted
-$want_magic_inst = 1
-
-# uncomment to attach uart2 to network port
-#$use_uart2 = 0
-#$use_uart2_net = 1
+$dev_tree_blob  = "hv.dtb"
 
 add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/mcheck" -prepend
 
-run-command-file "%script%/../common/hvsim.include"
+run-command-file "boot.simics"

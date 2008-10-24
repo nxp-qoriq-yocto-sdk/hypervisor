@@ -1,5 +1,25 @@
 #
-# Script to run 8578/u-boot/ultravisor/linux on simulator
+# Copyright (C) 2008 Freescale Semiconductor, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+#  NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+#  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
 # UART0 is the hypervisor
@@ -7,6 +27,7 @@
 # UART2 is Linux partition 1
 # UART3 is Linux partition 2
 $use_uart1 = 1
+$use_uart2 = 1
 $use_uart3 = 0
 
 $guest_image[0]  = "vmlinux"
@@ -20,12 +41,13 @@ $guest_addr[3]   = 0x00d00000
 
 $kernel_image  = "hv.uImage"
 
-$dtb_image  = "hv-linux-2p.dtb"
+$dev_tree_blob  = "hv-linux-2p.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../common" -prepend
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "hvsim.include"                                                                 
+run-command-file "boot.simics"

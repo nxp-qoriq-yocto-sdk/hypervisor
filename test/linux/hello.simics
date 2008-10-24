@@ -18,12 +18,13 @@ $guest_addr[1]   = 0x00800000
 
 $kernel_image  = "hv.uImage"
 
-$dtb_image  = "hv-hello.dtb"
+$dev_tree_blob  = "hv-hello.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../common" -prepend
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "hvsim.include"                                                                 
+run-command-file "boot.simics"
