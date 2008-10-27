@@ -520,6 +520,110 @@ static void *map_flash(phys_addr_t phys)
 }
 
 /**
+ * create_sdbell_handle - craete the receive handles for a special doorbell
+ * @kind - the doorbell name
+ * @guest - guest device tree
+ * @offset - pointer to the partition node in the guest device tree
+ * @dbell - pointer to special doorbell to use
+ *
+ * This function creates a doorbell receive handle node (under the partition
+ * node for each managed partition in a the manager's device tree) for a
+ * particular special doorbell.
+ *
+ * 'kind' is a string that is used to both name the special doorbell and to
+ * create the compatible property for the receive handle node.
+ *
+ * This function must be called after recv_dbell_partition_init() is called,
+ * because it creates receive doorbell handles that do not have an fsl,endpoint
+ * property.  recv_dbell_partition_init() considers receive doorbell handle
+ * nodes without and endpoint to be an error.  And endpoint is required in
+ * doorbell handle nodes only when the doorbell is defined in the hypervisor
+ * DTS.  Special doorbells are created by the hypervisor in
+ * create_guest_special_doorbells(), so they don't exist in any DTS.
+ */
+static int create_sdbell_handles(const char *kind,
+	guest_t *guest,	int offset, struct ipi_doorbell *dbell)
+{
+	char s[96];	// Should be big enough
+	int ret, length;
+
+	// Create the special doorbell receive handle node.
+	offset = ret = fdt_add_subnode(guest->devtree, offset, kind);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"Couldn't create %s doorbell node: %i\n", kind, ret);
+		return ret;
+	}
+	// 'offset' is now the offset of the new doorbell receive handle node
+
+	// Write the 'compatible' property to the doorbell receive handle node
+	// We can't embed a \0 in the format string, because that will confuse
+	// snprintf (it will stop scanning when it sees the \0), so we use %c.
+	length = snprintf(s, sizeof(s),
+		"fsl,hv-%s-doorbell%cfsl,hv-doorbell-receive-handle", kind, 0);
+	ret = fdt_setprop(guest->devtree, offset, "compatible", s, length + 1);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"Couldn't set 'compatible' property in %s doorbell node: %i\n",
+			kind, ret);
+		return ret;
+	}
+
+	ret = attach_receive_doorbell(guest, dbell, offset);
+
+	return ret;
+}
+
+/**
+ * create_guest_special_doorbells - create the special doorbells for this guest
+ *
+ * Each guest gets a number of special doorbells.  These doorbells are run
+ * when certain specific events occur, and the manager needs to be notified.
+ *
+ * For simplicity, these doorbells are always created, even if there is no
+ * manager.  The doorbells will still be rung when the corresponding event
+ * occurs, but no interrupts will be sent.
+ */
+static int create_guest_special_doorbells(guest_t *guest)
+{
+	assert(!guest->dbell_state_change);
+
+	guest->dbell_state_change = alloc_type(ipi_doorbell_t);
+	if (!guest->dbell_state_change) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: out of memory\n", __func__);
+		goto error;
+	}
+
+	guest->dbell_watchdog_expiration = alloc_type(ipi_doorbell_t);
+	if (!guest->dbell_watchdog_expiration) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: out of memory\n", __func__);
+		goto error;
+	}
+
+	guest->dbell_restart_request = alloc_type(ipi_doorbell_t);
+	if (!guest->dbell_restart_request) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: out of memory\n", __func__);
+		goto error;
+	}
+
+	return 0;
+
+error:
+	free(guest->dbell_restart_request);
+	free(guest->dbell_watchdog_expiration);
+	free(guest->dbell_restart_request);
+
+	guest->dbell_restart_request = NULL;
+	guest->dbell_watchdog_expiration = NULL;
+	guest->dbell_restart_request = NULL;
+
+	return -ERR_NOMEM;
+}
+
+/**
  * Load a binary or ELF image into guest memory
  *
  * @guest: guest data structure
@@ -642,79 +746,6 @@ static const uint32_t hv_version[4] = {
 	FH_API_COMPAT_VERSION
 };
 
-/**
- * lookup_doorbell - return the doorbell object from a special doorbell property
- *
- * returns NULL if there is no special doorbell property or if there was an
- * error trying to locate the doorbell object.
- */
-static struct ipi_doorbell *lookup_doorbell(const char *compatible,
-	guest_t *guest, int offset, struct ipi_doorbell *current)
-{
-	const char *path;
-	struct ipi_doorbell *dbell;
-
-	// Look for the doorbell receive handle node via its 'compatible' property
-	offset = fdt_node_offset_by_compatible(guest->devtree, offset, compatible);
-	if (offset < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL, // LOGLEVEL_DEBUG,
-			"%s: guest %s, no %s doorbell\n", __func__, guest->name, compatible);
-		return NULL;
-	}
-
-	// Make sure this node really is a doorbell receive handle.
-	if (fdt_node_check_compatible(guest->devtree, offset, "fsl,hv-doorbell-receive-handle")) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"%s: guest %s, %s node is not a doorbell receive handle\n",
-			__func__, guest->name, compatible);
-		return NULL;
-	}
-
-	// Get the path of the master doorbell node for this doorbell receive
-	// handle.  This could be an alias.
-	path = fdt_getprop(guest->devtree, offset, "fsl,endpoint", NULL);
-	if (!path) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"%s: guest %s, no endpoint property for %s doorbell receive handle\n",
-			__func__, guest->name, compatible);
-		return NULL;
-	}
-
-	// Get the offset of the doorbell node in the master device tree.
-	offset = lookup_alias(fdt, path);
-	if (offset < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"%s: guest %s, endpoint %s does not exist\n",
-			__func__, guest->name, path);
-		return NULL;
-	}
-
-	// Convert the offset to a doorbell object
-	dbell = ptr_from_node(fdt, offset, "doorbell");
-	if (!dbell) {
-		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			 "%s: guest %s, no doorbell object for endpoint %s\n",
-			__func__, guest->name, path);
-		return NULL;
-	}
-
-	// If 'current' is non-zero, then this is not the first manager for
-	// this partition, and the previous manager(s) have already defined
-	// a doorbell for this event.  If so, we need to make sure that this
-	// new manager is using the same doorbell.
-	if (current && (dbell != current)) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"%s: guest %s, %s is already defined for a different doorbell\n",
-			__func__, guest->name, compatible);
-		return current;
-	}
-
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG, "%s: guest %s, found %s doorbell\n",
-		__func__, guest->name, compatible);
-
-	return dbell;
-}
-
 static int process_partition_handles(guest_t *guest)
 {
 	int off = -1;
@@ -782,19 +813,22 @@ static int process_partition_handles(guest_t *guest)
 		if (ret)
 			return ret;
 
-		// Check for special doorbells.
+		// Create special doorbells
 
-		target_guest->dbell_state_change =
-			lookup_doorbell("fsl,hv-state-change-doorbell", guest, off,
-				target_guest->dbell_state_change);
+		ret = create_sdbell_handles("state-change",
+			guest, off, target_guest->dbell_state_change);
+		if (ret)
+			return ret;
 
-		target_guest->dbell_watchdog_expiration =
-			lookup_doorbell("fsl,hv-watchdog-expiration-doorbell", guest, off,
-				target_guest->dbell_watchdog_expiration);
+		ret = create_sdbell_handles("watchdog-expiration",
+			guest, off, target_guest->dbell_watchdog_expiration);
+		if (ret)
+			return ret;
 
-		target_guest->dbell_restart_request =
-			lookup_doorbell("fsl,hv-reset-request-doorbell", guest, off,
-				target_guest->dbell_restart_request);
+		ret = create_sdbell_handles("reset-request",
+			guest, off, target_guest->dbell_restart_request);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -881,7 +915,7 @@ uint32_t start_guest_lock;
 
 guest_t *node_to_partition(int partition)
 {
-	int i, len;
+	int i, len, ret;
 	char *name;
 
 	// Verify that 'partition' points to a compatible node
@@ -907,6 +941,16 @@ guest_t *node_to_partition(int partition)
 			return NULL;
 		}
 
+		// We create the special doorbells here, instead of in
+		// init_guest_primary(), because it guarantees that the
+		// doorbells will be created for all partitions before the
+		// managers start looking for their managed partitions.
+		ret = create_guest_special_doorbells(&guests[i]);
+		if (ret < 0) {
+			spin_unlock(&start_guest_lock);
+			return NULL;
+		}
+
 		name = fdt_getprop_w(fdt, partition, "label", &len);
 		if (len > 0) {
 			name[len - 1] = 0;
@@ -920,7 +964,7 @@ guest_t *node_to_partition(int partition)
 				return NULL;
 			}
 
-			int ret = fdt_get_path(fdt, partition, name, MAX_PATH);
+			ret = fdt_get_path(fdt, partition, name, MAX_PATH);
 			if (ret >= 0) {
 				name[MAX_PATH - 1] = 0;
 			} else {
@@ -1362,6 +1406,11 @@ static int init_guest_primary(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 
+#ifdef CONFIG_IPI_DOORBELL
+	send_dbell_partition_init(guest);
+	recv_dbell_partition_init(guest);
+#endif
+
 	ret = process_partition_handles(guest);
 	if (ret < 0)
 		goto fail;
@@ -1372,10 +1421,6 @@ static int init_guest_primary(guest_t *guest, int partition,
 
 #ifdef CONFIG_BYTE_CHAN
 	byte_chan_partition_init(guest);
-#endif
-#ifdef CONFIG_IPI_DOORBELL
-	send_dbell_partition_init(guest);
-	recv_dbell_partition_init(guest);
 #endif
 
 	vmpic_partition_init(guest);

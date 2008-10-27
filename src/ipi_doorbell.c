@@ -115,6 +115,73 @@ static int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
 	return ghandle;
 }
 
+/**
+ * attach_receive_doorbell - attach a doorbell to a receive handle
+ * @guest: the guest to update
+ * @dbell: the doorbell to attach
+ * @offset: offset in the guest device tree of the receive handle node
+ *
+ * Attach a doorbell to an existing doorbell receive handle node.  This
+ * function also allocates a virq and creates an "interrupts" property in the
+ * node with the virq values.
+ */
+int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell, int offset)
+{
+	uint32_t irq[2];
+	int ret;
+
+	// The recv_list is a list of VIRQs that are "sent" when the doorbell
+	// is rung.
+	guest_recv_dbell_list_t *recv_list = alloc_type(guest_recv_dbell_list_t);
+	if (!recv_list) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: failed to create receive doorbell list object\n", __func__);
+		return -ERR_NOMEM;
+	}
+
+	vpic_interrupt_t *virq = vpic_alloc_irq(guest);
+	if (!virq) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			 "%s: out of virqs.\n", __func__);
+		ret = -ERR_NOMEM;
+		goto error;
+	}
+
+	irq[0] = ret = vmpic_alloc_handle(guest, &virq->irq);
+	irq[1] = 0;
+	if (ret < 0) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			 "%s: can't alloc vmpic irqs\n", __func__);
+		ret = -ERR_NOMEM;
+		goto error;
+	}
+
+	// Write the 'interrupts' property to the doorbell receive handle node
+	ret = fdt_setprop(guest->devtree, offset, "interrupts", irq, sizeof(irq));
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"Couldn't set 'interrupts' property in doorbell node: %i\n", ret);
+		ret = -ERR_BADIMAGE;
+		goto error;
+	}
+
+	// Add this receive handle to the list of receive handles for the doorbell
+	register_t saved = spin_lock_critsave(&dbell->dbell_lock);
+	recv_list->next = dbell->recv_head;
+	dbell->recv_head = recv_list;
+	spin_unlock_critsave(&dbell->dbell_lock, saved);
+
+	recv_list->guest_vint = virq;
+
+	return 0;
+
+error:
+	// FIXME: destroy virq and free handles
+	free(recv_list);
+
+	return ret;
+}
+
 void send_dbell_partition_init(guest_t *guest)
 {
 	int off = -1, ret;
@@ -166,10 +233,6 @@ void recv_dbell_partition_init(guest_t *guest)
 {
 	int off = -1, ret;
 	const char *endpoint;
-	guest_recv_dbell_list_t *dbell_node;
-	register_t saved;
-	uint32_t irq[2];
-	vpic_interrupt_t *virq;
 	ipi_doorbell_t *dbell;
 
 	while (1) {
@@ -205,43 +268,9 @@ void recv_dbell_partition_init(guest_t *guest)
 			continue;
 		}
 
-		dbell_node = alloc_type(guest_recv_dbell_list_t);
-		if (!dbell_node) {
-			ret = ERR_NOMEM;
+		ret = attach_receive_doorbell(guest, dbell, off);
+		if (ret < 0)
 			break;
-		}
-
-		virq = vpic_alloc_irq(guest);
-		if (!virq) {
-			free(dbell_node);
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			         "recv_dbell_partition_init: out of virqs.\n");
-			return;
-		}
-		
-		irq[0] = ret = vmpic_alloc_handle(guest, &virq->irq);
-		irq[1] = 0;
-
-		if (ret < 0) {
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			         "recv_dbell_partition_init: can't alloc vmpic irqs\n");
-			break;
-		} 
-
-		ret = fdt_setprop(guest->devtree, off, "interrupts",
-		                  irq, sizeof(irq));
-		if (ret < 0) {
-			/* FIXME: destroy virq */
-			free(dbell_node);
-			break;
-		}
-
-		dbell_node->guest_vint = virq;
-
-		saved = spin_lock_critsave(&dbell->dbell_lock);
-		dbell_node->next = dbell->recv_head;
-		dbell->recv_head = dbell_node;
-		spin_unlock_critsave(&dbell->dbell_lock, saved);
 	}
 
 	printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
