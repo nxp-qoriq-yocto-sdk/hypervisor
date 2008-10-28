@@ -89,6 +89,10 @@ bin/include/%.d : $(src)include/%.h
 
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(libos)lib/Makefile.libos
+include $(src)tools/partman/Makefile
+
+.PHONY: partman
+partman: bin/linux/partman
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
