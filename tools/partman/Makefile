@@ -23,6 +23,6 @@
 
 bin/linux/partman: $(src)tools/partman/partman.c
 	@mkdir -p $(@D)
-	$(call show,build $<)
+	$(call show,build $(<:$(src)%=%) into $@)
 	$(V)$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -o $@ $<
 	$(V)$(CROSS_COMPILE)strip $@

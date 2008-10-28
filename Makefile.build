@@ -84,7 +84,7 @@ all: bin/hv.uImage bin/hv.map
 
 bin/include/%.d : $(src)include/%.h
 	@$(MKDIR) $(@D)
-	$(call show,mkdep: $<)
+	$(call show,mkdep: $(<:$(src)%=%))
 	$(V)$(libos)lib/confdep $< $< > $@
 
 include $(LIBFDT_DIR)/Makefile.libfdt
