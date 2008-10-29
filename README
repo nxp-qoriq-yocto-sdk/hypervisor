@@ -11,8 +11,11 @@ Building the hypervisor
           o make allyesconfig
           o make 
     * to build the tests
-          o cd hv/test
-          o make 
+          o make test
+    * to build a specific test "foo"
+          o make test-foo
+    * to run a specific test "foo"
+          o make test-foo-run
 
 ----------------------------------------------------------
 Source tree directory structure

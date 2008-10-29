@@ -84,11 +84,15 @@ all: bin/hv.uImage bin/hv.map
 
 bin/include/%.d : $(src)include/%.h
 	@$(MKDIR) $(@D)
-	$(call show,mkdep: $<)
+	$(call show,mkdep: $(<:$(src)%=%))
 	$(V)$(libos)lib/confdep $< $< > $@
 
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(libos)lib/Makefile.libos
+include $(src)tools/partman/Makefile
+
+.PHONY: partman
+partman: bin/linux/partman
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
