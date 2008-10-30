@@ -205,21 +205,23 @@ static int copy_to_partition(unsigned int partition, void *buffer,
 }
 
 /**
- * Parse an ELF image into a buffer
+ * Parse an ELF image, and copy the program headers into the target guest
  *
+ * @partition: the partition handle to copy to
  * @elf: Pointer to the ELF image
  * @elf_length: length of the ELF image, or -1 to ignore length checking
  * @bin_length: pointer to returned buffer length
- * @load_address: pointer to returned load address
- * @entry_offset: pointer to returned offset of entry address within buffer
+ * @load_address: load address, or -1 to use ELF load address
+ * @entry_address: pointer to returned entry address
+ *
+ * Returns 0 for failure or non-zero for success
  */
-static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
-	unsigned long *load_address, unsigned long *entry_offset)
+static int parse_and_copy_elf(unsigned int partition, void *elf,
+			      size_t elf_length, unsigned long load_address,
+			      unsigned long *entry_address)
 {
 	struct elf_header *hdr = (struct elf_header *) elf;
 	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
-	void *buffer = NULL;
-	size_t size = 0;
 	unsigned long base = -1;
 	unsigned long vbase = -1;
 	unsigned int i;
@@ -227,27 +229,27 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 	if (elf_length < sizeof(struct elf_header)) {
 		if (verbose)
 			printf("%s: truncated ELF image\n", __func__);
-		return NULL;
+		return 0;
 	}
 
 	if (elf_length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
 		if (verbose)
 			printf("%s: truncated ELF image\n", __func__);
-		return NULL;
+		return 0;
 	}
 
 	/* We only support 32-bit for now */
 	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
 		if (verbose)
 			printf("%s: only 32-bit ELF images are supported\n", __func__);
-		return NULL;
+		return 0;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
 	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
 		if (verbose)
 			printf("%s: only big-endian ELF images are supported\n", __func__);
-		return NULL;
+		return 0;
 	}
 
 	/*
@@ -259,12 +261,12 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 		if (phdr[i].offset + phdr[i].filesz > elf_length) {
 			if (verbose)
 				printf("%s: truncated ELF image\n", __func__);
-			return NULL;
+			return 0;
 		}
 		if (phdr[i].filesz > phdr[i].memsz) {
 			if (verbose)
 				printf("%s: invalid ELF program header file size\n", __func__);
-			return NULL;
+			return 0;
 		}
 		if (phdr[i].type == PT_LOAD) {
 			if (phdr[i].paddr < base)
@@ -274,39 +276,67 @@ static void *parse_elf(void *elf, size_t elf_length, size_t *bin_length,
 		}
 	}
 
-	/* Copy each PT_LOAD segment to memory */
+	/* If the user did not specify -a, then we use the real paddr values
+	 * in the ELF image.
+	 */
+	if (load_address == (unsigned long) -1)
+		load_address = base;
+
+	/* Copy each PT_LOAD segment to the target partition */
 
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].type == PT_LOAD) {
-			size_t newsize = (phdr[i].paddr - base) + phdr[i].memsz;
+			unsigned long target_addr = load_address + (phdr[i].paddr - base);
+			int ret;
 
-			if (size < newsize) {
-				buffer = realloc(buffer, newsize);
-				size = newsize;
+			if (verbose)
+				printf("%s: copying 0x%x bytes from ELF image offset 0x%x to guest physical address 0x%lx\n",
+				       __func__, phdr[i].filesz, phdr[i].offset, target_addr);
+			ret = copy_to_partition(partition, elf + phdr[i].offset, target_addr, phdr[i].filesz);
+			if (ret) {
+				if (verbose)
+					printf("Copy failed, error=%i\n", ret);
+				return 0;
 			}
 
-			memcpy(buffer + (phdr[i].paddr - base), elf + phdr[i].offset, phdr[i].filesz);
-			memset(buffer + (phdr[i].paddr - base) + phdr[i].filesz, 0, phdr[i].memsz - phdr[i].filesz);
+			if (phdr[i].memsz > phdr[i].filesz) {
+				void *buffer;
+
+				if (verbose)
+					printf("%s: writing 0x%x null bytes to guest physical address 0x%lx\n",
+					       __func__, phdr[i].memsz - phdr[i].filesz, target_addr + phdr[i].filesz);
+
+				buffer = malloc(phdr[i].memsz - phdr[i].filesz);
+				if (!buffer) {
+					if (verbose)
+						printf("could not allocate %u bytes\n",
+						       phdr[i].memsz - phdr[i].filesz);
+					return 0;
+				}
+				memset(buffer, 0, phdr[i].memsz - phdr[i].filesz);
+				ret = copy_to_partition(partition, buffer,
+                                                        target_addr + phdr[i].filesz,
+                                                        phdr[i].memsz - phdr[i].filesz);
+				free(buffer);
+				if (ret) {
+					if (verbose)
+						printf("Copy failed, error=%i\n", ret);
+					return 0;
+				}
+			}
 		}
 	}
 
 	if (verbose) {
-		printf("%s: load address is 0x%lx\n", __func__, base);
-		printf("%s: virtual base address is 0x%lx\n", __func__, vbase);
-		printf("%s: entry offset is 0x%lx\n", __func__, hdr->entry - vbase);
-		printf("%s: image size is 0x%x\n", __func__, size);
+		printf("%s: load address is 0x%lx\n", __func__, load_address);
+		printf("%s: entry address is 0x%lx\n", __func__,
+		       load_address + (hdr->entry - vbase));
 	}
 
-	if (load_address)
-		*load_address = base;
+	if (entry_address)
+		*entry_address = load_address + (hdr->entry - vbase);
 
-	if (entry_offset)
-		*entry_offset = hdr->entry - vbase;
-
-	if (bin_length)
-		*bin_length = size;
-
-	return buffer;
+	return 1;
 }
 
 /**
@@ -369,30 +399,30 @@ fail:
 /**
  * Load an image file into memory and parse it if it's an ELF
  *
+ * @partition: the partition handle to copy to
  * @filename: file name of image
- * @size: returned size of loaded image
- * @load_address: pointer to returned load address
- * @entry_offset: pointer to returned offset of entry address within buffer
+ * @load_address: load address, or -1 to use ELF load address
+ * @entry_address: pointer to returned entry address
  *
- * Returns a pointer to a buffer if success.  The buffer must be released
- * with free().
- *
- * Returns NULL if there was an error
+ * Returns 0 for failure or non-zero for success
  */
-static void *load_image_file(const char *filename, size_t *size,
-	unsigned long *load_address, unsigned long *entry_offset)
+static int load_and_copy_image_file(unsigned int partition,
+				    const char *filename,
+                                    unsigned long load_address,
+				    unsigned long *entry_address)
 {
 	off_t off;
 	int f;
 	void *mapped = MAP_FAILED;
 	void *buffer = NULL;
 	struct stat buf;
+	int ret;
 
 	f = open(filename, O_RDONLY);
 	if (f == -1) {
 		if (verbose)
 			perror(__func__);
-		return NULL;
+		return 0;
 	}
 
 	if (fstat(f, &buf)) {
@@ -416,28 +446,34 @@ static void *load_image_file(const char *filename, size_t *size,
 	}
 
 	if (memcmp(mapped, "\177ELF", 4) == 0) {
-		buffer = parse_elf(mapped, off, size, load_address, entry_offset);
-	} else {
-		buffer = malloc(off);
-		if (!buffer) {
+		ret = parse_and_copy_elf(partition, mapped, off, load_address, entry_address);
+		if (!ret) {
 			if (verbose)
-				perror(__func__);
+				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
+				       filename, partition, load_address, ret);
 			goto fail;
 		}
-		memcpy(buffer, mapped, off);
+	} else {
+		// If -a was not specified, then assume 0
+		if (load_address == (unsigned long) -1)
+			load_address = 0;
 
-		if (size)
-			*size = off;
-		if (load_address)
-			*load_address = 0;
-		if (entry_offset)
-			*entry_offset = 0;
+		ret = copy_to_partition(partition, mapped, load_address, off);
+		if (ret) {
+			if (verbose)
+				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
+				       filename, partition, load_address, ret);
+			goto fail;
+		}
+
+		if (entry_address)
+			*entry_address = load_address;
 	}
 
 	munmap(mapped, off);
 	close(f);
 
-	return buffer;
+	return 1;
 
 fail:
 	if (mapped != MAP_FAILED)
@@ -446,7 +482,7 @@ fail:
 	free(buffer);
 	close(f);
 
-	return NULL;
+	return 0;
 }
 
 /**
@@ -570,10 +606,8 @@ exit:
  */
 static int cmd_load_image(struct parameters *p)
 {
-	void *image;
-	size_t filesize;
 	unsigned long load_address;
-	unsigned long entry_offset;
+	unsigned long entry_address;
 	int ret = 0;
 
 	if (!p->h_specified || !p->f_specified) {
@@ -583,25 +617,15 @@ static int cmd_load_image(struct parameters *p)
 
 	printf("Loading file %s\n", p->f);
 
-	image = load_image_file(p->f, &filesize, &load_address, &entry_offset);
-	if (!image) {
-		printf("Could not load file %s\n", p->f);
+	load_address = p->a_specified ? p->a : (unsigned long) -1;
+
+	ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
+	if (!ret) {
+		printf("Could not load and copy file %s\n", p->f);
 		return EIO;
 	}
 
-	if (!p->a_specified)
-		p->a = load_address;
-
-	printf("Copying image to partition %i at address 0x%lx\n", p->h, p->a);
-
-	ret = copy_to_partition(p->h, image, p->a, filesize);
-
-	free(image);
-
-	if (ret)
-		printf("Copy failed with error %i\n", ret);
-	else
-		printf("(Entry address is 0x%lx)\n", load_address + entry_offset);
+	printf("(Entry address is 0x%lx)\n", entry_address);
 
 	return ret;
 }
@@ -625,34 +649,20 @@ static int cmd_start(struct parameters *p)
 		p->a = 0;
 
 	if (p->f_specified) {
-		void *image;
-		size_t filesize;
 		unsigned long load_address;
-		unsigned long entry_offset;
+		unsigned long entry_address;
 		int ret = 0;
 
-		printf("Loading file %s\n", p->f);
+		printf("Loading and copying file %s\n", p->f);
 
-		image = load_image_file(p->f, &filesize, &load_address, &entry_offset);
-		if (!image)
+		load_address = p->a_specified ? p->a : (unsigned long) -1;
+
+		ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
+		if (!ret)
 			return EIO;
 
-		if (!p->a_specified)
-			p->a = load_address;
-
 		if (!p->e_specified)
-			p->e = p->a + entry_offset;
-
-		printf("Copying image to partition at address 0x%lx\n", p->a);
-
-		ret = copy_to_partition(p->h, image, p->a, filesize);
-
-		free(image);
-		if (ret) {
-			printf("Could not copy file %s to partition %i, error=%i\n",
-				p->f, p->h, ret);
-			return ret;
-		}
+			p->e = entry_address;
 	}
 
 	im.partition = p->h;
@@ -701,36 +711,20 @@ static int cmd_restart(struct parameters *p)
 	printf("Restarting partition %i\n", p->h);
 
 	if (p->f_specified) {
-		void *image;
-		size_t filesize;
 		unsigned long load_address;
-		unsigned long entry;
+		unsigned long entry_address;
 		int ret = 0;
 
-		printf("Loading image %s\n", p->f);
+		printf("Loading and copying image %s\n", p->f);
 
-		image = load_image_file(p->f, &filesize, &load_address, &entry);
-		if (!image)
+		load_address = p->a_specified ? p->a : (unsigned long) -1;
+
+		ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
+		if (!ret)
 			return EIO;
-
-		if (!p->a_specified)
-			p->a = load_address;
-
-		if (!p->e_specified)
-			p->e = entry;
-
-		printf("Copying image to partition at address 0x%lx\n", p->a);
-
-		ret = copy_to_partition(p->h, image, p->a, filesize);
-
-		free(image);
-		if (ret) {
-			printf("Could not copy file %s to partition %i, error=%i\n",
-				p->f, p->h, ret);
-			return ret;
-		}
 	}
 
+	// FIXME: restart partition should take an entry address
 	im.partition = p->h;
 
 	printf("Restarting partition\n");
