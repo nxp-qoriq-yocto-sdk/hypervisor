@@ -79,6 +79,7 @@ void setgevent(gcpu_t *gcpu, int event)
 void ret_to_guest(trapframe_t *frameptr)
 {
 	gcpu_t *gcpu = get_gcpu();
+	int waiting = gcpu->waiting_for_gevent;
 
 	assert(!(mfmsr() & MSR_CE));
 	assert(cpu->ret_user_hook);
@@ -100,6 +101,7 @@ void ret_to_guest(trapframe_t *frameptr)
 		gevent_table[bit](frameptr);
 	}
 
+	gcpu->waiting_for_gevent = waiting;
 	assert(!(mfmsr() & MSR_CE));
 }
 
