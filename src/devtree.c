@@ -1,5 +1,5 @@
 /** @file
- * Device tree processing
+ * Device tree semantic processing
  */
 /* Copyright (C) 2008 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
