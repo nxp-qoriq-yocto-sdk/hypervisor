@@ -153,51 +153,61 @@ nomem:
  *
  * @tree: device (sub)tree root
  * @callback: pointer to per-node operation
+ * @postvisit: if non-zero, visit nodes after their children
  *
- * The callback is performed on each node of the tree, with children
- * visited before their parent.  It is safe to remove nodes as they are
- * visited, but it is not safe to remove the parent or any sibling of the
- * visited node.
+ * The callback is performed on each node of the tree.  When postvisit is
+ * set, it is safe to remove nodes as they are visited, but it is not
+ * safe to remove the parent or any sibling of the visited node.
  *
  * If a callback returns non-zero, the traversal is aborted, and the
  * return code propagated.
  */
-int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node))
+int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node),
+                  int postvisit)
 {
-	list_t *node;
-	int skip_children = 0;
+	list_t *node = &tree->child_node;
+	int backtrack = 0;
 	int ret;
 
 	if (!tree)
 		return 0;
 
-	node = tree->children.next;
+	while (1) {
+		dt_node_t *dtnode = to_container(node, dt_node_t, child_node);
+		dt_node_t *parent = dtnode->parent;
 
-	if (!list_empty(&tree->children)) {
-		while (node != &tree->child_node) {
-			dt_node_t *dtnode = to_container(node, dt_node_t, child_node);
-			dt_node_t *parent = dtnode->parent;
+		if (!backtrack) {
+			if (!postvisit) {
+				ret = callback(dtnode);
+				if (ret)
+					return ret;
+			}
 
-			if (!skip_children && !list_empty(&dtnode->children)) {
+			if (!list_empty(&dtnode->children)) {
 				node = dtnode->children.next;
 				continue;
 			}
+		}
 		
-			skip_children = 0;
-			node = dtnode->child_node.next;
+		backtrack = 0;
+		node = dtnode->child_node.next;
 
+		if (postvisit) {
 			ret = callback(dtnode);
 			if (ret)
 				return ret;
+		}
+
+		if (dtnode == tree)
+			return 0;
+
+		assert(parent);
 		
-			if (node->next == &parent->children) {
-				node = &parent->child_node;
-				skip_children = 1;
-			}
+		if (node->next == &parent->children) {
+			node = &parent->child_node;
+			backtrack = 1;
 		}
 	}
-
-	return callback(tree);
 }
 
 static int destroy_node(dt_node_t *node)
@@ -223,5 +233,5 @@ static int destroy_node(dt_node_t *node)
 
 void delete_node(dt_node_t *tree)
 {
-	for_each_node(tree, destroy_node);
+	for_each_node(tree, destroy_node, 1);
 }
