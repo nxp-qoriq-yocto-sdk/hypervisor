@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc3
-Date: 10/10/2008
+Revsion: 0.3-rc4
+Date: 10/31/2008
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc3
+   -Topaz 0.3-rc4
       -is compatible with P4080 4.0.20 / 4.0.pre5
       -the unit tests are not compatible with earlier versions
        of simics due a model change with respect to flash
@@ -33,6 +33,31 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc4 bug fixes and changes
+      -support for loading uncompressed uImages for client program
+       images and ramdisk
+      -Bug 2121 is fixed. write_gmsr: mask out privileged bits
+      -Bug 2196 is fixed.  ISI interrupt comes when use TLB0
+       and machine check when TLB1.
+      -guest debug mode: add support for ICMP guest debug event
+      -support the partition management interrupts
+         Note: the 0.81 spec does not have these documented
+         currently
+      -support the fsl,hv-wd-mgr-notify property which specifies
+       that watchdog timeouts should signal the manager
+       partition
+      -all L2 cache control registers are now supported
+      -Bug 2169 is fixed. Set valid bit in tlbcache tag from MAS1,
+       rather than always 1.
+      -partman now supports copying ELF images with
+       discontiguous load segments
+      -hypervisor now catches machine checks and dumps
+       errors
+      -support building the hypervisor out of tree with the
+       O= option on the make command line.  By default all
+       objects produced by the build go into the output
+       directory
 
    -Topaz 0.3-rc3 bug fixes and changes
       -L1 and L2 cache control register access is now
