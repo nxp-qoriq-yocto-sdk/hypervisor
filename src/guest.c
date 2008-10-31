@@ -1049,33 +1049,38 @@ static void start_guest_primary_nowait(void)
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
-	guest->active_cpus = guest->cpucnt;
-	guest->state = guest_running;
-	smp_mbar();
-	send_doorbells(guest->dbell_state_change);
+
+	assert(guest->active_cpus == 0);
+	enable_critint();
 
 	for (i = 1; i < guest->cpucnt; i++) {
 		if (!guest->gcpus[i]) {
-			enable_critint();
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			         "guest %s waiting for cpu %d...\n", guest->name, i);
 		
 			while (!guest->gcpus[i]) {
-				if (cpu->ret_user_hook)
-					break;
+				if (cpu->ret_user_hook) {
+					disable_critint();
+					return;
+				}
 
 				barrier();
 			}
-
-			disable_critint();
-
-			if (cpu->ret_user_hook)
-				return;
 		}
 
 		setgevent(guest->gcpus[i], GEV_START);
 	}
 
+	atomic_add(&guest->active_cpus, 1);
+
+	while (guest->active_cpus != guest->cpucnt)
+		barrier();
+
+	disable_critint();
+
+	guest->state = guest_running;
+	smp_mbar();
+	send_doorbells(guest->dbell_state_change);
 	cpu->traplevel = 0;
 
 	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
@@ -1158,6 +1163,8 @@ static void start_guest_secondary(void)
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
 	         "cpu %d/%d spinning on table...\n", pir, gpir);
 
+	atomic_add(&guest->active_cpus, 1);
+
 	while (guest->spintbl[gpir].addr_lo & 1) {
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
 		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
@@ -1222,13 +1229,12 @@ void start_core(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 
-	if (gcpu == guest->gcpus[0]) {
-		assert(guest->state == guest_starting);
+	assert(guest->state == guest_starting);
+
+	if (gcpu == guest->gcpus[0])
 		start_guest_primary_nowait();
-	} else {
-		assert(guest->state == guest_running);
+	else
 		start_guest_secondary();
-	}
 
 	wait_for_gevent(regs);
 }
