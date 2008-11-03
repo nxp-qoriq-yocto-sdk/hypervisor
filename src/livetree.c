@@ -151,9 +151,11 @@ nomem:
 /**
  * Perform an operation on each node of a tree (including the root).
  *
- * @tree: device (sub)tree root
- * @callback: pointer to per-node operation
- * @postvisit: if non-zero, visit nodes after their children
+ * @param[in] tree device (sub)tree root
+ * @param[in] arg opaque argument to callback functions
+ * @param[in] previsit pointer to operation on each node before visting children
+ * @param[in] postvisit pointer to operation on each node after visting children
+ * @return zero on success, non-zero if the traversal was terminated
  *
  * The callback is performed on each node of the tree.  When postvisit is
  * set, it is safe to remove nodes as they are visited, but it is not
@@ -162,8 +164,9 @@ nomem:
  * If a callback returns non-zero, the traversal is aborted, and the
  * return code propagated.
  */
-int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node),
-                  int postvisit)
+int for_each_node(dt_node_t *tree, void *arg,
+                  int (*previsit)(dt_node_t *node, void *arg),
+                  int (*postvisit)(dt_node_t *node, void *arg))
 {
 	list_t *node = &tree->child_node;
 	int backtrack = 0;
@@ -177,8 +180,8 @@ int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node),
 		dt_node_t *parent = dtnode->parent;
 
 		if (!backtrack) {
-			if (!postvisit) {
-				ret = callback(dtnode);
+			if (previsit) {
+				ret = previsit(dtnode, arg);
 				if (ret)
 					return ret;
 			}
@@ -193,7 +196,7 @@ int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node),
 		node = dtnode->child_node.next;
 
 		if (postvisit) {
-			ret = callback(dtnode);
+			ret = postvisit(dtnode, arg);
 			if (ret)
 				return ret;
 		}
@@ -203,14 +206,14 @@ int for_each_node(dt_node_t *tree, int (*callback)(dt_node_t *node),
 
 		assert(parent);
 		
-		if (node->next == &parent->children) {
+		if (node == &parent->children) {
 			node = &parent->child_node;
 			backtrack = 1;
 		}
 	}
 }
 
-static int destroy_node(dt_node_t *node)
+static int destroy_node(dt_node_t *node, void *arg)
 {
 	list_for_each_delsafe(&node->props, i, next) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
@@ -233,5 +236,52 @@ static int destroy_node(dt_node_t *node)
 
 void delete_node(dt_node_t *tree)
 {
-	for_each_node(tree, destroy_node, 1);
+	for_each_node(tree, NULL, NULL, destroy_node);
+}
+
+static int flatten_pre(dt_node_t *node, void *fdt)
+{
+	int ret = fdt_begin_node(fdt, node->name);
+	if (ret)
+		return ret;
+
+	list_for_each(&node->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+		
+		ret = fdt_property(fdt, prop->name, prop->data, prop->len);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int flatten_post(dt_node_t *node, void *fdt)
+{
+	return fdt_end_node(fdt);
+}
+
+/**
+ * Create a flat device tree blob from a live tree.
+ *
+ * @param[in] tree live device tree root
+ * @param[in] fdt address at which to create a flat tree
+ * @param[in] fdt_len size of window in which to create a flat tree
+ * @return zero on success, -FDT_ERR_NOSPACE if fdt_len is too small
+ */
+int flatten_dev_tree(dt_node_t *tree, void *fdt, size_t fdt_len)
+{
+	int ret = fdt_create(fdt, fdt_len);
+	if (ret)
+		return ret;
+
+	ret = fdt_finish_reservemap(fdt);
+	if (ret)
+		return ret;
+
+	ret = for_each_node(tree, fdt, flatten_pre, flatten_post);
+	if (ret)
+		return ret;
+
+	return fdt_finish(fdt);
 }

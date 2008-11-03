@@ -55,8 +55,9 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt_window, size_t fdt_len);
 dt_node_t *create_dev_tree(void);
 void delete_node(dt_node_t *tree);
 
-int for_each_child(dt_node_t *tree, int (*callback)(dt_node_t *node),
-                   int postvisit);
+int for_each_node(dt_node_t *tree, void *arg,
+                  int (*previsit)(dt_node_t *node, void *arg),
+                  int (*postvisit)(dt_node_t *node, void *arg));
 
 /** #address-cells and #size-cells at root of hv tree */
 extern uint32_t rootnaddr, rootnsize;
