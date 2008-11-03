@@ -25,6 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <libos/queue.h>
+
+#include <errors.h>
 #include <devtree.h>
 
 dt_node_t *unflatten_dev_tree(const void *fdt)
@@ -213,17 +216,20 @@ int for_each_node(dt_node_t *tree, void *arg,
 	}
 }
 
+static void destroy_prop(dt_prop_t *prop)
+{
+	list_del(&prop->prop_node);
+
+	free(prop->name);
+	free(prop->data);
+	free(prop);
+}
+
 static int destroy_node(dt_node_t *node, void *arg)
 {
 	list_for_each_delsafe(&node->props, i, next) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
-		
-		list_del(i);
-
-		free(prop->name);
-		free(prop->data);
-
-		free(prop);
+		destroy_prop(prop);
 	}
 	
 	if (node->parent)
@@ -284,4 +290,273 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt, size_t fdt_len)
 		return ret;
 
 	return fdt_finish(fdt);
+}
+
+/**
+ * Non-recursively searches for a subnode with a particular name
+ *
+ * @param[in] node parent node of the node to be found
+ * @param[in] name name of the node to be found
+ * @param[in] create if non-zero, create the subnode if not found
+ * @return pointer to subnode, or NULL if not found
+ */
+dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create)
+{
+	list_for_each(&node->children, i) {
+		dt_node_t *subnode = to_container(i, dt_node_t, child_node);
+
+		if (!strcmp(name, subnode->name))
+			return subnode;
+	}
+
+	if (create) {
+		dt_node_t *subnode = alloc_type(dt_node_t);
+		subnode->name = strdup(name);
+		subnode->parent = node;
+
+		list_init(&subnode->children);
+		list_init(&subnode->props);
+
+		list_add(&node->children, &subnode->child_node);
+		return subnode;
+	}
+
+	return NULL;
+}
+
+/**
+ * Get a property of a node
+ *
+ * @param[in] node node in which to find/create the property
+ * @param[in] name name of the property to get
+ * @param[in] create if non-null, create the property if not found
+ * @return a pointer to the property, or NULL if not found
+ */
+dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create)
+{
+	dt_prop_t *prop;
+
+	list_for_each(&node->props, i) {
+		prop = to_container(i, dt_prop_t, prop_node);
+
+		if (!strcmp(name, prop->name))
+			return prop;
+	}
+
+	prop = alloc_type(dt_prop_t);
+	if (prop) {
+		prop->name = strdup(name);
+		list_add(&node->props, &prop->prop_node);
+	}
+
+	return prop;
+}
+
+/**
+ * Set a property of a node
+ *
+ * @param[in] node node in which to set the property
+ * @param[in] name name of the property to set
+ * @param[in] data new contents of the property
+ * @param[in] len new length of the property
+ * @return zero on success
+ */
+int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
+{
+	void *newdata = NULL;
+	dt_prop_t *prop;
+	
+	prop = dt_get_prop(node, name, 1);
+	if (!prop)
+		return ERR_NOMEM;
+
+	if (len != 0) {
+		newdata = malloc(len);
+		if (!newdata) {
+			if (!prop->data)
+				destroy_prop(prop);
+
+			return ERR_NOMEM;
+		}
+	}
+
+	free(prop->data);
+
+	prop->data = newdata;	
+	prop->len = len;
+
+	if (prop->data)
+		memcpy(prop->data, data, len);
+
+	return 0;
+}
+
+typedef struct merge_ctx {
+	dt_node_t *dest;
+	int notfirst;
+} merge_ctx_t;
+
+static int merge_pre(dt_node_t *src, void *arg)
+{
+	merge_ctx_t *ctx = arg;
+
+	if (!ctx->notfirst) {
+		ctx->notfirst = 1;
+	} else {
+		ctx->dest = dt_get_subnode(ctx->dest, src->name, 1);
+
+		if (!ctx->dest)
+			return ERR_NOMEM;
+	}
+
+	list_for_each(&src->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+		
+		int ret = dt_set_prop(ctx->dest, prop->name, prop->data, prop->len);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int merge_post(dt_node_t *src, void *arg)
+{
+	merge_ctx_t *ctx = arg;
+
+	ctx->dest = ctx->dest->parent;
+	return 0;
+}
+
+/**
+ * Merge one subtree into another.
+ *
+ * @param[in] dest tree to merge into
+ * @param[in] src tree to merge from
+ * @param[in] deletion if non-zero, honor delete-node, delete-prop, etc.
+ * @return zero on success, non-zero on failure
+ *
+ * The contents of src are merged into dest, recursively.
+ *
+ * Any properties that exist in both the source and destination
+ * nodes are resolved in favor of the source node.
+ *
+ * The names of the toplevel dest and src trees are ignored; that is,
+ * this function will not create a new tree with both inputs as siblings
+ * if the name does not match, and the name of the resultant tree root
+ * will be that of the destination input.
+ */
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion)
+{
+	merge_ctx_t ctx = { .dest = dest };
+
+	return for_each_node(src, &ctx, merge_pre, merge_post);
+}
+
+typedef struct print_ctx {
+	queue_t *out;
+	int depth;
+} print_ctx_t;
+
+static int is_strlist(const char *str, size_t len)
+{
+	int last_was_null = 0;
+
+	if (str[len - 1] != 0)
+		return 0;
+
+	for (size_t i = 0; i < len; i++) {
+		if (str[i] == 0) {
+			if (last_was_null)
+				return 0;
+
+			last_was_null = 1;
+		} else if (str[i] < 32 || str[i] > 127) {
+			return 0;
+		} else {
+			last_was_null = 0;
+		}
+	}
+
+	return 1;
+}
+
+static int print_pre(dt_node_t *tree, void *arg)
+{
+	print_ctx_t *ctx = arg;
+
+	for (int i = 0; i < ctx->depth; i++)
+		qprintf(ctx->out, "\t");
+
+	if (ctx->depth == 0)
+		qprintf(ctx->out, "{\n");
+	else
+		qprintf(ctx->out, "%s {\n", tree->name);
+
+	ctx->depth++;
+
+	list_for_each(&tree->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+
+		for (int j = 0; j < ctx->depth; j++)
+			qprintf(ctx->out, "\t");
+		
+		qprintf(ctx->out, "%s", prop->name);
+
+		if (is_strlist(prop->data, prop->len)) {
+			const char *str = prop->data;
+			size_t pos = 0;
+
+			while (pos < prop->len) {
+				qprintf(ctx->out, "%s\"%s\"",
+				        pos == 0 ? " = " : ", ", &str[pos]);
+				pos += strlen(&str[pos]) + 1;
+			}
+		} else if (prop->len & 3) {
+			uint8_t *data = prop->data;
+			
+			for (int j = 0; j < prop->len; j++) {
+				qprintf(ctx->out, "%s%02x",
+				        j == 0 ? " = [" : " ", data[j]);
+			}
+
+			qprintf(ctx->out, "]");
+		} else if (prop->len != 0) {
+			uint32_t *data = prop->data;
+
+			for (int j = 0; j < prop->len / 4; j++)
+				qprintf(ctx->out, "%s%#x", j == 0 ? " = <" : " ", data[j]);
+
+			qprintf(ctx->out, ">");
+		}
+
+		qprintf(ctx->out, ";\n");
+	}
+
+	return 0;
+}
+
+static int print_post(dt_node_t *tree, void *arg)
+{
+	print_ctx_t *ctx = arg;
+	ctx->depth--;
+
+	for (int i = 0; i < ctx->depth; i++)
+		qprintf(ctx->out, "\t");
+
+	qprintf(ctx->out, "}\n");	
+	return 0;
+}
+
+/**
+ * Print a device tree's contents to a libos queue.
+ *
+ * @param[in] tree device tree to print
+ * @param[in] out libos queue to print to
+ */
+void dt_print_tree(dt_node_t *tree, queue_t *out)
+{
+	print_ctx_t ctx = { .out = out };
+
+	for_each_node(tree, &ctx, print_pre, print_post);
 }

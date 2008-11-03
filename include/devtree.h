@@ -59,6 +59,11 @@ int for_each_node(dt_node_t *tree, void *arg,
                   int (*previsit)(dt_node_t *node, void *arg),
                   int (*postvisit)(dt_node_t *node, void *arg));
 
+dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create);
+
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion);
+void dt_print_tree(dt_node_t *tree, struct queue *out);
+
 /** #address-cells and #size-cells at root of hv tree */
 extern uint32_t rootnaddr, rootnsize;
 
