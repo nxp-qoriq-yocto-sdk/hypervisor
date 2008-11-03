@@ -58,7 +58,8 @@ enum command {
 	e_load,
 	e_start,
 	e_stop,
-	e_restart
+	e_restart,
+	e_doorbell,
 };
 
 struct parameters {
@@ -145,6 +146,11 @@ static void usage(void)
 	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
 	printf("\t\timages.\n\n");
 */
+
+	printf("Monitor doorbells:\n\tpartman -d -f <file>\n");
+	printf("\t\t<file> is a shell script or program to run on every doorbell.\n");
+	printf("\t\tThe first parameter to the script is the doorbell handle.\n\n");
+
 	printf("Specify -v for verbose output\n\n");
 }
 
@@ -736,6 +742,52 @@ static int cmd_restart(struct parameters *p)
 	return ret;
 }
 
+static int cmd_doorbells(struct parameters *p)
+{
+	uint32_t dbell;
+	ssize_t ret;
+	char command[PATH_MAX + 32];
+	char temp[PATH_MAX + 1];
+
+	if (!p->f_specified) {
+		usage();
+		return EINVAL;
+	}
+
+	// Verify that the passed-in script exists and can actually be
+	// executed.
+	snprintf(command, sizeof(command), "test -x %s", p->f);
+	if (system(command)) {
+		printf("%s is not a executable file\n", p->f);
+		return EINVAL;
+	}
+
+	int f = open("/dev/fsl-hv", O_RDONLY);
+	if (f == -1) {
+		ret = errno;
+		if (verbose)
+			perror(__func__);
+		return ret;
+	}
+
+	while (1) {
+		ret = read(f, &dbell, sizeof(dbell));
+		if (ret <= 0) {
+			if (verbose)
+				perror(__func__);
+			break;
+		}
+
+		snprintf(command, sizeof(command), "%s %u", realpath(p->f, temp), dbell);
+
+		system(command);
+	}
+
+	close(f);
+
+	return 0;
+}
+
 /**
  * verify_dev - verify that the management driver is loaded and /dev/fsl-hv is correct
  *
@@ -816,7 +868,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "slgxvh:f:a:e:")) != -1) {
+	while ((c = getopt(argc, argv, "slgxdvh:f:a:e:")) != -1) {
 		switch (c) {
 		case 's':
 			cmd = e_status;
@@ -832,6 +884,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			cmd = e_restart;
+			break;
+		case 'd':
+			cmd = e_doorbell;
 			break;
 		case 'v':
 			verbose = 1;
@@ -875,6 +930,9 @@ int main(int argc, char *argv[])
 		break;
 	case e_restart:
 		ret = cmd_restart(&p);
+		break;
+	case e_doorbell:
+		ret = cmd_doorbells(&p);
 		break;
 	default:
 		usage();
