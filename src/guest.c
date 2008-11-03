@@ -1412,10 +1412,8 @@ static int init_guest_primary(guest_t *guest, int partition,
 	if (ret < 0)
 		goto fail;
 
-#ifdef CONFIG_IPI_DOORBELL
 	send_dbell_partition_init(guest);
 	recv_dbell_partition_init(guest);
-#endif
 
 	ret = process_partition_handles(guest);
 	if (ret < 0)

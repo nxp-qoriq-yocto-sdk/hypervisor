@@ -96,11 +96,10 @@ partman: bin/linux/partman
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
-            gspr.c misc.S livetree.c
+            gspr.c misc.S livetree.c ipi_doorbell.c
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
-hv-src-$(CONFIG_IPI_DOORBELL) += ipi_doorbell.c
 hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
 hv-src-$(CONFIG_SHELL) += shell.c
 hv-src-$(CONFIG_PAMU) += pamu.c

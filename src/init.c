@@ -205,9 +205,7 @@ void start(unsigned long devtree_ptr)
 	shell_init();
 #endif
 
-#ifdef CONFIG_IPI_DOORBELL
 	create_doorbells();
-#endif
 
 #ifdef CONFIG_PAMU
 	pamu_global_init();

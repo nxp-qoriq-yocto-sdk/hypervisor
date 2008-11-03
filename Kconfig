@@ -62,11 +62,6 @@ config GDB_STUB
 		remotely with GDB.  The stub is located in the hypervisor, 
 		allowing non-intrusive debugging.
 
-config IPI_DOORBELL
-	bool "Inter Partition Interrupt support"
-	help
-		Provides support for inter partition signalling.
-
 config SHELL
 	bool "Command-line shell"
 	select LIBOS_QUEUE
