@@ -33,10 +33,14 @@
 void init(unsigned long devtree_ptr);
 extern void *fdt;
 int saved_trap_eip, saved_icmp_eip;
+volatile int loopcnt, loopcnt_monitor;
+uint32_t dac2_write_hit_pc, data_watchpoint_cmp;
 
 void debug_handler(trapframe_t *frameptr)
 {
-	switch (mfspr(SPR_DBSR)) {
+	register_t val = mfspr(SPR_DBSR);
+
+	switch (val) {
 		case DBCR0_TRAP:
 			saved_trap_eip = frameptr->srr0;
 			frameptr->srr0 += 4;
@@ -45,11 +49,44 @@ void debug_handler(trapframe_t *frameptr)
 			saved_icmp_eip = frameptr->srr0;
 			/* disable single-stepping */
 			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP);
+			break;
+		case DBCR0_IAC1:
+			loopcnt_monitor = 1;
+			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_IAC1);
+			break;
+		case DBCR0_DAC2W:
+			dac2_write_hit_pc = frameptr->srr0;
+			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_DAC2W);
+	}
+
+	mtspr(SPR_DBSR, val);
+}
+
+static inline uint32_t get_pc(void)
+{
+	register uint32_t retval asm("r3") = 0;
+
+	asm ("mflr %%r0;"
+	     "bl dummy;"
+	     "dummy: ;"
+	     "mflr %0;"
+	     "mtlr %%r0;" : "=r" (retval) : :"r0","memory" );
+
+	return retval;
+}
+
+void hwbreaktestfunc(void)
+{
+	if (loopcnt_monitor) {
+		data_watchpoint_cmp = get_pc();
+		loopcnt = 0;
 	}
 }
 
 void start(unsigned long devtree_ptr)
 {
+	int test_events = DBCR0_TRAP | DBCR0_ICMP | DBCR0_IAC1 | DBCR0_DAC2W;
+
 	init(devtree_ptr);
 
 	printf("Guest Debug test:\n");
@@ -63,7 +100,7 @@ void start(unsigned long devtree_ptr)
 	 */
 
 	mtmsr(mfmsr() & ~MSR_DE);
-	mtspr(SPR_DBCR0, DBCR0_IDM | DBCR0_TRAP | DBCR0_ICMP);
+	mtspr(SPR_DBCR0, DBCR0_IDM | test_events);
 
 	printf("Testing Trap Debug event : ");
 
@@ -71,12 +108,28 @@ void start(unsigned long devtree_ptr)
 	
 	asm volatile ("twge %r2, %r2");
 
-	printf("Passed\n");
+	printf("PASSED\n");
 
 	printf("Testing ICMP Debug event : ");
 
 	if (saved_trap_eip + 8 == saved_icmp_eip )
-		printf("Passed\n");
-	
+		printf("PASSED\n");
+
+	printf("Testing IAC1/IAC2 Debug event : ");
+	loopcnt = 1;
+	mtspr(SPR_DBCR1, 0);
+	mtspr(SPR_DBCR2, 0);
+	mtspr(SPR_IAC1, (unsigned long) &hwbreaktestfunc);
+	mtspr(SPR_DAC2, (unsigned long) &loopcnt);
+
+	while (loopcnt)
+		hwbreaktestfunc();
+
+	printf("PASSED\n");
+
+	printf("Testing DAC1/DAC2 Debug event : ");
+	if (dac2_write_hit_pc == 8 + data_watchpoint_cmp)
+		printf("PASSED\n");
+
 	printf("Test Complete\n");
 }

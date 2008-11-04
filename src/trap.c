@@ -100,14 +100,6 @@ void debug_trap(trapframe_t *regs)
 	gcpu->dsrr0 = regs->srr0;
 	gcpu->dsrr1 = regs->srr1;
 
-	gcpu->dbsr = mfspr(SPR_DBSR);
-
-	/*
-	 * Prevent recursive debug interrupts by clearing debug 
-	 * events in DBSR 
-	 */
-	mtspr(SPR_DBSR, mfspr(SPR_DBSR) | DBSR_TRAP | DBSR_ICMP);
-	
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DEBUG];
 	regs->srr1 &= MSR_GS | MSR_UCLE;
 }

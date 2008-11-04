@@ -195,7 +195,6 @@ typedef struct gcpu {
 	unsigned long crit_gdbell_pending;
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;
-	uint32_t dbsr;
 	register_t ivpr;
 	register_t ivor[38];
 	register_t sprg[6]; /* Guest SPRG4-9 */

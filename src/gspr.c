@@ -351,8 +351,36 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_DBCR0);
 		break;
 
+	case SPR_DBCR1:
+		*val = mfspr(SPR_DBCR1);
+		break;
+
+	case SPR_DBCR2:
+		*val = mfspr(SPR_DBCR2);
+		break;
+
+	case SPR_DBCR4:
+		*val = mfspr(SPR_DBCR4);
+		break;
+
 	case SPR_DBSR:
-		*val = gcpu->dbsr;
+		*val = mfspr(SPR_DBSR);
+		break;
+
+	case SPR_IAC1:
+		*val = mfspr(SPR_IAC1);
+		break;
+
+	case SPR_IAC2:
+		*val = mfspr(SPR_IAC2);
+		break;
+
+	case SPR_DAC1:
+		*val = mfspr(SPR_DAC1);
+		break;
+
+	case SPR_DAC2:
+		*val = mfspr(SPR_DAC2);
 		break;
 
 	default:
@@ -633,10 +661,70 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		mtspr(SPR_DBCR0, val);
 		break;
 
+	case SPR_DBCR1:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+
+		if (((val & DBCR1_IAC1ER_EAMSK) == DBCR1_IAC1ER_RADDR) ||
+		    ((val & DBCR1_IAC2ER_EAMSK) == DBCR1_IAC2ER_RADDR))
+			return 1;
+
+		val &= (DBCR1_IAC1ER_EAMSK | DBCR1_IAC2ER_EAMSK);
+		mtspr(SPR_DBCR1, val);
+		break;
+
+	case SPR_DBCR2:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+
+		if (((val & DBCR2_DAC1ER_EAMSK) == DBCR2_DAC1ER_RADDR) ||
+		    ((val & DBCR2_DAC2ER_EAMSK) == DBCR2_DAC2ER_RADDR))
+			return 1;
+
+		val &= (DBCR2_DAC1ER_EAMSK | DBCR2_DAC2ER_EAMSK);
+		mtspr(SPR_DBCR2, val);
+		break;
+
+	case SPR_DBCR4:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+
+		if (((val & DBCR4_DAC1XM) > DBCR4_DAC1XM_RNG) ||
+		    ((val & DBCR4_DAC2XM) > DBCR4_DAC2XM_RNG))
+			return 1;
+
+		val &= (DBCR4_DAC1XM | DBCR4_DAC2XM);
+		mtspr(SPR_DBCR4, val);
+		break;
+
 	case SPR_DBSR:
 		if (!gcpu->guest->guest_debug_mode)
 			return 1;
-		gcpu->dbsr = val;
+		mtspr(SPR_DBSR, val);
+		break;
+
+	case SPR_IAC1:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		mtspr(SPR_IAC1, val);
+		break;
+
+	case SPR_IAC2:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		mtspr(SPR_IAC2, val);
+		break;
+
+	case SPR_DAC1:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		mtspr(SPR_DAC1, val);
+		break;
+
+	case SPR_DAC2:
+		if (!gcpu->guest->guest_debug_mode)
+			return 1;
+		mtspr(SPR_DAC2, val);
 		break;
 
 	default:
