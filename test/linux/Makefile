@@ -43,8 +43,6 @@ $(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
 $($(test)-hv-dts): $($(test)-part-dtb)
 
-bin/$(test)/hv-linux-fman.dtb: bin/common/p4080master.dts
-
 include $(src)tools/partman/Makefile
 
 .PHONY: $(test)
