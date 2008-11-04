@@ -176,12 +176,10 @@ bin/dochecklxdialog:
 
 # generated files seem to need this to find local include files
 bin/lex.zconf.o: bin/lex.zconf.c
-	@$(MKDIR) $(@D)
 	$(HOSTCC) $(HOSTCFLAGS) -c -I$(kcsrc) $(HOST_EXTRACFLAGS) $< -o $@
 
 bin/zconf.tab.o: bin/zconf.tab.c
 	$(HOSTCC) $(HOSTCFLAGS) -c -I$(kcsrc) $(HOST_EXTRACFLAGS) $< -o $@
-
 
 bin/qconf.o: $(kcsrc)/qconf.cc
 	@$(MKDIR) $(@D)
@@ -320,6 +318,7 @@ lex.%.c: %.l
 
 else
 bin/%:: $(kcsrc)/%_shipped
+	@$(MKDIR) $(@D)
 	cp -af $< $@
 endif
 
