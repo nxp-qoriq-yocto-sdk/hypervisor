@@ -29,6 +29,6 @@ $(test)-run: $(test)
 	$(SIMICS) $(testdir)$</run.simics
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 OBJS += $(test)-obj
