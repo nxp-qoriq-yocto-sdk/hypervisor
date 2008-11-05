@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <arpa/inet.h>
 
 /*
  * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
@@ -116,6 +117,27 @@ struct program_header {
 	uint32_t flags;
 	uint32_t align;
 };
+
+/*
+ *  uImage header
+ */
+struct image_header {
+	uint32_t magic;   /* Image Header Magic Number */
+	uint32_t hcrc;    /* Image Header CRC Checksum */
+	uint32_t time;    /* Image Creation Timestamp */
+	uint32_t size;    /* Image Data Size */
+	uint32_t load;    /* Data  Load  Address */
+	uint32_t ep;      /* Entry Point Address */
+	uint32_t dcrc;    /* Image Data CRC Checksum */
+	uint8_t os;       /* Operating System */
+	uint8_t arch;     /* CPU architecture */
+	uint8_t type;     /* Image Type */
+	uint8_t comp;     /* Compression Type */
+	uint8_t name[32]; /* Image Name */
+	uint8_t data[0];
+};
+
+#define UIMAGE_SIGNATURE 0x27051956
 
 /* Support functions */
 
@@ -459,6 +481,23 @@ static int load_and_copy_image_file(unsigned int partition,
 				       filename, partition, load_address, ret);
 			goto fail;
 		}
+	} else if (ntohl(((struct image_header *)mapped)->magic ==
+							UIMAGE_SIGNATURE)) {
+		struct image_header *hdr;
+
+		hdr = (struct image_header *)mapped;
+		ret = copy_to_partition(partition,
+					&hdr->data,
+					load_address, ntohl(hdr->size));
+		if (ret) {
+			printf("Could not load file %s to partition %i "
+			       "at address %lx, error=%i\n",
+				filename, partition, load_address, ret);
+			goto fail;
+		}
+
+		if (entry_address)
+			*entry_address = load_address;
 	} else {
 		// If -a was not specified, then assume 0
 		if (load_address == (unsigned long) -1)
