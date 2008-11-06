@@ -11,6 +11,8 @@ partman \- manage a Freescale Embedded Hypervisor partition
 .br
 \fBpartman\fR [ \fB\-v\fR ] \fB\-x\fR \fB\-h\fR handle
 .br
+\fBpartman\fR [ \fB\-v\fR ] \fB\-d\fR \fB\-f\fR file
+.br
 .SH DESCRIPTION
 .PP
 The Freescale Embedded Hypervisor provides a Linux-based partition management
@@ -31,11 +33,19 @@ Start a partition.
 \fB\-x\fR
 Stop a partition.
 .TP
+\fB\-d\fR
+Listen for doorbells.
+.TP
 \fB\-h\fR handle
 Handle of the target partition.
 .TP
 \fB\-f\fR filename
-Name of a file to load.  If this file is an ELF image, the ELF headers will be
+For the \fB\-d\fR command, this specifies the program to run when a doorbell
+is received.  This can be any program that can be executed by the shell.
+\fBpartman\fR passes the doorbell handle as a parameter to this script.
+
+For all other commands, this specifies the name of the file to
+load.  If this file is an ELF image, the ELF headers will be
 parsed and PT_LOAD segments will be extracted and copied to the target
 partition in the right order.  Otherwise, the file is treated as a single
 binary blob.
