@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc4
-Date: 10/31/2008
+Revsion: 0.3-rc5
+Date: 11/06/2008
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc4
+   -Topaz 0.3-rc5
       -is compatible with P4080 4.0.20 / 4.0.pre5
       -the unit tests are not compatible with earlier versions
        of simics due a model change with respect to flash
@@ -33,6 +33,13 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc5 bug fixes and changes
+      -support for loading uncompressed uImages from partman
+      -fixed bug 2165-- watchdog unit test hangs after rebooting once
+      -guest debug mode emulation -- support for IAC and DAC
+      -removed CONFIG_IPI_DOORBELL option
+      -libos-- clear MSR after fixup_mmu()
 
    -Topaz 0.3-rc4 bug fixes and changes
       -support for loading uncompressed uImages for client program

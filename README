@@ -34,5 +34,7 @@ Source tree directory structure
    tools/partman        The Linux user space partition manager tool
    test                 Hypervisor unit tests
    test/common          files shared by the tests
+   test/sim             The sim.git project.  U-boot, kernel images
+                        comem from here.
 
 ----------------------------------------------------------
