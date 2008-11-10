@@ -1529,6 +1529,17 @@ wait:	{
 	}
 } 
 
+/** Temporarily map guest physical memory into a hypervisor virtual address
+ *
+ * @param[in]  tlbentry TLB1 entry index to use
+ * @param[in]  tbl Guest page table to map from
+ * @param[in]  addr Guest physical address to map
+ * @param[in]  vpage Virtual base of window to hold mapping
+ * @param[out] len Length of the actual mapping
+ * @param[in]  maxtsize tsize of the virtual window
+ * @param[in]  write if non-zero, fail if write access is not allowed
+ * @return virtual address that corresponds to addr
+ */
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
                 void *vpage, size_t *len, int maxtsize, int write)
 {
@@ -1703,6 +1714,119 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 
 		memcpy(vdest, vsrc, chunk);
 
+		vsrc += chunk;
+		vdest += chunk;
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+		dchunk -= chunk;
+		schunk -= chunk;
+	}
+
+	return ret;
+}
+
+/** Temporarily map physical memory into a hypervisor virtual address
+ *
+ * @param[in] tlbentry TLB1 entry index to use
+ * @param[in] paddr Guest physical address to map
+ * @param[in] vpage Virtual base of window to hold mapping
+ * @param[inout] len Length of the actual mapping
+ * @param[in] mas2flags WIMGE bits, typically TLB_MAS2_IO or TLB_MAS2_MEM
+ * @return the virtual address that corresponds to paddr.
+ */
+void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
+               size_t *len, register_t mas2flags)
+{
+	size_t offset, bytesize;
+	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
+
+	tsize = min(max_page_tsize((uintptr_t)vpage >> PAGE_SHIFT, tsize),
+	            natural_alignment(paddr >> PAGE_SHIFT));
+
+	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
+	offset = paddr & (bytesize - 1);
+
+	tlb1_set_entry(tlbentry, (unsigned long)vpage, paddr & ~(bytesize - 1),
+	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+	*len = min(bytesize - offset, *len);
+	return vpage + offset;
+}
+
+/** Copy from a true physical address to a hypervisor virtual address 
+ *
+ * @param[in] dest Hypervisor virtual address to copy to
+ * @param[in] src Physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
+{
+	size_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
+		void *vsrc;
+		
+		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+		                &chunk, TLB_MAS2_MEM);
+		if (!vsrc)
+			break;
+
+		assert (chunk <= len);
+		memcpy(dest, vsrc, chunk);
+
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	return ret;
+}
+
+/** Copy from a true physical address to a guest physical address
+ *
+ * @param[in] dtbl Guest physical page table of the destination
+ * @param[in] dest Guest physical address to copy to
+ * @param[in] src Guest physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
+                          pte_t *stbl, phys_addr_t src, size_t len)
+{
+	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
+	
+	/* Initializiations not needed, but GCC is stupid. */
+	void *vdest = NULL, *vsrc = NULL;
+	
+	while (len > 0) {
+		if (!schunk) {
+			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
+			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+			                &schunk, TLB_MAS2_MEM);
+			if (!vsrc)
+				break;
+		}
+
+		if (!dchunk) {
+			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
+			                  &dchunk, TLB_TSIZE_16M, 1);
+			if (!vdest)
+				break;
+		}
+
+		chunk = min(schunk, dchunk);
+		if (chunk > len)
+			chunk = len;
+
+		memcpy(vdest, vsrc, chunk);
+
+		vsrc += chunk;
+		vdest += chunk;
 		src += chunk;
 		dest += chunk;
 		ret += chunk;
