@@ -98,38 +98,34 @@ int is_elf(void *image)
  * Per ePAPR spec, the destination address encoded in the ELF file is
  * ignored.
  */
-int load_elf(guest_t *guest, void *image, unsigned long length,
+int load_elf(guest_t *guest, phys_addr_t image, unsigned long length,
              phys_addr_t target, register_t *entry)
 {
-	struct elf_header *hdr = (struct elf_header *) image;
-	struct program_header *phdr = (struct program_header *) (image + hdr->phoff);
+	struct elf_header hdr;
+	struct program_header phdr;
 	unsigned long base = -1;
-	unsigned int i;
+	unsigned int i, ret;
 
-	if (strncmp(image, "\177ELF", 4)) {
-		printf("guest %s: invalid ELF magic\n", guest->name);
-		return ERR_BADIMAGE;
-	}
+	if (copy_from_phys(&hdr, image, sizeof(hdr)) != sizeof(hdr))
+		return ERR_UNHANDLED;
 
-	if (length < sizeof(struct elf_header)) {
-		printf("guest %s: truncated ELF image\n", guest->name);
-		return ERR_BADIMAGE;
-	}
+	if (strncmp((char *)hdr.ident, "\177ELF", 4))
+		return ERR_UNHANDLED;
 
-	if (length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
-		printf("guest %s: truncated ELF image\n", guest->name);
-		return ERR_BADIMAGE;
-	}
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+	         "loading ELF image from flash\n");
 
 	/* We only support 32-bit for now */
-	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
-		printf("guest %s: only 32-bit ELF images are supported\n", guest->name);
+	if (hdr.ident[EI_CLASS] != ELFCLASS32) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "load_elf: only 32-bit ELF images are supported\n");
 		return ERR_BADIMAGE;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
-	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
-		printf("guest %s: only big-endian ELF images are supported\n", guest->name);
+	if (hdr.ident[EI_DATA] != ELFDATA2MSB) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "load_elf: only big-endian ELF images are supported\n");
 		return ERR_BADIMAGE;
 	}
 
@@ -139,35 +135,67 @@ int load_elf(guest_t *guest, void *image, unsigned long length,
 	 * segments.
 	 */
 
-	for (i = 0; i < hdr->phnum; i++) {
-		if (phdr[i].offset + phdr[i].filesz > length) {
-			printf("guest %s: truncated ELF image\n", guest->name);
+	for (i = 0; i < hdr.phnum; i++) {
+		phys_addr_t phdr_phys = image + hdr.phoff + i * hdr.phentsize;
+	
+		if (copy_from_phys(&phdr, phdr_phys, sizeof(phdr)) != sizeof(phdr)) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_elf: cannot read program header\n");
 			return ERR_BADIMAGE;
 		}
-		if (phdr[i].filesz > phdr[i].memsz) {
-			printf("guest %s: invalid ELF program header file size\n", guest->name);
+
+		if (phdr.offset + phdr.memsz > length) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_elf: image size exceeds target window\n");
 			return ERR_BADIMAGE;
 		}
-		if ((phdr[i].type == PT_LOAD) && (phdr[i].vaddr < base))
-			base = phdr[i].vaddr;
+
+		if (phdr.filesz > phdr.memsz) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_elf: invalid ELF segment size\n");
+			return ERR_BADIMAGE;
+		}
+
+		if ((phdr.type == PT_LOAD) && (phdr.vaddr < base))
+			base = phdr.vaddr;
 	}
 
 	/* Copy each PT_LOAD segment to memory */
 
-	for (i = 0; i < hdr->phnum; i++) {
-		if (phdr[i].type == PT_LOAD) {
-			copy_to_gphys(guest->gphys,
-				target + (phdr[i].vaddr - base),
-				image + phdr[i].offset, phdr[i].filesz);
-			zero_to_gphys(guest->gphys,
-				target + (phdr[i].vaddr - base) + phdr[i].filesz,
-				phdr[i].memsz - phdr[i].filesz);
+	for (i = 0; i < hdr.phnum; i++) {
+		phys_addr_t phdr_phys = image + hdr.phoff + i * hdr.phentsize;
+	
+		if (copy_from_phys(&phdr, phdr_phys, sizeof(phdr)) != sizeof(phdr)) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_elf: cannot read program header %d\n", i);
+			return ERR_BADIMAGE;
+		}
+
+		if (phdr.type == PT_LOAD) {
+			phys_addr_t seg_target = target + phdr.vaddr - base;
+
+			ret = copy_phys_to_gphys(guest->gphys, seg_target,
+			                         image + phdr.offset,
+			                         phdr.filesz);
+			if (ret != phdr.filesz) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "load_elf: cannot copy segment %d\n", i);
+				return ERR_BADADDR;
+			}
+
+			ret = zero_to_gphys(guest->gphys, seg_target + phdr.filesz,
+			                    phdr.memsz - phdr.filesz);
+			if (ret != phdr.memsz - phdr.filesz) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "load_elf: cannot zero segment %d\n", i);
+				return ERR_BADADDR;
+			}
 		}
 	}
 
 	/* Return the entry point for the image if requested */
 	if (entry)
-		*entry = target - base + hdr->entry;
+		*entry = target - base + hdr.entry;
 
 	return 0;
 }

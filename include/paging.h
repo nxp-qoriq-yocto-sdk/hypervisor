@@ -161,7 +161,7 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 size_t copy_from_phys(void *dest, phys_addr_t src, size_t len);
 
 size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
-                          pte_t *stbl, phys_addr_t src, size_t len);
+                          phys_addr_t src, size_t len);
 
 #define TLB_MISS_HANDLED 0
 #define TLB_MISS_REFLECT 1
