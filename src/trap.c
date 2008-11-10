@@ -300,15 +300,14 @@ void tlb_miss(trapframe_t *regs)
 	int itlb = regs->exc == EXC_ITLB;
 	int guest = likely(regs->srr1 & MSR_GS);
 	int epid = !itlb && (mfspr(SPR_ESR) & ESR_EPID);
+	register_t vaddr = itlb ? regs->srr0 : mfspr(SPR_DEAR);
 
 #ifdef CONFIG_TLB_CACHE
 	if (guest || epid) {
-		register_t vaddr = itlb ? regs->srr0 : mfspr(SPR_DEAR);
 		register_t mas1, mas2;
 		int pid = mfspr(SPR_PID);
 		int space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
 		                   (regs->srr1 & MSR_DS) >> 4;
-
 		int ret = guest_tlb1_miss(vaddr, space, pid);
 
 		if (likely(ret == TLB_MISS_HANDLED))
@@ -346,8 +345,15 @@ void tlb_miss(trapframe_t *regs)
 	assert(!(regs->srr1 & MSR_GS));
 #endif
 
-	if (epid && !guest)
-		abort_guest_access(regs, GUESTMEM_TLBMISS);
-	else
-		reflect_trap(regs);
+	if (unlikely(!guest)) {
+		if (epid) {
+			abort_guest_access(regs, GUESTMEM_TLBMISS);
+			return;
+		}
+		
+		if (handle_hv_tlb_miss(regs, vaddr))
+			return;
+	}
+
+	reflect_trap(regs);
 }

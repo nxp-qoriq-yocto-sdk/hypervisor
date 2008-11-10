@@ -65,7 +65,6 @@ void init_guest(void);
 
 void *fdt;
 static phys_addr_t mem_end;
-unsigned long CCSRBAR_VA;
 void *temp_mapping[2];
 extern char _end;
 uint64_t bigmap_phys;
@@ -147,7 +146,6 @@ void start(unsigned long devtree_ptr)
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 
 	valloc_init(1024 * 1024, PHYSBASE);
-	CCSRBAR_VA = (unsigned long)valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(128 * 1024 * 1024, 128 * 1024 * 1024);
 
@@ -159,16 +157,24 @@ void start(unsigned long devtree_ptr)
 	if (mem_end > lowest_guest_addr - 1)
 		mem_end = lowest_guest_addr - 1;
 
-	tlb1_init();
-	
 	exclude_memrsv();
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
 	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
+	
+	/* Only access memory in the boot mapping for now */
+	malloc_exclude_segment((void *)(PHYSBASE + 256 * 1024 * 1024),
+	                       (void *)ULONG_MAX);
 	
 	if (mem_end <= ULONG_MAX)
 		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
 		                       (void *)ULONG_MAX);
 	malloc_init();
+	tlb1_init();
+
+	CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, 16 * 1024 * 1024,
+	                                TLB_MAS2_IO, TLB_MAS3_KERN, 1);
+	
+	cpu->console_ok = 1;
 	core_init();
 	
 	fdt_size = fdt_totalsize(fdt) + 4096;
