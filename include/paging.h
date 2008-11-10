@@ -32,9 +32,8 @@
 
 #define TEMPTLB1 48
 #define TEMPTLB2 49
-#define TEMPTLB3 50
 
-#define DYN_TLB_START 51
+#define DYN_TLB_START 50
 #define DYN_TLB_END 57
 
 #define PERM_TLB_START 58
