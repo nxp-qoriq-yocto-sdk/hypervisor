@@ -60,7 +60,6 @@ struct image_header {
 	uint8_t type;     /* Image Type */
 	uint8_t comp;     /* Compression Type */
 	uint8_t name[32]; /* Image Name */
-	uint8_t data[0];
 };
 
 /**
@@ -115,48 +114,46 @@ static int add_initrd_start_end_to_guest_dt(guest_t *guest,
  * @target: guest physical address of the destination
  * @entry: guest phys address of entry point, if not NULL
  */
-int load_uimage(guest_t *guest, void *image, unsigned long length,
-		phys_addr_t target, register_t *entry)
+int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
+                phys_addr_t target, register_t *entry)
 {
-	struct image_header *hdr;
+	struct image_header hdr;
 	uint32_t size;
 	int ret;
 
-	hdr = (struct image_header *)image;
+	if (copy_from_phys(&hdr, image_phys, sizeof(hdr)) != sizeof(hdr))
+		return ERR_UNHANDLED;
 
-	if (be32_to_cpu(hdr->magic) != UIMAGE_SIGNATURE)
+	if (be32_to_cpu(hdr.magic) != UIMAGE_SIGNATURE)
 		return ERR_UNHANDLED;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-		 "guest %s: Loading uImage from flash\n", guest->name);
+	         "Loading uImage from flash\n");
 
-	if (length < sizeof(struct image_header)) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "guest %s: truncated image.\n", guest->name);
-		return ERR_BADIMAGE;
-	}
-
-	size = be32_to_cpu(hdr->size);
+	size = be32_to_cpu(hdr.size);
 	if (length < size) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "guest %s: image size specified in device tree is "
-			 "less then size of image present in mkimage header.\n",
-			 guest->name);
+		         "load_uimage: image size exceeds target window\n");
 		return ERR_BADIMAGE;
 	}
 
-	if (be32_to_cpu(hdr->type) == IMAGE_TYPE_RAMDISK) {
+	if (be32_to_cpu(hdr.type) == IMAGE_TYPE_RAMDISK) {
 		ret = add_initrd_start_end_to_guest_dt(guest, target,
 						       target + size);
 		if (ret < 0)
 			return ret;
 	}
 
-	if (copy_to_gphys(guest->gphys, target, &hdr->data, size) != size)
+	ret = copy_phys_to_gphys(guest->gphys, target,
+	                         image_phys + sizeof(hdr), size);
+	if (ret != size) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "load_uimage: cannot copy\n");
 		return ERR_BADADDR;
+	}
 
 	if (entry)
-		*entry = target - be32_to_cpu(hdr->load) + be32_to_cpu(hdr->ep);
+		*entry = target - be32_to_cpu(hdr.load) + be32_to_cpu(hdr.ep);
 
 	return 0;
 }

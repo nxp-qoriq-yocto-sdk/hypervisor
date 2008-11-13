@@ -29,16 +29,11 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/core-regs.h>
 #include <libos/bitops.h>
+#include <libos/list.h>
 
 #include <percpu.h>
 #include <paging.h>
 #include <errors.h>
-
-/* First TLB1 entry reserved for the hypervisor. Entries below this but
- * above TLB1_GSIZE are used to break up guest TLB1 entries due to
- * alignment, size, or permission holes.
- */
-static int tlb1_reserved = BASE_TLB_ENTRY;
 
 static void free_tlb1(unsigned int entry)
 {
@@ -49,7 +44,7 @@ static void free_tlb1(unsigned int entry)
 	do {
 		while (gcpu->tlb1_map[entry][i]) {
 			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
-			assert(idx + bit < tlb1_reserved);
+			assert(idx + bit <= GUEST_TLB_END);
 			
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 			         "clearing tlb1[%d] for gtlb1[%d], cpu%lu\n",
@@ -79,7 +74,7 @@ static int alloc_tlb1(unsigned int entry, int evict)
 		while (~gcpu->tlb1_inuse[i]) {
 			int bit = count_lsb_zeroes(~gcpu->tlb1_inuse[i]);
 
-			if (idx + bit >= tlb1_reserved)
+			if (idx + bit > GUEST_TLB_END)
 				goto none_avail;
 			
 			gcpu->tlb1_inuse[i] |= 1UL << bit;
@@ -103,7 +98,7 @@ none_avail:
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 		         "alloc_tlb1: evicting entry %d\n", i);
 		
-		if (gcpu->evict_tlb1 >= tlb1_reserved)
+		if (gcpu->evict_tlb1 > GUEST_TLB_END)
 			gcpu->evict_tlb1 = 0;
 
 		return i;
@@ -720,26 +715,182 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 	return -1;
 }
 
+unsigned long CCSRBAR_VA;
+
 void tlb1_init(void)
 {
-	int tlb = BASE_TLB_ENTRY;
+}
+
+static uint32_t map_lock;
+static DECLARE_LIST(maps);
+static int next_pinned_tlbe = PERM_TLB_START;
+static int next_dyn_tlbe = DYN_TLB_START;
+
+typedef struct map_entry {
+	list_t map_node;
+	unsigned long start_page, end_page;
+	unsigned long phys_offset; /* phys start page - virt start page */
+	uint32_t mas2flags:8;
+	uint32_t mas3flags:6;
+	uint32_t pinned_tlbe:6; /* zero if not pinned */
+	uint32_t tsize:5;
+} map_entry_t;
+
+/* map_lock must be held */
+static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
+{
+	unsigned long start_page = me->start_page;
+	unsigned long start_phys;
 	
-	tlb1_set_entry(--tlb, CCSRBAR_VA, CCSRBAR_PA,
-	               CCSRBAR_SIZE, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	int tlbe = me->pinned_tlbe;
 
-	phys_addr_t addr = 256 * 1024 * 1024;
-	while (addr < 4096ULL * 1024 * 1024 - PHYSBASE) {
-		int tsize = natural_alignment(addr >> PAGE_SHIFT);
-		tlb1_set_entry(--tlb, PHYSBASE + addr,
-		               addr, tsize, TLB_MAS2_MEM,
-		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	if (likely(!tlbe)) {
+		start_phys = (gaddr >> PAGE_SHIFT) + me->phys_offset;
+		tlbe = next_dyn_tlbe++;
 
-		addr += tsize_to_pages(tsize) << PAGE_SHIFT;
+		if (next_dyn_tlbe > DYN_TLB_END)
+			next_dyn_tlbe = DYN_TLB_START;
+
+		unsigned long page_mask = ~(tsize_to_pages(me->tsize) - 1);
+		start_phys &= page_mask;
+		start_page &= page_mask;
+	} else {
+		start_phys = start_page + me->phys_offset;
 	}
 
-	if (mfspr(SPR_PIR))
-		tlb1_reserved = tlb;
+	tlb1_set_entry(tlbe, start_page << PAGE_SHIFT,
+	               ((phys_addr_t)start_phys) << PAGE_SHIFT,
+	               me->tsize, me->mas2flags, me->mas3flags,
+	               0, 0, TLB_MAS8_HV);
+}
 
-	cpu->console_ok = 1;
+/** Try to handle a TLB miss on a hypervisor mapping
+ *
+ * @param[in] regs trap frame
+ * @param[in] vaddr faulting address
+ * @return non-zero if successfully handled
+ */
+int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
+{
+	unsigned long saved = spin_lock_critsave(&map_lock);
+	unsigned long page = vaddr >> PAGE_SHIFT;
+	int ret = 0;
+
+	list_for_each(&maps, i) {
+		map_entry_t *me = to_container(i, map_entry_t, map_node);
+		
+		if (page < me->start_page)
+			continue;
+		if (page > me->end_page)
+			continue;
+
+		insert_map_entry(me, vaddr);
+		ret = 1;
+		break;
+	}
+	
+	spin_unlock_critsave(&map_lock, saved);
+	return ret;
+}
+
+/** Create a permanent hypervisor mapping
+ *
+ * @param[in] paddr base of physical region to map
+ * @param[in] len length of region to map
+ * @param[in] mas2flags WIMGE bits
+ * @param[in] mas3flags permission bits
+ * @param[in] pin 
+ *   If non-zero, create a permanent TLB1 entry.  Otherwise, the mapping
+ *   will be dynamically faulted into the temporary TLB1 entries, unless
+ *   it is covered by an existing pinned mapping.
+ *
+ * @return the virtual address of the mapping, or NULL if out of resources.
+ */
+void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin)
+{
+	map_entry_t *me;
+	register_t saved;
+	uintptr_t ret = 0;
+
+	unsigned long start_page = paddr >> PAGE_SHIFT;
+	unsigned long end_page = (paddr + len - 1) >> PAGE_SHIFT;
+
+	saved = spin_lock_critsave(&map_lock);
+
+	/* Look for an existing region of which this is a subset */
+	list_for_each(&maps, i) {
+		me = to_container(i, map_entry_t, map_node);
+
+		if (start_page < me->start_page + me->phys_offset)
+			continue;
+		if (end_page > me->end_page + me->phys_offset)
+			continue;
+
+		ret = (start_page - me->phys_offset) << PAGE_SHIFT;
+		ret += paddr & (PAGE_SIZE - 1);
+
+		/* We have to insert pinned mappings here, in case it's
+		 * the initial RAM mapping which we can't fault in later.
+		 */
+		insert_map_entry(me, ret);
+		goto out;
+	}
+
+	unsigned long pages = end_page - start_page + 1;
+
+	if (pin) {
+		if (next_pinned_tlbe > PERM_TLB_END)
+			goto out;
+
+		/* Pinned mappings must be a power of 4 number of pages
+		 * in order to fit in one TLB entry.
+		 */
+		if (tsize_to_pages(pages_to_tsize(pages)) != pages) {
+			spin_unlock_critsave(&map_lock, saved);
+			printlog(LOGTYPE_MMU, LOGLEVEL_ERROR,
+			         "map(): Internal error: called with MAP_PIN and %ld pages\n",
+			         pages);
+			return NULL;
+		}
+	}
+
+	me = malloc(sizeof(map_entry_t));
+	if (!me)
+		goto out;
+
+	ret = (uintptr_t)valloc(pages << PAGE_SHIFT, pages << PAGE_SHIFT);
+	if (!ret)
+		goto out_me;
+
+	ret += paddr & (PAGE_SIZE - 1);
+
+	me->start_page = ret >> PAGE_SHIFT;
+	me->end_page = me->start_page + pages - 1;
+	me->phys_offset = start_page - me->start_page;
+	me->mas2flags = mas2flags;
+	me->mas3flags = mas3flags;
+
+	me->tsize = min(max_page_size(me->start_page,
+	                              me->end_page - me->start_page + 1),
+	                natural_alignment(start_page));
+
+	if (pin) {
+		assert(tsize_to_pages(me->tsize) == pages);
+		me->pinned_tlbe = next_pinned_tlbe++;
+
+		insert_map_entry(me, ret);
+	} else {
+		me->pinned_tlbe = 0;
+	}
+
+	list_add(&maps, &me->map_node);
+
+out:
+	spin_unlock_critsave(&map_lock, saved);
+	return (void *)ret;
+
+out_me:
+	free(me);
+	spin_unlock_critsave(&map_lock, saved);
+	return (void *)ret;
 }

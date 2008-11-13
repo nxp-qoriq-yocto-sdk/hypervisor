@@ -480,45 +480,6 @@ fail:
 	return ret;
 }
 
-// FIXME: we're hard-coding the phys address of flash here, it should
-// read from the DTS instead.
-#define FLASH_ADDR      0xe8000000
-#define FLASH_SIZE      (128 * 1024 * 1024)
-
-/*
- * Map flash into memory and return a hypervisor virtual address for the
- * given physical address.
- *
- * @phys: physical address inside flash space
- *
- * The TLB entry created by this function is temporary.
- * FIXME: implement a more generalized I/O mapping mechanism.
- */
-static void *map_flash(phys_addr_t phys)
-{
-	/* Make sure 'phys' points to flash */
-	if ((phys < FLASH_ADDR) || (phys > (FLASH_ADDR + FLASH_SIZE - 1))) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: phys addr %llx is out of range\n", __FUNCTION__, phys);
-		return NULL;
-	}
-
-	/*
-	 * There is no permanent TLB entry for flash, so we create a temporary
-	 * one here. TEMPTLB2/3 are slots reserved for temporary mappings.  We
-	 * can't use TEMPTLB1, because map_gphys() is using that one.
-	 */
-
-	tlb1_set_entry(TEMPTLB2, (unsigned long)temp_mapping[1],
-	               FLASH_ADDR, TLB_TSIZE_64M, TLB_MAS2_MEM,
-	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-	tlb1_set_entry(TEMPTLB3, (unsigned long)temp_mapping[1] + 64 * 1024 * 1024,
-	               FLASH_ADDR, TLB_TSIZE_64M, TLB_MAS2_MEM,
-	               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-
-	return temp_mapping[1] + (phys - FLASH_ADDR);
-}
-
 /**
  * create_sdbell_handle - craete the receive handles for a special doorbell
  * @kind - the doorbell name
@@ -624,12 +585,12 @@ error:
 }
 
 /**
- * Load a binary or ELF image into guest memory
+ * Load an image into guest memory
  *
  * @guest: guest data structure
- * @image_phys: real physical address of the image
+ * @image: real physical address of the image
  * @guest_phys: guest physical address to load the image to
- * @length: size of the image, can be -1 if image is an ELF
+ * @length: size of the target window, can be -1 if unspecified
  *
  * If the image is a plain binary, then 'length' must be the exact size of
  * the image.
@@ -637,24 +598,15 @@ error:
  * If the image is an ELF, then 'length' is used only to verify the image
  * data.  To skip verification, set length to -1.
  */
-static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
+static int load_image_from_flash(guest_t *guest, phys_addr_t image,
                                  phys_addr_t guest_phys, size_t length,
                                  register_t *entry)
 {
 	int ret;
-	void *image = map_flash(image_phys);
-	if (!image) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest %s: image source address %llx not in flash\n",
-		       guest->name, image_phys);
-		return ERR_BADTREE;
-	}
 
-	if (is_elf(image)) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-		         "guest %s: loading ELF image from flash\n", guest->name);
-		return load_elf(guest, image, length, guest_phys, entry);
-	}
+	ret = load_elf(guest, image, length, guest_phys, entry);
+	if (ret != ERR_UNHANDLED)
+		return ret;
 
 	ret = load_uimage(guest, image, length, guest_phys, entry);
 	if (ret != ERR_UNHANDLED)
@@ -664,15 +616,14 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image_phys,
 
 	if (!length || (length == (size_t) -1)) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest %s: missing or invalid image size\n",
-			guest->name);
+		         "load_image_from_flash: missing or invalid image size\n");
 		return ERR_BADTREE;
 	}
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-	         "guest %s: loading binary image from flash\n", guest->name);
+	         "loading binary image from flash\n");
 
-	if (copy_to_gphys(guest->gphys, guest_phys, image, length) != length)
+	if (copy_phys_to_gphys(guest->gphys, guest_phys, image, length) != length)
 		return ERR_BADADDR;
 
 	if (entry)
@@ -1529,6 +1480,17 @@ wait:	{
 	}
 } 
 
+/** Temporarily map guest physical memory into a hypervisor virtual address
+ *
+ * @param[in]  tlbentry TLB1 entry index to use
+ * @param[in]  tbl Guest page table to map from
+ * @param[in]  addr Guest physical address to map
+ * @param[in]  vpage Virtual base of window to hold mapping
+ * @param[out] len Length of the actual mapping
+ * @param[in]  maxtsize tsize of the virtual window
+ * @param[in]  write if non-zero, fail if write access is not allowed
+ * @return virtual address that corresponds to addr
+ */
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
                 void *vpage, size_t *len, int maxtsize, int write)
 {
@@ -1703,6 +1665,119 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 
 		memcpy(vdest, vsrc, chunk);
 
+		vsrc += chunk;
+		vdest += chunk;
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+		dchunk -= chunk;
+		schunk -= chunk;
+	}
+
+	return ret;
+}
+
+/** Temporarily map physical memory into a hypervisor virtual address
+ *
+ * @param[in] tlbentry TLB1 entry index to use
+ * @param[in] paddr Guest physical address to map
+ * @param[in] vpage Virtual base of window to hold mapping
+ * @param[inout] len Length of the actual mapping
+ * @param[in] mas2flags WIMGE bits, typically TLB_MAS2_IO or TLB_MAS2_MEM
+ * @return the virtual address that corresponds to paddr.
+ */
+void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
+               size_t *len, register_t mas2flags)
+{
+	size_t offset, bytesize;
+	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
+
+	tsize = min(max_page_tsize((uintptr_t)vpage >> PAGE_SHIFT, tsize),
+	            natural_alignment(paddr >> PAGE_SHIFT));
+
+	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
+	offset = paddr & (bytesize - 1);
+
+	tlb1_set_entry(tlbentry, (unsigned long)vpage, paddr & ~(bytesize - 1),
+	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+
+	*len = min(bytesize - offset, *len);
+	return vpage + offset;
+}
+
+/** Copy from a true physical address to a hypervisor virtual address 
+ *
+ * @param[in] dest Hypervisor virtual address to copy to
+ * @param[in] src Physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
+{
+	size_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
+		void *vsrc;
+		
+		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+		                &chunk, TLB_MAS2_MEM);
+		if (!vsrc)
+			break;
+
+		assert (chunk <= len);
+		memcpy(dest, vsrc, chunk);
+
+		src += chunk;
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	return ret;
+}
+
+/** Copy from a true physical address to a guest physical address
+ *
+ * @param[in] dtbl Guest physical page table of the destination
+ * @param[in] dest Guest physical address to copy to
+ * @param[in] src Guest physical address to copy from
+ * @param[in] len Bytes to copy
+ * @return number of bytes successfully copied
+ */
+size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
+                          phys_addr_t src, size_t len)
+{
+	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
+	
+	/* Initializiations not needed, but GCC is stupid. */
+	void *vdest = NULL, *vsrc = NULL;
+	
+	while (len > 0) {
+		if (!schunk) {
+			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
+			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+			                &schunk, TLB_MAS2_MEM);
+			if (!vsrc)
+				break;
+		}
+
+		if (!dchunk) {
+			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
+			                  &dchunk, TLB_TSIZE_16M, 1);
+			if (!vdest)
+				break;
+		}
+
+		chunk = min(schunk, dchunk);
+		if (chunk > len)
+			chunk = len;
+
+		memcpy(vdest, vsrc, chunk);
+
+		vsrc += chunk;
+		vdest += chunk;
 		src += chunk;
 		dest += chunk;
 		ret += chunk;

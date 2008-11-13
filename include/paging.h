@@ -28,9 +28,16 @@
 
 #include <hv.h>
 
-#define TEMPTLB1 61
-#define TEMPTLB2 62
-#define TEMPTLB3 63
+#define GUEST_TLB_END 47
+
+#define TEMPTLB1 48
+#define TEMPTLB2 49
+
+#define DYN_TLB_START 50
+#define DYN_TLB_END 57
+
+#define PERM_TLB_START 58
+#define PERM_TLB_END 62
 
 #define PHYS_BITS 36
 #define VIRT_BITS 32
@@ -139,11 +146,21 @@ void tlb1_init(void);
 /** Permanent 16MiB chunk of valloc space for temporary local mappings */
 extern void *temp_mapping[2];
 
+void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
+                void *vpage, size_t *len, int maxtsize, int write);
+void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
+               size_t *len, register_t mas2flags);
+
 size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len);
 size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len);
 size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len);
 size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
                            pte_t *stbl, phys_addr_t src, size_t len);
+
+size_t copy_from_phys(void *dest, phys_addr_t src, size_t len);
+
+size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
+                          phys_addr_t src, size_t len);
 
 #define TLB_MISS_HANDLED 0
 #define TLB_MISS_REFLECT 1
@@ -152,8 +169,16 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 int guest_tlb1_miss(register_t vaddr, int space, int pid);
 int guest_tlb_isi(register_t vaddr, int space, int pid);
 
+struct trapframe;
 struct gcpu;
+
 void save_mas(struct gcpu *gcpu);
 void restore_mas(struct gcpu *gcpu);
+
+#define MAP_PIN    1
+#define MAP_GLOBAL 2
+
+void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin);
+int handle_hv_tlb_miss(struct trapframe *regs, uintptr_t vaddr);
 
 #endif

@@ -385,7 +385,6 @@ void create_ns16550(void)
 				printf("ns16550 irq config failed: %d\n", ret);
 				irq = NULL;
 			} else {
-				irq->ops->set_delivery_type(irq, TYPE_CRIT);
 				irq->ops->set_priority(irq, 15);
 			}
 		}

@@ -26,7 +26,7 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
-#define BASE_TLB_ENTRY 60 /**< TLB entry used for initial mapping */
+#define BASE_TLB_ENTRY 63 /**< TLB entry used for initial mapping */
 #define PHYSBASE 0x40000000 /**< Virtual base of large page physical mapping */
 #define PHYSMAPSIZE TLB_TSIZE_256M
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */

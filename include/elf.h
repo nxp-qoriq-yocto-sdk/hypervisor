@@ -25,10 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef ELF_H
+#define ELF_H
+
 #include <percpu.h>
 #include <libos/libos.h>
 
-int is_elf(void *image);
-
-int load_elf(guest_t *guest, void *image, unsigned long length,
+int load_elf(guest_t *guest, phys_addr_t image_phys, unsigned long length,
              phys_addr_t target, register_t *entry);
+
+#endif
