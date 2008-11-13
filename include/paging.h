@@ -27,6 +27,7 @@
 #define PAGING_H
 
 #include <hv.h>
+#include <libos/list.h>
 
 #define GUEST_TLB_END 47
 
@@ -180,5 +181,36 @@ void restore_mas(struct gcpu *gcpu);
 
 void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin);
 int handle_hv_tlb_miss(struct trapframe *regs, uintptr_t vaddr);
+
+struct trapframe;
+struct guest;
+
+#ifdef CONFIG_DEVICE_VIRT
+
+typedef void (*vf_callback_t)(struct trapframe *regs, phys_addr_t paddr);
+
+typedef struct vf_range {
+	list_t list;
+	phys_addr_t start;
+	phys_addr_t end;
+	vf_callback_t callback;
+} vf_range_t;
+
+int register_vf_handler(struct guest *guest,
+                      phys_addr_t start,
+                      phys_addr_t end,
+                      vf_callback_t callback);
+
+//  In emulate.c
+int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr);
+
+#endif
+
+#ifdef CONFIG_VIRTUAL_I2C
+
+// Prototypes of the callback functions
+void i2c_callback(struct trapframe *regs, phys_addr_t phys);
+
+#endif
 
 #endif

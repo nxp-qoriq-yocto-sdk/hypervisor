@@ -107,6 +107,76 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 	return total;
 }
 
+#ifdef CONFIG_DEVICE_VIRT
+
+/**
+ * is_compatible - determine if this node is compatible
+ *
+ * Returns 1 if this node contains a matching compatible string, 0 if it
+ * doesn't (or if there's no compatible property), or negative if there's
+ * some device tree error.
+ */
+static int is_compatible(void *devtree, int node, const char *compat)
+{
+	int ret;
+
+	ret = fdt_node_check_compatible(devtree, node, compat);
+
+	if ((ret == -FDT_ERR_NOTFOUND) || (ret > 0))
+		// There's no 'compatible' property, or it doesn't contain the
+		// string we want.
+		return 0;
+
+	// Yes, it's compatible
+	if (ret == 0)
+		return 1;
+
+	// Some error occurred
+	return ret;
+}
+
+/**
+ * find_other_device - determines if there's another device sharing this page
+ *
+ * This function scans the device tree to determine if there are other
+ * devices that shares the same memory page as this one.  It returns a count
+ * of these devices, or a negative number if an error occurs.
+ *
+ * We assume that if there are any two devices that share the same page,
+ * the registers of all such devices completely fit within one page.  This
+ * eliminates the need to be given a 'size' parameter.
+ */
+static int find_other_device(void *devtree, int node, phys_addr_t paddr)
+{
+	int node2 = -1;
+	int count = 0;
+
+	// Round down to the nearest page
+	paddr &= ~(PAGE_SIZE - 1);
+
+	while ((node2 = fdt_next_node(devtree, node2, NULL)) >= 0) {
+		phys_addr_t paddr2;
+		int ret;
+
+		if (node == node2)
+			continue;
+
+		// Get the guest physical address for this device
+		ret = dt_get_reg(devtree, node2, 0, &paddr2, NULL);
+		if (ret < 0)
+			continue;
+
+		paddr2 &= ~(PAGE_SIZE - 1);
+
+		if (paddr == paddr2)
+			count++;
+	}
+
+	return count;
+}
+
+#endif
+
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
                                  phys_addr_t addr, phys_addr_t size)
 {
@@ -146,6 +216,26 @@ static int map_guest_reg_one(guest_t *guest, int node,
 		return ret;	
 
 	gaddr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
+
+	// Is this an I2C node?
+#ifdef CONFIG_VIRTUAL_I2C
+	ret = is_compatible(guest->devtree, node, "fsl-i2c");
+	if (ret < 0)
+		// An error probably indicates that the device tree is borked,
+		// so we can't printlog any meaningful information about the
+		// node.  Just return an error.
+		return ret;
+	if (ret > 0) {
+		// We know that I2C devices come in pairs, so if we
+		// _don't_ find another device on this page, then we
+		// know that we should restrict access in this page.
+		if (!find_other_device(guest->devtree, node, gaddr)) {
+			ret = register_vf_handler(guest, gaddr, gaddr + size,
+						  i2c_callback);
+			return ret;
+		}
+	}
+#endif
 
 	while (offset < size) {
 		val_from_int(addrbuf, gaddr + offset);
@@ -1379,6 +1469,10 @@ static int init_guest_primary(guest_t *guest, int partition,
 #endif
 
 	vmpic_partition_init(guest);
+
+#ifdef CONFIG_DEVICE_VIRT
+	list_init(&guest->vf_list);
+#endif
 
 	ret = map_guest_reg_all(guest, partition);
 	if (ret < 0)

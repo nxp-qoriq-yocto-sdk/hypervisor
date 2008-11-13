@@ -172,10 +172,11 @@
 			fsl,ppid-to-liodn = <0>;
 		};
 
-		i2c0: i2c@118000 {
-			device_type = "i2c";
-			compatible = "fsl,p4080-i2c",
-			             "fsl,i2c", "fsl-i2c";
+		i2c@118000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cell-index = <0>;
+			compatible = "fsl-i2c";
 			reg = <0x118000 0x100>;
 			interrupts = <38 2>;
 			interrupt-parent = <&mpic>;

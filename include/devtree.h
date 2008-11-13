@@ -90,6 +90,9 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
                   uint32_t *addrbuf, phys_addr_t *size,
                   uint32_t naddr, uint32_t nsize);
 
+int xlate_reg(const void *tree, int node, const uint32_t *reg,
+              phys_addr_t *addr, phys_addr_t *size);
+
 int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);
 
