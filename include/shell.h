@@ -42,8 +42,6 @@ typedef struct command {
 } command_t;
 
 void shell_init(void);
-char *stripspace(const char *str);
-char *nextword(char **str);
 
 #define shell_cmd(x) __attribute__((section(".shellcmd"))) command_t *_##x##_PTR = (&x)
 

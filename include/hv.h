@@ -38,4 +38,11 @@ int stop_guest(struct guest *guest);
 int restart_guest(struct guest *guest);
 phys_addr_t find_lowest_guest_phys(void *fdt);
 
+char *stripspace(const char *str);
+char *nextword(char **str);
+uint64_t get_number64(queue_t *out, const char *numstr);
+int64_t get_snumber64(queue_t *out, const char *numstr);
+uint32_t get_number32(queue_t *out, const char *numstr);
+int32_t get_snumber32(queue_t *out, const char *numstr);
+
 #endif
