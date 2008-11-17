@@ -130,6 +130,8 @@ uint64_t get_number64(shell_t *shell, const char *numstr)
 	uint64_t ret;
 	char *endp;
 	int skip, base;
+	
+	cpu->errno = 0;
 
 	if (numstr[0] == '-') {
 		cpu->errno = ERR_RANGE;
@@ -155,6 +157,8 @@ int64_t get_snumber64(shell_t *shell, const char *numstr)
 	int64_t ret;
 	char *endp;
 	int skip, base;
+
+	cpu->errno = 0;
 	
 	base = get_base(shell, numstr, &skip);
 	if (!base)
