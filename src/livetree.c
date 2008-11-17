@@ -44,6 +44,9 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 		case FDT_BEGIN_NODE: {
 			dt_node_t *parent = node;
 			node = alloc_type(dt_node_t);
+			if (!node)
+				goto nomem;
+
 			node->parent = parent;
 
 			if (!parent)
@@ -141,13 +144,13 @@ err:
 	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 	         "unflatten_dev_tree: libfdt error %s (%d)\n",
 	         fdt_strerror(ret), ret);
-	delete_node(top);
+	dt_delete_node(top);
 	return NULL;
 
 nomem:
 	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 	         "unflatten_dev_tree: out of memory\n");
-	delete_node(top);
+	dt_delete_node(top);
 	return NULL;
 }
 
@@ -160,16 +163,15 @@ nomem:
  * @param[in] postvisit pointer to operation on each node after visting children
  * @return zero on success, non-zero if the traversal was terminated
  *
- * The callback is performed on each node of the tree.  When postvisit is
- * set, it is safe to remove nodes as they are visited, but it is not
- * safe to remove the parent or any sibling of the visited node.
+ * The callback is performed on each node of the tree.  In postvisit, it
+ * is safe to remove nodes as they are visited, but it is not safe to
+ * remove the parent or any sibling of the visited node.
  *
  * If a callback returns non-zero, the traversal is aborted, and the
  * return code propagated.
  */
-int for_each_node(dt_node_t *tree, void *arg,
-                  int (*previsit)(dt_node_t *node, void *arg),
-                  int (*postvisit)(dt_node_t *node, void *arg))
+int dt_for_each_node(dt_node_t *tree, void *arg,
+                     dt_callback_t previsit, dt_callback_t postvisit)
 {
 	list_t *node = &tree->child_node;
 	int backtrack = 0;
@@ -240,9 +242,9 @@ static int destroy_node(dt_node_t *node, void *arg)
 	return 0;
 }
 
-void delete_node(dt_node_t *tree)
+void dt_delete_node(dt_node_t *tree)
 {
-	for_each_node(tree, NULL, NULL, destroy_node);
+	dt_for_each_node(tree, NULL, NULL, destroy_node);
 }
 
 static int flatten_pre(dt_node_t *node, void *fdt)
@@ -285,7 +287,7 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt, size_t fdt_len)
 	if (ret)
 		return ret;
 
-	ret = for_each_node(tree, fdt, flatten_pre, flatten_post);
+	ret = dt_for_each_node(tree, fdt, flatten_pre, flatten_post);
 	if (ret)
 		return ret;
 
@@ -293,25 +295,41 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt, size_t fdt_len)
 }
 
 /**
- * Non-recursively searches for a subnode with a particular name
+ * Non-recursively searches for a subnode with a particular name,
+ * optionally creating it.
  *
  * @param[in] node parent node of the node to be found
- * @param[in] name name of the node to be found
+ * @param[in] name name of the node to be found; does not
+ *   need to be null-terminated
+ * @param[in] namelen length of name in bytes
  * @param[in] create if non-zero, create the subnode if not found
  * @return pointer to subnode, or NULL if not found
  */
-dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create)
+dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
+                                  size_t namelen, int create)
 {
 	list_for_each(&node->children, i) {
 		dt_node_t *subnode = to_container(i, dt_node_t, child_node);
 
-		if (!strcmp(name, subnode->name))
+		if (!strncmp(name, subnode->name, namelen) &&
+		    subnode->name[namelen] == 0)
 			return subnode;
 	}
 
 	if (create) {
 		dt_node_t *subnode = alloc_type(dt_node_t);
-		subnode->name = strdup(name);
+		if (!subnode)
+			return NULL;
+
+		subnode->name = malloc(namelen + 1);
+		if (!subnode->name) {
+			free(subnode);
+			return NULL;
+		}
+
+		memcpy(subnode->name, name, namelen);
+		subnode->name[namelen] = 0;
+
 		subnode->parent = node;
 
 		list_init(&subnode->children);
@@ -325,7 +343,21 @@ dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create)
 }
 
 /**
- * Get a property of a node
+ * Non-recursively searches for a subnode with a particular name,
+ * optionally creating it.
+ *
+ * @param[in] node parent node of the node to be found
+ * @param[in] name name of the node to be found
+ * @param[in] create if non-zero, create the subnode if not found
+ * @return pointer to subnode, or NULL if not found
+ */
+dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create)
+{
+	return dt_get_subnode_namelen(node, name, strlen(name), create);
+}
+
+/**
+ * Get a property of a node, optionally creating it.
  *
  * @param[in] node node in which to find/create the property
  * @param[in] name name of the property to get
@@ -343,13 +375,40 @@ dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create)
 			return prop;
 	}
 
+	if (!create)
+		return NULL;
+
 	prop = alloc_type(dt_prop_t);
 	if (prop) {
 		prop->name = strdup(name);
+		if (!prop->name)
+			return NULL;
+
 		list_add(&node->props, &prop->prop_node);
 	}
 
 	return prop;
+}
+
+/**
+ * Get a the value of a property as a null-terminated string
+ *
+ * @param[in] node node in which to look for the property
+ * @param[in] name name of the property to get
+ * @return a pointer to a NULL-terminated string, or NULL
+ *   if the property is not found or is not null-terminated.
+ */
+char *dt_get_prop_string(dt_node_t *node, const char *name)
+{
+	dt_prop_t *prop = dt_get_prop(node, name, 0);
+	if (!prop)
+		return NULL;
+
+	char *str = prop->data;
+	if (!str || str[prop->len - 1] != 0)
+		return NULL;
+
+	return str;
 }
 
 /**
@@ -389,6 +448,19 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 		memcpy(prop->data, data, len);
 
 	return 0;
+}
+
+/**
+ * Set a property of a node to a null-terminated string
+ *
+ * @param[in] node node in which to set the property
+ * @param[in] name name of the property to set
+ * @param[in] str new contents of the property
+ * @return zero on success
+ */
+int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
+{
+	return dt_set_prop(node, name, str, strlen(str) + 1);
 }
 
 typedef struct merge_ctx {
@@ -450,7 +522,7 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion)
 {
 	merge_ctx_t ctx = { .dest = dest };
 
-	return for_each_node(src, &ctx, merge_pre, merge_post);
+	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
 }
 
 typedef struct print_ctx {
@@ -558,5 +630,286 @@ void dt_print_tree(dt_node_t *tree, queue_t *out)
 {
 	print_ctx_t ctx = { .out = out };
 
-	for_each_node(tree, &ctx, print_pre, print_post);
+	dt_for_each_node(tree, &ctx, print_pre, print_post);
+}
+
+/** Check whether a given node is compatible with a given string.
+ *
+ * @param[in] node node to check
+ * @param[in] compat compatible string to check
+ * @return non-zero if the node is compatible
+ */
+int dt_node_is_compatible(dt_node_t *node, const char *compat)
+{
+	dt_prop_t *prop = dt_get_prop(node, "compatible", 0);
+	if (!prop)
+		return 0;
+
+	const char *str = prop->data;
+	const char *end = prop->data + prop->len;
+
+	while (str && str < end) {
+		if (!strncmp(compat, str, end - str + 1))
+			return 1;
+
+		str = memchr(str, 0, end - str + 1) + 1;
+	}
+
+	return 0;
+}
+
+typedef struct compat_ctx {
+	dt_callback_t callback;
+	const char *compat;
+	void *arg;
+} compat_ctx_t;
+
+static int compat_callback(dt_node_t *node, void *arg)
+{
+	compat_ctx_t *ctx = arg;
+
+	if (dt_node_is_compatible(node, ctx->compat))
+		return ctx->callback(node, ctx->arg);
+
+	return 0;
+}
+
+/** Iterate over each compatible node.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] compat compatible string to search for
+ * @param[in] callback function to call for each compatible node
+ * @param[in] arg opaque argument to callback function
+ * @return if non-zero, the return value of the final callback function
+ *
+ * If a callback returns non-zero, the iteration will be aborted.
+ */
+int dt_for_each_compatible(dt_node_t *tree, const char *compat,
+                            dt_callback_t callback, void *arg)
+{
+	compat_ctx_t ctx = {
+		.callback = callback,
+		.compat = compat,
+		.arg = arg
+	};
+
+	return dt_for_each_node(tree, &ctx, compat_callback, NULL);
+}
+
+static int first_callback(dt_node_t *node, void *arg)
+{
+	dt_node_t **ret = arg;
+	*ret = node;
+	return 1;	
+}
+
+/** Return the first compatible node, when only one is expected.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] compat compatible string to search for
+ * @return the first compatible node, or NULL if none found
+ */
+dt_node_t *dt_get_first_compatible(dt_node_t *tree, const char *compat)
+{
+	dt_node_t *ret = NULL;
+	dt_for_each_compatible(tree, compat, first_callback, &ret);
+	return ret;
+}
+
+typedef struct propvalue_ctx {
+	dt_callback_t callback;
+	const char *propname;
+	const void *value;
+	size_t len;
+	void *arg;
+} propvalue_ctx_t;
+
+static int propvalue_callback(dt_node_t *node, void *arg)
+{
+	propvalue_ctx_t *ctx = arg;
+	dt_prop_t *prop = dt_get_prop(node, ctx->propname, 0);
+
+	if (prop) {
+		if (!ctx->value ||
+		    (ctx->len == prop->len &&
+		     !memcmp(ctx->value, prop->data, prop->len)))
+			return ctx->callback(node, ctx->arg);
+	}
+
+	return 0;
+}
+
+
+/** Iterate over each node with a given value in a given property.
+ *
+ * @param[in] tree root of tree to search
+ * @paramlin] propname property name to search for
+ * @param[in] value value the property must hold, or NULL to find any
+ *   instance of the property
+ * @param[in] callback function to call for each matching node
+ * @param[in] arg opaque argument to callback function
+ * @return if non-zero, the return value of the final callback function
+ *
+ * If a callback returns non-zero, the iteration will be aborted.
+ */
+int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
+                           const void *value, size_t len,
+                           dt_callback_t callback, void *arg)
+{
+	propvalue_ctx_t ctx = {
+		.callback = callback,
+		.propname = propname,
+		.value = value,
+		.len = len,
+		.arg = arg
+	};
+
+	return dt_for_each_node(tree, &ctx, propvalue_callback, NULL);
+}
+
+/** Return the node associated with an alias or path.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] name alias or path to look for
+ * @return if non-zero, the found node
+ *
+ * This function first searches for an alias matching the provided
+ * name; if it is not found, it then treats the name as a path.
+ */
+dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name)
+{
+	dt_node_t *node;
+	const char *path;
+	
+	node = dt_get_subnode(tree, "aliases", 0);
+	if (node) {
+		path = dt_get_prop_string(node, name);
+		
+		if (path)
+			name = path;
+	}
+
+	return dt_lookup_path(tree, name, 0);
+}
+
+/** Return the node associated with a path, optionally creating it.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] path path to look for
+ * @return if non-zero, the found node
+ *
+ * Leading, consecutive, and trailing slashes are ignored.
+ */
+dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create)
+{
+	dt_node_t *node = tree;
+
+	do {
+		size_t namelen;
+		const char *slash;
+	
+		while (*path == '/')
+			path++;
+
+		if (*path == 0)
+			break;
+
+		slash = strchr(path, '/');
+		if (slash)
+			namelen = slash - path;
+		else
+			namelen = strlen(path); 
+
+		node = dt_get_subnode_namelen(node, path, namelen, create);
+		if (!node)
+			return NULL;
+
+		path = slash;
+	} while (path);
+
+	return node;
+}
+
+/** Return the node associated with a phandle.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] phandle phandle value to look for
+ * @return if non-zero, the found node
+ *
+ * The ePAPR "phandle" value is searched for first, followed
+ * by the legacy "linux,phandle" value.
+ */
+dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle)
+{
+	dt_node_t *node = NULL;
+
+	dt_for_each_prop_value(tree, "phandle", &phandle, 4,
+	                       first_callback, &node);
+
+	if (!node)
+		dt_for_each_prop_value(tree, "linux,phandle", &phandle, 4,
+		                       first_callback, &node);
+
+	return node;
+}
+
+/** Return the phandle of a node.
+ *
+ * @param[in] node node of which to retrieve phandle
+ * @return if non-zero, the node's phandle
+ *
+ * The ePAPR "phandle" value is searched for first, followed
+ * by the legacy "linux,phandle" value.
+ */
+uint32_t dt_get_phandle(dt_node_t *node)
+{
+	dt_prop_t *prop = dt_get_prop(node, "phandle", 0);
+	if (!prop)
+		prop = dt_get_prop(node, "linux,phandle", 0);
+	if (!prop || prop->len != 4)
+		return 0;
+
+	return *(const uint32_t *)prop->data;
+}
+
+/** Retrieve the full path of a node.
+ *
+ * @param[in] node node of which to retrieve path
+ * @param[in] buf buffer in which to place path
+ * @param[in] buflen length of buf, including null terminator
+ * @return the number of bytes required to hold the full path
+ *
+ * The function succeeds if the return value <= buflen.
+ */
+size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen)
+{
+	size_t len = 1, used_pos = buflen - 1, pos = buflen - 1;
+
+	if (buflen != 0)
+		buf[buflen - 1] = 0;
+	
+	while (1) {
+		size_t namelen;
+
+		if (!node->parent)
+			break;
+
+		namelen = strlen(node->name);
+
+		pos -= namelen + 1;
+		len += namelen + 1;
+	
+		if (len <= buflen) {
+			buf[pos] = '/';
+			memcpy(&buf[pos + 1], node->name, namelen);
+			used_pos = pos;
+		}
+		
+		node = node->parent;
+	}
+
+	if (buflen != 0)
+		memmove(buf, buf + used_pos, buflen - used_pos);
+
+	return len;
 }

@@ -53,44 +53,74 @@ dt_node_t *unflatten_dev_tree(const void *fdt);
 int flatten_dev_tree(dt_node_t *tree, void *fdt_window, size_t fdt_len);
 
 dt_node_t *create_dev_tree(void);
-void delete_node(dt_node_t *tree);
+void dt_delete_node(dt_node_t *tree);
 
-int for_each_node(dt_node_t *tree, void *arg,
-                  int (*previsit)(dt_node_t *node, void *arg),
-                  int (*postvisit)(dt_node_t *node, void *arg));
+typedef int (*dt_callback_t)(dt_node_t *node, void *arg);
 
+int dt_for_each_node(dt_node_t *tree, void *arg,
+                     dt_callback_t previsit, dt_callback_t postvisit);
+
+dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
+                                  size_t namelen, int create);
 dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create);
+dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create);
+char *dt_get_prop_string(dt_node_t *node, const char *name);
+
+int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len);
+int dt_set_prop_string(dt_node_t *node, const char *name, const char *str);
 
 int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
+int dt_node_is_compatible(dt_node_t *node, const char *compat);
+int dt_for_each_compatible(dt_node_t *tree, const char *compat,
+                           dt_callback_t callback, void *arg);
+
+dt_node_t *dt_get_first_compatible(dt_node_t *tree, const char *compat);
+
+int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
+                           const void *value, size_t len,
+                           dt_callback_t callback, void *arg);
+
+size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen);
+
+dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name);
+dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);
+dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
+
+uint32_t dt_get_phandle(dt_node_t *node);
+
+/** Hardware device tree passed by firmware */
+extern dt_node_t *hw_devtree;
+
 /** #address-cells and #size-cells at root of hv tree */
 extern uint32_t rootnaddr, rootnsize;
 
-int get_addr_format(const void *tree, int node,
-                    uint32_t *naddr, uint32_t *nsize);
-int get_addr_format_nozero(const void *tree, int node,
-                           uint32_t *naddr, uint32_t *nsize);
+int fdt_get_addr_format(const void *fdt, int offset,
+                        uint32_t *naddr, uint32_t *nsize);
+int get_addr_format(dt_node_t *node, uint32_t *naddr, uint32_t *nsize);
+int get_addr_format_nozero(dt_node_t *node, uint32_t *naddr, uint32_t *nsize);
 
-void *ptr_from_node(const void *devtree, int offset, const char *type);
-int lookup_alias(const void *tree, const char *path);
-int get_interrupt_domain(const void *tree, int node);
-int get_interrupt(const void *tree, int node, int intnum,
-                  const uint32_t **intspec, int *ncells);
-int get_num_interrupts(const void *tree, int node);
+void *ptr_from_node(dt_node_t *node, const char *type);
 
-phys_addr_t find_memory(void);
+dt_node_t *get_interrupt_domain(dt_node_t *tree, dt_node_t *node);
+dt_node_t *get_interrupt(dt_node_t *tree, dt_node_t *node, int intnum,
+                         const uint32_t **intspec, int *ncellsp);
+int get_num_interrupts(dt_node_t *tree, dt_node_t *node);
+int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr);
+
+phys_addr_t find_memory(void *fdt);
 
 int xlate_one(uint32_t *addr, const uint32_t *ranges,
               int rangelen, uint32_t naddr, uint32_t nsize,
               uint32_t prev_naddr, uint32_t prev_nsize,
               phys_addr_t *rangesize);
 
-int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
+int xlate_reg_raw(dt_node_t *node, const uint32_t *reg,
                   uint32_t *addrbuf, phys_addr_t *size,
                   uint32_t naddr, uint32_t nsize);
 
-int dt_get_reg(const void *tree, int node, int res,
+int dt_get_reg(dt_node_t *node, int res,
                phys_addr_t *addr, phys_addr_t *size);
 
 void copy_val(uint32_t *dest, const uint32_t *src, int naddr);
@@ -119,12 +149,8 @@ void create_ns16550(void);
 void open_stdout(void);
 void open_stdin(void);
 
-extern void *fdt;
 extern struct queue *stdin, *stdout;
 
-int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible);
-int get_cpu_node(const void *fdt, int cpu);
-int fdt_node_offset_by_prop(const void *fdt, int startoffset,
-                                  const char *propname);
+dt_node_t *get_cpu_node(dt_node_t *tree, int cpu);
 
 #endif

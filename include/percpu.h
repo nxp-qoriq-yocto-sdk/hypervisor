@@ -99,7 +99,8 @@ typedef struct guest {
 	struct pte *gphys;      /**< guest phys to real phys mapping */
 	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
 	const char *name;
-	void *devtree;
+	struct dt_node *devtree;
+	struct dt_node *partition; /**< Partition node in main device tree. */
 	handle_t handle;        /**< The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
 	/** Used as a reference count when stopping a partition. */
@@ -108,17 +109,16 @@ typedef struct guest {
 	struct boot_spin_table *spintbl;
 	/** Guest physical/virtual addr of the OS entry point. */
 	register_t entry;       
+
 	phys_addr_t dtb_gphys;  /**< Guest physical addr of DTB image */
-	register_t tlbivax_addr;/**< Used for tlbivax shootdown IPIs */
+	phys_addr_t dtb_window_len; /**< Length of guest DTB window */
+	register_t tlbivax_addr; /**< Used for tlbivax shootdown IPIs */
 
 	/** Countdown to wait for all cores to invalidate */
 	register_t tlbivax_count;
 
 	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
 	uint32_t lpid;
-
-	/** Offset to partition node in main device tree. */
-	int partition;
 
 	/** guest debug mode **/
 	int guest_debug_mode;
@@ -209,8 +209,10 @@ typedef struct gcpu {
 
 #define get_gcpu() (cpu->client.gcpu)
 
+struct dt_node;
+
 int alloc_guest_handle(guest_t *guest, handle_t *handle);
-guest_t *node_to_partition(int partition);
+guest_t *node_to_partition(struct dt_node *partition);
 
 #endif
 #endif

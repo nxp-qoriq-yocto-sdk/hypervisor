@@ -1,7 +1,7 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080";
+	compatible = "fsl,hv-platform-p4080", "simple-bus";
 	model = "fsl,hv-linux-p2";
 	epapr-version = "ePAPR-1.0";
 	#address-cells = <2>;

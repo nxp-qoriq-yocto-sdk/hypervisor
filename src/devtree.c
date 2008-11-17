@@ -36,47 +36,89 @@
 #include <libos/interrupts.h>
 #include <libos/mpic.h>
 
-int get_addr_format(const void *tree, int node,
-                    uint32_t *naddr, uint32_t *nsize)
+int get_addr_format(dt_node_t *node, uint32_t *naddr, uint32_t *nsize)
 {
+	dt_prop_t *prop;
+
 	*naddr = 2;
 	*nsize = 1;
 
-	int len;
-	const uint32_t *naddrp = fdt_getprop(tree, node, "#address-cells", &len);
-	if (!naddrp) {
-		if (len != -FDT_ERR_NOTFOUND)
-			return len;
-	} else if (len == 4 && *naddrp <= MAX_ADDR_CELLS) {
-		*naddr = *naddrp;
-	} else {
-		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
-		         "Bad addr cells %d\n", *naddrp);
-		return ERR_BADTREE;
+	prop = dt_get_prop(node, "#address-cells", 0);
+	if (prop) {
+		if (prop->len != 4)
+			goto bad;
+
+		*naddr = *(const uint32_t *)prop->data;
+
+		if (*naddr > MAX_ADDR_CELLS)
+			goto bad;
 	}
 
-	const uint32_t *nsizep = fdt_getprop(tree, node, "#size-cells", &len);
-	if (!nsizep) {
-		if (len != -FDT_ERR_NOTFOUND)
-			return len;
-	} else if (len == 4 && *nsizep <= MAX_SIZE_CELLS) {
-		*nsize = *nsizep;
-	} else {
-		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
-		         "Bad size cells %d\n", *nsizep);
-		return ERR_BADTREE;
+	prop = dt_get_prop(node, "#size-cells", 0);
+	if (prop) {
+		if (prop->len != 4)
+			goto bad;
+
+		*nsize = *(const uint32_t *)prop->data;
+
+		if (*nsize > MAX_SIZE_CELLS)
+			goto bad;
 	}
 
 	return 0;
+
+bad:
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_NORMAL,
+	         "%s: Bad #addresss-cells or #size-cells\n", node->name);
+	return ERR_BADTREE;
 }
 
-int get_addr_format_nozero(const void *tree, int node,
-                           uint32_t *naddr, uint32_t *nsize)
+int fdt_get_addr_format(const void *fdt, int offset,
+                        uint32_t *naddr, uint32_t *nsize)
 {
-	int ret = get_addr_format(tree, node, naddr, nsize);
+	const uint32_t *prop;
+	int len;
+
+	*naddr = 2;
+	*nsize = 1;
+
+	prop = fdt_getprop(fdt, offset, "#address-cells", &len);
+	if (prop) {
+		if (len != 4)
+			goto bad;
+
+		*naddr = *prop;
+
+		if (*naddr > MAX_ADDR_CELLS)
+			goto bad;
+	}
+
+	prop = fdt_getprop(fdt, offset, "#size-cells", &len);
+	if (prop) {
+		if (len != 4)
+			goto bad;
+
+		*nsize = *prop;
+
+		if (*nsize > MAX_SIZE_CELLS)
+			goto bad;
+	}
+
+	return 0;
+
+bad:
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_NORMAL,
+	         "Bad #addresss-cells or #size-cells\n");
+	return ERR_BADTREE;
+}
+
+int get_addr_format_nozero(dt_node_t *node, uint32_t *naddr, uint32_t *nsize)
+{
+	int ret = get_addr_format(node, naddr, nsize);
 	if (!ret && (*naddr == 0 || *nsize == 0)) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
-		         "Bad addr/size cells %d/%d\n", *naddr, *nsize);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_NORMAL,
+		         "%s: Bad addr/size cells %d/%d\n",
+		         node->name, *naddr, *nsize);
 
 		ret = ERR_BADTREE;
 	}
@@ -171,7 +213,7 @@ static int find_range(const uint32_t *reg, const uint32_t *ranges,
 			return i;
 	}
 
-	return -FDT_ERR_NOTFOUND;
+	return ERR_NOTFOUND;
 }
 
 /* Currently only generic buses without special encodings are supported.
@@ -224,17 +266,18 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	return 0;
 }
 
-int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
+int xlate_reg_raw(dt_node_t *node, const uint32_t *reg,
                   uint32_t *addrbuf, phys_addr_t *size,
                   uint32_t naddr, uint32_t nsize)
 {
 	uint32_t prev_naddr, prev_nsize;
-	const uint32_t *ranges;
-	int len, ret;
+	dt_node_t *parent;
+	dt_prop_t *prop;
+	int ret;
 
-	int parent = fdt_parent_offset(tree, node);
-	if (parent < 0)
-		return parent;
+	parent = node->parent;
+	if (!parent)
+		return ERR_BADTREE;
 
 	copy_val(addrbuf, reg, naddr);
 
@@ -251,30 +294,24 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 		prev_nsize = nsize;
 		node = parent;
 
-		parent = fdt_parent_offset(tree, node);
-		if (parent == -FDT_ERR_NOTFOUND)
+		parent = node->parent;
+		if (!parent)
 			break;
-		if (parent < 0)
-			return parent;
 
-		ret = get_addr_format(tree, parent, &naddr, &nsize);
+		ret = get_addr_format(parent, &naddr, &nsize);
 		if (ret < 0)
 			return ret;
 
-		ranges = fdt_getprop(tree, node, "ranges", &len);
-		if (!ranges) {
-			if (len == -FDT_ERR_NOTFOUND)
-				return ERR_NOTRANS;
-		
-			return len;
-		}
+		prop = dt_get_prop(node, "ranges", 0);
+		if (!prop)
+			return ERR_NOTRANS;
 
-		if (len == 0)
+		if (prop->len == 0)
 			continue;
-		if (len % 4)
+		if (prop->len % 4)
 			return ERR_BADTREE;
 
-		ret = xlate_one(addrbuf, ranges, len, naddr, nsize,
+		ret = xlate_one(addrbuf, prop->data, prop->len, naddr, nsize,
 		                prev_naddr, prev_nsize, NULL);
 		if (ret < 0)
 			return ret;
@@ -283,21 +320,21 @@ int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
 	return 0;
 }
 
-int xlate_reg(const void *tree, int node, const uint32_t *reg,
+int xlate_reg(dt_node_t *node, const uint32_t *reg,
               phys_addr_t *addr, phys_addr_t *size)
 {
 	uint32_t addrbuf[MAX_ADDR_CELLS];
 	uint32_t naddr, nsize;
 
-	int parent = fdt_parent_offset(tree, node);
-	if (parent < 0)
-		return parent;
+	dt_node_t *parent = node->parent;
+	if (!parent)
+		return ERR_BADTREE;
 
-	int ret = get_addr_format(tree, parent, &naddr, &nsize);
+	int ret = get_addr_format(parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
 
-	ret = xlate_reg_raw(tree, node, reg, addrbuf, size, naddr, nsize);
+	ret = xlate_reg_raw(node, reg, addrbuf, size, naddr, nsize);
 	if (ret < 0)
 		return ret;
 
@@ -308,96 +345,91 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 	return 0;
 }
 
-int dt_get_reg(const void *tree, int node, int res,
+int dt_get_reg(dt_node_t *node, int res,
                phys_addr_t *addr, phys_addr_t *size)
 {
-	int ret, len;
+	int ret;
 	uint32_t naddr, nsize;
-	const uint32_t *reg = fdt_getprop(tree, node, "reg", &len);
-	if (!reg)
-		return len;
+	dt_prop_t *prop;
+	const uint32_t *reg;
+	
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop)
+		return ERR_NOTFOUND;
 
-	int parent = fdt_parent_offset(tree, node);
-	if (parent < 0)
-		return parent;
+	dt_node_t *parent = node->parent;
+	if (!parent)
+		return ERR_BADTREE;
 
-	ret = get_addr_format(tree, parent, &naddr, &nsize);
+	ret = get_addr_format_nozero(parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
 
-	if (naddr == 0 || nsize == 0)
-		return ERR_NOTRANS;
+	if (prop->len < (naddr + nsize) * 4 * (res + 1))
+		return ERR_RANGE;
 
-	if (len < (naddr + nsize) * 4 * (res + 1))
-		return ERR_BADTREE;
-
-	return xlate_reg(tree, node, &reg[(naddr + nsize) * res], addr, size);
+	reg = prop->data;
+	return xlate_reg(node, &reg[(naddr + nsize) * res], addr, size);
 }
 
-void *ptr_from_node(const void *tree, int offset, const char *type)
+void *ptr_from_node(dt_node_t *node, const char *type)
 {
 	char buf[64];
-	void *const *ptr;
-	int len;
+	dt_prop_t *prop;
 
 	snprintf(buf, sizeof(buf), "fsl,hv-internal-%s-ptr", type);
+	buf[sizeof(buf) - 1] = 0;
 
-	ptr = fdt_getprop(tree, offset, buf, &len);
-	if (!ptr) {
-		if (len != -FDT_ERR_NOTFOUND)
-			printf("ptr_from_node(%s): libfdt error %d (%s)\n",
-			       type, len, fdt_strerror(len));
-	
+	prop = dt_get_prop(node, buf, 0);
+	if (!prop)
 		return NULL;
-	}
 
-	return *ptr;
+	assert(prop->len == 4);
+	return *(void *const *)prop->data;
 }
 
 #ifdef CONFIG_LIBOS_NS16550
-void create_ns16550(void)
+static int create_one_ns16550(dt_node_t *node, void *arg)
 {
-	int off = -1, ret;
+	int ret;
 	phys_addr_t addr;
-	const uint32_t *prop;
+	const uint32_t *intspec;
+	dt_node_t *irqnode;
+	interrupt_t *irq = NULL;
 	int ncells;
 
-	while (1) {
-		interrupt_t *irq = NULL;
-
-		off = fdt_node_offset_by_compatible(fdt, off, "ns16550");
-		if (off < 0)
-			break;
-
-		ret = dt_get_reg(fdt, off, 0, &addr, NULL);
-		if (ret < 0) {
-			printf("ns16550 failed to get reg: %d\n", ret);
-			continue;
-		}
-
-		// FIXME: clock-frequency
-		ret = get_interrupt(fdt, off, 0, &prop, &ncells);
-		if (ret >= 0)
-			irq = get_mpic_irq(prop, ncells);
-		if (irq) {
-			ret = irq->ops->config_by_intspec(irq, prop, ncells);
-			if (ret < 0) {
-				printf("ns16550 irq config failed: %d\n", ret);
-				irq = NULL;
-			} else {
-				irq->ops->set_priority(irq, 15);
-			}
-		}
-
-		chardev_t *cd = ns16550_init((uint8_t *)(unsigned long)
-		                             (CCSRBAR_VA + (addr - CCSRBAR_PA)),
-		                             irq, 0, 16);
-
-		ret = fdt_setprop(fdt, off, "fsl,hv-internal-chardev-ptr",
-		                  &cd, sizeof(cd));
-		if (ret < 0)
-			break;
+	ret = dt_get_reg(node, 0, &addr, NULL);
+	if (ret < 0) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "ns16550 failed to get reg: %d\n", ret);
+		return 0;
 	}
+
+	// FIXME: clock-frequency
+	irqnode = get_interrupt(hw_devtree, node, 0, &intspec, &ncells);
+	if (irqnode)
+		irq = get_mpic_irq(intspec, ncells);
+	if (irq) {
+		ret = irq->ops->config_by_intspec(irq, intspec, ncells);
+		if (ret < 0) {
+			printf("ns16550 irq config failed: %d\n", ret);
+			irq = NULL;
+		} else {
+			irq->ops->set_priority(irq, 15);
+		}
+	}
+
+	chardev_t *cd = ns16550_init((uint8_t *)(unsigned long)
+	                             (CCSRBAR_VA + (addr - CCSRBAR_PA)),
+	                             irq, 0, 16);
+
+	dt_set_prop(node, "fsl,hv-internal-chardev-ptr", &cd, sizeof(cd));
+	return 0;
+}
+
+void create_ns16550(void)
+{
+	dt_for_each_compatible(hw_devtree, "ns16550", create_one_ns16550, NULL);
 }
 #endif
 
@@ -405,11 +437,11 @@ chardev_t *cd_console;
 byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;
 
-int open_stdout_chardev(int node)
+static int open_stdout_chardev(dt_node_t *node)
 {
 	chardev_t *cd;
 	
-	cd = ptr_from_node(fdt, node, "chardev");
+	cd = ptr_from_node(node, "chardev");
 	if (!cd)
 		return ERR_INVALID;
 
@@ -439,11 +471,11 @@ int open_stdout_chardev(int node)
 }
 
 #ifdef CONFIG_BYTE_CHAN
-int open_stdout_bytechan(int node)
+static int open_stdout_bytechan(dt_node_t *node)
 {
 	byte_chan_t *bc;
 	
-	bc = ptr_from_node(fdt, node, "bc");
+	bc = ptr_from_node(node, "bc");
 	if (!bc)
 		return ERR_INVALID;
 
@@ -460,13 +492,13 @@ int open_stdout_bytechan(int node)
 
 void open_stdout(void)
 {
-	int ret = lookup_alias(fdt, "stdout");
-	if (ret < 0)
+	dt_node_t *node = dt_lookup_alias(hw_devtree, "stdout");
+	if (!node)
 		return;
 
-	open_stdout_chardev(ret);
+	open_stdout_chardev(node);
 #ifdef CONFIG_BYTE_CHAN
-	open_stdout_bytechan(ret);
+	open_stdout_bytechan(node);
 #endif
 }
 
@@ -543,7 +575,7 @@ static void add_memory(phys_addr_t start, phys_addr_t size)
 	                   (void *)(unsigned long)(start + size - 1));
 }
 
-phys_addr_t find_memory(void)
+phys_addr_t find_memory(void *fdt)
 {
 	phys_addr_t mem_end = 0;
 	int memnode = -1;
@@ -576,7 +608,7 @@ phys_addr_t find_memory(void)
 			continue;
 		}
 
-		int ret = get_addr_format(fdt, parent, &naddr, &nsize);
+		int ret = fdt_get_addr_format(fdt, parent, &naddr, &nsize);
 		if (ret < 0) {
 			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
 			         "error %d (%s) getting address format for memory node\n",
@@ -618,75 +650,75 @@ phys_addr_t find_memory(void)
 	return mem_end;
 }
 
-/** Look up a string which may be a path or an alias
- *
- * @param[in] tree the device tree to search
- * @param[in] path the path or alias to look up
- * @return the node offset within the tree, or a libfdt error.
- */
-int lookup_alias(const void *tree, const char *path)
+dt_node_t *get_interrupt_domain(dt_node_t *tree, dt_node_t *node)
 {
-	int ret;
-	
-	if (path[0] == '/') {
-		ret = fdt_path_offset(tree, path);
-		if (ret != -FDT_ERR_NOTFOUND)
-			return ret;
-	}
-
-	ret = fdt_subnode_offset(tree, 0, "aliases");
-	if (ret < 0)
-		return ret;
-
-	path = fdt_getprop(tree, ret, path, &ret);
-	if (!path)
-		return ret;
-
-	return fdt_path_offset(tree, path);
-}
-
-int get_interrupt_domain(const void *tree, int node)
-{
-	const uint32_t *prop;
-	int len;
+	dt_prop_t *prop;
 
 	while (1) {
-		prop = fdt_getprop(tree, node,
-		                   "interrupt-parent", &len);
+		prop = dt_get_prop(node, "interrupt-parent", 0);
 		if (prop) {
-			node = fdt_node_offset_by_phandle(tree, *prop);
+			if (prop->len != 4) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: bad interrupt-parent len %d in %s\n",
+				         __func__, prop->len, node->name);
+
+				return NULL;
+			}
+
+			assert(tree);
+			assert(prop->data);
+
+			node = dt_lookup_phandle(tree, *(const uint32_t *)prop->data);
 		} else {
-			node = fdt_parent_offset(tree, node);
+			node = node->parent;
 		}
-		if (node < 0)
-			return node;
 
-		prop = fdt_getprop(tree, node, "interrupt-controller", &len);
-		if (prop)
-			return node;
+		if (!node)
+			return NULL;
 
-		prop = fdt_getprop(tree, node, "interrupt-map", &len);
-		if (prop)
+		if (dt_get_prop(node, "interrupt-controller", 0))
+			return node;
+		if (dt_get_prop(node, "interrupt-map", 0))
 			return node;
 	}
 }
 
-static int get_int_cells(const void *tree, int domain)
+int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr)
 {
-	int len;
-	const uint32_t *prop;
-	
-	prop = fdt_getprop(tree, domain, "#interrupt-cells", &len);
-	if (!prop) {
-		if (len == -FDT_ERR_NOTFOUND) {
-			printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-			len = ERR_BADTREE;
+	dt_prop_t *prop;
+
+	if (nint) {	
+		prop = dt_get_prop(domain, "#interrupt-cells", 0);
+		if (!prop) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "get_int_cells: %s has no #interrupt-cells\n",
+			         domain->name);
+			return ERR_BADTREE;
 		}
 
-		return len;
+		*nint = *(const uint32_t *)prop->data;
+
+		if (*nint == 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "dt_get_int_format: %s has #interrupt-cells == 0\n",
+			         domain->name);
+			return ERR_BADTREE;
+		}
 	}
-	
-	return *prop;
+
+	if (naddr) {
+		prop = dt_get_prop(domain, "#address-cells", 0);
+		if (!prop) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_NORMAL,
+			         "dt_get_int_format: %s has no #address-cells\n",
+			         domain->name);
+			*naddr = 0;
+		} else {
+			*naddr = *(const uint32_t *)prop->data;
+		}
+	}
+
+	return 0;
 }
 
 /** Get the interrupt controller and intspec for a node.
@@ -697,24 +729,26 @@ static int get_int_cells(const void *tree, int domain)
  * @param[out] intspec the returned interrupt spec
  * @return the node offset of the interrupt controller, or an error.
  */
-int get_num_interrupts(const void *tree, int node)
+int get_num_interrupts(dt_node_t *tree, dt_node_t *node)
 {
-	const uint32_t *intspec;
-	int domain, len;
+	dt_prop_t *prop;
+	dt_node_t *domain;
+	uint32_t icell;
+	int ret;
 
-	intspec = fdt_getprop(tree, node, "interrupts", &len);
-	if (!intspec) {
-		if (len == -FDT_ERR_NOTFOUND)
-			len = 0;
-	
-		return len;
-	}
-	
+	prop = dt_get_prop(node, "interrupts", 0);
+	if (!prop)
+		return 0;
+
 	domain = get_interrupt_domain(tree, node);
-	if (domain < 0)
-		return domain;
+	if (!domain)
+		return ERR_BADTREE;
+
+	ret = dt_get_int_format(domain, &icell, NULL);
+	if (ret < 0)
+		return ret;
 	
-	return len / get_int_cells(tree, domain);
+	return prop->len / icell;
 }
 
 /** Get the interrupt controller and intspec for a node.
@@ -726,106 +760,78 @@ int get_num_interrupts(const void *tree, int node)
  * @param[out] ncells the number of cells in the intspec (optional)
  * @return the node offset of the interrupt controller, or an error.
  */
-int get_interrupt(const void *tree, int node, int intnum,
-                  const uint32_t **intspec, int *ncellsp)
+dt_node_t *get_interrupt(dt_node_t *tree, dt_node_t *node, int intnum,
+                         const uint32_t **intspec, int *ncellsp)
 {
-	const uint32_t *prop;
-	int len, domain, speclen, ncells;
+	dt_prop_t *prop;
+	dt_node_t *domain;
+	uint32_t ncells;
+	int ret;
 
-	while (1) {
-		*intspec = fdt_getprop(tree, node, "interrupts", &speclen);
-		if (!*intspec)
-			return speclen;
+	prop = dt_get_prop(node, "interrupts", 0);
+	if (!prop)
+		return NULL;
+	*intspec = prop->data;
 		
-		domain = get_interrupt_domain(tree, node);
-		if (domain < 0) {
-			if (domain == -FDT_ERR_NOTFOUND) {
-				printf("get_interrupt: Interrupt domain has no #interrupt-cells\n");
-				domain = ERR_BADTREE;
-			}
-
-			return domain;
-		}
-
-		ncells = get_int_cells(tree, domain);
-		if (ncells < 0)
-			return ncells;
-
-		if (ncellsp)
-			*ncellsp = ncells;
-
-		if ((intnum + 1) * ncells * 4 > speclen)
-			return ERR_BADTREE;
-
-		*intspec += ncells * intnum;
-
-		prop = fdt_getprop(tree, domain, "interrupt-controller", &len);
-		if (prop)
-			return domain;
-
-		/* FIXME: Translate interrupt here */
-		printf("get_interrupt: interrupt-map not yet supported\n");
-		return ERR_BADTREE;
+	domain = get_interrupt_domain(tree, node);
+	if (!domain) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Node %s has no interrupt controller\n",
+		         __func__, node->name);
+		return NULL;
 	}
+
+	ret = dt_get_int_format(domain, &ncells, NULL);
+	if (ret < 0)
+		return NULL;
+
+	if (ncellsp)
+		*ncellsp = ncells;
+
+	if ((intnum + 1) * ncells * 4 > prop->len)
+		return NULL;
+
+	*intspec += ncells * intnum;
+
+	if (dt_get_prop(domain, "interrupt-controller", 0))
+		return domain;
+
+	/* FIXME: Translate interrupt here */
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "get_interrupt: interrupt-map not yet supported\n");
+	return NULL;
 }
 
+typedef struct get_cpu_ctx {
+	dt_node_t *ret;
+	int cpunum;
+} get_cpu_ctx_t;
 
-/*
- * Searches for a descendant of the supplied offset by compatible
- *
- */
-int fdt_next_descendant_by_compatible(const void *fdt, int offset, int *depth, const char *compatible)
+static int get_cpu_node_callback(dt_node_t *node, void *arg)
 {
-	while (1) {
-		offset = fdt_next_node(fdt, offset, depth);
-		if (offset < 0)
-			return offset;
-		if (*depth < 1)
-			return -FDT_ERR_NOTFOUND;
-		if (fdt_node_check_compatible(fdt, offset, compatible) == 0)
-			return offset;
+	get_cpu_ctx_t *ctx = arg;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "get_cpu_node: Missing reg property in cpu node\n");
+		return 0;
 	}
-}
 
-int get_cpu_node(const void *fdt, int cpunum)
-{
-	int off = 0;
-
-	while (1) {
-		const uint32_t *reg;
-		int len;
-
-		off = fdt_node_offset_by_prop_value(fdt, off, "device_type", "cpu", 4);
-		if (off < 0)
-			return off;
-
-		reg = fdt_getprop(fdt, off, "reg", &len);
-		if (!reg) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			         "Missing reg property in cpu node, fdt error %d\n", len);
-			return len;
-		}
-
-		if (*reg == cpunum)
-			return off;
-	}
-}
-
-int fdt_node_offset_by_prop(const void *fdt, int startoffset,
-                                  const char *propname)
-{
-	int offset;
-	int len;
-	const void *val;
-
-	for (offset = fdt_next_node(fdt, startoffset, NULL);
-	     offset >= 0;
-	     offset = fdt_next_node(fdt, offset, NULL)) {
-		val = fdt_getprop(fdt, offset, propname, &len);
-		if (val)
-			return offset;
+	if (*(const uint32_t *)prop->data == ctx->cpunum) {
+		ctx->ret = node;
+		return 1;
 	}
 	
-	return offset; /* error from fdt_next_node() */
+	return 0;
 }
 
+dt_node_t *get_cpu_node(dt_node_t *tree, int cpunum)
+{
+	get_cpu_ctx_t ctx = { .cpunum = cpunum };
+
+	dt_for_each_prop_value(tree, "device_type", "cpu", 4,
+	                       get_cpu_node_callback, &ctx);
+	return ctx.ret;
+}

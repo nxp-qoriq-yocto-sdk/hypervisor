@@ -117,33 +117,38 @@ static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 	                       (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
-	         "cpu%ld mapping guest %lx to real %lx, %lx pages\n",
-	         mfspr(SPR_PIR), grpn, rpn, pages);
+	         "mapping guest %lx to real %lx, %lx pages\n",
+	         grpn, rpn, pages);
 
 	vptbl_map(guest->gphys, grpn, rpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 }
 
-static int map_guest_reg_one(guest_t *guest, int node,
-                             int partition, const uint32_t *reg,
+static int map_guest_reg_one(guest_t *guest, dt_node_t *node,
+                             dt_node_t *partition, const uint32_t *reg,
                              uint32_t naddr, uint32_t nsize)
 {
 	phys_addr_t gaddr, size;
 	uint32_t addrbuf[MAX_ADDR_CELLS];
 	phys_addr_t rangesize, addr, offset = 0;
 	int maplen, ret;
+	dt_prop_t *prop;
 	const uint32_t *physaddrmap;
 
-	physaddrmap = fdt_getprop(fdt, partition, "fsl,hv-physaddr-map", &maplen);
-	if (!physaddrmap && maplen != -FDT_ERR_NOTFOUND)
-		return maplen;
-	if (!physaddrmap || maplen & 3)
+	prop = dt_get_prop(partition, "fsl,hv-physaddr-map", 0);
+	if (!prop || prop->len & 3) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
 		return ERR_BADTREE;
+	}
 
-	ret = xlate_reg_raw(guest->devtree, node, reg, addrbuf,
-	                    &size, naddr, nsize);
-	if (ret < 0)
+	physaddrmap = prop->data;
+	maplen = prop->len;
+
+	ret = xlate_reg_raw(node, reg, addrbuf, &size, naddr, nsize);
+	if (ret < 0) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
 		return ret;	
+	}
 
 	gaddr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
@@ -152,7 +157,7 @@ static int map_guest_reg_one(guest_t *guest, int node,
 
 		ret = xlate_one(addrbuf, physaddrmap, maplen, rootnaddr, rootnsize,
 		                guest->naddr, guest->nsize, &rangesize);
-		if (ret == -FDT_ERR_NOTFOUND) {
+		if (ret == ERR_NOTFOUND) {
 			// FIXME: It is assumed that if the beginning of the reg is not
 			// in physaddrmap, then none of it is.
 
@@ -161,11 +166,15 @@ static int map_guest_reg_one(guest_t *guest, int node,
 			return 0;
 		}
 		
-		if (ret < 0)
+		if (ret < 0) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
 			return ret;
+		}
 
-		if (addrbuf[0] || addrbuf[1])
+		if (addrbuf[0] || addrbuf[1]) {
+			printf("%s: %d %x %x\n", __func__, __LINE__, addrbuf[0], addrbuf[1]);
 			return ERR_BADTREE;
+		}
 
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
@@ -179,63 +188,53 @@ static int map_guest_reg_one(guest_t *guest, int node,
 	return 0;
 }
 
-static int map_guest_ranges(guest_t *guest, int node, int partition)
+static int map_guest_ranges(guest_t *guest, dt_node_t *node,
+                            dt_node_t *partition)
 {
-	int len, ret;
+	size_t len;
 	uint32_t naddr, nsize, caddr, csize;
-	char path[MAX_PATH];
+	dt_prop_t *prop;
+	const uint32_t *ranges;
+	int ret;
 
-	const uint32_t *reg = fdt_getprop(guest->devtree, node,
-	                                  "fsl,hv-map-ranges", &len);
-	if (!reg) {
-		if (len == -FDT_ERR_NOTFOUND)
-			return 0;
-	
-		return len;
-	}
+	prop = dt_get_prop(node, "fsl,hv-map-ranges", 0);
+	if (!prop)
+		return 0;
 
-	reg = fdt_getprop(guest->devtree, node, "ranges", &len);
-	if (!reg) {
-		if (len == -FDT_ERR_NOTFOUND)
-			return 0;
-	
-		return len;
-	}
+	prop = dt_get_prop(node, "ranges", 0);
+	if (!prop)
+		return 0;
 
-	if (len & 3) {
+	if (prop->len & 3) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-		         "Unaligned ranges length %d\n", len);
+		         "Unaligned ranges length %d in %s\n", prop->len, prop->name);
 		return ERR_BADTREE;
 	}
 
-	len >>= 2;
+	ranges = prop->data;
+	len = prop->len / 4;
 
-	ret = fdt_get_path(guest->devtree, node, path, sizeof(path));
-	if (ret >= 0)
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-		         "found ranges in %s\n", path);
+	dt_node_t *parent = node->parent;
+	if (!parent)
+		return ERR_BADTREE;
 
-	int parent = fdt_parent_offset(guest->devtree, node);
-	if (parent < 0)
-		return parent;
-
-	ret = get_addr_format_nozero(guest->devtree, parent, &naddr, &nsize);
+	ret = get_addr_format_nozero(parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
 
-	ret = get_addr_format_nozero(guest->devtree, node, &caddr, &csize);
+	ret = get_addr_format_nozero(node, &caddr, &csize);
 	if (ret < 0)
 		return ret;
 
 	for (int i = 0; i < len; i += caddr + naddr + csize) {
 		if (i + caddr + naddr + csize > len) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			         "Incomplete ranges entry\n");
+			         "Incomplete ranges entry in %s\n", prop->name);
 			return ERR_BADTREE;
 		}
 
 		ret = map_guest_reg_one(guest, node, partition,
-		                        reg + i + caddr, naddr, csize);
+		                        ranges + i + caddr, naddr, csize);
 		if (ret < 0 && ret != ERR_NOTRANS)
 			return ret;
 	}
@@ -243,47 +242,42 @@ static int map_guest_ranges(guest_t *guest, int node, int partition)
 	return 0;
 }
 
-static int map_guest_reg(guest_t *guest, int node, int partition)
+static int map_guest_reg(guest_t *guest, dt_node_t *node, dt_node_t *partition)
 {
 	int len, ret;
 	uint32_t naddr, nsize;
-	char path[MAX_PATH];
-
-	const uint32_t *reg = fdt_getprop(guest->devtree, node, "reg", &len);
-	if (!reg) {
-		if (len == -FDT_ERR_NOTFOUND)
-			return 0;
+	const uint32_t *reg;
+	dt_prop_t *prop;
+	dt_node_t *parent;
 	
-		return len;
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop)
+		return 0;
+
+	if (prop->len & 3) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "Unaligned ranges length %d in %s\n", prop->len, prop->name);
+		return ERR_BADTREE;
 	}
 
-	if (len & 3)
+	reg = prop->data;
+	len = prop->len / 4;
+
+	parent = node->parent;
+	if (!parent)
 		return ERR_BADTREE;
 
-	len >>= 2;
+	if (parent->parent && !dt_node_is_compatible(parent, "simple-bus"))
+		return 0;
 
-	ret = fdt_get_path(guest->devtree, node, path, sizeof(path));
-	if (ret >= 0)
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG, "found reg in %s\n", path);
-
-	int parent = fdt_parent_offset(guest->devtree, node);
-	if (parent < 0)
-		return parent;
-
-	if (parent) {
-		ret = fdt_node_check_compatible(guest->devtree, parent, "simple-bus");
-		if (ret)
-			return 0;
-	}
-
-	ret = get_addr_format_nozero(guest->devtree, parent, &naddr, &nsize);
+	ret = get_addr_format_nozero(parent, &naddr, &nsize);
 	if (ret < 0)
 		return ret;
 
 	for (int i = 0; i < len; i += naddr + nsize) {
 		if (i + naddr + nsize > len) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			         "Incomplete reg entry\n");
+			         "Incomplete reg entry in %s\n", prop->name);
 			return ERR_BADTREE;
 		}
 
@@ -296,36 +290,37 @@ static int map_guest_reg(guest_t *guest, int node, int partition)
 	return 0;
 }
 
-static int map_guest_reg_all(guest_t *guest, int partition)
+typedef struct map_guest_ctx {
+	guest_t *guest;
+	dt_node_t *partition;
+} map_guest_ctx_t;
+
+static int map_guest_one(dt_node_t *node, void *arg)
 {
-	int node = -1;
-
-	while ((node = fdt_next_node(guest->devtree, node, NULL)) >= 0) {
-		int ret = map_guest_reg(guest, node, partition);
-		if (ret < 0) {
-			int len;
-			const char *node_name = fdt_get_name(guest->devtree, node, &len);
-			if (node_name)
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				         "error: map_guest_reg failed for node %s\n", node_name);
-			return ret;
-		}
-
-		ret = map_guest_ranges(guest, node, partition);
-		if (ret < 0) {
-			int len;
-			const char *node_name = fdt_get_name(guest->devtree, node, &len);
-			if (node_name)
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				         "map_guest_ranges failed for node %s\n", node_name);
-			return ret;
-		}
-	}
+	map_guest_ctx_t *ctx = arg;
+	int ret;
 	
-	if (node != -FDT_ERR_NOTFOUND)
-		return node;
+	ret = map_guest_reg(ctx->guest, node, ctx->partition);
+	if (ret < 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "map_guest_reg: error %d in %s\n", ret, node->name);
+
+	ret = map_guest_ranges(ctx->guest, node, ctx->partition); 
+	if (ret < 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "map_guest_ranges: error %d in %s\n", ret, node->name);
 
 	return 0;
+}
+
+static int map_guest_reg_all(guest_t *guest)
+{
+	map_guest_ctx_t ctx = {
+		.guest = guest,
+		.partition = guest->partition
+	};
+
+	return dt_for_each_node(guest->devtree, &ctx, map_guest_one, NULL);
 }
 
 static void reset_spintbl(guest_t *guest)
@@ -348,61 +343,106 @@ static const char *cpu_clocks[] = {
 	"bus-frequency",
 };
 
-static int copy_cpu_clocks(guest_t *guest, int vnode, int vcpu,
+static int copy_cpu_clocks(guest_t *guest, dt_node_t *vnode, int vcpu,
                            const uint32_t *cpulist, int cpulist_len)
 {
-	int pcpu, node;
-	const uint32_t *prop;
-	int i;
+	dt_node_t *node;
+	dt_prop_t *prop;
+	int pcpu, i;
 	
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
 	if (pcpu < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "partition %s has no cpu %d\n", guest->name, vcpu);
+		         "copy_cpu_clocks: partition has no cpu %d\n", vcpu);
 		return pcpu;
 	}
 
-	node = get_cpu_node(fdt, pcpu);
-	if (node < 0) {
+	node = get_cpu_node(hw_devtree, pcpu);
+	if (!node) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "partition %s vcpu %d maps to non-existent CPU %d\n",
-		         guest->name, vcpu, pcpu);
-		return node;
+		         "copy_cpu_clocks: vcpu %d maps to non-existent CPU %d\n",
+		         vcpu, pcpu);
+		return ERR_RANGE;
 	}
 
 	for (i = 0; i < sizeof(cpu_clocks) / sizeof(char *); i++) {
-		int ret, len;
+		int ret;
 
-		prop = fdt_getprop(fdt, node, cpu_clocks[i], &len);
+		prop = dt_get_prop(node, cpu_clocks[i], 0);
 		if (!prop) {
 			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			         "copy_cpu_clocks: failed to read clock property, "
-			         "error %d\n", len);
+			         "copy_cpu_clocks: failed to read clock property");
 
-			return len;
+			return ERR_BADTREE;
 		}
 
-		ret = fdt_setprop(guest->devtree, vnode, cpu_clocks[i], prop, len);
+		ret = dt_set_prop(vnode, cpu_clocks[i], prop->data, prop->len);
 		if (ret < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "copy_cpu_clocks: failed to set clock property, "
 			         "error %d\n", ret);
 
-			return len;
+			return ret;
 		}
 	}
 
 	return 0;
 } 
 
+typedef struct create_guest_spin_table_ctx {
+	guest_t *guest;
+	const uint32_t *cpulist;
+	int cpulist_len;
+} create_guest_spin_table_ctx_t;
+
+static int create_guest_spin_table_cpu(dt_node_t *node, void *arg)
+{
+	create_guest_spin_table_ctx_t *ctx = arg;
+	uint64_t spin_addr;
+	dt_prop_t *prop;
+	int pcpu, ret;
+	
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop || prop->len != 4) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "create_guest_spin_table: missing/bad cpu reg property\n");
+		return ERR_BADTREE;
+	}
+	pcpu = *(const uint32_t *)prop->data;
+
+	ret = copy_cpu_clocks(ctx->guest, node, pcpu,
+	                      ctx->cpulist, ctx->cpulist_len);
+	if (ret < 0)
+		return ret;
+
+	if (pcpu == 0)
+		return dt_set_prop_string(node, "status", "okay");
+
+	ret = dt_set_prop_string(node, "status", "disabled");
+	if (ret < 0)
+		return ret;
+
+	ret = dt_set_prop_string(node, "enable-method", "spin-table");
+	if (ret < 0)
+		return ret;
+
+	spin_addr = 0xfffff000 + pcpu * sizeof(struct boot_spin_table);
+	return dt_set_prop(node, "cpu-release-addr", &spin_addr, 8);
+}
+
 static int create_guest_spin_table(guest_t *guest,
                                    const uint32_t *cpulist,
                                    int cpulist_len)
 {
 	unsigned long rpn;
-	uint64_t spin_addr;
 	int ret, i;
-	
+
+	create_guest_spin_table_ctx_t	ctx = {
+		.guest = guest,
+		.cpulist = cpulist,
+		.cpulist_len = cpulist_len
+	};
+
 	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
 	if (!guest->spintbl)
 		return ERR_NOMEM;
@@ -417,65 +457,12 @@ static int create_guest_spin_table(guest_t *guest,
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
 
-	int off = 0;
-	while (1) {
-		uint32_t pcpu;
-		ret = fdt_node_offset_by_prop_value(guest->devtree, off,
-		                                    "device_type", "cpu", 4);
-		if (ret == -FDT_ERR_NOTFOUND)
-			break;
-		if (ret < 0)
-			goto fail;
+	ret = dt_for_each_prop_value(guest->devtree, "device_type", "cpu", 4,
+	                             create_guest_spin_table_cpu, &ctx);
 
-		off = ret;
-		const uint32_t *reg = fdt_getprop(guest->devtree, off, "reg", &ret);
-		if (!reg)
-			goto fail;
-		if (ret != 4) {
-			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-			         "create_guest_spin_table(%s): bad cpu reg property\n",
-			       guest->name);
-			return ERR_BADTREE;
-		}
-
-		pcpu = *reg;
-		ret = copy_cpu_clocks(guest, off, pcpu, cpulist, cpulist_len);
-		if (ret < 0)
-			continue;
-
-		if (pcpu == 0) {
-			ret = fdt_setprop_string(guest->devtree, off, "status", "okay");
-			if (ret < 0)
-				goto fail;
-			
-			continue;
-		}
-
-		ret = fdt_setprop_string(guest->devtree, off, "status", "disabled");
-		if (ret < 0)
-			goto fail;
-
-		ret = fdt_setprop_string(guest->devtree, off,
-		                         "enable-method", "spin-table");
-		if (ret < 0)
-			goto fail;
-
-		spin_addr = 0xfffff000 + pcpu * sizeof(struct boot_spin_table);
-		ret = fdt_setprop(guest->devtree, off,
-		                  "cpu-release-addr", &spin_addr, 8);
-		if (ret < 0)
-			goto fail;
-
-		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-		         "cpu-release-addr of CPU%u: %llx\n", pcpu, spin_addr);
-	}
-
-	return 0;
-
-fail:
-	printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-	         "create_guest_spin_table(%s): libfdt error %d (%s)\n",
-	       guest->name, ret, fdt_strerror(ret));
+	if (ret < 0)
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "create_guest_spin_table: error %d\n", ret);
 
 	return ret;
 }
@@ -502,19 +489,18 @@ fail:
  * DTS.  Special doorbells are created by the hypervisor in
  * create_guest_special_doorbells(), so they don't exist in any DTS.
  */
-static int create_sdbell_handles(const char *kind,
-	guest_t *guest,	int offset, struct ipi_doorbell *dbell)
+static int create_sdbell_handle(const char *kind,
+                                guest_t *guest, dt_node_t *node,
+                                struct ipi_doorbell *dbell)
 {
 	char s[96];	// Should be big enough
 	int ret, length;
 
 	// Create the special doorbell receive handle node.
-	offset = ret = fdt_add_subnode(guest->devtree, offset, kind);
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"Couldn't create %s doorbell node: %i\n", kind, ret);
-		return ret;
-	}
+	node = dt_get_subnode(node, kind, 1);
+	if (!node)
+		return ERR_NOMEM;
+
 	// 'offset' is now the offset of the new doorbell receive handle node
 
 	// Write the 'compatible' property to the doorbell receive handle node
@@ -522,15 +508,12 @@ static int create_sdbell_handles(const char *kind,
 	// snprintf (it will stop scanning when it sees the \0), so we use %c.
 	length = snprintf(s, sizeof(s),
 		"fsl,hv-%s-doorbell%cfsl,hv-doorbell-receive-handle", kind, 0);
-	ret = fdt_setprop(guest->devtree, offset, "compatible", s, length + 1);
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"Couldn't set 'compatible' property in %s doorbell node: %i\n",
-			kind, ret);
-		return ret;
-	}
 
-	ret = attach_receive_doorbell(guest, dbell, offset);
+	ret = dt_set_prop(node, "compatible", s, length + 1);
+	if (ret < 0)
+		return ret;
+
+	ret = attach_receive_doorbell(guest, dbell, node);
 
 	return ret;
 }
@@ -581,7 +564,7 @@ error:
 	guest->dbell_watchdog_expiration = NULL;
 	guest->dbell_restart_request = NULL;
 
-	return -ERR_NOMEM;
+	return ERR_NOMEM;
 }
 
 /**
@@ -642,31 +625,24 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image,
  */
 static int load_image(guest_t *guest)
 {
-	int node = guest->partition;
-	int ret, size, first = 1;
-	const uint32_t *prop, *end;
+	int ret, first = 1;
+	dt_prop_t *prop;
+	const uint32_t *entry, *end;
 	uint64_t image_addr;
 	uint64_t guest_addr;
 	uint64_t length;
 
-	prop = fdt_getprop(fdt, node, "fsl,hv-load-image-table", &size);
-	if (!prop) {
-		/* 'size' will never equal zero if table is NULL */
-		if (size == -FDT_ERR_NOTFOUND)
-			return 0;
+	prop = dt_get_prop(guest->partition, "fsl,hv-load-image-table", 0);
+	if (!prop)
+		return 0;
 
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest %s: could not read fsl,hv-load-image-table property\n",
-		         guest->name);
-		return size;
-	}
+	entry = prop->data;
+	end = (const uint32_t *)((uintptr_t)prop->data + prop->len);
 
-	end = (const uint32_t *)((uintptr_t)prop + size);
-
-	while (prop + rootnaddr + guest->naddr + guest->nsize <= end) {
-		image_addr = int_from_tree(&prop, rootnaddr);
-		guest_addr = int_from_tree(&prop, guest->naddr);
-		length = int_from_tree(&prop, guest->nsize);
+	while (entry + rootnaddr + guest->naddr + guest->nsize <= end) {
+		image_addr = int_from_tree(&entry, rootnaddr);
+		guest_addr = int_from_tree(&entry, guest->naddr);
+		length = int_from_tree(&entry, guest->nsize);
 
 		if (length != (size_t)length) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -697,90 +673,71 @@ static const uint32_t hv_version[4] = {
 	FH_API_COMPAT_VERSION
 };
 
-static int process_partition_handles(guest_t *guest)
+static int process_partition_handle(dt_node_t *node, void *arg)
 {
-	int off = -1;
+	guest_t *guest = arg;
 	int ret;
 
-	// Add a 'reg' property to every partition-handle node
-
-	while (1) {
-		// get a pointer to the first/next partition-handle node
-		off = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,hv-partition-handle");
-		if (off < 0) {
-			if (off == -FDT_ERR_NOTFOUND)
-				return 0;
-
-			return off;
-		}
-
-		// Find the end-point partition node in the hypervisor device tree
-
-		const char *s = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
-		if (!s) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "guest %s: partition node missing fsl,endpoint (%d)\n",
-			         guest->name, ret);
-			continue;
-		}
-
-		int endpoint = fdt_path_offset(fdt, s);
-		if (endpoint < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "guest %s: partition %s does not exist (%d)\n",
-			         guest->name, s, endpoint);
-			continue;
-		}
-
-		// Get the guest_t for the partition, or create one if necessary
-		guest_t *target_guest = node_to_partition(endpoint);
-		if (!target_guest) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "guest %s: %s is not a partition\n",
-			         guest->name, s);
-			continue;
-		}
-
-		// Store the pointer to the target guest in our list of handles
-		target_guest->handle.guest = target_guest;
-
-		// Allocate a handle
-		int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
-		if (ghandle < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "guest %s: too many handles\n", guest->name);
-			return ghandle;
-		}
-
-		// Insert a 'reg' property into the partition-handle node of the
-		// guest device tree
-		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, sizeof(ghandle));
-		if (ret)
-			return ret;
-
-		ret = fdt_setprop(guest->devtree, off, "label",
-		                  target_guest->name, strlen(target_guest->name) + 1);
-		if (ret)
-			return ret;
-
-		// Create special doorbells
-
-		ret = create_sdbell_handles("state-change",
-			guest, off, target_guest->dbell_state_change);
-		if (ret)
-			return ret;
-
-		ret = create_sdbell_handles("watchdog-expiration",
-			guest, off, target_guest->dbell_watchdog_expiration);
-		if (ret)
-			return ret;
-
-		ret = create_sdbell_handles("reset-request",
-			guest, off, target_guest->dbell_restart_request);
-		if (ret)
-			return ret;
+	// Find the end-point partition node in the hypervisor device tree
+	const char *s = dt_get_prop_string(node, "fsl,endpoint");
+	if (!s) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "process_partition_handle: partition node missing fsl,endpoint\n");
+		return 0;
 	}
+
+	dt_node_t *endpoint = dt_lookup_alias(hw_devtree, s);
+	if (!endpoint) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "process_partition_handle: partition %s does not exist\n", s);
+		return 0;
+	}
+
+	// Get the guest_t for the partition, or create one if necessary
+	guest_t *target_guest = node_to_partition(endpoint);
+	if (!target_guest) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "process_partition_handle: %s is not a partition\n", s);
+		return 0;
+	}
+
+	// Store the pointer to the target guest in our list of handles
+	target_guest->handle.guest = target_guest;
+
+	// Allocate a handle
+	int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
+	if (ghandle < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "guest %s: too many handles\n", guest->name);
+		return ghandle;
+	}
+
+	// Insert a 'reg' property into the partition-handle node of the
+	// guest device tree
+	ret = dt_set_prop(node, "reg", &ghandle, sizeof(ghandle));
+	if (ret)
+		return ret;
+
+	ret = dt_set_prop_string(node, "label", target_guest->name);
+	if (ret)
+		return ret;
+
+	// Create special doorbells
+
+	ret = create_sdbell_handle("state-change", guest, node,
+	                           target_guest->dbell_state_change);
+	if (ret)
+		return ret;
+
+	ret = create_sdbell_handle("watchdog-expiration", guest, node,
+	                           target_guest->dbell_watchdog_expiration);
+	if (ret)
+		return ret;
+
+	ret = create_sdbell_handle("reset-request", guest, node,
+	                           target_guest->dbell_restart_request);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -825,54 +782,42 @@ int restart_guest(guest_t *guest)
  */
 static int partition_config(guest_t *guest)
 {
-	const uint32_t *prop;
-	int hv, ret, len;
+	dt_node_t *node;
+	int ret;
 	
-	hv = fdt_subnode_offset(guest->devtree, 0, "hypervisor");
-	if (hv < 0)
-		hv = fdt_add_subnode(guest->devtree, 0, "hypervisor");
-	if (hv < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "Couldn't create hypervisor node: %d\n", hv);
-		return hv;
-	}
+	node = dt_get_subnode(guest->devtree, "hypervisor", 1);
+	if (!node)
+		return ERR_NOMEM;
 
 	/* guest cache lock mode */
-	prop = fdt_getprop(guest->devtree, hv, "fsl,hv-guest-cache-lock", &len);
-	if (prop)
+	if (dt_get_prop(node, "fsl,hv-guest-cache-lock", 0))
 		guest->guest_cache_lock = 1;
 
 	/* guest debug mode */
-	prop = fdt_getprop(guest->devtree, hv, "fsl,hv-guest-debug", &len);
-	if (prop)
+	if (dt_get_prop(node, "fsl,hv-guest-debug", 0))
 		guest->guest_debug_mode = 1;
 
 	if (mpic_coreint) {
-		ret = fdt_setprop(guest->devtree, hv,
-		                  "fsl,hv-pic-coreint", NULL, 0);
+		ret = dt_set_prop(node, "fsl,hv-pic-coreint", NULL, 0);
 		if (ret < 0)
 			return ret;
 	}
 
-	ret = fdt_setprop(guest->devtree, hv, "fsl,hv-partition-label",
-	                  guest->name, strlen(guest->name) + 1);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return dt_set_prop(node, "fsl,hv-partition-label",
+	                   guest->name, strlen(guest->name) + 1);
 }
 
 uint32_t start_guest_lock;
 
-guest_t *node_to_partition(int partition)
+guest_t *node_to_partition(dt_node_t *partition)
 {
-	int i, len, ret;
+	int i, ret;
 	char *name;
 
 	// Verify that 'partition' points to a compatible node
-	if (fdt_node_check_compatible(fdt, partition, "fsl,hv-partition")) {
+	if (!dt_node_is_compatible(partition, "fsl,hv-partition")) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: invalid offset %u\n", __FUNCTION__, partition);
+		         "%s: invalid partition node", __FUNCTION__);
 		return NULL;
 	}
 
@@ -902,10 +847,8 @@ guest_t *node_to_partition(int partition)
 			return NULL;
 		}
 
-		name = fdt_getprop_w(fdt, partition, "label", &len);
-		if (len > 0) {
-			name[len - 1] = 0;
-		} else {
+		name = dt_get_prop_string(partition, "label");
+		if (!name) {
 			/* If no label, use the partition node path. */
 			name = malloc(MAX_PATH);
 			if (!name) {
@@ -915,14 +858,10 @@ guest_t *node_to_partition(int partition)
 				return NULL;
 			}
 
-			ret = fdt_get_path(fdt, partition, name, MAX_PATH);
-			if (ret >= 0) {
-				name[MAX_PATH - 1] = 0;
-			} else {
+			ret = dt_get_path(partition, name, MAX_PATH);
+			if (ret > MAX_PATH)
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				         "node_to_partition: Couldn't get partition node path.\n");
-				sprintf(name, "partition %d", i);
-			}
+				         "node_to_partition: path name too long\n");
 		}
 
 		guests[i].name = name;
@@ -967,7 +906,7 @@ static void start_guest_primary_nowait(void)
 	register register_t r8 asm("r8");
 	register register_t r9 asm("r9");
 	guest_t *guest = get_gcpu()->guest; 
-	int i;
+	int ret, i;
 	
 	disable_critint();
 
@@ -983,15 +922,30 @@ static void start_guest_primary_nowait(void)
 	gdb_stub_init();
 #endif
 
-	/* FIXME: append device tree to image, or use address provided by
-	 * the device tree, or something sensible like that.
-	 */
-	int ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
-	                        guest->devtree, fdt_totalsize(guest->devtree));
-	if (ret != fdt_totalsize(guest->devtree)) {
+	void *fdt = malloc(guest->dtb_window_len);
+	if (!fdt) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "Couldn't copy device tree to guest %s, %d\n",
-		         guest->name, ret);
+		         "%s: cannot allocate %llu bytes for dtb window\n",
+		         __func__, (unsigned long long)guest->dtb_window_len);
+
+		return;
+	}
+
+	ret = flatten_dev_tree(guest->devtree, fdt, guest->dtb_window_len);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: cannot unflatten dtb\n", __func__);
+
+		return;
+	}
+
+	assert(fdt_totalsize(fdt) <= guest->dtb_window_len);
+
+	ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
+	                    fdt, fdt_totalsize(fdt));
+	if (ret != fdt_totalsize(fdt)) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: cannot copy device tree to guest\n", __func__);
 		return;
 	}
 
@@ -1034,8 +988,8 @@ static void start_guest_primary_nowait(void)
 	send_doorbells(guest->dbell_state_change);
 	cpu->traplevel = 0;
 
-	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
-		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+	if (dt_get_prop(guest->partition, "fsl,hv-dbg-wait-at-start", 0)
+	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
 	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
@@ -1151,8 +1105,8 @@ static void start_guest_secondary(void)
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	if (fdt_get_property(fdt, guest->partition, "fsl,hv-dbg-wait-at-start", NULL)
-		&& guest->stub_ops && guest->stub_ops->wait_at_start_hook)
+	if (dt_get_prop(guest->partition, "fsl,hv-dbg-wait-at-start", 0)
+	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
 	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
@@ -1287,77 +1241,66 @@ int start_guest(guest_t *guest)
 	return ret;
 }
 
-static int init_guest_primary(guest_t *guest, int partition,
-                              const uint32_t *cpus, int cpus_len)
+static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
+                              int cpus_len)
 {
 	int ret;
-	uint32_t gfdt_size;
-	const void *guest_origtree;
-	const uint32_t *prop;
+	dt_prop_t *prop;
+	const uint32_t *propdata;
 	int gpir;
 
 	/* count number of cpus for this partition and alloc data struct */
 	guest->cpucnt = count_cpus(cpus, cpus_len);
 	guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
-	if (!guest->gcpus) {
-		ret = ERR_NOMEM;
-		goto fail;
-	}
+	if (!guest->gcpus)
+		goto nomem;
 
 	gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
 	assert(gpir == 0);
 
-	guest_origtree = fdt_getprop(fdt, partition, "fsl,hv-dtb", &ret);
-	if (!guest_origtree) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest missing property fsl,hv-dtb\n");
-		goto fail;
-	}
-
-	ret = get_addr_format_nozero(guest_origtree, 0,
-	                             &guest->naddr, &guest->nsize);
-	if (ret < 0)
-		goto fail;
-
-	prop = fdt_getprop(fdt, partition, "fsl,hv-dtb-window", &ret);
+	prop = dt_get_prop(guest->partition, "fsl,hv-dtb", 0);
 	if (!prop) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest missing property fsl,hv-dtb-window\n");
-		goto fail;
-	}
-	if (ret != (guest->naddr + guest->nsize) * 4) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest has invalid property len for fsl,hv-dtb-window\n");
-		ret = ERR_BADTREE;
-		goto fail;
+		         "init_guest_primary: guest missing property fsl,hv-dtb\n");
+		return ERR_BADTREE;
 	}
 
-	guest->dtb_gphys = int_from_tree(&prop, guest->naddr);
-	gfdt_size = int_from_tree(&prop, guest->nsize);
-
-	gfdt_size += ret;
-	
-	guest->devtree = alloc(gfdt_size, 16);
+	guest->devtree = unflatten_dev_tree(prop->data);
 	if (!guest->devtree) {
-		ret = ERR_NOMEM;
-		goto fail;
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest_primary: Can't unflatten guest device tree\n");
+		return ERR_BADTREE;
 	}
 
-	ret = fdt_open_into(guest_origtree, guest->devtree, gfdt_size);
+	ret = get_addr_format_nozero(guest->devtree, &guest->naddr, &guest->nsize);
 	if (ret < 0)
 		goto fail;
 
-	ret = fdt_setprop(guest->devtree, 0, "fsl,hv-version",
-	                  hv_version, 16);
+	prop = dt_get_prop(guest->partition, "fsl,hv-dtb-window", 0);
+	if (!prop) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest_primary: Guest missing property fsl,hv-dtb-window\n");
+		return ERR_BADTREE;
+	}
+
+	if (prop->len != (guest->naddr + guest->nsize) * 4) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest_primary: Invalid property len for fsl,hv-dtb-window\n");
+		return ERR_BADTREE;
+	}
+
+	propdata = prop->data;
+	guest->dtb_gphys = int_from_tree(&propdata, guest->naddr);
+	guest->dtb_window_len = int_from_tree(&propdata, guest->nsize);
+	
+	ret = dt_set_prop(guest->devtree, "fsl,hv-version", hv_version, 16);
 	if (ret < 0)
 		goto fail;
 
 	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
-	if (!guest->gphys || !guest->gphys_rev) {
-		ret = ERR_NOMEM;
-		goto fail;
-	}
+	if (!guest->gphys || !guest->gphys_rev)
+		goto nomem;
 
 	ret = create_guest_spin_table(guest, cpus, cpus_len);
 	if (ret < 0)
@@ -1366,7 +1309,8 @@ static int init_guest_primary(guest_t *guest, int partition,
 	send_dbell_partition_init(guest);
 	recv_dbell_partition_init(guest);
 
-	ret = process_partition_handles(guest);
+	ret = dt_for_each_compatible(guest->devtree, "fsl,hv-partition-handle",
+	                             process_partition_handle, guest);
 	if (ret < 0)
 		goto fail;
 
@@ -1380,7 +1324,7 @@ static int init_guest_primary(guest_t *guest, int partition,
 
 	vmpic_partition_init(guest);
 
-	ret = map_guest_reg_all(guest, partition);
+	ret = map_guest_reg_all(guest);
 	if (ret < 0)
 		goto fail;
 
@@ -1389,7 +1333,7 @@ static int init_guest_primary(guest_t *guest, int partition,
 #endif
 
 	// Get the watchdog timeout options
-	prop = fdt_getprop(fdt, guest->partition, "fsl,hv-wd-mgr-notify", NULL);
+	prop = dt_get_prop(guest->partition, "fsl,hv-wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
 
 	start_guest_primary();
@@ -1397,396 +1341,102 @@ static int init_guest_primary(guest_t *guest, int partition,
 
 fail:
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "error %d (%s) building guest device tree for %s\n",
-	         ret, fdt_strerror(ret), guest->name);
+	         "init_guest_primary: error %d\n", ret);
 
 	return ret;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "init_guest_primary: out of memory\n");
+
+	return ERR_NOMEM;
 }
+
+typedef struct init_guest_ctx {
+	guest_t *guest;
+	dt_prop_t *cpulist;
+} init_guest_ctx_t;
+
+static int init_guest_one(dt_node_t *node, void *arg)
+{
+	init_guest_ctx_t *ctx = arg;
+	int pir = mfspr(SPR_PIR);
+	guest_t *guest;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "fsl,hv-cpus", 0);
+	if (!prop) {
+		char buf[MAX_PATH];
+		dt_get_path(node, buf, sizeof(buf));
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest: No fsl,hv-cpus in guest %s\n", buf);
+		return 0;
+	}
+
+	if (!cpu_in_cpulist(prop->data, prop->len, pir))
+		return 0;
+
+	guest = node_to_partition(node);
+	if (!guest) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest: node_to_partition failed\n");
+		return ERR_NOMEM;
+	}
+
+	if (ctx->guest) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "init_guest: extra guest %s on core %d\n", guest->name, pir);
+		return 0;
+	}
+
+	ctx->guest = guest;
+	ctx->cpulist = prop;
+	return 0;
+} 
 
 __attribute__((noreturn)) void init_guest(void)
 {
-	int off = -1, partition = 0, ret;
 	int pir = mfspr(SPR_PIR);
-	const uint32_t *cpus = NULL, *prop;
-	guest_t *guest = NULL, *temp_guest;
-	int len, cpus_len = 0;
-	
-	while (1) {
-		off = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-partition");
-		if (off < 0) {
-			if (partition)
-				break;
+	init_guest_ctx_t ctx = {};
 
-			goto wait;
-		}
+	dt_for_each_compatible(hw_devtree, "fsl,hv-partition",
+	                       init_guest_one, &ctx);
 
-		prop = fdt_getprop(fdt, off, "fsl,hv-cpus", &len);
-		if (!prop) {
-			char buf[MAX_PATH];
-			ret = fdt_get_path(fdt, off, buf, sizeof(buf));
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "No fsl,hv-cpus in guest %s\n", buf);
-			continue;
-		}
+	if (ctx.guest) {
+		const uint32_t *cpus = ctx.cpulist->data;
+		int cpus_len = ctx.cpulist->len;
+		guest_t *guest = ctx.guest;
 
-		if (!cpu_in_cpulist(prop, len, pir))
-			continue;
-
-		temp_guest = node_to_partition(off);
-		if (!temp_guest)
-			continue;
-
-		if (partition) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "extra guest %s on core %d\n", temp_guest->name, pir);
-			continue;
-		}
-
-		partition = off;
-		guest = temp_guest;
 		get_gcpu()->guest = guest;
-		cpus = prop;
-		cpus_len = len;
 
 		mtspr(SPR_LPIDR, guest->lpid);
-	
+
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		         "guest at %s on core %d\n", guest->name, pir);
-	}
 
-	if (pir == cpus[0]) {
-		/* Boot CPU */
-		init_guest_primary(guest, partition, cpus, cpus_len);
-	} else {
-		register_gcpu_with_guest(guest, cpus, cpus_len);
-	}
-
-wait:	{
-		/* Like wait_for_gevent(), but without a
-		 * stack frame to return on.
-		 */
-		register_t new_r1 = (register_t)&cpu->kstack[KSTACK_SIZE - FRAMELEN];
-
-		/* Terminate the callback chain. */
-		cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
-
-		get_gcpu()->waiting_for_gevent = 1;
-
-		asm volatile("mtsrr0 %0; mtsrr1 %1; mr %%r1, %2; rfi" : :
-		             "r" (wait_for_gevent_loop),
-		             "r" (mfmsr() | MSR_CE),
-		             "r" (new_r1) : "memory");
-		BUG();
-	}
-} 
-
-/** Temporarily map guest physical memory into a hypervisor virtual address
- *
- * @param[in]  tlbentry TLB1 entry index to use
- * @param[in]  tbl Guest page table to map from
- * @param[in]  addr Guest physical address to map
- * @param[in]  vpage Virtual base of window to hold mapping
- * @param[out] len Length of the actual mapping
- * @param[in]  maxtsize tsize of the virtual window
- * @param[in]  write if non-zero, fail if write access is not allowed
- * @return virtual address that corresponds to addr
- */
-void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
-                void *vpage, size_t *len, int maxtsize, int write)
-{
-	size_t offset, bytesize;
-	unsigned long attr;
-	unsigned long rpn;
-	phys_addr_t physaddr;
-	int tsize;
-
-	rpn = vptbl_xlate(tbl, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
-	if (!(attr & PTE_VALID) || (attr & PTE_VF))
-		return NULL;
-	if (write & !(attr & PTE_UW))
-		return NULL;
-
-	tsize = attr >> PTE_SIZE_SHIFT;
-	if (tsize > maxtsize)
-		tsize = maxtsize;
-
-	bytesize = (uintptr_t)tsize_to_pages(tsize) << PAGE_SHIFT;
-	offset = addr & (bytesize - 1);
-	physaddr = (phys_addr_t)rpn << PAGE_SHIFT;
-
-	if (len)
-		*len = bytesize - offset;
-
-	tlb1_set_entry(tlbentry, (unsigned long)vpage, physaddr & ~(bytesize - 1),
-	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-
-	return vpage + offset;
-}
-
-/** Copy from a hypervisor virtual address to a guest physical address
- *
- * @param[in] tbl Guest physical page table
- * @param[in] dest Guest physical address to copy to
- * @param[in] src Hypervisor virtual address to copy from
- * @param[in] len Bytes to copy
- * @return number of bytes successfully copied
- */
-size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
-{
-	size_t ret = 0;
-
-	while (len > 0) {
-		size_t chunk;
-		void *vdest;
-		
-		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
-		                  &chunk, TLB_TSIZE_16M, 1);
-		if (!vdest)
-			break;
-
-		if (chunk > len)
-			chunk = len;
-
-		memcpy(vdest, src, chunk);
-
-		src += chunk;
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-	}
-
-	return ret;
-}
-
-/** Fill a block of guest physical memory with zeroes
- *
- * @param[in] tbl Guest physical page table
- * @param[in] dest Guest physical address to copy to
- * @param[in] len Bytes to zero
- * @return number of bytes successfully zeroed
- */
-size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
-{
-	size_t ret = 0;
-
-	while (len > 0) {
-		size_t chunk;
-		void *vdest;
-
-		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
-		                  &chunk, TLB_TSIZE_16M, 1);
-		if (!vdest)
-			break;
-
-		if (chunk > len)
-			chunk = len;
-
-		memset(vdest, 0, chunk);
-
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-	}
-
-	return ret;
-}
-
-
-/** Copy from a guest physical address to a hypervisor virtual address 
- *
- * @param[in] tbl Guest physical page table
- * @param[in] dest Hypervisor virtual address to copy to
- * @param[in] src Guest physical address to copy from
- * @param[in] len Bytes to copy
- * @return number of bytes successfully copied
- */
-size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len)
-{
-	size_t ret = 0;
-
-	while (len > 0) {
-		size_t chunk;
-		void *vsrc;
-		
-		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping[0],
-		                 &chunk, TLB_TSIZE_16M, 0);
-		if (!vsrc)
-			break;
-
-		if (chunk > len)
-			chunk = len;
-
-		memcpy(dest, vsrc, chunk);
-
-		src += chunk;
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-	}
-
-	return ret;
-}
-
-/** Copy from a guest physical address to another guest physical address
- *
- * @param[in] dtbl Guest physical page table of the destination
- * @param[in] dest Guest physical address to copy to
- * @param[in] stbl Guest physical page table of the source
- * @param[in] src Guest physical address to copy from
- * @param[in] len Bytes to copy
- * @return number of bytes successfully copied
- */
-size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
-                          pte_t *stbl, phys_addr_t src, size_t len)
-{
-	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
-	
-	/* Initializiations not needed, but GCC is stupid. */
-	void *vdest = NULL, *vsrc = NULL;
-
-	while (len > 0) {
-		if (!schunk) {
-			vsrc = map_gphys(TEMPTLB1, stbl, src, temp_mapping[0],
-			                 &schunk, TLB_TSIZE_16M, 0);
-			if (!vsrc)
-				break;
+		if (pir == cpus[0]) {
+			/* Boot CPU */
+			init_guest_primary(guest, cpus, cpus_len);
+		} else {
+			register_gcpu_with_guest(guest, cpus, cpus_len);
 		}
-
-		if (!dchunk) {
-			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
-			                  &dchunk, TLB_TSIZE_16M, 1);
-			if (!vdest)
-				break;
-		}
-
-		chunk = min(schunk, dchunk);
-		if (chunk > len)
-			chunk = len;
-
-		memcpy(vdest, vsrc, chunk);
-
-		vsrc += chunk;
-		vdest += chunk;
-		src += chunk;
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-		dchunk -= chunk;
-		schunk -= chunk;
 	}
 
-	return ret;
-}
+	/* Like wait_for_gevent(), but without a
+	 * stack frame to return on.
+	 */
+	register_t new_r1 = (register_t)&cpu->kstack[KSTACK_SIZE - FRAMELEN];
 
-/** Temporarily map physical memory into a hypervisor virtual address
- *
- * @param[in] tlbentry TLB1 entry index to use
- * @param[in] paddr Guest physical address to map
- * @param[in] vpage Virtual base of window to hold mapping
- * @param[inout] len Length of the actual mapping
- * @param[in] mas2flags WIMGE bits, typically TLB_MAS2_IO or TLB_MAS2_MEM
- * @return the virtual address that corresponds to paddr.
- */
-void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
-               size_t *len, register_t mas2flags)
-{
-	size_t offset, bytesize;
-	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	/* Terminate the callback chain. */
+	cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
 
-	tsize = min(max_page_tsize((uintptr_t)vpage >> PAGE_SHIFT, tsize),
-	            natural_alignment(paddr >> PAGE_SHIFT));
+	get_gcpu()->waiting_for_gevent = 1;
 
-	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
-	offset = paddr & (bytesize - 1);
-
-	tlb1_set_entry(tlbentry, (unsigned long)vpage, paddr & ~(bytesize - 1),
-	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-
-	*len = min(bytesize - offset, *len);
-	return vpage + offset;
-}
-
-/** Copy from a true physical address to a hypervisor virtual address 
- *
- * @param[in] dest Hypervisor virtual address to copy to
- * @param[in] src Physical address to copy from
- * @param[in] len Bytes to copy
- * @return number of bytes successfully copied
- */
-size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
-{
-	size_t ret = 0;
-
-	while (len > 0) {
-		size_t chunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
-		void *vsrc;
-		
-		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-		                &chunk, TLB_MAS2_MEM);
-		if (!vsrc)
-			break;
-
-		assert (chunk <= len);
-		memcpy(dest, vsrc, chunk);
-
-		src += chunk;
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-	}
-
-	return ret;
-}
-
-/** Copy from a true physical address to a guest physical address
- *
- * @param[in] dtbl Guest physical page table of the destination
- * @param[in] dest Guest physical address to copy to
- * @param[in] src Guest physical address to copy from
- * @param[in] len Bytes to copy
- * @return number of bytes successfully copied
- */
-size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
-                          phys_addr_t src, size_t len)
-{
-	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
-	
-	/* Initializiations not needed, but GCC is stupid. */
-	void *vdest = NULL, *vsrc = NULL;
-	
-	while (len > 0) {
-		if (!schunk) {
-			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
-			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-			                &schunk, TLB_MAS2_MEM);
-			if (!vsrc)
-				break;
-		}
-
-		if (!dchunk) {
-			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
-			                  &dchunk, TLB_TSIZE_16M, 1);
-			if (!vdest)
-				break;
-		}
-
-		chunk = min(schunk, dchunk);
-		if (chunk > len)
-			chunk = len;
-
-		memcpy(vdest, vsrc, chunk);
-
-		vsrc += chunk;
-		vdest += chunk;
-		src += chunk;
-		dest += chunk;
-		ret += chunk;
-		len -= chunk;
-		dchunk -= chunk;
-		schunk -= chunk;
-	}
-
-	return ret;
+	asm volatile("mtsrr0 %0; mtsrr1 %1; mr %%r1, %2; rfi" : :
+	             "r" (wait_for_gevent_loop),
+	             "r" (mfmsr() | MSR_CE),
+	             "r" (new_r1) : "memory");
+	BUG();
 }
 
 /* This is a hack to find an upper bound of the hypervisor's memory.
@@ -1798,7 +1448,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
  * one labelled for hypervisor use, and maybe one designated for dynamic
  * memory allocation.
  */
-phys_addr_t find_lowest_guest_phys(void)
+phys_addr_t find_lowest_guest_phys(void *fdt)
 {
 	int off = -1, ret;
 	phys_addr_t low = (phys_addr_t)-1;
@@ -1818,7 +1468,7 @@ phys_addr_t find_lowest_guest_phys(void)
 		if (!gtree)
 			continue;
 
-		ret = get_addr_format_nozero(gtree, 0, &gnaddr, &gnsize);
+		ret = fdt_get_addr_format(fdt, 0, &gnaddr, &gnsize);
 		if (ret < 0)
 			continue;
 

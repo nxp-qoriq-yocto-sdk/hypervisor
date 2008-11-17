@@ -36,6 +36,6 @@ struct guest;
 int start_guest(struct guest *guest);
 int stop_guest(struct guest *guest);
 int restart_guest(struct guest *guest);
-phys_addr_t find_lowest_guest_phys(void);
+phys_addr_t find_lowest_guest_phys(void *fdt);
 
 #endif

@@ -65,37 +65,27 @@ int send_doorbells(struct ipi_doorbell *dbell)
 	return count;
 }
 
+static int create_doorbell(dt_node_t *node, void *arg)
+{
+	ipi_doorbell_t *dbell = alloc_type(ipi_doorbell_t);
+	if (!dbell)
+		return ERR_NOMEM;
+
+	int ret = dt_set_prop(node, "fsl,hv-internal-doorbell-ptr",
+	                      &dbell, sizeof(dbell));
+	if (ret < 0)
+		free(dbell);
+
+	return ret;
+}
+
 void create_doorbells(void)
 {
-	int off = -1, ret;
-	ipi_doorbell_t *dbell;
-
-	while (1) {
-		ret = fdt_node_offset_by_compatible(fdt, off,
-		                                    "fsl,hv-doorbell");
-		if (ret < 0)
-			break;
-
-		dbell = alloc_type(ipi_doorbell_t);
-		if (!dbell) {
-			printf("doorbell_global_init: failed to create doorbell.\n");
-			return;
-		}
-
-		off = ret;
-		ret = fdt_setprop(fdt, off, "fsl,hv-internal-doorbell-ptr",
-		                  &dbell, sizeof(dbell));
-		if (ret < 0) {
-			free(dbell);
-			break;
-		}
-	}
-
-	if (ret == -FDT_ERR_NOTFOUND)
-		return;
-
-	printf("create_doorbells: libfdt error %d (%s).\n",
-	       ret, fdt_strerror(ret));
+	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-doorbell",
+	                                 create_doorbell, NULL);
+	if (ret < 0)
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: error %d.\n", __func__, ret);
 }
 
 static int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
@@ -125,7 +115,8 @@ static int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
  * function also allocates a virq and creates an "interrupts" property in the
  * node with the virq values.
  */
-int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell, int offset)
+int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
+                            dt_node_t *node)
 {
 	uint32_t irq[2];
 	int ret;
@@ -134,16 +125,16 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell, int offs
 	// is rung.
 	guest_recv_dbell_list_t *recv_list = alloc_type(guest_recv_dbell_list_t);
 	if (!recv_list) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
 			"%s: failed to create receive doorbell list object\n", __func__);
-		return -ERR_NOMEM;
+		return ERR_NOMEM;
 	}
 
 	vpic_interrupt_t *virq = vpic_alloc_irq(guest);
 	if (!virq) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			 "%s: out of virqs.\n", __func__);
-		ret = -ERR_NOMEM;
+		         "%s: out of virqs.\n", __func__);
+		ret = ERR_BUSY;
 		goto error;
 	}
 
@@ -151,17 +142,16 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell, int offs
 	irq[1] = 0;
 	if (ret < 0) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			 "%s: can't alloc vmpic irqs\n", __func__);
-		ret = -ERR_NOMEM;
+		         "%s: can't alloc vmpic irqs\n", __func__);
 		goto error;
 	}
 
 	// Write the 'interrupts' property to the doorbell receive handle node
-	ret = fdt_setprop(guest->devtree, offset, "interrupts", irq, sizeof(irq));
+	ret = dt_set_prop(node, "interrupts", irq, sizeof(irq));
 	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"Couldn't set 'interrupts' property in doorbell node: %i\n", ret);
-		ret = -ERR_BADIMAGE;
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: Couldn't set 'interrupts' property: %i\n",
+		         __func__, ret);
 		goto error;
 	}
 
@@ -182,98 +172,88 @@ error:
 	return ret;
 }
 
+static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
+{
+	ipi_doorbell_t *dbell;
+	dt_prop_t *endpoint;
+	dt_node_t *epnode;
+
+	endpoint = dt_get_prop(node, "fsl,endpoint", 0);
+	if (!endpoint) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: %s has no endpoint\n", __func__, node->name);
+		return NULL;
+	}
+
+	epnode = dt_lookup_alias(hw_devtree, endpoint->data);
+	if (!epnode) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: endpoint %s of %s not found\n", __func__,
+		         node->name, (const char *)endpoint->data);
+		return NULL;
+	}
+
+	/* Get the pointer corresponding to hv-internal-doorbell-ptr */
+	dbell = ptr_from_node(epnode, "doorbell");
+	if (!dbell) {
+		printf("%s: endpoint %s of %s not a doorbell\n", __func__,
+		       node->name, (const char *)endpoint->data);
+		return NULL;
+	}
+
+	return dbell;
+}
+
+int send_dbell_init_one(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	ipi_doorbell_t *dbell;
+	int32_t ghandle;
+
+	dbell = dbell_from_handle_node(node);
+	if (!dbell)
+		return 0;
+
+	ghandle = doorbell_attach_guest(dbell, guest);
+	if (ghandle < 0)
+		return ghandle;
+
+	return dt_set_prop(node, "reg", &ghandle, 4);
+}
+
+int recv_dbell_init_one(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	ipi_doorbell_t *dbell;
+	int32_t ghandle;
+
+	dbell = dbell_from_handle_node(node);
+	if (!dbell)
+		return 0;
+
+	ghandle = attach_receive_doorbell(guest, dbell, node);
+	if (ghandle < 0)
+		return ghandle;
+
+	return dt_set_prop(node, "reg", &ghandle, 4);
+}
+
 void send_dbell_partition_init(guest_t *guest)
 {
-	int off = -1, ret;
-	const char *endpoint;
-	ipi_doorbell_t *dbell;
-
-	while (1) {
-		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,hv-doorbell-send-handle");
-		if (ret == -FDT_ERR_NOTFOUND)
-			return;
-		if (ret < 0)
-			break;
-
-		off = ret;
-
-		endpoint = fdt_getprop(guest->devtree, off,
-		                       "fsl,endpoint", &ret);
-		if (!endpoint)
-			break;
-
-		ret = lookup_alias(fdt, endpoint);
-		if (ret < 0)
-			break;
-
-		/* Get the pointer corresponding to hv-internal-doorbell-ptr */
-		dbell = ptr_from_node(fdt, ret, "doorbell");
-		if (!dbell) {
-			printf("send_doorbell_partition_init: endpoint not a doorbell\n");
-			continue;
-		}
-
-		int32_t ghandle = doorbell_attach_guest(dbell, guest);
-		if (ghandle < 0) {
-			printf("send_doorbell_partition_init: cannot attach\n");
-			return;
-		}
-
-		printf("send_dbell_partition_init: guest handle = %d\n",
-		       ghandle);
-
-		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, 4);
-		if (ret < 0)
-			break;
-	}
+	int ret = dt_for_each_compatible(guest->devtree,
+	                                 "fsl,hv-doorbell-send-handle",
+	                                 send_dbell_init_one, guest);
+	if (ret < 0)
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: error %d.\n", __func__, ret);
 }
 
 void recv_dbell_partition_init(guest_t *guest)
 {
-	int off = -1, ret;
-	const char *endpoint;
-	ipi_doorbell_t *dbell;
-
-	while (1) {
-		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,hv-doorbell-receive-handle");
-		if (ret == -FDT_ERR_NOTFOUND)
-			return;
-		if (ret < 0)
-			break;
-
-		off = ret;
-
-		endpoint = fdt_getprop(guest->devtree, off,
-		                       "fsl,endpoint", &ret);
-		if (!endpoint) {
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			         "recv_dbell_partition_init: no endpoint property\n");
-			continue;
-		}
-
-		ret = lookup_alias(fdt, endpoint);
-		if (ret < 0) {
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			         "recv_dbell_partition_init: no endpoint\n");
-			continue;
-		}
-
-		/* Get the pointer corresponding to hv-internal-doorbell-ptr */
-		dbell = ptr_from_node(fdt, ret, "doorbell");
-		if (!dbell) {
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-			         "recv_dbell_partition_init: no pointer\n");
-			continue;
-		}
-
-		ret = attach_receive_doorbell(guest, dbell, off);
-		if (ret < 0)
-			break;
-	}
-
-	printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-	         "recv_dbell_partition_init: error %d (%s).\n",
-	         ret, ret >= -FDT_ERR_MAX ? fdt_strerror(ret) : "");
+	int ret = dt_for_each_compatible(guest->devtree,
+	                                 "fsl,hv-doorbell-receive-handle",
+	                                 recv_dbell_init_one, guest);
+	if (ret < 0)
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: error %d.\n", __func__, ret);
 }

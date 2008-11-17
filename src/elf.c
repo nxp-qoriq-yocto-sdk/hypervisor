@@ -180,6 +180,8 @@ int load_elf(guest_t *guest, phys_addr_t image, unsigned long length,
 			if (ret != phdr.filesz) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "load_elf: cannot copy segment %d\n", i);
+				printf("%d %d\n", ret, phdr.filesz);
+				printf("%llx %llx\n", seg_target, image + phdr.offset);
 				return ERR_BADADDR;
 			}
 

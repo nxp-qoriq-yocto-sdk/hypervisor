@@ -35,7 +35,6 @@
  */
 
 #include <stdint.h>
-#include <libfdt.h>
 #include <libos/trapframe.h>
 #include <events.h>
 #include <byte_chan.h>
@@ -53,8 +52,6 @@
 
 static const byte_chan_t *find_stub_byte_channel(char *compatible);
 static int register_callbacks(void);
-
-extern void *fdt;
 
 #define CHECK_MEM(p) \
 	if (!p) { \
@@ -103,6 +100,29 @@ int gdb_stub_init(void)
 	return register_callbacks();
 }
 
+static int find_stub_by_vcpu(dt_node_t *node, void *arg)
+{
+	dt_node_t **ret = arg;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "fsl,hv-dbg-cpus", 0);
+	if (!prop) {
+		TRACE("Did not find fsl,hv-dbg-cpus in gdb-stub node in the device tree.");
+		return 0;
+	}
+
+	/* FIXME: Handle multiple vcpus */
+	int vcpu_num = *(const uint32_t *)prop->data;
+	TRACE("VCPU_NUM = %d\n", vcpu_num);
+	TRACE("GCPU_NUM = %d\n", get_gcpu()->gcpu_num);
+	if (vcpu_num == get_gcpu()->gcpu_num) {
+		*ret = node;
+		return 1;
+	}
+
+	return 0;
+}
+
 /** Find in the device-tree, the byte-channel that this instance of the gdb-stub
  * is connected to.
  * @return pointer to the byte-channel with the gdb-stub as it's end-point.
@@ -110,88 +130,47 @@ int gdb_stub_init(void)
 static const byte_chan_t *find_stub_byte_channel(char *compatible)
 {
 	gcpu_t *gcpu = get_gcpu();
-	int32_t off = -1, vcpu_num;
-	const uint32_t *fsl_ep = NULL;
-	int32_t prop_length = 0;
-	uint32_t node_offset = 0;
-	uint32_t bc_phandle = 0;
-	uint32_t bc_offset = 0;
-	byte_chan_t *const *bc_ptr = NULL;
-	uint8_t match = 0;
-	int32_t depth = 0;
+	uint32_t bc_phandle;
+	dt_node_t *bcnode;
+	byte_chan_t *bc;
+	dt_node_t *node = NULL;
+	dt_prop_t *prop;
 
-	off = gcpu->guest->partition;
-	while (1) {
-		off = fdt_next_descendant_by_compatible(fdt, off, &depth, compatible);
-		TRACE("off: %d\n", off);
-		if (off < 0)
-			break;
-		fsl_ep = fdt_getprop(fdt, off, "fsl,hv-dbg-cpus", &prop_length);
-		if (fsl_ep == NULL) {
-			if (prop_length == -FDT_ERR_NOTFOUND) {
-				TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
-				return NULL;
-			}
-			TRACE("Internal error: libfdt error return: %d.", prop_length);
-			return NULL;
-		}
-		/* FIXME: Handle multiple vcpu's */
-		vcpu_num = *fsl_ep;
-		TRACE("VCPU_NUM = %d\n", vcpu_num);
-		TRACE("GCPU_NUM = %d\n", gcpu->gcpu_num);
-		if (vcpu_num == gcpu->gcpu_num) {
-			match = 1;
-			break;
-		}
-	}
-	if (!match)
+	dt_for_each_compatible(gcpu->guest->partition, compatible,
+	                       find_stub_by_vcpu, &node);
+
+	if (!node)
 		return NULL;
-	node_offset = off;
+
 	/* Get value of fsl,endpoint (a phandle), which gives you the offset of
 	 * the byte-channel in the device tree.
 	 */
-	/* TODO: Use ptr_from_node() (But, this call does not work).
-	 * fsl_ep = ptr_from_node(fdt, node_offset, "fsl,endpoint");
-	 */
-	fsl_ep = fdt_getprop(fdt, node_offset, "fsl,endpoint", &prop_length);
-	if (fsl_ep == NULL) {
-		if (prop_length == -FDT_ERR_NOTFOUND) {
-			TRACE("Did not find fsl,endpoint in gdb-stub node in the device tree.");
-			return NULL;
-		}
-		TRACE("Internal error: libfdt error return: %d.", prop_length);
+	prop = dt_get_prop(node, "fsl,endpoint", 0);
+	if (!prop || prop->len != 4) {
+		TRACE("Bad/missing fsl,endpoint in gdb-stub node in the device tree.");
 		return NULL;
 	}
-	if (prop_length != 4) {
-		TRACE("Invalid fsl,endpoint.");
+
+	bc_phandle = *(const uint32_t *)prop->data;
+	bcnode = dt_lookup_phandle(hw_devtree, bc_phandle);
+	if (!bcnode) {
+		TRACE("Bad fsl,endpoint phandle in gdb-stub node in the device tree.");
 		return NULL;
 	}
-	bc_phandle = *fsl_ep;
-	bc_offset = fdt_node_offset_by_phandle(fdt, bc_phandle);
 
 	/* Get value of the internally created property: fsl,hv-internal-bc-ptr.
 	 * The value is a pointer to the byte-channel as obtained upon a
 	 * byte_chan_alloc()
 	 */
-	/* TODO: Use ptr_from_node() */
-	bc_ptr = fdt_getprop(fdt, bc_offset, "fsl,hv-internal-bc-ptr",
-		             &prop_length);
-	TRACE("bc_ptr: 0x%x, *bc_ptr: 0x%x", (uint32_t) bc_ptr, (uint32_t) *bc_ptr);
-	if (bc_ptr == NULL) {
-		if (prop_length == -FDT_ERR_NOTFOUND) {
-			TRACE("endpoint is not a byte channel");
-			return NULL;
-		}
-		TRACE("Internal error: libfdt error return: %d.", prop_length);
-		return NULL;
-	}
-	if (prop_length != 4) {
-		TRACE("gdb-stub got invalid fsl,hv-internal-bc-ptr.");
+	bc = ptr_from_node(bcnode, "bc");	
+	TRACE("bc: %p", bc);
+	if (!bc) {
+		TRACE("endpoint is not a byte channel");
 		return NULL;
 	}
 
 	/* OK, we have a good byte-channel to use. */
-	return *bc_ptr; /* PS: Note deref. */
+	return bc;
 }
 
 /**

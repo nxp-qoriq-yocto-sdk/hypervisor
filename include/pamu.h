@@ -33,16 +33,10 @@ typedef struct pamu_handle {
 	handle_t user;
 } pamu_handle_t;
 
-typedef struct ppid_handle {
-	unsigned int liodn_handle;
-	handle_t user;
-} ppid_handle_t;
-
 void pamu_global_init(void);
 void pamu_partition_init(guest_t *guest);
 
 int pamu_enable_liodn(unsigned int liodn);
 int pamu_disable_liodn(unsigned int liodn);
-unsigned int pamu_map_ppid_liodn(unsigned int handle);
 
 #endif

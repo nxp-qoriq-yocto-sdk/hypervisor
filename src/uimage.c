@@ -30,11 +30,10 @@
  * this software, even if advised of the possibility of such damage.
  */
 
+#include <libos/endian.h>
 #include <percpu.h>
 #include <errors.h>
-#include <libfdt.h>
-#include <libos/errors.h>
-#include <libos/hcalls.h>
+#include <devtree.h>
 
 #define UIMAGE_SIGNATURE 0x27051956
 
@@ -73,37 +72,29 @@ static int add_initrd_start_end_to_guest_dt(guest_t *guest,
 					    phys_addr_t initrd_start,
 					    phys_addr_t initrd_end)
 {
-	int chosen, ret;
+	dt_node_t *chosen;
+	int ret = ERR_NOMEM;
 
-	chosen = fdt_subnode_offset(guest->devtree, 0, "chosen");
-	if (chosen < 0) {
-		chosen = fdt_add_subnode(guest->devtree, 0, "chosen");
-		if (chosen < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				 "Couldn't create chosen node: %d\n", chosen);
-			return chosen;
-		}
-	}
+	chosen = dt_get_subnode(guest->devtree, "chosen", 1);
+	if (!chosen)
+		goto err;
 
-	ret = fdt_setprop(guest->devtree, chosen, "linux,initrd-start",
-			  &initrd_start, sizeof(initrd_start));
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "Failed to set linux,initrd-start property in chosen"
-			 " node: %d, error %d\n", chosen, ret);
-		return ret;
-	}
+	ret = dt_set_prop(chosen, "linux,initrd-start",
+	                  &initrd_start, sizeof(initrd_start));
+	if (ret < 0)
+		goto err;
 
-	ret = fdt_setprop(guest->devtree, chosen, "linux,initrd-end",
-			  &initrd_end, sizeof(initrd_end));
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "Failed to set linux,initrd-end property in chosen "
-			 "node: %d, error %d\n", chosen, ret);
-		return ret;
-	}
+	ret = dt_set_prop(chosen, "linux,initrd-end",
+	                  &initrd_end, sizeof(initrd_end));
+	if (ret < 0)
+		goto err;
 
 	return 0;
+
+err:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: error %d\n", __func__, ret);
+	return ret;
 }
 
 /**
@@ -124,20 +115,20 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
 	if (copy_from_phys(&hdr, image_phys, sizeof(hdr)) != sizeof(hdr))
 		return ERR_UNHANDLED;
 
-	if (be32_to_cpu(hdr.magic) != UIMAGE_SIGNATURE)
+	if (cpu_from_be32(hdr.magic) != UIMAGE_SIGNATURE)
 		return ERR_UNHANDLED;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "Loading uImage from flash\n");
 
-	size = be32_to_cpu(hdr.size);
+	size = cpu_from_be32(hdr.size);
 	if (length < size) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "load_uimage: image size exceeds target window\n");
 		return ERR_BADIMAGE;
 	}
 
-	if (be32_to_cpu(hdr.type) == IMAGE_TYPE_RAMDISK) {
+	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_RAMDISK) {
 		ret = add_initrd_start_end_to_guest_dt(guest, target,
 						       target + size);
 		if (ret < 0)
@@ -153,7 +144,7 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
 	}
 
 	if (entry)
-		*entry = target - be32_to_cpu(hdr.load) + be32_to_cpu(hdr.ep);
+		*entry = target - cpu_from_be32(hdr.load) + cpu_from_be32(hdr.ep);
 
 	return 0;
 }

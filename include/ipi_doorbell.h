@@ -41,9 +41,12 @@ typedef struct ipi_doorbell_handle {
 	handle_t user;
 } ipi_doorbell_handle_t;
 
+struct dt_node;
+
 /* Prototypes for functions in ipi_doorbell.c */
 int send_doorbells(struct ipi_doorbell *dbell);
-int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell, int offset);
+int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
+                            struct dt_node *node);
 void create_doorbells(void);
 void send_dbell_partition_init(guest_t *guest);
 void recv_dbell_partition_init(guest_t *guest);

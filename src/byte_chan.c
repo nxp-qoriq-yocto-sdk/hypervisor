@@ -130,6 +130,138 @@ err:
 	return ret;
 }
 
+int create_byte_channel(dt_node_t *node, void *arg)
+{
+	byte_chan_t *bc = byte_chan_alloc();
+	if (!bc)
+		return ERR_NOMEM;
+
+	return dt_set_prop(node, "fsl,hv-internal-bc-ptr", &bc, sizeof(bc));
+}
+
+void create_byte_channels(void)
+{
+	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-byte-channel",
+	                                 create_byte_channel, NULL);
+	if (ret < 0)
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: error %d\n", __func__, ret);
+}
+
+static int connect_byte_channel(byte_chan_t *bc, dt_node_t *endpoint,
+                                dt_node_t *bcnode, int index)
+{
+	int ret;
+	void *ptr;
+	
+	ptr = ptr_from_node(endpoint, "chardev");
+	if (ptr) {
+		ret = byte_chan_attach_chardev(bc, ptr);
+		if (ret == ERR_BUSY) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "%s: endpoint %s in %s is full\n",
+			         __func__, endpoint->name, bcnode->name);
+			return 0;
+		}
+
+		return ret;
+	}
+
+#ifdef CONFIG_BCMUX
+	ptr = ptr_from_node(endpoint, "mux");
+	if (ptr) {
+		dt_prop_t *channel = dt_get_prop(bcnode, "fsl,mux-channel", 0);
+		const uint32_t *channeldata = channel->data;
+
+		if (!channel) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "%s: no mux channel in %s\n", __func__, bcnode->name);
+			return 0;
+		}
+
+		if (channel->len % 4 || (index + 1) * 4 > channel->len) {
+			printf("%s: bad fsl,mux-channel in %s\n", __func__, bcnode->name);
+			return 0;
+		}
+	
+		ret = mux_complex_add(ptr, bc, channeldata[index]);
+		if (ret == ERR_BUSY) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "%s: %s: mux channel already attached\n",
+			         __func__, bcnode->name);
+			return 0;
+		}
+
+		if (ret == ERR_RANGE) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "%s: %s: mux channel out of range\n",
+			         __func__, bcnode->name);
+			return 0;
+		}
+
+		return ret;
+	}
+#endif
+
+	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+	         "%s: unrecognized endpoint %s in %s\n",
+	         __func__, endpoint->name, bcnode->name);
+	return 0;
+}
+
+int connect_byte_channel_node(dt_node_t *node, void *arg)
+{
+	byte_chan_t *bc = ptr_from_node(node, "bc");
+	const uint32_t *endpoint;
+	dt_node_t *epnode;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "fsl,endpoint", 0);
+	if (!prop)
+		return 0;
+
+	if (prop->len != 4 && prop->len != 8) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: %s: Invalid fsl,endpoint length.\n",
+		         __func__, node->name);
+		return 0;
+	}
+
+	endpoint = prop->data;
+
+	epnode = dt_lookup_phandle(hw_devtree, endpoint[0]);
+	if (!epnode) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: %s: endpoint not found.\n", __func__, node->name);
+		return 0;
+	}
+			
+	connect_byte_channel(bc, epnode, node, 0);
+
+	if (prop->len == 8) {
+		epnode = dt_lookup_phandle(hw_devtree, endpoint[1]);
+		if (!epnode) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			         "%s: %s: second endpoint not found.\n",
+			         __func__, node->name);
+			return 0;
+		}
+			
+		connect_byte_channel(bc, epnode, node, 1);
+	}
+
+	return 0;
+}
+
+void connect_global_byte_channels(void)
+{
+	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-byte-channel",
+	                                 connect_byte_channel_node, NULL);
+	if (ret < 0)
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: error %d\n", __func__, ret);
+}
+
 int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
                            vpic_interrupt_t *rxirq,
                            vpic_interrupt_t *txirq)
@@ -161,211 +293,83 @@ int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
 	return ghandle;
 }
 
-void create_byte_channels(void)
+static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 {
-	int off = -1, ret;
-
-	while (1) {
-		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel");
-		if (ret < 0)
-			break;
-
-		byte_chan_t *bc = byte_chan_alloc();
-		if (!bc) {	
-			printf("byte_chan_global_init: failed to create byte channel.\n");
-			return;
-		}
-
-		off = ret;
-		ret = fdt_setprop(fdt, off, "fsl,hv-internal-bc-ptr", &bc, sizeof(bc));
-		if (ret < 0)
-			break;
-	}
-
-	if (ret == -FDT_ERR_NOTFOUND)
-		return;
-
-	printf("create_byte_channels: libfdt error %d (%s).\n",
-	       ret, fdt_strerror(ret));
-}
-
-static void connect_byte_channel(byte_chan_t *bc, int endpoint,
-                                 int bcnode, int index)
-{
-	void *ptr = ptr_from_node(fdt, endpoint, "chardev");
-	if (ptr) {
-		int ret = byte_chan_attach_chardev(bc, ptr);
-		if (ret < 0)
-				printf("error %d attaching byte channel to chardev\n", ret);
-
-		return;
-	}
-
-#ifdef CONFIG_BCMUX
-	ptr = ptr_from_node(fdt, endpoint, "mux");
-	if (ptr) {
-		int len;
-		const uint32_t *channel = fdt_getprop(fdt, bcnode,
-		                                      "fsl,mux-channel", &len);
-
-		if (!channel) {
-			printf("connect_byte_channel: fsl,mux-channel: libfdt error %d (%s).\n",
-			       len, fdt_strerror(len));
-			return;
-		}
-
-		if (len % 4 || (index + 1) * 4 > len) {
-			printf("connect_byte_channel: bad fsl,mux-channel\n");
-			return;
-		}
-	
-		int ret = mux_complex_add(ptr, bc, channel[index]);
-		if (ret < 0)
-				printf("error %d attaching byte channel to mux\n", ret);
-
-		return;
-	}
-#endif
-
-	printf("connect_byte_channel: unrecognized endpoint\n");
-}
-
-void connect_global_byte_channels(void)
-{
-	int off = -1, ret, len;
-	byte_chan_t *bc;
-	const uint32_t *endpoint;
-
-	while (1) {
-		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel");
-		if (ret == -FDT_ERR_NOTFOUND)
-			return;
-		if (ret < 0)
-			break;
-
-		off = ret;
-		bc = ptr_from_node(fdt, off, "bc");
-		if (!bc) {
-			printf("connect_global_byte_channel: no pointer\n");
-			continue;
-		}
-
-		endpoint = fdt_getprop(fdt, off, "fsl,endpoint", &ret);
-		if (!endpoint) {
-			if (ret == -FDT_ERR_NOTFOUND)
-				continue;
-			break;
-		}
-
-		len = ret;
-		if (len != 4 && len != 8) {
-			printf("connect_global_byte_channel: Invalid fsl,endpoint.\n");
-			continue;
-		}
-
-		ret = fdt_node_offset_by_phandle(fdt, endpoint[0]);
-		if (ret < 0) {
-			if (ret == -FDT_ERR_NOTFOUND) {
-				printf("connect_global_byte_channel: Invalid fsl,endpoint.\n");
-				continue;
-			}
-
-			break;
-		}
-				
-		connect_byte_channel(bc, ret, off, 0);
-
-		if (len == 8) {
-			ret = fdt_node_offset_by_phandle(fdt, endpoint[1]);
-			if (ret < 0)
-				break;
-				
-			connect_byte_channel(bc, ret, off, 1);
-		}
-	}
-
-	printf("connect_global_byte_channels: libfdt error %d (%s).\n",
-	       ret, fdt_strerror(ret));
-}
-
-void byte_chan_partition_init(guest_t *guest)
-{
-	int off = -1, ret;
-	const char *endpoint;
+	guest_t *guest = arg;
+	dt_prop_t *endpoint;
+	dt_node_t *epnode;
 	byte_chan_t *bc;
 	uint32_t irq[4];
 	vpic_interrupt_t *virq[2];
 
-	while (1) {
-		ret = fdt_node_offset_by_compatible(guest->devtree, off,
-		                                    "fsl,hv-byte-channel-handle");
-		if (ret == -FDT_ERR_NOTFOUND)
-			return;
-		if (ret < 0)
-			break;
-
-		off = ret;
-
-		endpoint = fdt_getprop(guest->devtree, off, "fsl,endpoint", &ret);
-		if (!endpoint) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: no endpoint property\n");
-			continue;
-		}
-
-		ret = lookup_alias(fdt, endpoint);
-		if (ret < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: no endpoint\n");
-			continue;
-		}
-
-		bc = ptr_from_node(fdt, ret, "bc");
-		if (!bc) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: no pointer\n");
-			continue;
-		}
-
-		virq[0] = vpic_alloc_irq(guest);
-		virq[1] = vpic_alloc_irq(guest);
-
-		if (!virq[0] || !virq[1]) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: can't alloc vpic irqs\n");
-			return;
-		}
-		
-		irq[0] = vmpic_alloc_handle(guest, &virq[0]->irq);
-		irq[1] = 0;
-		irq[2] = vmpic_alloc_handle(guest, &virq[1]->irq);
-		irq[3] = 0;
-		
-		if (irq[0] < 0 || irq[2] < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: can't alloc vmpic irqs\n");
-			return;
-		} 
-
-		int32_t ghandle = byte_chan_attach_guest(bc, guest, virq[0], virq[1]);
-		if (ghandle < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "byte_chan_partition_init: cannot attach\n");
-			continue;
-		}
-
-		ret = fdt_setprop(guest->devtree, off, "reg", &ghandle, 4);
-		if (ret < 0)
-			break;
-
-		ret = fdt_setprop(guest->devtree, off, "interrupts", irq, sizeof(irq));
-		if (ret < 0)
-			break;
+	endpoint = dt_get_prop(node, "fsl,endpoint", 0);
+	if (!endpoint) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: %s has no endpoint property\n",
+		         __func__, node->name);
+		return 0;
 	}
 
-	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-	         "byte_chan_partition_init: error %d (%s).\n",
-	         ret, ret >= -FDT_ERR_MAX ? fdt_strerror(ret) : "");
+	epnode = dt_lookup_alias(hw_devtree, endpoint->data);
+	if (!epnode) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: endpoint %s in %s not found.\n", __func__,
+		         (const char *)endpoint->data, node->name);
+		return 0;
+	}
+	
+	bc = ptr_from_node(epnode, "bc");
+	if (!bc) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: endpoint %s in %s not a byte channel.\n",
+		         __func__, (const char *)endpoint->data, node->name);
+		return 0;
+	}
+
+	virq[0] = vpic_alloc_irq(guest);
+	virq[1] = vpic_alloc_irq(guest);
+
+	if (!virq[0] || !virq[1]) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: can't alloc vpic irqs\n", __func__);
+		return ERR_NOMEM;
+	}
+	
+	irq[0] = vmpic_alloc_handle(guest, &virq[0]->irq);
+	irq[1] = 0;
+	irq[2] = vmpic_alloc_handle(guest, &virq[1]->irq);
+	irq[3] = 0;
+	
+	if (irq[0] < 0 || irq[2] < 0) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: can't alloc vmpic irqs\n", __func__);
+		return ERR_NOMEM;
+	}
+
+	int32_t ghandle = byte_chan_attach_guest(bc, guest, virq[0], virq[1]);
+	if (ghandle == ERR_BUSY) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: endpoint %s in %s is full\n",
+		         __func__, epnode->name, node->name);
+		return 0;
+	}
+	if (ghandle < 0)
+		return ghandle;
+
+	int ret = dt_set_prop(node, "reg", &ghandle, 4);
+	if (ret < 0)
+		return ret;
+
+	return dt_set_prop(node, "interrupts", irq, sizeof(irq));
+}
+
+void byte_chan_partition_init(guest_t *guest)
+{
+	int ret = dt_for_each_compatible(guest->devtree, "fsl,hv-byte-channel-handle",
+	                                 byte_chan_partition_init_one, guest);
+	if (ret < 0)
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: error %d\n", __func__, ret);
 }
 
 /** Send data through a byte channel

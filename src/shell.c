@@ -416,157 +416,11 @@ static command_t pi = {
 };
 shell_cmd(pi);
 
-/* checks if the property is a printable string or multiple strings
- * return values : 0 indicates not a string, 1 indicates a string
- */
-static int string_check(const void *prop, int len)
-{
-	const char *str = prop;
-
-	if (str[len-1] != '\0')
-		return 0;
-
-	while (len) {
-		switch (*str) {
-			case 32 ... 126: /*printable character*/
-				str++;
-				len--;
-				break;
-			case 0:
-				if (len != 1) {
-					if (str[1] == '\0')
-						return 0;
-				}
-				str++;
-				len--;
-				break;
-			default:
-				return 0;
-		}
-	}
-
-	return 1;
-}
-
-static inline void print_tab(int depth, shell_t *shell)
-{
-	while (depth--)
-		queue_writechar(shell->out, '\t');
-}
-
-static void wrap_output(int depth, shell_t *shell)
-{
-	queue_writechar(shell->out, '\r');
-	queue_writechar(shell->out, '\n');
-	print_tab(depth + 1, shell);
-}
-
-static void print_prop_data(const void *prop, int len, shell_t *shell, int depth)
-{
-	int i;
-
-	if (string_check(prop, len)) {
-		queue_writechar(shell->out, '"');
-		for(i = 0; i < len; i += strlen(&((char *)prop)[i]) + 1) {
-			if (i != 0)
-				qprintf(shell->out, "\", \"");
-			qprintf(shell->out, "%s", &((char *)prop)[i]);
-		}
-		queue_writechar(shell->out, '"');
-		return;
-	}
-
-	if (!(len & (CELL_SIZE - 1))) {
-		len >>= 2;
-		queue_writechar(shell->out, '<');
-		for (i = 0; i < len; i++) {
-			qprintf(shell->out, "0x%x%s", ((uint32_t *)prop)[i], i == (len - 1) ? "" : " ");
-				if (!((i + 1) % 4) && (i != len - 1)) {
-					 wrap_output(depth, shell);
-				}
-		}
-		queue_writechar(shell->out, '>');
-		return;
-	}
-
-	qprintf(shell->out, "<binary data>");
-}
-
-static int print_device_tree(void *fdt, shell_t *shell)
-{
-	int depth = 0, offset = 0, nextoffset, paroffset = 0, len;
-	const void *prop;
-	uint32_t tag;
-	const char *name;
-	const struct fdt_property *node_prop;
-
-	while (1) {
-		tag = fdt_next_tag(fdt, offset, &nextoffset);
-		switch (tag) {
-		case FDT_BEGIN_NODE:
-			name = fdt_get_name(fdt, offset, NULL);
-			if (name) {
-				print_tab(depth, shell);
-				qprintf(shell->out, "%s {\n", name);
-			}
-			paroffset = offset;
-			depth++;
-			break;
-
-		case FDT_END_NODE:
-			depth--;
-			print_tab(depth, shell);
-			qprintf(shell->out, "};\n");
-			break;
-
-		case FDT_PROP:
-			node_prop = fdt_offset_ptr(fdt, offset, sizeof(*node_prop));
-			if (!node_prop) {
-				qprintf(shell->out, "Corrupted device tree \n");
-				return 1;
-			}
-
-			name = fdt_string(fdt, node_prop->nameoff);
-			prop = fdt_getprop(fdt, paroffset, name, &len);
-			if (len < 0) {
-				qprintf(shell->out, "error reading property %s, errno =%d\n", name, len);
-				return 1;
-			}
-
-			if (len == 0) {
-				print_tab(depth, shell);
-				qprintf(shell->out, "%s;\n", name);
-			} else {
-				print_tab(depth, shell);
-				qprintf(shell->out, "%s = ", name);
-				if (!strcmp(name, "fsl,hv-dtb")) {
-					qprintf(shell->out, "<binary data>\n");
-				} else {
-					print_prop_data(prop, len, shell, depth);
-					qprintf(shell->out, ";\n");
-				}
-			}
-			break;
-
-		case FDT_END:
-			return 0;
-
-		default:
-			qprintf(shell->out, "Unknown device tree tag %x\n", tag);
-			return 1;
-		}
-		offset = nextoffset;
-	}
-
-	return 0;
-}
-
 static void gdt_fn(shell_t *shell, char *args)
 {
 	char *numstr, *cmdstr;
 	unsigned int num;
 	guest_t *guest;
-	int ret;
 
 	args = stripspace(args);
 	cmdstr = nextword(&args);
@@ -584,11 +438,8 @@ static void gdt_fn(shell_t *shell, char *args)
 	guest = &guests[num];
 	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
 
-	if(!strcmp(cmdstr, "print")) {
-		ret = print_device_tree(guest->devtree, shell);
-		if (ret)
-			qprintf(shell->out, "Failed to print device tree\n");
-	}
+	if(!strcmp(cmdstr, "print"))
+		dt_print_tree(guest->devtree, shell->out);
 }
 
 static command_t gdt = {
@@ -603,11 +454,7 @@ shell_cmd(gdt);
 
 static void mdt_fn(shell_t *shell, char *args)
 {
-	int ret;
-
-	ret = print_device_tree(fdt, shell);
-	if (ret)
-		qprintf(shell->out, "Failed to print device tree\n");
+	dt_print_tree(hw_devtree, shell->out);
 }
 
 static command_t mdt = {

@@ -63,13 +63,13 @@ void init_guest(void);
 
 #define UART_OFFSET		0x11c500
 
-void *fdt;
+dt_node_t *hw_devtree;
 static phys_addr_t mem_end;
 void *temp_mapping[2];
 extern char _end;
 uint64_t bigmap_phys;
 
-static void exclude_memrsv(void)
+static void exclude_memrsv(void *fdt)
 {
 	int i, num = fdt_num_mem_rsv(fdt);
 	if (num < 0) {
@@ -117,30 +117,56 @@ static void exclude_memrsv(void)
 static void pic_init(void)
 {
 	int coreint = 0;
-	int chosen;
-	
-	chosen = fdt_subnode_offset(fdt, 0, "chosen");
-	if (chosen >= 0) {
-		int len;
-		const uint32_t *prop = fdt_getprop(fdt, chosen,
-		                                   "fsl,hv-pic-coreint", &len);
-		if (prop)
-			coreint = 1;
-	}
+	dt_node_t *chosen;
+
+	chosen = dt_get_subnode(hw_devtree, "chosen", 0);
+	if (chosen && dt_get_prop(chosen, "fsl,hv-pic-coreint", 0))
+		coreint = 1;
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
 		"coreint mode is %d\n", coreint);
-	mpic_init((unsigned long)fdt, coreint);
+	mpic_init(coreint);
 }
 
 uint32_t rootnaddr, rootnsize;
 
+void *map_fdt(phys_addr_t devtree_ptr)
+{
+	const size_t mapsize = 4 * 1024 * 1024;
+	size_t len = mapsize;
+	void *vaddr;
+
+	/* Map guarded, as we don't know where the end of memory is yet. */
+	vaddr = map_phys(TEMPTLB1, devtree_ptr & ~(mapsize - 1), temp_mapping[0],
+	                 &len, TLB_MAS2_MEM | MAS2_G);
+
+	vaddr += devtree_ptr & (mapsize - 1);
+
+	/* If the fdt was near the end of a 4MiB page, then we need
+	 * another mapping.
+	 */
+	if (len < sizeof(struct fdt_header) ||
+	    len < fdt_totalsize(vaddr)) {
+		devtree_ptr += len;
+		len = mapsize;
+		
+		map_phys(TEMPTLB2, devtree_ptr, temp_mapping[0] + mapsize,
+		         &len, TLB_MAS2_MEM | MAS2_G);
+
+		printf("len %zd\n", len);
+
+		/* We don't handle flat trees larger than 4MiB. */
+		assert (len >= sizeof(struct fdt_header));
+		assert (len >= fdt_totalsize(vaddr));
+	}
+
+	return vaddr;
+}
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t lowest_guest_addr;
-	int fdt_size;
-	void *new_fdt;
-	int ret;
+	void *fdt;
 
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
@@ -149,17 +175,18 @@ void start(unsigned long devtree_ptr)
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
-	fdt = (void *)(devtree_ptr + PHYSBASE);
-	get_addr_format_nozero(fdt, 0, &rootnaddr, &rootnsize);
+	fdt = map_fdt(devtree_ptr);
 
-	mem_end = find_memory();
-	lowest_guest_addr = find_lowest_guest_phys();
+	mem_end = find_memory(fdt);
+	lowest_guest_addr = find_lowest_guest_phys(fdt);
 	if (mem_end > lowest_guest_addr - 1)
 		mem_end = lowest_guest_addr - 1;
 
-	exclude_memrsv();
+	exclude_memrsv(fdt);
 	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
-	malloc_exclude_segment(fdt, fdt + fdt_totalsize(fdt) - 1);
+	malloc_exclude_segment((void *)PHYSBASE + devtree_ptr,
+	                       (void *)PHYSBASE + devtree_ptr +
+	                       fdt_totalsize(fdt) - 1);
 	
 	/* Only access memory in the boot mapping for now */
 	malloc_exclude_segment((void *)(PHYSBASE + 256 * 1024 * 1024),
@@ -176,17 +203,21 @@ void start(unsigned long devtree_ptr)
 	
 	cpu->console_ok = 1;
 	core_init();
-	
-	fdt_size = fdt_totalsize(fdt) + 4096;
-	new_fdt = malloc(fdt_size);
-	
-	if (new_fdt && (ret = fdt_open_into(fdt, new_fdt, fdt_size)) == 0) {
-		fdt = new_fdt;
-	} else {
-		printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
-		         "Couldn't allocate %d bytes for fdt_open_into().\n",
-		         fdt_size);
+
+	hw_devtree = unflatten_dev_tree(fdt);
+	if (!hw_devtree) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+		         "panic: couldn't unflatten hardware device tree.\n");
+		return;
 	}
+
+	/* We need to unmap the FDT, since we use temp_mapping[0] in
+	 * TEMPTLB2, which could otherwise cause a duplicate TLB entry.
+	 */
+	tlb1_set_entry(TEMPTLB1, 0, 0, 0, 0, 0, 0, 0, 0);
+	tlb1_set_entry(TEMPTLB2, 0, 0, 0, 0, 0, 0, 0, 0);
+
+	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	pic_init();
 	enable_critint();
@@ -231,117 +262,89 @@ void secondary_init(void)
 	partition_init();
 }
 
+static int release_secondary(dt_node_t *node, void *arg)
+{
+	dt_prop_t *prop;
+	const char *str;
+	uint32_t reg;
+	phys_addr_t table;
+
+	str = dt_get_prop_string(node, "status");
+	if (!str || strcmp(str, "disabled") != 0)
+		return 0;
+
+	str = dt_get_prop_string(node, "enable-method");
+	if (!str) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "release_secondary: Missing enable-method on disabled cpu node\n");
+		return 0;
+	}
+
+	if (strcmp(str, "spin-table") != 0) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "release_secondary: Unknown enable-method \"%s\"; not enabling\n",
+		         str);
+		return 0;
+	} 
+
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop || prop->len != 4) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "release_secondary: Missing/bad reg property in cpu node\n");
+		return 0;
+	}
+	reg = *(const uint32_t *)prop->data;
+
+	prop = dt_get_prop(node, "cpu-release-addr", 0);
+	if (!prop || prop->len != 8) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "release_secondary: Missing/bad cpu-release-addr\n");
+		return 0;
+	}
+	table = *(const uint64_t *)prop->data;
+
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+	         "starting cpu %u, table %llx\n", reg, (unsigned long long)table);
+
+	size_t len = sizeof(struct boot_spin_table);
+	void *table_va = map_phys(TEMPTLB1, table, temp_mapping[0],
+	                          &len, TLB_MAS2_MEM);
+
+	if (len != sizeof(struct boot_spin_table)) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "release_secondary: spin-table %llx spans page boundary\n",
+		         (unsigned long long)table);
+		return 0;
+	}	
+
+	cpu_t *cpu = alloc_type(cpu_t);
+	if (!cpu)
+		goto nomem;
+
+	cpu->kstack = memalign(16, KSTACK_SIZE);
+	if (!cpu->kstack)
+		goto nomem;
+	cpu->kstack += KSTACK_SIZE - FRAMELEN;
+
+	cpu->client.gcpu = alloc_type(gcpu_t);
+	if (!cpu->client.gcpu)
+		goto nomem;
+	cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
+
+	if (start_secondary_spin_table(table_va, reg, cpu))
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR, "couldn't spin up CPU%u\n", reg);
+
+	return 0;
+
+nomem:
+	printlog(LOGTYPE_MP, LOGLEVEL_ERROR, "release_secondary: out of memory\n");
+	return ERR_NOMEM;
+}
+
 static void release_secondary_cores(void)
 {
-	int node = 0;
-
-	while (1) {
-		int len;
-		const char *status;
-
-		node = fdt_node_offset_by_prop_value(fdt, node, "device_type",
-		                                     "cpu", 4);
-		if (node == -FDT_ERR_NOTFOUND)
-			return;
-		if (node < 0) {
-			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-			         "error %d (%s) reading CPU nodes, "
-			         "secondary cores may not be released.\n",
-			         node, fdt_strerror(node));
-
-			return;
-		}
-		
-		status = fdt_getprop(fdt, node, "status", &len);
-		if (!status) {
-			if (len == -FDT_ERR_NOTFOUND)
-				continue;
-
-			node = len;
-			goto fail_one;
-		}
-
-		if (len != strlen("disabled") + 1 || strcmp(status, "disabled"))
-			continue;
-
-		const char *enable = fdt_getprop(fdt, node, "enable-method", &len);
-		if (!status) {
-			printf("Missing enable-method on disabled cpu node\n");
-			node = len;
-			goto fail_one;
-		}
-
-		if (len != strlen("spin-table") + 1 || strcmp(enable, "spin-table")) {
-			printf("Unknown enable-method \"%s\"; not enabling\n", enable);
-			continue;
-		}
-
-		const uint32_t *reg = fdt_getprop(fdt, node, "reg", &len);
-		if (!reg) {
-			printf("Missing reg property in cpu node\n");
-			node = len;
-			goto fail_one;
-		}
-
-		if (len != 4) {
-			printf("Bad length %d for cpu reg property; core not released\n",
-			       len);
-			return;
-		}
-
-		const uint64_t *table = fdt_getprop(fdt, node, "cpu-release-addr", &len);
-		if (!table) {
-			printf("Missing cpu-release-addr property in cpu node\n");
-			node = len;
-			goto fail_one;
-		}
-
-		printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-		         "starting cpu %u, table %llx\n", *reg, *table);
-
-		tlb1_set_entry(TEMPTLB1, (unsigned long)temp_mapping[0],
-		               (*table) & ~(PAGE_SIZE - 1),
-		               TLB_TSIZE_4K, TLB_MAS2_IO,
-		               TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
-
-		char *table_va = temp_mapping[0];
-		table_va += *table & (PAGE_SIZE - 1);
-
-		cpu_t *cpu = alloc_type(cpu_t);
-		if (!cpu)
-			goto nomem;
-
-		cpu->kstack = alloc(KSTACK_SIZE, 16);
-		if (!cpu->kstack)
-			goto nomem;
-
-		cpu->kstack += KSTACK_SIZE - FRAMELEN;
-
-		cpu->client.gcpu = alloc_type(gcpu_t);
-		if (!cpu->client.gcpu)
-			goto nomem;
-
-		cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
-
-		if (start_secondary_spin_table((void *)table_va, *reg, cpu))
-			printf("couldn't spin up CPU%u\n", *reg);
-
-next_core:
-		;
-	}
- 
-nomem:
-	printf("out of memory reading CPU nodes, "
-	       "secondary cores may not be released.\n");
-
-	return;
-
-fail_one:
-	printf("error %d (%s) reading CPU node, "
-	       "this core may not be released.\n",
-	       node, fdt_strerror(node));
-
-	goto next_core;
+	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
+	                       release_secondary, NULL);
 }
 
 static void partition_init(void)

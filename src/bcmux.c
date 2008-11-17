@@ -296,11 +296,8 @@ static mux_complex_t *mux_complex_init(byte_chan_t *bc)
 int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
                     char multiplexing_id)
 {
-	if ((unsigned char)multiplexing_id >= MAX_MUX_CHANNELS) {
-		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-		         "Byte channel multiplexer: all channels allocated\n");
+	if ((unsigned char)multiplexing_id >= MAX_MUX_CHANNELS)
 		return ERR_RANGE;
-	}
 
 	byte_chan_handle_t *handle = byte_chan_claim(bc);
 	if (!handle)
@@ -342,67 +339,61 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	return 0;
 }
 
-void create_muxes(void)
+int create_mux(dt_node_t *node, void *arg)
 {
-	int off = -1, ret;
+	dt_prop_t *prop;
+	dt_node_t *endpoint;
 
-	while (1) {
-		ret = fdt_node_offset_by_compatible(fdt, off, "fsl,hv-byte-channel-mux");
-		if (ret < 0)
-			break;
-
-		off = ret;
-
-		const uint32_t *physdev = fdt_getprop(fdt, off, "fsl,phys-dev", &ret);
-		if (!physdev) {
-			if (ret != -FDT_ERR_NOTFOUND)
-				break;
-			
-			printf("create_muxes: no fsl,phys-dev in mux node.\n");
-			continue;
-		}
-
-		ret = fdt_node_offset_by_phandle(fdt, *physdev);
-		if (ret < 0)
-			break;
-
-		byte_chan_t *bc = ptr_from_node(fdt, ret, "bc");
-		if (!bc) {
-			chardev_t *cd = ptr_from_node(fdt, ret, "chardev");
-			if (!cd) {
-				printf("create_muxes: unrecognized fsl,phys-dev\n");
-				continue;
-			}
-
-			bc = byte_chan_alloc();
-			if (!bc) {	
-				printf("create_muxes: failed to create byte channel.\n");
-				return;
-			}
-
-			ret = byte_chan_attach_chardev(bc, cd);
-			if (ret < 0) {
-				printf("create_muxes: error %d attaching to chardev\n", ret);
-				continue;
-			}
-		}
-
-		mux_complex_t *mux = mux_complex_init(bc);
-		if (!mux) {	
-			printf("create_mux: error creating mux\n");
-			continue;
-		}
-		
-		ret = fdt_setprop(fdt, off, "fsl,hv-internal-mux-ptr", &mux, sizeof(mux));
-		if (ret < 0)
-			break;
+	prop = dt_get_prop(node, "fsl,phys-dev", 0);
+	if (!prop || prop->len != 4) {
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+		         "%s: missing or bad fsl,phys-dev in %s.\n",
+		         __func__, node->name);
+		return 0;
 	}
 
-	if (ret == -FDT_ERR_NOTFOUND)
-		return;
+	endpoint = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
+	if (!endpoint) {
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+		         "%s: Cannot find phys-dev in %s.\n",
+		         __func__, node->name);
+		return 0;
+	}
 
-	printf("create_byte_channels: libfdt error %d (%s).\n",
-	       ret, fdt_strerror(ret));
+	byte_chan_t *bc = ptr_from_node(endpoint, "bc");
+	if (!bc) {
+		chardev_t *cd = ptr_from_node(endpoint, "chardev");
+		if (!cd) {
+			printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			         "%s: Unrecognized phys-dev in %s.\n",
+			         __func__, node->name);
+			return 0;
+		}
+ 
+		bc = byte_chan_alloc();
+		if (!bc)
+			return ERR_NOMEM;	
+
+		int ret = byte_chan_attach_chardev(bc, cd);
+		if (ret < 0) {
+			printf("%s: error %d attaching to chardev\n", __func__, ret);
+			return 0;
+		}
+	}
+
+	mux_complex_t *mux = mux_complex_init(bc);
+	if (!mux) 
+		return ERR_NOMEM;
+	
+	return dt_set_prop(node, "fsl,hv-internal-mux-ptr", &mux, sizeof(mux));}
+
+void create_muxes(void)
+{
+	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-byte-channel-mux",
+	                                 create_mux, NULL);
+	if (ret < 0)
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		         "%s: error %d\n", __func__, ret);
 }
 
 #if defined(TEST) && defined(CONFIG_LIBOS_NS16550)
