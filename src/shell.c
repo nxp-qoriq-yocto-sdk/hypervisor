@@ -467,10 +467,38 @@ static command_t mdt = {
 shell_cmd(mdt);
 
 #ifdef CONFIG_PAMU
+#define BUFF_SIZE 64
+#define BIT_SHIFT_1P 50
+#define BIT_SHIFT_1T 40
+#define BIT_SHIFT_1G 30
+#define BIT_SHIFT_1M 20
+#define BIT_SHIFT_1K 10
+
+static void decode_wse(unsigned int wse, char *str)
+{
+	unsigned int i = 0;
+
+	i = wse - 10;
+
+	if (i >= BIT_SHIFT_1P)
+		sprintf(str, "%d EB", 1<<(i-BIT_SHIFT_1P+1));
+	else if (i >= BIT_SHIFT_1T)
+		sprintf(str, "%d PB", 1<<(i-BIT_SHIFT_1T+1));
+	else if (i >= BIT_SHIFT_1G)
+		sprintf(str, "%d TB", 1<<(i-BIT_SHIFT_1G+1));
+	else if (i >= BIT_SHIFT_1M)
+		sprintf(str, "%d GB", 1<<(i-BIT_SHIFT_1M+1));
+	else if (i >= BIT_SHIFT_1K)
+		sprintf(str, "%d MB", 1<<(i-BIT_SHIFT_1K+1));
+	else
+		sprintf(str, "%d KB", 1<<(i+1));
+}
+
 static void paact_dump_fn(shell_t *shell, char *args)
 {
 	int liodn;
 	ppaace_t *entry;
+	char str[BUFF_SIZE];
 
 	/*
 	 * Currently all PAMUs in the platform share the same PAACT(s), hence,
@@ -480,8 +508,14 @@ static void paact_dump_fn(shell_t *shell, char *args)
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
 		entry = get_ppaace(liodn);
 		if (entry && entry->v) {
-			qprintf(shell->out, "liodn#: %d wba: 0x%x wse: 0x%x twba: 0x%x\n",
-				liodn, entry->wbal, entry->wse, entry->twbal);
+			memset(str, 0, BUFF_SIZE);
+			decode_wse(entry->wse, str);
+			qprintf(shell->out, "liodn#: %d(0x%x)"
+				"\n\tWindow Base Address: 0x%x"
+				"\n\tTranslated Window Base Address: 0x%x"
+				"\n\tsize: %s\n\n",
+				liodn, liodn, (entry->wbal << PAGE_SHIFT),
+				(entry->twbal << PAGE_SHIFT), str);
 		}
 	}
 }

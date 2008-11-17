@@ -781,6 +781,100 @@ static int emu_rfdi(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+#ifdef CONFIG_DEVICE_VIRT
+
+/**
+ * emu_load_store - emulate any of the load or store instructions
+ * @vaddr - effective address from the DEAR register
+ *
+ * Emulate any of the load and store instructions.  Unlike the other emu_xxx
+ * functions, this one is not called from hvpriv().  It's called from
+ * whatever function is emulating a particular device.
+ *
+ * Note that the phrase "emulate a device" is not exactly accurate.  We're
+ * not really emulating a device, we're just ensuring that access to the
+ * device's registers is allowed for that guest.
+ *
+ * We currently only support 8-bit accesses.  This should be okay, since all
+ * the registers are 8-bit, so it's highly unlikely any guest OS will use
+ * any other instruction type. In the future, we'll add more support.
+ *
+ * Returns 0 on success, non-zero if this instruction is not yet supported.
+ */
+int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
+{
+	unsigned int major, minor, rSD, rA;
+
+	// Extract the major and minor opcodes from the instruction, and the
+	// target register number.
+	major = (insn >> 26) & 0x3f;
+	minor = (insn >> 1) & 0x3ff;
+	rSD = (insn >> 21) & 0x1f;	// Source or destination register
+	rA = (insn >> 26) & 0x1f;	// Base register
+
+	// Now decode the instruction and emulate it.
+
+	switch (major) {
+	case 0x1f:
+		switch (minor) {
+		case 0x077:	// lbzux
+			if (unlikely(rA == 0))
+				// We expect the core to trap on an invalid
+				// instruction before it would trap on a VF,
+				// but just in case it doesn't.
+				return 1;
+			regs->gpregs[rA] = (register_t) vaddr;
+			// fall-through ...
+		case 0x057:	// lbzx
+			regs->gpregs[rSD] = in8(vaddr);
+			break;
+
+		case 0x0f7:	// stbux
+			if (unlikely(rA == 0))
+				return 1;
+			regs->gpregs[rA] = (register_t) vaddr;
+			// fall-through ...
+		case 0x0d7:	// stbx
+			out8(vaddr, regs->gpregs[rSD]);
+			break;
+
+		default:
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				 "%s: unimplemented instruction %08x (major=0x%x minor=0x%x rSD=0x%x)\n",
+				 __func__, insn, major, minor, rSD);
+			return 1;
+		}
+		break;
+	case 0x23:	// lbzu
+		if (unlikely(rA == 0))
+			return 1;
+		regs->gpregs[rA] = (register_t) vaddr;
+		// fall-through ...
+	case 0x22:	// lbz
+		regs->gpregs[rSD] = in8(vaddr);
+		break;
+
+	case 0x27:	// stbu
+		if (unlikely(rA == 0))
+			return 1;
+		regs->gpregs[rA] = (register_t) vaddr;
+		// fall-through ...
+	case 0x26:	// stb
+		out8(vaddr, regs->gpregs[rSD]);
+		break;
+
+	default:
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			 "%s: unimplemented instruction %08x (major=0x%x minor=0x%x rSD=0x%x)\n",
+			 __func__, insn, major, minor, rSD);
+		return 1;
+	}
+
+	return 0;
+}
+
+#endif
+
 void hvpriv(trapframe_t *regs)
 {
 	uint32_t insn, major, minor;

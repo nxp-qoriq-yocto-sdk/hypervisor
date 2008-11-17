@@ -93,3 +93,24 @@ config TLB_CACHE
 		256KiB per core, and the possibility of some small added
 		latency when accessing pages that the guest believes are
 		pinned to TLB1.
+
+config DEVICE_VIRT
+	# Core support for device virtualization.  Enable this if you
+	# want to be able to virtual devices that share a page or
+	# interrupt, like I2C.
+	bool
+
+config VIRTUAL_I2C
+	bool "I2C virtualization"
+	select DEVICE_VIRT
+	help
+		Enable this option if you want access to I2C devices
+		to be protected across partitions.  The I2C block
+		has two I2C controllers on it.  The two controllers share
+		the same page of memory and the same interrupt number.
+		This feature enables protection of the memory space and
+		virtualization of the interrupts, so that one I2C
+		controller can be assigned to one partition, and the other
+		I2C controller can be assigned to another partition, and
+		neither partition will be able to access the I2C registers
+		of the other.

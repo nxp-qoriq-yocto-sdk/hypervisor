@@ -27,6 +27,8 @@
 
 #include <paging.h>
 #include <libos/fsl-booke-tlb.h>
+#include <percpu.h>
+#include <errors.h>
 
 /* epn is already shifted by levels that the caller deals with. */
 static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
@@ -176,3 +178,41 @@ next:
 		}
 	}
 }
+
+#ifdef CONFIG_DEVICE_VIRT
+
+/**
+ * register_vf_handler - register a virtualization fault handler
+ * @start - starting guest physical address of range
+ * @end - ending guest physical address of range
+ * @callback - function to call if an access to the range by the guest occurs
+ *
+ * This function registers a callback handler for device virtualization.
+ * When a virtualization fault occurs, the trap handler compares the guest
+ * and the guest physical address of the attempted access.  If it all
+ * matches, the callback function is called.
+ */
+int register_vf_handler(guest_t *guest, phys_addr_t start, phys_addr_t end,
+			vf_callback_t callback)
+{
+	vf_range_t *vf;
+
+	vf = malloc(sizeof(vf_range_t));
+	if (!vf)
+		return ERR_NOMEM;
+
+	assert(start);
+	assert(end);
+	assert(start < end);
+	assert(callback);
+
+	vf->start = start;
+	vf->end = end;
+	vf->callback = callback;
+
+	list_add(&guest->vf_list, &vf->list);
+
+	return 0;
+}
+
+#endif

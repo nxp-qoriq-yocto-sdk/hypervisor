@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
+#include <libos/list.h>
 #include <hv.h>
 #include <vpic.h>
 #include <tlbcache.h>
@@ -150,6 +151,11 @@ typedef struct guest {
 	 *  this partition.  The receivers are the managers of this partition.
 	 */
 	struct ipi_doorbell *dbell_restart_request;
+
+#ifdef CONFIG_DEVICE_VIRT
+	/** List of virtualized devices (vf_list_t objects). */
+	list_t vf_list;
+#endif
 } guest_t;
 
 #define MAX_PARTITIONS 8

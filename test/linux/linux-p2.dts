@@ -76,6 +76,17 @@
 		device_type = "soc";
 		ranges = <0 0 0xfe000000 0x400000>;
 
+		i2c@118100 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cell-index = <1>;
+			compatible = "fsl-i2c";
+			reg = <0x118100 0x100>;
+			interrupts = <38 2>;
+			interrupt-parent = <&mpic>;
+			dfsrr;
+		};
+
 		serial@11d600 {		// UART3
 			device_type = "serial";
 			compatible = "fsl,p4080-uart",
