@@ -168,7 +168,7 @@ static int calc_new_imaplen(dt_node_t *tree, const uint32_t *imap, int imaplen, 
 			return -1;
 		}
 
-		ret = dt_get_int_format(node, &new_addr_cell, &new_intr_cell);
+		ret = dt_get_int_format(node, &new_intr_cell, &new_addr_cell);
 		if (ret < 0)
 			return ret;
 
@@ -215,7 +215,7 @@ static uint32_t *create_new_imap(dt_node_t *tree, const uint32_t *imap, int imap
 		if (!node)
 			goto err;
 
-		ret = dt_get_int_format(node, &new_addr_cell, &new_intr_cell);
+		ret = dt_get_int_format(node, &new_intr_cell, &new_addr_cell);
 		if (ret < 0)
 			goto err;
 
@@ -319,7 +319,7 @@ static void patch_interrupt_map(guest_t *guest, dt_node_t *node,
 		return;
 	}
 
-	map_ptr = create_new_imap(guest->devtree, imap->data, imap->len,
+	map_ptr = create_new_imap(guest->devtree, imap->data, imap->len / CELL_SIZE,
 	                          cell_len, newmaplen, vmpic_phandle, guest);
 	if (map_ptr == NULL) {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
