@@ -299,8 +299,8 @@ static void patch_interrupt_map(guest_t *guest, dt_node_t *node,
 		return;
 	}
 
-	if ((*(const uint32_t *)addr != VMPIC_ADDR_CELLS) ||
-	    (*(const uint32_t *)intr != VMPIC_INTR_CELLS)) {
+	if ((*(const uint32_t *)addr->data != VMPIC_ADDR_CELLS) ||
+	    (*(const uint32_t *)intr->data != VMPIC_INTR_CELLS)) {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 		         "patch_interrupt_map: illegal value for vmpic address "
 		         "cells or interrupt cells\n");
