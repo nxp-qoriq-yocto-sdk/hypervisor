@@ -217,7 +217,7 @@
 			fsl,hv-cpus = <0 2>;
 			fsl,hv-dtb = /incbin/("demo-p1.dtb");
 			fsl,hv-physaddr-map = <0 0 0 0x01000000 0 0x18000000>;
-			fsl,hv-load-image-table = <0 0xe8000000 0 0 0 0
+			fsl,hv-load-image-table = <0 0xe8100000 0 0 0 0
 			                           0 0xe9000000 0 0x01300000 0 0x00400000>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 		};
