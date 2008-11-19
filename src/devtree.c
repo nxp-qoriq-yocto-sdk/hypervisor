@@ -492,7 +492,11 @@ static int open_stdout_bytechan(dt_node_t *node)
 
 void open_stdout(void)
 {
+	// Temporarily fall back on serial0 if no stdout; eventually, get
+	// stdout from config tree.
 	dt_node_t *node = dt_lookup_alias(hw_devtree, "stdout");
+	if (!node)
+		node = dt_lookup_alias(hw_devtree, "serial0");
 	if (!node)
 		return;
 
@@ -825,6 +829,28 @@ static int get_cpu_node_callback(dt_node_t *node, void *arg)
 	}
 	
 	return 0;
+}
+
+/** Search for a descendant of the supplied offset by compatible
+ *
+ * @param[in] fdt flat device tree to search
+ * @param[in] offset node whose children to search
+ * @param[in,out] depth should be a pointer to zero initially
+ * @param[in] compatible compatible string to search for
+ * @return offset to next compatible node
+ */
+int fdt_next_descendant_by_compatible(const void *fdt, int offset,
+                                      int *depth, const char *compatible)
+{
+	while (1) {
+		offset = fdt_next_node(fdt, offset, depth);
+		if (offset < 0)
+			return offset;
+		if (*depth < 1)
+			return -FDT_ERR_NOTFOUND;
+		if (fdt_node_check_compatible(fdt, offset, compatible) == 0)
+			return offset;
+	}
 }
 
 dt_node_t *get_cpu_node(dt_node_t *tree, int cpunum)

@@ -31,6 +31,8 @@
 #define FH_API_VERSION 1
 #define FH_API_COMPAT_VERSION 1
 
+#define MAX_CORES 8
+
 struct guest;
 
 int start_guest(struct guest *guest);
@@ -44,5 +46,8 @@ uint64_t get_number64(queue_t *out, const char *numstr);
 int64_t get_snumber64(queue_t *out, const char *numstr);
 uint32_t get_number32(queue_t *out, const char *numstr);
 int32_t get_snumber32(queue_t *out, const char *numstr);
+
+void branch_to_reloc(void *bigmap_text_base,
+                     register_t mas3, register_t mas7);
 
 #endif

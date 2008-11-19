@@ -24,6 +24,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <libos/fsl-booke-tlb.h>
+
 /** Wait until a guest-event critical interrupt is delivered.
  *
  * Don't call this directly; only return to it with waiting_for_gevent
@@ -33,3 +35,31 @@
 wait_for_gevent_loop:
 	wait
 	b	wait_for_gevent_loop
+
+/** Branch to relocated hypervisor code
+ * r3 = bigmap virtual address of new text base
+ * r4 = new mas3
+ * r5 = new mas7
+ */
+.global branch_to_reloc
+branch_to_reloc:
+	addis	%r3, %r3, (1f - PHYSBASE)@ha
+	addi	%r3, %r3, (1f - PHYSBASE)@l
+	mtctr	%r3
+	btctr	%r3
+
+1:	/* Now running out of bigmap, relocate boot mapping */
+	lis	%r6, PHYSBASE@h
+	ori	%r6, %r6, PHYSBASE@l
+	tlbsx	0, %r6
+
+	mtspr	SPR_MAS3, %r4
+	mtspr	SPR_MAS7, %r5
+
+	isync
+	tlbwe
+	isync
+	msync
+
+	/* Return into new text mapping */
+	blr

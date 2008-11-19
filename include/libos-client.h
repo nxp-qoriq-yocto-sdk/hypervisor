@@ -27,8 +27,10 @@
 #define LIBOS_CLIENT_H
 
 #define BASE_TLB_ENTRY 63 /**< TLB entry used for initial mapping */
-#define PHYSBASE 0x40000000 /**< Virtual base of large page physical mapping */
-#define PHYSMAPSIZE TLB_TSIZE_256M
+#define PHYSBASE 0x100000 /**< Virtual base of text mapping */
+#define PHYSMAPSIZE TLB_TSIZE_1M
+#define BIGPHYSBASE 0x40000000 /**< Virtual base of large page physical mapping */
+#define VMAPBASE 0x10000000 /**< Base of dynamically allocated virtual space */
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
@@ -37,12 +39,15 @@
 
 #include <stdint.h>
 
-extern uint64_t bigmap_phys;
+extern uint64_t text_phys, bigmap_phys;
 
 #define HAVE_VIRT_TO_PHYS
 static inline uint64_t virt_to_phys(void *ptr)
 {
-	return (uintptr_t)ptr - PHYSBASE + bigmap_phys;
+	if ((uintptr_t)ptr >= BIGPHYSBASE)
+		return (uintptr_t)ptr - BIGPHYSBASE + bigmap_phys;
+
+	return (uintptr_t)ptr - PHYSBASE + text_phys;
 }
 
 typedef struct {
@@ -63,6 +68,9 @@ typedef struct {
 	 */
 	int tlbcache_bits;
 #endif
+
+	/** HV dynamic TLB round-robin eviction pointer */
+	int next_dyn_tlbe;
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */

@@ -93,8 +93,14 @@ uint32_t dt_get_phandle(dt_node_t *node);
 /** Hardware device tree passed by firmware */
 extern dt_node_t *hw_devtree;
 
+/** Hypervisor config tree passed in bootargs */
+extern dt_node_t *config_tree;
+
 /** #address-cells and #size-cells at root of hv tree */
 extern uint32_t rootnaddr, rootnsize;
+
+int fdt_next_descendant_by_compatible(const void *fdt, int offset,
+                                      int *depth, const char *compatible);
 
 int fdt_get_addr_format(const void *fdt, int offset,
                         uint32_t *naddr, uint32_t *nsize);

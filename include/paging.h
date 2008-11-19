@@ -36,9 +36,9 @@
 #define TEMPTLB2 49
 
 #define DYN_TLB_START 50
-#define DYN_TLB_END 57
+#define DYN_TLB_END 54
 
-#define PERM_TLB_START 58
+#define PERM_TLB_START 55
 #define PERM_TLB_END 62
 
 #define PHYS_BITS 36
@@ -143,8 +143,6 @@ void tlbsync(void);
 #define CCSRBAR_PA              0xfe000000
 #define CCSRBAR_SIZE            TLB_TSIZE_16M
 
-void tlb1_init(void);
-
 /** Permanent 16MiB chunk of valloc space for temporary local mappings */
 extern void *temp_mapping[2];
 
@@ -177,11 +175,10 @@ struct gcpu;
 void save_mas(struct gcpu *gcpu);
 void restore_mas(struct gcpu *gcpu);
 
-#define MAP_PIN    1
-#define MAP_GLOBAL 2
-
-void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin);
+void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags);
+int map_hv_pma(phys_addr_t paddr, size_t len, int text);
 int handle_hv_tlb_miss(struct trapframe *regs, uintptr_t vaddr);
+void secondary_map_mem(void);
 
 struct trapframe;
 struct guest;

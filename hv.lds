@@ -29,7 +29,7 @@ OUTPUT_ARCH(powerpc:common)
 
 SECTIONS
 {
-	. = 0x40000000;
+	. = 0x00100000;
 
 	.text : {
 		*(.text)

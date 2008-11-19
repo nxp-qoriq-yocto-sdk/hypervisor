@@ -1,4 +1,7 @@
 
+/** @file
+ * Initialization
+ */
 /*
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *
@@ -45,16 +48,21 @@
 
 extern cpu_t cpu0;
 
-static gcpu_t noguest = {
-	.cpu = &cpu0,   /* link back to cpu */
+static gcpu_t noguest[MAX_CORES] = {
+	{
+		.cpu = &cpu0,   /* link back to cpu */
+	}
 };
 
 extern uint8_t init_stack_top;
 
 cpu_t cpu0 = {
 	.kstack = &init_stack_top - FRAMELEN,
-	.client.gcpu = &noguest,
+	.client.gcpu = &noguest[0],
 };
+
+cpu_t secondary_cpus[MAX_CORES - 1];
+uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
 
 static void core_init(void);
 static void release_secondary_cores(void);
@@ -63,11 +71,31 @@ void init_guest(void);
 
 #define UART_OFFSET		0x11c500
 
-dt_node_t *hw_devtree;
-static phys_addr_t mem_end;
+dt_node_t *hw_devtree, *config_tree;
 void *temp_mapping[2];
 extern char _end;
-uint64_t bigmap_phys;
+uint64_t text_phys, bigmap_phys;
+
+static void exclude_phys(phys_addr_t addr, phys_addr_t end)
+{
+	if (addr < bigmap_phys)
+		addr = bigmap_phys;
+
+	if (end < addr)
+		return;
+
+	addr += BIGPHYSBASE - bigmap_phys;
+	end += BIGPHYSBASE - bigmap_phys;
+
+	if (addr > 0x100000000ULL)
+		return;
+
+	if (end >= 0x100000000ULL || end < addr)
+		end = 0xffffffffUL;
+
+	malloc_exclude_segment((void *)(unsigned long)addr,
+	                       (void *)(unsigned long)end);
+}
 
 static void exclude_memrsv(void *fdt)
 {
@@ -79,7 +107,7 @@ static void exclude_memrsv(void *fdt)
 	}
 
 	for (i = 0; i < num; i++) {
-		uint64_t addr, size;
+		uint64_t addr, size, end;
 		int ret;
 		
 		ret = fdt_get_mem_rsv(fdt, i, &addr, &size);
@@ -93,24 +121,20 @@ static void exclude_memrsv(void *fdt)
 		         "memreserve 0x%llx->0x%llx\n",
 		         addr, addr + size - 1);
 
-		if (addr + size < addr) {
+		if (size == 0)
+			continue;
+
+		end = addr + size - 1;
+
+		if (end < addr) {
 			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
 			         "rsvmap %d contains invalid region 0x%llx->0x%llx\n",
 			         i, addr, addr + size - 1);
 
-			return;
+			continue;
 		}
 
-		addr += PHYSBASE;
-
-		if (addr > 0x100000000ULL)
-			return;
-
-		if (addr + size + PHYSBASE > 0x100000000ULL)
-			size = 0x100000000ULL - addr;
-
-		malloc_exclude_segment((void *)(unsigned long)addr,
-		                       (void *)(unsigned long)(addr + size - 1));
+		exclude_phys(addr, end);
 	}
 }
 
@@ -153,8 +177,6 @@ void *map_fdt(phys_addr_t devtree_ptr)
 		map_phys(TEMPTLB2, devtree_ptr, temp_mapping[0] + mapsize,
 		         &len, TLB_MAS2_MEM | MAS2_G);
 
-		printf("len %zd\n", len);
-
 		/* We don't handle flat trees larger than 4MiB. */
 		assert (len >= sizeof(struct fdt_header));
 		assert (len >= fdt_totalsize(vaddr));
@@ -163,47 +185,236 @@ void *map_fdt(phys_addr_t devtree_ptr)
 	return vaddr;
 }
 
+void unmap_fdt(void)
+{
+	/* We need to unmap the FDT, since we use temp_mapping[0] in
+	 * TEMPTLB2, which could otherwise cause a duplicate TLB entry.
+	 */
+	tlb1_clear_entry(TEMPTLB1);
+	tlb1_clear_entry(TEMPTLB2);
+}
+
+extern queue_t early_console;
+
+static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
+{
+	const void *fdt;
+	const char *str;
+	int offset, len;
+	
+	fdt = map_fdt(devtree_ptr);
+
+	offset = fdt_subnode_offset(fdt, 0, "chosen");
+	if (offset < 0) {
+		printf("Cannot find /chosen, error %d\n", offset);
+		return offset;
+	}
+
+	str = fdt_getprop(fdt, offset, "bootargs", &len);
+	if (!str) {
+		printf("Cannot find bootargs in /chosen, error %d\n", len);
+		return len;
+	}
+
+	str = strstr(str, "config-addr=");
+	if (!str) {
+		printf("config-addr not specified in bootargs\n");
+		return ERR_NOTFOUND;
+	}
+
+	str += strlen("config-addr=");
+
+	*cfg_addr = get_number64(&early_console, str);
+	if (cpu->errno) 
+		return cpu->errno;
+
+	unmap_fdt();
+	return 0;
+}
+
+static const unsigned long hv_text_size = 1024 * 1024;
+static int reloc_hv = 1;
+
+static void add_memory(phys_addr_t start, phys_addr_t size)
+{
+	phys_addr_t vstart = start - bigmap_phys + BIGPHYSBASE;
+
+	if (start + size < start)
+		return;
+
+	if (vstart > 0x100000000ULL)
+		return;
+
+	if (vstart + size > 0x100000000UL ||
+	    vstart + size < vstart) {
+		size = 0x100000000ULL - vstart;
+
+		/* Round down to power-of-two */
+		size = 1UL << ilog2(size);
+	}
+
+	int ret = map_hv_pma(start, size, 0);
+	if (ret < 0) {
+		printf("%s: error %d mapping PMA %#llx to %#llx\n",
+		       __func__, ret, start, size);
+		return;
+	}
+
+	/* We don't need to relocate the hypervisor if we are granted
+	 * the original boot mapping.
+	 */
+	if (start == 0 && size >= hv_text_size)
+		reloc_hv = 0;
+
+	malloc_add_segment((void *)(unsigned long)vstart,
+	                   (void *)(unsigned long)(vstart + size - 1));
+}
+
+/* On first iteration, call with add == 0 to return
+ * the lowest address referenced.
+ *
+ * On the second iteration, call with add == 1 to add the memory regions.
+ */
+static void process_hv_mem(void *fdt, int offset, int add)
+{
+	const uint32_t *prop;
+	uint64_t addr, size;
+	int pma, len;
+	int depth = 0;
+	
+	if (!add)
+		bigmap_phys = ~0ULL;
+
+	while (1) {
+		offset = fdt_next_descendant_by_compatible(fdt, offset,
+		                                           &depth, "hv-memory");
+		if (offset < 0) {
+			if (offset != -FDT_ERR_NOTFOUND)
+				printf("%s: error %d finding hv-memory\n", __func__, offset);
+
+			break;
+		}
+
+		prop = fdt_getprop(fdt, offset, "phys-mem", &len);
+		if (prop < 0 || len != 4) {
+			printf("%s: error %d getting phys-mem\n", __func__, len);
+			continue;
+		}
+
+		pma = fdt_node_offset_by_phandle(fdt, *prop);
+		if (pma < 0) {
+			printf("%s: error %d looking up phys-mem\n", __func__, pma);
+			continue;
+		}
+
+		prop = fdt_getprop(fdt, pma, "addr", &len);
+		if (prop < 0 || len != 8) {
+			printf("%s: error %d getting pma addr\n", __func__, len);
+			continue;
+		}
+		addr = (((uint64_t)prop[0]) << 32) | prop[1];
+
+		prop = fdt_getprop(fdt, pma, "size", &len);
+		if (prop < 0 || len != 8) {
+			printf("%s: error %d getting pma size\n", __func__, len);
+			continue;
+		}
+		size = (((uint64_t)prop[0]) << 32) | prop[1];
+
+		if (size & (size - 1)) {
+			printf("%s: pma size %lld not a power of 2\n", __func__, size);
+			continue;
+		}
+
+		printf("addr %llx size %llx base %llx\n", addr, size, bigmap_phys);
+
+		if (add)
+			add_memory(addr, size);
+		else if (addr < bigmap_phys)
+			bigmap_phys = addr;
+	}
+}
+
+/* Note that we do not verify that a PMA is covered by a hw memory node,
+ * or that guest PMAs are not covered by memreserve areas.
+ */
+static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
+{
+	void *fdt;
+	int offset;
+	int depth = 0;
+
+	fdt = map_fdt(cfg_addr);
+	
+	offset = fdt_next_descendant_by_compatible(fdt, 0, &depth, "hv-config");
+	if (offset < 0) {
+		printf("%s: config tree has no hv-config, err %d\n",
+		       __func__, offset);
+		return offset;
+	}
+
+	process_hv_mem(fdt, offset, 0);
+	process_hv_mem(fdt, offset, 1);
+	
+	unmap_fdt();
+
+	fdt = map_fdt(devtree_ptr);
+
+	exclude_phys(0, (uintptr_t)&_end - 1);
+	exclude_phys(devtree_ptr, devtree_ptr + fdt_totalsize(fdt) - 1);
+	exclude_memrsv(fdt);
+
+	unmap_fdt();
+
+	malloc_init();
+
+	if (reloc_hv) {
+		void *new_text = memalign(hv_text_size, hv_text_size);
+		if (!new_text) {
+			printf("Cannot relocate hypervisor\n");
+			return ERR_NOMEM;
+		}
+
+		text_phys = virt_to_phys(new_text);
+		barrier();
+		memcpy(new_text, (void *)PHYSBASE, (uintptr_t)&_end - PHYSBASE);
+		branch_to_reloc(new_text, (text_phys & MAS3_RPN) | TLB_MAS3_KERN,
+		                text_phys >> 32);
+	}
+
+	return 0;
+}
+
 void start(unsigned long devtree_ptr)
 {
-	phys_addr_t lowest_guest_addr;
+	phys_addr_t cfg_addr = 0;
 	void *fdt;
+	int ret;
 
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 
-	valloc_init(1024 * 1024, PHYSBASE);
+	cpu->client.next_dyn_tlbe = DYN_TLB_START;
+
+	valloc_init(VMAPBASE, BIGPHYSBASE);
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
-	fdt = map_fdt(devtree_ptr);
+	ret = get_cfg_addr(devtree_ptr, &cfg_addr);
+	if (ret < 0)
+		return;
 
-	mem_end = find_memory(fdt);
-	lowest_guest_addr = find_lowest_guest_phys(fdt);
-	if (mem_end > lowest_guest_addr - 1)
-		mem_end = lowest_guest_addr - 1;
-
-	exclude_memrsv(fdt);
-	malloc_exclude_segment((void *)PHYSBASE, &_end - 1);
-	malloc_exclude_segment((void *)PHYSBASE + devtree_ptr,
-	                       (void *)PHYSBASE + devtree_ptr +
-	                       fdt_totalsize(fdt) - 1);
-	
-	/* Only access memory in the boot mapping for now */
-	malloc_exclude_segment((void *)(PHYSBASE + 256 * 1024 * 1024),
-	                       (void *)ULONG_MAX);
-	
-	if (mem_end <= ULONG_MAX)
-		malloc_exclude_segment((void *)(PHYSBASE + (uintptr_t)mem_end + 1),
-		                       (void *)ULONG_MAX);
-	malloc_init();
-	tlb1_init();
+	ret = init_hv_mem(devtree_ptr, cfg_addr);
+	if (ret < 0)
+		return;
 
 	CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, 16 * 1024 * 1024,
-	                                TLB_MAS2_IO, TLB_MAS3_KERN, 1);
+	                                TLB_MAS2_IO, TLB_MAS3_KERN);
 	
 	cpu->console_ok = 1;
 	core_init();
 
+	fdt = map_fdt(devtree_ptr);
 	hw_devtree = unflatten_dev_tree(fdt);
 	if (!hw_devtree) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
@@ -211,11 +422,7 @@ void start(unsigned long devtree_ptr)
 		return;
 	}
 
-	/* We need to unmap the FDT, since we use temp_mapping[0] in
-	 * TEMPTLB2, which could otherwise cause a duplicate TLB entry.
-	 */
-	tlb1_set_entry(TEMPTLB1, 0, 0, 0, 0, 0, 0, 0, 0);
-	tlb1_set_entry(TEMPTLB2, 0, 0, 0, 0, 0, 0, 0, 0);
+	unmap_fdt();
 
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
@@ -255,7 +462,9 @@ void start(unsigned long devtree_ptr)
 
 void secondary_init(void)
 {
-	tlb1_init();
+	secondary_map_mem();
+	cpu->console_ok = 1;
+	
 	core_init();
 	mpic_reset_core();
 	enable_critint();
@@ -295,6 +504,12 @@ static int release_secondary(dt_node_t *node, void *arg)
 	}
 	reg = *(const uint32_t *)prop->data;
 
+	if (reg > MAX_CORES) {
+		printlog(LOGTYPE_MP, LOGLEVEL_NORMAL,
+		         "%s: Ignoring core %d, max cores %d\n",
+		         __func__, reg, MAX_CORES);
+	}
+
 	prop = dt_get_prop(node, "cpu-release-addr", 0);
 	if (!prop || prop->len != 8) {
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
@@ -317,28 +532,18 @@ static int release_secondary(dt_node_t *node, void *arg)
 		return 0;
 	}	
 
-	cpu_t *cpu = alloc_type(cpu_t);
-	if (!cpu)
-		goto nomem;
+	/* Per-cpu data must be in the text mapping, or else secondaries
+	 * won't have it mapped.
+	 */
+	cpu_t *newcpu = &secondary_cpus[reg - 1];
+	newcpu->kstack = secondary_stacks[reg - 1] + KSTACK_SIZE - FRAMELEN;
+	newcpu->client.gcpu = &noguest[reg];
+	newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
 
-	cpu->kstack = memalign(16, KSTACK_SIZE);
-	if (!cpu->kstack)
-		goto nomem;
-	cpu->kstack += KSTACK_SIZE - FRAMELEN;
-
-	cpu->client.gcpu = alloc_type(gcpu_t);
-	if (!cpu->client.gcpu)
-		goto nomem;
-	cpu->client.gcpu->cpu = cpu;  /* link back to cpu */
-
-	if (start_secondary_spin_table(table_va, reg, cpu))
+	if (start_secondary_spin_table(table_va, reg, newcpu))
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR, "couldn't spin up CPU%u\n", reg);
 
 	return 0;
-
-nomem:
-	printlog(LOGTYPE_MP, LOGLEVEL_ERROR, "release_secondary: out of memory\n");
-	return ERR_NOMEM;
 }
 
 static void release_secondary_cores(void)

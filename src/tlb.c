@@ -717,14 +717,9 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 
 unsigned long CCSRBAR_VA;
 
-void tlb1_init(void)
-{
-}
-
 static uint32_t map_lock;
 static DECLARE_LIST(maps);
 static int next_pinned_tlbe = PERM_TLB_START;
-static int next_dyn_tlbe = DYN_TLB_START;
 
 typedef struct map_entry {
 	list_t map_node;
@@ -746,10 +741,10 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 
 	if (likely(!tlbe)) {
 		start_phys = (gaddr >> PAGE_SHIFT) + me->phys_offset;
-		tlbe = next_dyn_tlbe++;
+		tlbe = cpu->client.next_dyn_tlbe++;
 
-		if (next_dyn_tlbe > DYN_TLB_END)
-			next_dyn_tlbe = DYN_TLB_START;
+		if (cpu->client.next_dyn_tlbe > DYN_TLB_END)
+			cpu->client.next_dyn_tlbe = DYN_TLB_START;
 
 		unsigned long page_mask = ~(tsize_to_pages(me->tsize) - 1);
 		start_phys &= page_mask;
@@ -793,20 +788,33 @@ int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 	return ret;
 }
 
+void secondary_map_mem(void)
+{
+	unsigned long saved = spin_lock_critsave(&map_lock);
+
+	cpu->client.next_dyn_tlbe = DYN_TLB_START;
+
+	/* Insert pre-existing pinned mappings */
+	list_for_each(&maps, i) {
+		map_entry_t *me = to_container(i, map_entry_t, map_node);
+
+		if (me->pinned_tlbe)
+			insert_map_entry(me, me->start_page << PAGE_SHIFT);
+	}
+	
+	spin_unlock_critsave(&map_lock, saved);
+}
+
 /** Create a permanent hypervisor mapping
  *
  * @param[in] paddr base of physical region to map
  * @param[in] len length of region to map
  * @param[in] mas2flags WIMGE bits
  * @param[in] mas3flags permission bits
- * @param[in] pin 
- *   If non-zero, create a permanent TLB1 entry.  Otherwise, the mapping
- *   will be dynamically faulted into the temporary TLB1 entries, unless
- *   it is covered by an existing pinned mapping.
  *
  * @return the virtual address of the mapping, or NULL if out of resources.
  */
-void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin)
+void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags)
 {
 	map_entry_t *me;
 	register_t saved;
@@ -829,30 +837,10 @@ void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin)
 		ret = (start_page - me->phys_offset) << PAGE_SHIFT;
 		ret += paddr & (PAGE_SIZE - 1);
 
-		/* We have to insert pinned mappings here, in case it's
-		 * the initial RAM mapping which we can't fault in later.
-		 */
-		insert_map_entry(me, ret);
 		goto out;
 	}
 
 	unsigned long pages = end_page - start_page + 1;
-
-	if (pin) {
-		if (next_pinned_tlbe > PERM_TLB_END)
-			goto out;
-
-		/* Pinned mappings must be a power of 4 number of pages
-		 * in order to fit in one TLB entry.
-		 */
-		if (tsize_to_pages(pages_to_tsize(pages)) != pages) {
-			spin_unlock_critsave(&map_lock, saved);
-			printlog(LOGTYPE_MMU, LOGLEVEL_ERROR,
-			         "map(): Internal error: called with MAP_PIN and %ld pages\n",
-			         pages);
-			return NULL;
-		}
-	}
 
 	me = malloc(sizeof(map_entry_t));
 	if (!me)
@@ -874,14 +862,7 @@ void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags, int pin)
 	                              me->end_page - me->start_page + 1),
 	                natural_alignment(start_page));
 
-	if (pin) {
-		assert(tsize_to_pages(me->tsize) == pages);
-		me->pinned_tlbe = next_pinned_tlbe++;
-
-		insert_map_entry(me, ret);
-	} else {
-		me->pinned_tlbe = 0;
-	}
+	me->pinned_tlbe = 0;
 
 	list_add(&maps, &me->map_node);
 
@@ -893,6 +874,64 @@ out_me:
 	free(me);
 	spin_unlock_critsave(&map_lock, saved);
 	return (void *)ret;
+}
+
+static map_entry_t pma_maps[PERM_TLB_END - PERM_TLB_START + 1];
+
+/** Create a permanent hypervisor mapping for a PMA
+ *
+ * @param[in] paddr base of physical region to map, must be naturally aligned
+ * @param[in] len length of region to map, must be power of 2
+ * @param[in] text non-zero if adding a text mapping (PHYSBASE),
+ *   zero if adding a data mapping (BIGPHYSBASE).
+ * @return zero on success
+ */
+int map_hv_pma(phys_addr_t paddr, size_t len, int text)
+{
+	unsigned long npages = len >> PAGE_SHIFT;
+	int order = ilog2(npages);
+	int tsize = order / 2 + 1;
+	unsigned long pages_per_entry = tsize_to_pages(tsize);
+	register_t saved;
+	map_entry_t *me;
+	int entries = order & 1 ? 2 : 1;
+	int ret = 0;
+	
+	saved = spin_lock_critsave(&map_lock);
+
+	for (int i = 0; i < entries; i++) {
+		unsigned long page = paddr >> PAGE_SHIFT;
+		int tlbe;
+		
+		if (next_pinned_tlbe > PERM_TLB_END) {
+			ret = ERR_BUSY;
+			goto out;
+		}
+			
+		tlbe = next_pinned_tlbe++;
+		me = &pma_maps[tlbe - PERM_TLB_START];
+
+		if (text)
+			me->start_page = (paddr - text_phys + PHYSBASE) >> PAGE_SHIFT;
+		else
+			me->start_page = (paddr - bigmap_phys + BIGPHYSBASE) >> PAGE_SHIFT;
+
+		me->end_page = me->start_page + pages_per_entry - 1;
+		me->phys_offset = page - me->start_page;
+		me->mas2flags = TLB_MAS2_MEM;
+		me->mas3flags = TLB_MAS3_KERN;
+		me->tsize = tsize;
+		me->pinned_tlbe = tlbe;
+	
+		list_add(&maps, &me->map_node);
+		insert_map_entry(me, ret);
+
+		paddr += pages_per_entry << PAGE_SHIFT;
+	}
+
+out:
+	spin_unlock_critsave(&map_lock, saved);
+	return ret;
 }
 
 /** Temporarily map guest physical memory into a hypervisor virtual address

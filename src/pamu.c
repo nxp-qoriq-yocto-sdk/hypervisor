@@ -361,7 +361,7 @@ void pamu_global_init(void)
 	}
 
 	pamubypenr_ptr = map(guts_addr + PAMUBYPENR, 4,
-	                     TLB_MAS2_IO, TLB_MAS3_KERN, 0);
+	                     TLB_MAS2_IO, TLB_MAS3_KERN);
 	pamubypenr = in32(pamubypenr_ptr);
 
 	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
