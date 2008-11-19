@@ -3,7 +3,7 @@
  */
 /* Copyright (C) 2008 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -12,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -76,7 +76,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 
 			if (node == top)
 				return node;
-		
+
 			node = node->parent;
 			break;
 
@@ -112,13 +112,13 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 				ret = -FDT_ERR_TRUNCATED;
 				goto err;
 			}
-			
+
 			prop->data = malloc(prop->len);
 			if (!prop->data)
 				goto nomem;
 
 			memcpy(prop->data, fdtprop->data, prop->len);
-			break;	
+			break;
 		}
 
 		case FDT_END:
@@ -126,7 +126,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 				ret = -FDT_ERR_BADSTRUCTURE;
 				goto err;
 			}
-		
+
 			return NULL;
 
 		case FDT_NOP:
@@ -196,7 +196,7 @@ int dt_for_each_node(dt_node_t *tree, void *arg,
 				continue;
 			}
 		}
-		
+
 		backtrack = 0;
 		node = dtnode->child_node.next;
 
@@ -210,7 +210,7 @@ int dt_for_each_node(dt_node_t *tree, void *arg,
 			return 0;
 
 		assert(parent);
-		
+
 		if (node == &parent->children) {
 			node = &parent->child_node;
 			backtrack = 1;
@@ -233,7 +233,7 @@ static int destroy_node(dt_node_t *node, void *arg)
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
 		destroy_prop(prop);
 	}
-	
+
 	if (node->parent)
 		list_del(&node->child_node);
 
@@ -255,7 +255,7 @@ static int flatten_pre(dt_node_t *node, void *fdt)
 
 	list_for_each(&node->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
-		
+
 		ret = fdt_property(fdt, prop->name, prop->data, prop->len);
 		if (ret)
 			return ret;
@@ -424,7 +424,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 {
 	void *newdata = NULL;
 	dt_prop_t *prop;
-	
+
 	prop = dt_get_prop(node, name, 1);
 	if (!prop)
 		return ERR_NOMEM;
@@ -441,7 +441,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 
 	free(prop->data);
 
-	prop->data = newdata;	
+	prop->data = newdata;
 	prop->len = len;
 
 	if (prop->data)
@@ -483,7 +483,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
-		
+
 		int ret = dt_set_prop(ctx->dest, prop->name, prop->data, prop->len);
 		if (ret)
 			return ret;
@@ -572,7 +572,7 @@ static int print_pre(dt_node_t *tree, void *arg)
 
 		for (int j = 0; j < ctx->depth; j++)
 			qprintf(ctx->out, "\t");
-		
+
 		qprintf(ctx->out, "%s", prop->name);
 
 		if (is_strlist(prop->data, prop->len)) {
@@ -586,7 +586,7 @@ static int print_pre(dt_node_t *tree, void *arg)
 			}
 		} else if (prop->len & 3) {
 			uint8_t *data = prop->data;
-			
+
 			for (int j = 0; j < prop->len; j++) {
 				qprintf(ctx->out, "%s%02x",
 				        j == 0 ? " = [" : " ", data[j]);
@@ -616,7 +616,7 @@ static int print_post(dt_node_t *tree, void *arg)
 	for (int i = 0; i < ctx->depth; i++)
 		qprintf(ctx->out, "\t");
 
-	qprintf(ctx->out, "}\n");	
+	qprintf(ctx->out, "}\n");
 	return 0;
 }
 
@@ -700,7 +700,7 @@ static int first_callback(dt_node_t *node, void *arg)
 {
 	dt_node_t **ret = arg;
 	*ret = node;
-	return 1;	
+	return 1;
 }
 
 /** Return the first compatible node, when only one is expected.
@@ -780,11 +780,11 @@ dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name)
 {
 	dt_node_t *node;
 	const char *path;
-	
+
 	node = dt_get_subnode(tree, "aliases", 0);
 	if (node) {
 		path = dt_get_prop_string(node, name);
-		
+
 		if (path)
 			name = path;
 	}
@@ -807,7 +807,7 @@ dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create)
 	do {
 		size_t namelen;
 		const char *slash;
-	
+
 		while (*path == '/')
 			path++;
 
@@ -818,7 +818,7 @@ dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create)
 		if (slash)
 			namelen = slash - path;
 		else
-			namelen = strlen(path); 
+			namelen = strlen(path);
 
 		node = dt_get_subnode_namelen(node, path, namelen, create);
 		if (!node)
@@ -887,7 +887,7 @@ size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen)
 
 	if (buflen != 0)
 		buf[buflen - 1] = 0;
-	
+
 	while (1) {
 		size_t namelen;
 
@@ -898,13 +898,13 @@ size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen)
 
 		pos -= namelen + 1;
 		len += namelen + 1;
-	
+
 		if (len <= buflen) {
 			buf[pos] = '/';
 			memcpy(&buf[pos + 1], node->name, namelen);
 			used_pos = pos;
 		}
-		
+
 		node = node->parent;
 	}
 
