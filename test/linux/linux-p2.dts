@@ -113,6 +113,7 @@
 		compatible = "fsl,hv-vmpic";
 		interrupt-controller;
 		#interrupt-cells = <2>;
+		#address-cells = <0>;
 		fsl,hv-phandle-ref = <&vmpic>;
 	};
 

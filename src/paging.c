@@ -184,25 +184,27 @@ next:
 /**
  * register_vf_handler - register a virtualization fault handler
  * @start - starting guest physical address of range
- * @end - ending guest physical address of range
+ * @end - guest physical address of last byte in range
  * @callback - function to call if an access to the range by the guest occurs
  *
  * This function registers a callback handler for device virtualization.
- * When a virtualization fault occurs, the trap handler compares the guest
- * and the guest physical address of the attempted access.  If it all
- * matches, the callback function is called.
+ * When a virtualization fault occurs, the trap handler the guest physical
+ * address of the attempted access.  If matches, the callback function is
+ * called.
+ *
+ * Currently, we only support virtualization of addresses in CCSR space.  We
+ * also assume that for CCSR address space, guest physical equals real
+ * physical.
  */
-int register_vf_handler(guest_t *guest, phys_addr_t start, phys_addr_t end,
-			vf_callback_t callback)
+vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t start, phys_addr_t end,
+				vf_callback_t callback)
 {
 	vf_range_t *vf;
 
 	vf = malloc(sizeof(vf_range_t));
 	if (!vf)
-		return ERR_NOMEM;
+		return NULL;
 
-	assert(start);
-	assert(end);
 	assert(start < end);
 	assert(callback);
 
@@ -210,9 +212,14 @@ int register_vf_handler(guest_t *guest, phys_addr_t start, phys_addr_t end,
 	vf->end = end;
 	vf->callback = callback;
 
+	// Get a permanent hypervisor virtual address
+	vf->vaddr = map(start, end - start + 1, TLB_MAS2_IO, TLB_MAS3_KERN, 1);
+
+	// Each guest has its own list
 	list_add(&guest->vf_list, &vf->list);
 
-	return 0;
+	return vf;
 }
 
 #endif
+

@@ -786,6 +786,8 @@ static int emu_rfdi(trapframe_t *regs, uint32_t insn)
 /**
  * emu_load_store - emulate any of the load or store instructions
  * @vaddr - effective address from the DEAR register
+ * @store - returns 0 if this is a load, non-zero if this is a store
+ * @reg - returns the source/destination register number
  *
  * Emulate any of the load and store instructions.  Unlike the other emu_xxx
  * functions, this one is not called from hvpriv().  It's called from
@@ -801,7 +803,8 @@ static int emu_rfdi(trapframe_t *regs, uint32_t insn)
  *
  * Returns 0 on success, non-zero if this instruction is not yet supported.
  */
-int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
+int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
+		   int *store, unsigned int *reg)
 {
 	unsigned int major, minor, rSD, rA;
 
@@ -827,6 +830,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
 			// fall-through ...
 		case 0x057:	// lbzx
 			regs->gpregs[rSD] = in8(vaddr);
+			*store = 0;
 			break;
 
 		case 0x0f7:	// stbux
@@ -836,6 +840,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
 			// fall-through ...
 		case 0x0d7:	// stbx
 			out8(vaddr, regs->gpregs[rSD]);
+			*store = 1;
 			break;
 
 		default:
@@ -852,6 +857,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
 		// fall-through ...
 	case 0x22:	// lbz
 		regs->gpregs[rSD] = in8(vaddr);
+		*store = 0;
 		break;
 
 	case 0x27:	// stbu
@@ -861,6 +867,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
 		// fall-through ...
 	case 0x26:	// stb
 		out8(vaddr, regs->gpregs[rSD]);
+		*store = 1;
 		break;
 
 	default:
@@ -869,6 +876,8 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr)
 			 __func__, insn, major, minor, rSD);
 		return 1;
 	}
+
+	*reg = rSD;
 
 	return 0;
 }

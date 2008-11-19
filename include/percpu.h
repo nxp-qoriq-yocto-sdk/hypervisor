@@ -156,6 +156,10 @@ typedef struct guest {
 	/** List of virtualized devices (vf_list_t objects). */
 	list_t vf_list;
 #endif
+#ifdef CONFIG_VIRTUAL_I2C
+	/** Emulated SR register */
+	uint8_t i2c_sr;
+#endif
 } guest_t;
 
 #define MAX_PARTITIONS 8

@@ -27,6 +27,7 @@
 #define PAGING_H
 
 #include <hv.h>
+#include <libos/interrupts.h>
 #include <libos/list.h>
 
 #define GUEST_TLB_END 47
@@ -184,33 +185,33 @@ int handle_hv_tlb_miss(struct trapframe *regs, uintptr_t vaddr);
 
 struct trapframe;
 struct guest;
+struct vpic_interrupt;
+struct vf_range;
+struct dt_node;
 
-#ifdef CONFIG_DEVICE_VIRT
-
-typedef void (*vf_callback_t)(struct trapframe *regs, phys_addr_t paddr);
+typedef void (*vf_callback_t)(struct vf_range *vf, struct trapframe *regs, phys_addr_t paddr);
 
 typedef struct vf_range {
 	list_t list;
 	phys_addr_t start;
 	phys_addr_t end;
 	vf_callback_t callback;
+	void *vaddr;		// hypervisor virtual address of 'start'
+	void *data;		// client-specific data
 } vf_range_t;
 
-int register_vf_handler(struct guest *guest,
-                      phys_addr_t start,
-                      phys_addr_t end,
-                      vf_callback_t callback);
+vf_range_t *register_vf_handler(struct guest *guest, phys_addr_t start,
+				phys_addr_t end, vf_callback_t callback);
 
-//  In emulate.c
-int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr);
+int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr,
+		   int *store, unsigned int *reg);
 
-#endif
+struct vf_range *find_vf(struct guest *guest, phys_addr_t start);
 
-#ifdef CONFIG_VIRTUAL_I2C
+int virtualize_device_interrupt(struct guest *guest, struct dt_node *node,
+				vf_range_t *vf, int_handler_t handler);
 
-// Prototypes of the callback functions
-void i2c_callback(struct trapframe *regs, phys_addr_t phys);
-
-#endif
+int virtualize_i2c_node(struct guest *guest, struct dt_node *node,
+			phys_addr_t paddr, phys_addr_t size);
 
 #endif

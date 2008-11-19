@@ -107,59 +107,6 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 	return total;
 }
 
-#ifdef CONFIG_DEVICE_VIRT
-
-typedef struct count_devices_ctx {
-	phys_addr_t paddr;
-	int count;
-} count_devices_ctx_t;
-
-static int count_devices_callback(dt_node_t *node, void *arg)
-{
-	count_devices_ctx_t *ctx = arg;
-	phys_addr_t paddr;
-
-	if (node->parent && node->parent->parent &&
-	    !dt_node_is_compatible(node->parent, "simple-bus"))
-		return 0;
-
-	// Get the guest physical address for this device
-	int ret = dt_get_reg(node, 0, &paddr, NULL);
-	if (ret < 0)
-		return 0;
-
-	paddr &= ~(PAGE_SIZE - 1);
-
-	if (paddr == ctx->paddr)
-		ctx->count++;
-
-	return 0;	
-}
-
-/**
- * Determine if there's another device sharing this page
- *
- * This function scans the device tree to determine if there are other
- * devices that shares the same memory page as this one.  It returns a count
- * of these devices, or a negative number if an error occurs.
- *
- * We assume that if there are any two devices that share the same page,
- * the registers of all such devices completely fit within one page.  This
- * eliminates the need to be given a 'size' parameter.
- */
-static int count_devices_in_page(dt_node_t *tree, phys_addr_t paddr)
-{
-	count_devices_ctx_t ctx = {
-		// Round down to the nearest page
-		.paddr = paddr & ~(PAGE_SIZE - 1)
-	};
-
-	dt_for_each_node(tree, &ctx, count_devices_callback, NULL);
-
-	return ctx.count;
-}
-#endif
-
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
                                  phys_addr_t addr, phys_addr_t size)
 {
@@ -207,16 +154,16 @@ static int map_guest_reg_one(guest_t *guest, dt_node_t *node,
 
 	// Is this an I2C node?
 #ifdef CONFIG_VIRTUAL_I2C
-	if (dt_node_is_compatible(node, "fsl-i2c")) {
-		// We know that I2C devices come in pairs, so if we
-		// _don't_ find another device on this page, then we
-		// know that we should restrict access in this page.
-		if (count_devices_in_page(guest->devtree, gaddr) == 1) {
-			ret = register_vf_handler(guest, gaddr, gaddr + size,
-			                          i2c_callback);
-			return ret;
-		}
-	}
+	ret = virtualize_i2c_node(guest, node, gaddr, size);
+	if (ret < 0)
+		// An error probably indicates that the device tree is borked,
+		// so we can't printlog any meaningful information about the
+		// node.  Just return an error.
+		return ret;
+	if (ret > 0)
+		// This node is an I2C node and it was virtualized, so we're
+		// done here.
+		return 0;
 #endif
 
 	while (offset < size) {

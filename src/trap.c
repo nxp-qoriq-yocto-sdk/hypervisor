@@ -287,8 +287,8 @@ void data_storage(trapframe_t *regs)
 		list_for_each(&guest->vf_list, list) {
 			vf = to_container(list, vf_range_t, list);
 
-			if ((paddr >= vf->start) && (paddr < vf->end)) {
-				vf->callback(regs, paddr);
+			if ((paddr >= vf->start) && (paddr <= vf->end)) {
+				vf->callback(vf, regs, paddr);
 				return;
 			}
 		}
