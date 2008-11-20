@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc5
-Date: 11/06/2008
+Revsion: 0.3-rc6
+Date: 11/20/2008
 
 -------------------------------------------------------
 Contents
@@ -23,16 +23,26 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc5
-      -is compatible with P4080 4.0.20 / 4.0.pre5
-      -the unit tests are not compatible with earlier versions
-       of simics due a model change with respect to flash
+   -Topaz 0.3-rc6
+      -is compatible with P4080 4.0.20 / 4.0.pre5 and later
+       versions of Simics
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.81
+    0.82
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc6 bug fixes and changes
+      -added I2C controller virtualization
+      -do not set interrupts to critical before they are registered--
+       fixes a problem where pending UART interrupts fired before
+       a handler was registered
+      -improved readability of shell 'paact' command output
+      -livetree integration-- no user visibile change from this, this
+       is groundwork for the upcoming new partition definition
+       change 
+      -removed obsolete ppid-to-liodn hcall
 
    -Topaz 0.3-rc5 bug fixes and changes
       -support for loading uncompressed uImages from partman
@@ -119,31 +129,6 @@ Contents
    -CPU core performance monitor support
       -support for the CPU performance interrupt is not implemented
 
-   -CPU core Debug support
-      -IAC,DAC,IRPT support is not present
-
-   -guest watchdog does not support the partition management
-    interrupts
-
-   -Cache control
-      -the following cache control registers are not implemented
-         L1CSR2
-         L2CAPTDATAHI
-         L2CAPTDATALO
-         L2CAPTECC
-         L2CSR0
-         L2CSR1
-         L2ERRADDR
-         L2ERRATTR
-         L2ERRCTL
-         L2ERRDET
-         L2ERRDIS
-         L2ERREADDR
-         L2ERRINJCTL
-         L2ERRINJHI
-         L2ERRINJLO
-         L2ERRINTEN
-
    -Power management
       -support for the MSR[WE] power management bit is not
        implemented
@@ -165,17 +150,6 @@ Contents
    -the hypervisor must be loaded and run from physical address 0x0
 
  E. Hypervisor Services
-
-   -Partition Management
-      -Partition management interrupts (as specified in the
-       Topaz spec) are not implemented:
-         -partition state change 
-         -watchdog expiration
-         -restart request
-
-   -Debug console
-      -the hypervisor debug console is partially implemented
-       and input is not supported
 
    -gdb stub
       -the gdb stub does not support hardware breakpoints or
