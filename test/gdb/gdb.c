@@ -119,7 +119,6 @@ void start(unsigned long devtree_ptr)
 	uint32_t rxavail;
 	uint32_t txavail;
 	char buf[16];
-	uint32_t x;
 	unsigned int cnt;
 	int i = 0, j, t;
 	int node = -1;

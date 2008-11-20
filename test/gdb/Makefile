@@ -1,4 +1,3 @@
-
 #
 # Copyright (C) 2008 Freescale Semiconductor, Inc.
 #
@@ -23,48 +22,55 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+test := gdb
+dir := $(testdir)$(test)/
 
-all: gdb_all
+# test source
+gdb-src-y := $(dir)gdb.c
 
-include ../Makefile.inc
+# define test and libos object files
+gdb-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(gdb-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+gdb-obj := $(gdb-obj:%=bin/%.o)
 
-GDB_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdb.c
-GDB_OBJS := $(basename $(GDB_SRCS))
-GDB_OBJS := $(GDB_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-GDB_OBJS := $(GDB_OBJS:%=bin/%)
+# test source
+gdb-hello-src-y := $(dir)gdb-hello.c
 
-GDB_HELLO_SRCS := $(LIBOS_SRCS:%=libos/%) $(COMMON_SRCS) gdb-hello.c
-GDB_HELLO_OBJS := $(basename $(GDB_HELLO_SRCS))
-GDB_HELLO_OBJS := $(GDB_HELLO_OBJS:%=%.o) $(LIBFDT_OBJS:%=libfdt/%)
-GDB_HELLO_OBJS := $(GDB_HELLO_OBJS:%=bin/%)
+# define test and libos object files
+gdb-hello-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(gdb-hello-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+gdb-hello-obj := $(gdb-hello-obj:%=bin/%.o)
 
-gdb_all: bin/gdb.bin bin/gdb.map bin/hv-gdb.dtb bin/gdb-hello.bin bin/hv-gdb-4p.dtb
+$(test)-dts := $(wildcard $(dir)*.dts)
+$(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
+$(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
+$(test)-part-dts := $(filter-out bin/$(test)/hv-%.dts,$($(test)-bin-dts))
 
-bin/gdb.bin: bin/gdb
-	$(CROSS_COMPILE)objcopy -O binary $< $@
+$(test)-hv-dtb := $($(test)-hv-dts:%.dts=%.dtb)
+$(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
-bin/gdb: $(GDB_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDB_OBJS) -lgcc
+$($(test)-hv-dts): $($(test)-part-dtb)
 
-bin/gdb.map: bin/gdb
-	nm -n bin/gdb > $@
+bin/$(test)/gdb: $(gdb-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
-ifneq ($(MAKECMDGOALS),clean)
-bin/gdb-hello.bin: bin/gdb-hello
-	$(CROSS_COMPILE)objcopy -O binary $< $@
+bin/$(test)/gdb-hello: $(gdb-hello-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
-bin/gdb-hello: $(GDB_HELLO_OBJS)
-	$(CC) $(LD_OPTS) -Wl,-T../common/tests.lds -o $@ $(GDB_HELLO_OBJS) -lgcc
+.PHONY: $(test)
+$(test): bin/$(test)/gdb bin/$(test)/gdb-hello $($(test)-hv-dtb)
 
--include $(GDB_OBJS:.o=.d)
--include $(GDB_HELLO_OBJS:.o=.d)
-endif
-
-bin/hv-gdb.dtb: hv-gdb.dts bin/gdb-p1.dtb
-bin/gdb-p1.dtb: gdb-p1.dts
-
-bin/hv-gdb-4p.dtb: hv-gdb-4p.dts bin/gdb-p1.dtb bin/gdb-p2.dtb bin/gdb-p3.dtb bin/gdb-p4.dtb
-bin/gdb-p1.dtb: gdb-p1.dts
-bin/gdb-p2.dtb: gdb-p2.dts
-bin/gdb-p3.dtb: gdb-p3.dts
-bin/gdb-p4.dtb: gdb-p4.dts
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics

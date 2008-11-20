@@ -249,7 +249,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <0 1>;
 			fsl,hv-physaddr-map = <0 0 0 0x10000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("bin/gdb-p1.dtb");
+			fsl,hv-dtb = /incbin/("p1.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 
@@ -264,7 +264,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <1 1>;
 			fsl,hv-physaddr-map = <0 0 0 0x20000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("bin/gdb-p2.dtb");
+			fsl,hv-dtb = /incbin/("p2.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 
@@ -279,7 +279,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <2 1>;
 			fsl,hv-physaddr-map = <0 0 0 0x30000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("bin/gdb-p3.dtb");
+			fsl,hv-dtb = /incbin/("p3.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 
@@ -294,7 +294,7 @@
 			compatible = "fsl,hv-partition";
 			fsl,hv-cpus = <3 1>;
 			fsl,hv-physaddr-map = <0 0 0 0x40000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("bin/gdb-p4.dtb");
+			fsl,hv-dtb = /incbin/("p4.dtb");
 			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
 			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 
