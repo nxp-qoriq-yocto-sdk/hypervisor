@@ -125,7 +125,7 @@ bin/hv.bin.gz: bin/hv.bin
 bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/hv: include/config/auto.conf $(OBJS)
+bin/hv: include/config/auto.conf $(OBJS) $(src)hv.lds
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ $(OBJS) -lgcc
 
