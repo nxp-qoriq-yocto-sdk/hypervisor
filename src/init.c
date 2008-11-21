@@ -326,10 +326,16 @@ static void process_hv_mem(void *fdt, int offset, int add)
 			continue;
 		}
 
+		if (addr & (size - 1)) {
+			printf("%s: pma addr %llx not aligned to size %llx\n",
+			       __func__, addr, size);
+			continue;
+		}
+
 		if (add)
 			add_memory(addr, size);
 		else if (addr < bigmap_phys)
-			bigmap_phys = addr;
+			bigmap_phys = addr & ~(BIGPHYSBASE - 1);
 	}
 }
 
