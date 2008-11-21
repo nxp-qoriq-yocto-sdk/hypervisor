@@ -29,12 +29,12 @@ $use_uart2 = 1
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
-$guest_image[1]  = "rootfs.ext2.gz"
-$guest_addr[1]   = 0x01000000
+$guest_image[1]  = "hv-1p.dtb"
+$guest_addr[1]   = 0x00f00000
+$guest_image[2]  = "rootfs.ext2.gz"
+$guest_addr[2]   = 0x01000000
 
 $kernel_image  = "hv.uImage"
-
-$dev_tree_blob  = "hv-linux-1p.dtb"
 
 add-directory "%script%" -prepend
 add-directory "%script%/../sim" -prepend

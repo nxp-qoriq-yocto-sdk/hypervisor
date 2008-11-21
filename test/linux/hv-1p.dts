@@ -1,0 +1,69 @@
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0:pma0 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x00000000>;
+		size = <0x0 0x20000000>;  // 256MB
+	};
+	pma1:pma1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x20000000>;
+		size = <0x0 0x20000000>;  // 256MB
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv:hypervisor-config {
+		compatible = "hv-config";
+		stdout = <&serial0>;
+
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		serial0:serial0 {
+			device = "serial0";
+		};
+
+		mpic {
+			device = "/soc@fe000000/mpic";
+		};
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		label = "p1-linux";
+		cpus = <0 2>;
+		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
+		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+
+		serial2 {
+			device = "serial2";
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0x0>;
+		};
+
+		node-update {
+		        chosen {
+		                linux,stdout-path = "/ccsr@fe000000/serial@11d500";
+		                bootargs = "console=ttyS0,115200";
+		        };
+		};
+	};
+};
