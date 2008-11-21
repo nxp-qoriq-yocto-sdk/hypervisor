@@ -645,6 +645,7 @@ static int load_image(guest_t *guest)
 	uint64_t image_addr;
 	uint64_t guest_addr;
 	uint64_t length;
+	unsigned int row = 1;
 
 	prop = dt_get_prop(guest->partition, "fsl,hv-load-image-table", 0);
 	if (!prop)
@@ -665,6 +666,13 @@ static int load_image(guest_t *guest)
 			continue;
 		}
 
+		// We want everyone to put a length field in the device tree
+		if (!length)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+				 "load_image: guest %s: "
+				 "image #%u should specify a non-zero length\n",
+				 guest->name, row);
+
 		ret = load_image_from_flash(guest, image_addr, guest_addr,
 		                            length ? length : -1,
 		                            first ? &guest->entry : NULL);
@@ -675,6 +683,7 @@ static int load_image(guest_t *guest)
 		}
 
 		first = 0;
+		row++;
 	}
 	
 	return 1;
@@ -1006,10 +1015,9 @@ static void start_guest_primary_nowait(void)
 	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
-	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
-	// map 1GiB, so we don't support loading/booting an OS above that
-	// address.  Also, we pass the guest physical address even though it
-	// should be a guest virtual address, but since we program the TLBs
+	// We only map 1GiB, so we don't support loading/booting an OS above
+	// that address.  We pass the guest physical address even though
+	// it should be a guest virtual address, but since we program the TLBs
 	// such that guest virtual == guest physical at boot time, this works. 
 
 	r3 = guest->dtb_gphys;

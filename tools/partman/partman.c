@@ -46,6 +46,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <arpa/inet.h>
+#include <byteswap.h>
 
 /*
  * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
@@ -74,7 +75,11 @@ struct parameters {
 	unsigned int e_specified:1;
 };
 
-#define PT_NULL      0
+/* Elf file types that we support */
+#define ET_EXEC   2
+#define ET_DYN    3
+
+/* Program header types that we support */
 #define PT_LOAD      1
 
 #define EI_CLASS     4  /* File class */
@@ -242,6 +247,14 @@ static int copy_to_partition(unsigned int partition, void *buffer,
  * @load_address: load address, or -1 to use ELF load address
  * @entry_address: pointer to returned entry address
  *
+ * The "entry segment" is the phdr segment that contains the entry address
+ * for the ELF image.  Usually, this is the first segment.  'entry_paddr'
+ * contains the starting physical address of this segment.  'vbase' contains
+ * the virtual address of this segment.
+ *
+ * 'plowest' contains the starting physical address of the segment that has
+ * the lowest starting physical address.
+ *
  * Returns 0 for failure or non-zero for success
  */
 static int parse_and_copy_elf(unsigned int partition, void *elf,
@@ -250,7 +263,8 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 {
 	struct elf_header *hdr = (struct elf_header *) elf;
 	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
-	unsigned long base = -1;
+	unsigned long entry_paddr = 0;
+	unsigned long plowest = -1;
 	unsigned long vbase = -1;
 	unsigned int i;
 
@@ -280,6 +294,13 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 		return 0;
 	}
 
+	/* We only support ET_EXEC images for now */
+	if (hdr->type != ET_EXEC) {
+		if (verbose)
+			printf("%s: only fixed address ELF images are supported\n", __func__);
+		return 0;
+	}
+
 	/*
 	 * Test the program segment sizes and find the base address at the
 	 * same time.  The base address is the smallest paddr of all PT_LOAD
@@ -297,24 +318,44 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 			return 0;
 		}
 		if (phdr[i].type == PT_LOAD) {
-			if (phdr[i].paddr < base)
-				base = phdr[i].paddr;
-			if (phdr[i].vaddr < vbase)
+			if (phdr[i].paddr < plowest)
+				plowest = phdr[i].paddr;
+
+			// The virtual base address is the virtual address of
+			// the phdr that contains the ELF entry point
+			if ((phdr[i].vaddr <= hdr->entry) &&
+			    (hdr->entry < (phdr[i].vaddr + phdr[i].memsz))) {
 				vbase = phdr[i].vaddr;
+				entry_paddr = phdr[i].paddr;
+			}
 		}
+	}
+
+	if (plowest == -1) {
+		if (verbose)
+			printf("%s: no PT_LOAD program headers in ELF image\n",
+			       __func__);
+		return 0;
+	}
+
+	if (vbase == -1) {
+		if (verbose)
+			printf("%s: ELF image has invalid entry address %x\n",
+			       __func__, hdr->entry);
+		return 0;
 	}
 
 	/* If the user did not specify -a, then we use the real paddr values
 	 * in the ELF image.
 	 */
 	if (load_address == (unsigned long) -1)
-		load_address = base;
+		load_address = plowest;
 
 	/* Copy each PT_LOAD segment to the target partition */
 
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].type == PT_LOAD) {
-			unsigned long target_addr = load_address + (phdr[i].paddr - base);
+			unsigned long target_addr = load_address + (phdr[i].paddr - plowest);
 			int ret;
 
 			if (verbose)
@@ -358,11 +399,19 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	if (verbose) {
 		printf("%s: load address is 0x%lx\n", __func__, load_address);
 		printf("%s: entry address is 0x%lx\n", __func__,
-		       load_address + (hdr->entry - vbase));
+		       load_address + (entry_paddr - plowest) + (hdr->entry - vbase));
 	}
 
+	/* Return the entry point for the image if requested.  'load_address'
+	 * is where the lowest segment is written to.  'entry_paddr - plowest'
+	 * is the offset from that address to the entry segment. 'hdr.entry -
+	 * vbase' is the offset of the entry point within the entry segment.
+	 * Therefore, the entry address is equal to the target address plus the
+	 * offset to the entry segment plus the offset within the entry segment
+	 * of the original entry point.
+	 */
 	if (entry_address)
-		*entry_address = load_address + (hdr->entry - vbase);
+		*entry_address = load_address + (entry_paddr - plowest) + (hdr->entry - vbase);
 
 	return 1;
 }
