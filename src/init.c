@@ -326,8 +326,6 @@ static void process_hv_mem(void *fdt, int offset, int add)
 			continue;
 		}
 
-		printf("addr %llx size %llx base %llx\n", addr, size, bigmap_phys);
-
 		if (add)
 			add_memory(addr, size);
 		else if (addr < bigmap_phys)

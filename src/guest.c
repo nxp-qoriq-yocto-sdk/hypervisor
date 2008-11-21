@@ -185,10 +185,8 @@ static int map_guest_reg_one(guest_t *guest, dt_node_t *node,
 			return ret;
 		}
 
-		if (addrbuf[0] || addrbuf[1]) {
-			printf("%s: %d %x %x\n", __func__, __LINE__, addrbuf[0], addrbuf[1]);
+		if (addrbuf[0] || addrbuf[1])
 			return ERR_BADTREE;
-		}
 
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
