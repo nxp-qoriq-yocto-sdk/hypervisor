@@ -106,7 +106,7 @@ hv-src-$(CONFIG_PAMU) += pamu.c
 hv-src-$(CONFIG_VIRTUAL_I2C) += i2c.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 
-#LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
+LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
 
 OBJS := $(basename $(libos-src-first-y:%=libos/%) \
                    $(libos-src-early-y:%=libos/%) \
