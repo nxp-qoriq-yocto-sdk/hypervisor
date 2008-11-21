@@ -152,6 +152,9 @@ typedef struct guest {
 	 */
 	struct ipi_doorbell *dbell_restart_request;
 
+	/** List of owned devices (dev_owner_t objects) */
+	list_t dev_list;
+
 #ifdef CONFIG_DEVICE_VIRT
 	/** List of virtualized devices (vf_list_t objects). */
 	list_t vf_list;

@@ -861,3 +861,111 @@ dt_node_t *get_cpu_node(dt_node_t *tree, int cpunum)
 	                       get_cpu_node_callback, &ctx);
 	return ctx.ret;
 }
+
+typedef struct assign_ctx {
+	dt_node_t *tree;
+	guest_t *guest;
+} assign_ctx_t;
+
+static uint32_t owner_lock;
+DECLARE_LIST(hv_devs);
+
+int assign_callback(dt_node_t *node, void *arg)
+{
+	assign_ctx_t *ctx = arg;
+	const char *alias;
+	dt_node_t *hwnode;
+	
+	/* Only process immediate children */
+	if (node->parent != ctx->tree)
+		return 0;
+
+	alias = dt_get_prop_string(node, "device");
+	if (!alias) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: malformed device property in %s\n",
+		         __func__, node->name);
+		return 0;
+	}
+
+	hwnode = dt_lookup_alias(hw_devtree, alias);
+	if (!hwnode) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: device %s in %s not found\n",
+		         __func__, alias, node->name);
+		return 0;
+	}
+
+	if (hwnode->parent && hwnode->parent->parent &&
+	    !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: don't know how to assign device %s on bus %s\n",
+		         __func__, alias, hwnode->parent->name);
+		return 0;
+	}
+
+	dev_owner_t *owner = malloc(sizeof(dev_owner_t));
+	if (!owner) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		return ERR_NOMEM;
+	}
+
+	spin_lock(&owner_lock);
+
+	/* Hypervisor ownership of a device is exclusive */
+	if (ctx->guest) {
+		if (!list_empty(&hwnode->owners)) {
+			dev_owner_t *other = to_container(hwnode->owners.next,
+			                                  dev_owner_t, dev_node);
+
+			if (!other->guest) {
+				spin_unlock(&owner_lock);
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			   	      "%s: device %s in %s already assigned to the hypervisor\n",
+		         		__func__, alias, node->name);
+				free(owner);
+				return 0;
+			}
+		}
+		
+		list_add(&ctx->guest->dev_list, &owner->dev_node);
+	} else {
+		if (!list_empty(&hwnode->owners)) {
+			dev_owner_t *other = to_container(hwnode->owners.next,
+			                                  dev_owner_t, dev_node);
+
+			/* If it's already owned when the hv tries to claim it,
+			 * it can only be the hv itself that already owns it.
+			 */
+			assert(!other->guest);
+			assert(hwnode->owners.next->next == &hwnode->owners);
+			spin_unlock(&owner_lock);
+			free(owner);
+			return 0;
+		}
+
+		list_add(&hv_devs, &owner->dev_node);
+	}
+
+	list_add(&hwnode->owners, &owner->dev_node);
+	spin_unlock(&owner_lock);
+
+	return 0;
+}
+
+/** Assign children of a subtree to the specified partition.
+ *
+ * @param[in] tree a partition or hv-config node
+ * @param[in] guest the guest corresponding to the partition, or NULL
+ *   if the node is for the hypervisor.
+ */
+void dt_assign_devices(dt_node_t *tree, guest_t *guest)
+{
+	assign_ctx_t ctx = {	
+		.tree = tree,
+		.guest = guest
+	};
+
+	dt_for_each_prop_value(tree, "device", NULL, 0, assign_callback, &ctx);
+}

@@ -36,10 +36,31 @@
 
 #define CELL_SIZE 4
 
+struct guest;
+
+typedef struct mem_resource {
+	phys_addr_t start, end;
+} mem_resource_t;
+
+extern list_t hv_devs;
+
+typedef struct dev_owner {
+	list_t dev_node, guest_node;
+	struct guest *guest; /* if NULL, owned by hypervisor */
+	struct dt_node *hwnode, *cfgnode;
+} dev_owner_t;
+
 typedef struct dt_node {
 	struct dt_node *parent;
 	list_t children, child_node, props;
 	char *name;
+
+	mem_resource_t *regs;
+	struct interrupt *irqs;
+	int num_regs;
+	int num_irqs;
+
+	list_t owners;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -114,6 +135,8 @@ dt_node_t *get_interrupt(dt_node_t *tree, dt_node_t *node, int intnum,
                          const uint32_t **intspec, int *ncellsp);
 int get_num_interrupts(dt_node_t *tree, dt_node_t *node);
 int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr);
+
+void dt_assign_devices(dt_node_t *tree, struct guest *guest);
 
 phys_addr_t find_memory(void *fdt);
 

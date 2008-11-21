@@ -65,6 +65,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 
 			list_init(&node->children);
 			list_init(&node->props);
+			list_init(&node->owners);
 			break;
 		}
 

@@ -383,6 +383,13 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 	return 0;
 }
 
+static void assign_hv_devs(void)
+{
+	dt_node_t *node = dt_get_first_compatible(config_tree, "hv-config");
+
+	dt_assign_devices(node, NULL);
+}
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t cfg_addr = 0;
@@ -422,8 +429,19 @@ void start(unsigned long devtree_ptr)
 
 	unmap_fdt();
 
+	fdt = map_fdt(cfg_addr);
+	config_tree = unflatten_dev_tree(fdt);
+	if (!config_tree) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+		         "panic: couldn't unflatten config device tree.\n");
+		return;
+	}
+
+	unmap_fdt();
+
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
+	assign_hv_devs(); 
 	pic_init();
 	enable_critint();
 
