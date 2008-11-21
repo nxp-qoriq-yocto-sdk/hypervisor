@@ -17,7 +17,7 @@
 		};
 
 		mpic {
-			device = "/soc/mpic";
+			device = "/soc/pic";
 		};
 
 		iommu {
