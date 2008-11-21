@@ -312,9 +312,17 @@ dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
 	list_for_each(&node->children, i) {
 		dt_node_t *subnode = to_container(i, dt_node_t, child_node);
 
-		if (!strncmp(name, subnode->name, namelen) &&
-		    subnode->name[namelen] == 0)
-			return subnode;
+		if (!strncmp(name, subnode->name, namelen)) {
+			if (subnode->name[namelen] == 0)
+				return subnode;
+
+			/* If the search name has no unit address, and it matches
+			 * the base name of the node, then it's a match.
+			 */
+			if (subnode->name[namelen] == '@' &&
+			    !memchr(name, '@', namelen))
+				return subnode;
+		}
 	}
 
 	if (create) {
