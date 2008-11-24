@@ -138,7 +138,14 @@ static void exclude_memrsv(void *fdt)
 	}
 }
 
-static void pic_init(void)
+static int mpic_probe(driver_t *drv, device_t *dev);
+
+static driver_t __driver mpic_driver = {
+	.compatible = "chrp,open-pic",
+	.probe = mpic_probe
+};
+
+static int mpic_probe(driver_t *drv, device_t *dev)
 {
 	int coreint = 0;
 	dt_node_t *chosen;
@@ -147,9 +154,11 @@ static void pic_init(void)
 	if (chosen && dt_get_prop(chosen, "fsl,hv-pic-coreint", 0))
 		coreint = 1;
 
-	printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
-		"coreint mode is %d\n", coreint);
 	mpic_init(coreint);
+
+	dev->driver = &mpic_driver;
+	dev->irqctrl = &mpic_ops;
+	return 0;
 }
 
 uint32_t rootnaddr, rootnsize;
@@ -389,11 +398,62 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 	return 0;
 }
 
+static dt_node_t *stdout_node;
+static int stdout_is_device;
+
+static void find_hv_console(dt_node_t *hvconfig)
+{
+	dt_prop_t *prop = dt_get_prop(hvconfig, "stdout", 0);
+	if (prop) {
+		if (prop->len == 4)
+			stdout_node = dt_lookup_phandle(config_tree,
+			                                *(const uint32_t *)prop->data);
+
+		if (stdout_node) {
+			const char *dev = dt_get_prop_string(stdout_node, "device");
+			if (dev) {
+				stdout_node = dt_lookup_alias(hw_devtree, dev);
+				stdout_is_device = 1;
+			}
+		} else {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: bad stdout phandle\n", __func__);
+		}
+	}
+
+	if (!stdout_node) {
+		stdout_node = dt_lookup_alias(hw_devtree, "stdout");
+		stdout_is_device = 1;
+	}
+
+	if (stdout_is_device)
+		open_stdout_chardev(stdout_node);
+}
+
 static void assign_hv_devs(void)
 {
 	dt_node_t *node = dt_get_first_compatible(config_tree, "hv-config");
 
 	dt_assign_devices(node, NULL);
+	find_hv_console(node);
+
+	list_for_each(&hv_devs, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+
+		dt_lookup_regs(owner->hwnode);
+	}
+
+	list_for_each(&hv_devs, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+
+		dt_lookup_irqs(owner->hwnode);
+	}
+
+	list_for_each(&hv_devs, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+
+		dt_bind_driver(owner->hwnode);
+	}
 }
 
 void start(unsigned long devtree_ptr)
@@ -448,12 +508,7 @@ void start(unsigned long devtree_ptr)
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	assign_hv_devs(); 
-	pic_init();
 	enable_critint();
-
-#ifdef CONFIG_LIBOS_NS16550
-	create_ns16550();
-#endif
 
 #ifdef CONFIG_BYTE_CHAN
 	create_byte_channels();
@@ -461,9 +516,9 @@ void start(unsigned long devtree_ptr)
 	create_muxes();
 #endif
 	connect_global_byte_channels();
-#endif
 
-	open_stdout();
+	open_stdout_bytechan(stdout_node);
+#endif
 
 	vmpic_global_init();
 

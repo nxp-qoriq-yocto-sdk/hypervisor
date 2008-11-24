@@ -38,10 +38,6 @@
 
 struct guest;
 
-typedef struct mem_resource {
-	phys_addr_t start, end;
-} mem_resource_t;
-
 extern list_t hv_devs;
 
 typedef struct dev_owner {
@@ -55,12 +51,9 @@ typedef struct dt_node {
 	list_t children, child_node, props;
 	char *name;
 
-	mem_resource_t *regs;
-	struct interrupt *irqs;
-	int num_regs;
-	int num_irqs;
-
+	device_t dev; /** libos device */
 	list_t owners;
+	struct guest *irq_owner;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -111,6 +104,8 @@ dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 
 uint32_t dt_get_phandle(dt_node_t *node);
 
+int dt_owned_by(dt_node_t *node, struct guest *guest);
+
 /** Hardware device tree passed by firmware */
 extern dt_node_t *hw_devtree;
 
@@ -137,6 +132,10 @@ int get_num_interrupts(dt_node_t *tree, dt_node_t *node);
 int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr);
 
 void dt_assign_devices(dt_node_t *tree, struct guest *guest);
+void dt_lookup_regs(dt_node_t *node);
+void dt_lookup_irqs(dt_node_t *node);
+
+int dt_bind_driver(dt_node_t *node);
 
 phys_addr_t find_memory(void *fdt);
 
@@ -184,5 +183,8 @@ void open_stdin(void);
 extern struct queue *stdin, *stdout;
 
 dt_node_t *get_cpu_node(dt_node_t *tree, int cpu);
+
+int open_stdout_chardev(dt_node_t *node);
+int open_stdout_bytechan(dt_node_t *node);
 
 #endif

@@ -36,6 +36,7 @@ config LIBOS_DEPS
 	select LIBOS_CONSOLE
 	select LIBOS_MP
 	select LIBOS_VIRT_ALLOC
+	select LIBOS_DRIVER_MODEL
 
 config BYTE_CHAN
 	bool "Byte-channel support"

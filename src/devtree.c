@@ -30,7 +30,6 @@
 #include <errors.h>
 #include <byte_chan.h>
 
-#include <libos/ns16550.h>
 #include <libos/queue.h>
 #include <libos/chardev.h>
 #include <libos/interrupts.h>
@@ -388,62 +387,34 @@ void *ptr_from_node(dt_node_t *node, const char *type)
 	return *(void *const *)prop->data;
 }
 
-#ifdef CONFIG_LIBOS_NS16550
-static int create_one_ns16550(dt_node_t *node, void *arg)
-{
-	int ret;
-	phys_addr_t addr;
-	const uint32_t *intspec;
-	dt_node_t *irqnode;
-	interrupt_t *irq = NULL;
-	int ncells;
-
-	ret = dt_get_reg(node, 0, &addr, NULL);
-	if (ret < 0) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "ns16550 failed to get reg: %d\n", ret);
-		return 0;
-	}
-
-	// FIXME: clock-frequency
-	irqnode = get_interrupt(hw_devtree, node, 0, &intspec, &ncells);
-	if (irqnode)
-		irq = get_mpic_irq(intspec, ncells);
-	if (irq) {
-		ret = irq->ops->config_by_intspec(irq, intspec, ncells);
-		if (ret < 0) {
-			printf("ns16550 irq config failed: %d\n", ret);
-			irq = NULL;
-		} else {
-			irq->ops->set_priority(irq, 15);
-		}
-	}
-
-	chardev_t *cd = ns16550_init((uint8_t *)(unsigned long)
-	                             (CCSRBAR_VA + (addr - CCSRBAR_PA)),
-	                             irq, 0, 16);
-
-	dt_set_prop(node, "fsl,hv-internal-chardev-ptr", &cd, sizeof(cd));
-	return 0;
-}
-
-void create_ns16550(void)
-{
-	dt_for_each_compatible(hw_devtree, "ns16550", create_one_ns16550, NULL);
-}
-#endif
-
 chardev_t *cd_console;
 byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;
 
-static int open_stdout_chardev(dt_node_t *node)
+int open_stdout_chardev(dt_node_t *node)
 {
 	chardev_t *cd;
-	
-	cd = ptr_from_node(node, "chardev");
-	if (!cd)
+
+	if (!dt_owned_by(node, NULL)) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: stdout (%s) is not owned by the hypervisor\n",
+		         __func__, node->name);
+
 		return ERR_INVALID;
+	}
+
+	dt_lookup_regs(node);
+	dt_lookup_irqs(node);
+	dt_bind_driver(node);
+
+	cd = node->dev.chardev;
+	if (!cd) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: stdout (%s) does not expose a character device\n",
+		         __func__, node->name);
+
+		return ERR_INVALID;
+	}
 
 	console_init(cd);
 
@@ -471,7 +442,7 @@ static int open_stdout_chardev(dt_node_t *node)
 }
 
 #ifdef CONFIG_BYTE_CHAN
-static int open_stdout_bytechan(dt_node_t *node)
+int open_stdout_bytechan(dt_node_t *node)
 {
 	byte_chan_t *bc;
 	
@@ -489,22 +460,6 @@ static int open_stdout_bytechan(dt_node_t *node)
 	return 0;
 }
 #endif
-
-void open_stdout(void)
-{
-	// Temporarily fall back on serial0 if no stdout; eventually, get
-	// stdout from config tree.
-	dt_node_t *node = dt_lookup_alias(hw_devtree, "stdout");
-	if (!node)
-		node = dt_lookup_alias(hw_devtree, "serial0");
-	if (!node)
-		return;
-
-	open_stdout_chardev(node);
-#ifdef CONFIG_BYTE_CHAN
-	open_stdout_bytechan(node);
-#endif
-}
 
 #ifdef CONFIG_SHELL
 int open_stdin_chardev(chardev_t *cd)
@@ -862,13 +817,36 @@ dt_node_t *get_cpu_node(dt_node_t *tree, int cpunum)
 	return ctx.ret;
 }
 
+static uint32_t owner_lock;
+DECLARE_LIST(hv_devs);
+
+static int __dt_owned_by(dt_node_t *node, struct guest *guest)
+{
+	list_for_each(&node->owners, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, dev_node);
+		
+		if (owner->guest == guest)
+			return 1;
+	}
+
+	return 0;
+}
+
+int dt_owned_by(dt_node_t *node, struct guest *guest)
+{
+	int ret;
+
+	spin_lock(&owner_lock);
+	ret = __dt_owned_by(node, guest);
+	spin_unlock(&owner_lock);
+
+	return ret;
+}
+
 typedef struct assign_ctx {
 	dt_node_t *tree;
 	guest_t *guest;
 } assign_ctx_t;
-
-static uint32_t owner_lock;
-DECLARE_LIST(hv_devs);
 
 int assign_callback(dt_node_t *node, void *arg)
 {
@@ -896,7 +874,14 @@ int assign_callback(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	if (hwnode->parent && hwnode->parent->parent &&
+	if (!hwnode->parent) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: cannot assign the root node %s from %s\n",
+		         __func__, alias, node->name);
+		return 0;
+	}
+
+	if (hwnode->parent->parent &&
 	    !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: don't know how to assign device %s on bus %s\n",
@@ -910,6 +895,9 @@ int assign_callback(dt_node_t *node, void *arg)
 		         "%s: out of memory\n", __func__);
 		return ERR_NOMEM;
 	}
+
+	owner->cfgnode = node;
+	owner->hwnode = hwnode;
 
 	spin_lock(&owner_lock);
 
@@ -929,7 +917,7 @@ int assign_callback(dt_node_t *node, void *arg)
 			}
 		}
 		
-		list_add(&ctx->guest->dev_list, &owner->dev_node);
+		list_add(&ctx->guest->dev_list, &owner->guest_node);
 	} else {
 		if (!list_empty(&hwnode->owners)) {
 			dev_owner_t *other = to_container(hwnode->owners.next,
@@ -945,7 +933,7 @@ int assign_callback(dt_node_t *node, void *arg)
 			return 0;
 		}
 
-		list_add(&hv_devs, &owner->dev_node);
+		list_add(&hv_devs, &owner->guest_node);
 	}
 
 	list_add(&hwnode->owners, &owner->dev_node);
@@ -969,3 +957,190 @@ void dt_assign_devices(dt_node_t *tree, guest_t *guest)
 
 	dt_for_each_prop_value(tree, "device", NULL, 0, assign_callback, &ctx);
 }
+
+/** Read the memory resources of the given node */
+void dt_lookup_regs(dt_node_t *node)
+{
+	dt_prop_t *prop;
+	uint32_t naddr, nsize;
+	const uint32_t *reg;
+	int ret;
+	
+	spin_lock(&owner_lock);
+
+	if (node->dev.regs)
+		goto out; 
+	
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop)
+		goto out;
+
+	ret = get_addr_format_nozero(node->parent, &naddr, &nsize);
+	if (ret < 0)
+		goto out; 
+
+	reg = prop->data;
+	node->dev.num_regs = prop->len / ((naddr + nsize) * 4);
+	
+	if (prop->len % ((naddr + nsize) * 4) != 0)
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Ignoring junk at end of reg in %s\n",
+		         __func__, node->name);
+
+	node->dev.regs = alloc_type_num(mem_resource_t, node->dev.num_regs);
+	if (!node->dev.regs) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		goto out;
+	}
+
+	for (int i = 0; i < node->dev.num_regs; i++) {
+		phys_addr_t addr, size;
+
+		ret = xlate_reg(node, &reg[(naddr + nsize) * i], &addr, &size);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d on reg resource %d in %s\n",
+			         __func__, ret, i, node->name);
+			continue;
+		}
+
+		node->dev.regs[i].start = addr;
+		node->dev.regs[i].size = size;
+
+		/* Create virtual mappings for HV-owned devices */
+		if (__dt_owned_by(node, NULL))
+			node->dev.regs[i].virt = map(addr, size,
+			                             TLB_MAS2_IO, TLB_MAS3_KERN);
+	}
+
+out:
+	spin_unlock(&owner_lock);
+}
+
+int dt_bind_driver(dt_node_t *node)
+{
+	dt_prop_t *compat;
+
+	/* Don't bind twice. */
+	if (node->dev.driver)
+		return 0;
+	
+	compat = dt_get_prop(node, "compatible", 0);
+	if (!compat)
+		return ERR_UNHANDLED;
+
+	return libos_bind_driver(&node->dev, compat->data, compat->len);
+}
+
+/* Maximum nesting of IRQ controllers, to avoid stack overruns
+ * and detect interrupt loops.
+ */
+#define MAX_IRQ_DEPTH 5
+
+static void __dt_lookup_irqs(dt_node_t *node, int depth);
+
+static interrupt_t *lookup_irq(dt_node_t *domain, const uint32_t *intspec,
+                               uint32_t nint, int depth)
+{
+	interrupt_t *irq;
+	int_ops_t *ctrl;
+
+	if (!domain->dev.driver) {
+		__dt_lookup_irqs(domain, depth + 1);
+		dt_bind_driver(domain);
+	}
+
+	ctrl = domain->dev.irqctrl;
+	if (!ctrl) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: %s does not expose an interrupt controller\n",
+		         __func__, domain->name);
+
+		return NULL;
+	}
+
+	irq = ctrl->get_irq(&domain->dev, intspec, nint);
+	if (!irq) {
+		/* For simplicity, we assume the first cell of the intspec is
+		 * the most meaningful.
+		 */
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: cannot register interrupt %u on %s\n",
+		         __func__, *intspec, domain->name);
+	}
+
+	return irq;
+}
+
+static void __dt_lookup_irqs(dt_node_t *node, int depth)
+{
+	dt_prop_t *prop;
+	uint32_t nint, naddr;
+	const uint32_t *ints;
+	dt_node_t *domain;
+	int ret;
+	
+	if (node->dev.irqs)
+		return; 
+
+	if (depth > MAX_IRQ_DEPTH) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: IRQ nesting too deep in %s\n",
+		         __func__, node->name);
+		return;
+	}
+	
+	prop = dt_get_prop(node, "interrupts", 0);
+	if (!prop)
+		return;
+
+	domain = get_interrupt_domain(hw_devtree, node);
+	if (!domain) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s has interrupts but no interrupt-parent\n",
+		         __func__, node->name);
+		return;
+	}
+
+	if (!dt_get_prop(domain, "interrupt-controller", 0)) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: interrupt parent %s of %s is a nexus, FIXME\n",
+		         __func__, domain->name, node->name);
+		return;
+	}
+
+	/* Only process hv-owned IRQ controllers */
+	if (!__dt_owned_by(domain, NULL))
+		return;
+
+	ret = dt_get_int_format(domain, &nint, &naddr);
+	if (ret < 0)
+		return;
+
+	ints = prop->data;
+	node->dev.num_irqs = prop->len / (nint * 4);
+	
+	if (prop->len % (nint * 4) != 0)
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Ignoring junk at end of interrupts in %s\n",
+		         __func__, node->name);
+
+	node->dev.irqs = alloc_type_num(interrupt_t *, node->dev.num_irqs);
+	if (!node->dev.irqs) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		return;
+	}
+
+	for (int i = 0; i < node->dev.num_irqs; i++)
+		node->dev.irqs[i] = lookup_irq(domain, &ints[i * nint], nint, depth);
+}
+
+void dt_lookup_irqs(dt_node_t *node)
+{
+	spin_lock(&owner_lock);
+	__dt_lookup_irqs(node, 0);
+	spin_unlock(&owner_lock);
+}
+

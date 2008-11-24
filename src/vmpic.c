@@ -108,8 +108,7 @@ int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
 	 * and see if this MPIC vector is a valid guest handle & it's
 	 * type is an interrupt type, then simply resuse it.
 	 */
-
- 	irq = get_mpic_irq(irqspec, ncells);
+ 	irq = NULL; //get_mpic_irq(irqspec, ncells);
  	if (!irq)
  		return ERR_INVALID;
 

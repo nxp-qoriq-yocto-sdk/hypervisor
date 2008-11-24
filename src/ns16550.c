@@ -1,7 +1,9 @@
-
-/*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
- *
+/** @file
+ * NS16550 glue code to libos driver
+ */
+/* Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Author: Scott Wood <scottwood@freescale.com>
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -23,50 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-ENTRY(_start)
+#include <libos/libos.h>
+#include <libos/interrupts.h>
+#include <libos/ns16550.h>
 
-OUTPUT_ARCH(powerpc:common)
+#include <errors.h>
+#include <devtree.h>
 
-SECTIONS
+static int ns16550_probe(driver_t *drv, device_t *dev);
+
+static driver_t __driver ns16550 = {
+	.compatible = "ns16550",
+	.probe = ns16550_probe
+};
+
+static int ns16550_probe(driver_t *drv, device_t *dev)
 {
-	. = 0x00100000;
+	chardev_t *cd;
+	interrupt_t *irq = NULL;
+	dt_prop_t *prop;
+	dt_node_t *node = to_container(dev, dt_node_t, dev);
+	uint64_t freq = 0;
 
-	.text : {
-		*(.text)
+	if (dev->num_regs < 1 || !dev->regs[0].virt)
+		return ERR_INVALID;
+
+	if (dev->num_irqs >= 1)
+		irq = dev->irqs[0];
+
+	prop = dt_get_prop(node, "clock-frequency", 0);
+	if (prop && prop->len == 4) {
+		freq = *(const uint32_t *)prop->data;
+	} else if (prop && prop->len == 8) {
+		freq = *(const uint64_t *)prop->data;
+	} else {
+		printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
+		         "%s: bad/missing clock-frequency in %s\n",
+		         __func__, node->name);
 	}
 
-	.rodata : {
-		*(.rodata)
-		*(.rodata.*)
-	}
+	cd = ns16550_init(dev->regs[0].virt, irq, freq, 16);
 
-	. = ALIGN(4096);
-	.data : {
-		*(.data)
-		*(.sdata)
-		
-		. = ALIGN(8);
-		extable_begin = .;
-		*(.extable)
-		extable_end = .;
-
-		. = ALIGN(8);
-		shellcmd_begin = .;
-		*(.shellcmd)
-		shellcmd_end = .;
-
-		. = ALIGN(8);
-		driver_begin = .;
-		*(.libos.drivers)
-		driver_end = .;
-	}
-
-	. = ALIGN(8);
-	bss_start = .;
-	.bss : {
-		*(.sbss)
-		*(.bss)
-	}
-	bss_end = .;
-	_end = .;
+	dev->driver = &ns16550;
+	dev->chardev = cd;
+	return 0;
 }
