@@ -45,15 +45,17 @@ $(O).config $(O)include/config/auto.conf.cmd: ;
 
 -include $(O)include/config/auto.conf.cmd
 
-$(O)include/config/auto.conf: $(O).config $(O)include/config/auto.conf.cmd
+CONFIGS := config xconfig gconfig menuconfig oldconfig silentoldconfig randconfig defconfig allyesconfig allnoconfig
+
+$(O)include/config/auto.conf: $(O).config $(O)include/config/auto.conf.cmd Kconfig $(LIBOS_DIR)/Kconfig
 	@$(MAKE) silentoldconfig
 
 .PHONY: FORCE
-help config %config: FORCE
+help $(CONFIGS): FORCE
 	@$(MKDIR) $(O)bin/
 	@$(MAKE) -C $(O) -f $(src)kconfig/Makefile $@
 
-non-config := $(filter-out %config clean distclean help, $(MAKECMDGOALS))
+non-config := $(filter-out $(CONFIGS) clean distclean help, $(MAKECMDGOALS))
 ifeq ($(MAKECMDGOALS),)
 	non-config := all
 endif
