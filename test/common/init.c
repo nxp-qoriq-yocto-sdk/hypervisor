@@ -56,10 +56,11 @@ int get_uart_offset(void);
 void *fdt;
 int coreint;
 
+/* FIXME: do proper reg/ranges parsing, and don't assume it's in CCSR */
 int get_uart_offset()
 {
 	int ret;
-	int *handle_p;
+	const uint32_t *prop;
 	const char *path;
 
 	ret = fdt_subnode_offset(fdt, 0, "aliases");
@@ -72,9 +73,11 @@ int get_uart_offset()
 
 	ret = fdt_path_offset(fdt, path);
 
-	handle_p = (int *)fdt_getprop(fdt, ret, "reg", &ret);
+	prop = fdt_getprop(fdt, ret, "reg", &ret);
+	if (!prop)
+		return 0;
 
-	return *handle_p;
+	return prop[1] - CCSRBAR_PA;
 }
 
 void init(unsigned long devtree_ptr)
