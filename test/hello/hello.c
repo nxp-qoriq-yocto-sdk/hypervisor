@@ -69,7 +69,11 @@ void start(unsigned long devtree_ptr)
 		return;
 	}
 
-	str = "hello world\r\n";
+	str = "hello world: ";
+	status = fh_byte_channel_send(handle, strlen(str), str);
+	str = "PASSED\r\n";
+	status = fh_byte_channel_send(handle, strlen(str), str);
+	str = "Test Complete\r\n";
 	status = fh_byte_channel_send(handle, strlen(str), str);
 
 }
