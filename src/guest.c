@@ -403,85 +403,55 @@ static void reset_spintbl(guest_t *guest)
 	}
 }
 
-static const char *cpu_clocks[] = {
-	"clock-frequency",
-	"timebase-frequency",
-	"bus-frequency",
-};
-
-static int copy_cpu_clocks(guest_t *guest, dt_node_t *vnode, int vcpu,
-                           const uint32_t *cpulist, int cpulist_len)
+static int copy_cpu_node(guest_t *guest, int vcpu,
+                         const uint32_t *cpulist, int cpulist_len,
+                         dt_node_t **nodep)
 {
-	dt_node_t *node;
-	dt_prop_t *prop;
-	int pcpu, i;
+	dt_node_t *node, *gnode;
+	int pcpu, ret;
+	char buf[32];
 	
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
 	if (pcpu < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "copy_cpu_clocks: partition has no cpu %d\n", vcpu);
+		         "%s: partition has no cpu %d\n", __func__, vcpu);
 		return pcpu;
 	}
 
 	node = get_cpu_node(hw_devtree, pcpu);
 	if (!node) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "copy_cpu_clocks: vcpu %d maps to non-existent CPU %d\n",
-		         vcpu, pcpu);
+		         "%s: vcpu %d maps to non-existent CPU %d\n",
+		         __func__, vcpu, pcpu);
 		return ERR_RANGE;
 	}
 
-	for (i = 0; i < sizeof(cpu_clocks) / sizeof(char *); i++) {
-		int ret;
-
-		prop = dt_get_prop(node, cpu_clocks[i], 0);
-		if (!prop) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			         "copy_cpu_clocks: failed to read clock property");
-
-			return ERR_BADTREE;
-		}
-
-		ret = dt_set_prop(vnode, cpu_clocks[i], prop->data, prop->len);
-		if (ret < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "copy_cpu_clocks: failed to set clock property, "
-			         "error %d\n", ret);
-
-			return ret;
-		}
-	}
-
-	return 0;
-} 
-
-typedef struct create_guest_spin_table_ctx {
-	guest_t *guest;
-	const uint32_t *cpulist;
-	int cpulist_len;
-} create_guest_spin_table_ctx_t;
-
-static int create_guest_spin_table_cpu(dt_node_t *node, void *arg)
-{
-	create_guest_spin_table_ctx_t *ctx = arg;
-	uint64_t spin_addr;
-	dt_prop_t *prop;
-	int pcpu, ret;
+	snprintf(buf, sizeof(buf), "cpu@%x", vcpu);
+	gnode = dt_get_subnode(guest->devtree, buf, 1);
+	if (!gnode)
+		return ERR_NOMEM;
 	
-	prop = dt_get_prop(node, "reg", 0);
-	if (!prop || prop->len != 4) {
-		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-		         "create_guest_spin_table: missing/bad cpu reg property\n");
-		return ERR_BADTREE;
-	}
-	pcpu = *(const uint32_t *)prop->data;
-
-	ret = copy_cpu_clocks(ctx->guest, node, pcpu,
-	                      ctx->cpulist, ctx->cpulist_len);
+	ret = dt_merge_tree(gnode, node, 0);
 	if (ret < 0)
 		return ret;
 
-	if (pcpu == 0)
+	*nodep = gnode;
+	return 0;
+} 
+
+static int create_guest_spin_table_cpu(guest_t *guest, int vcpu,
+                                       const uint32_t *cpulist,
+                                       int cpulist_len)
+{
+	uint64_t spin_addr;
+	dt_node_t *node;
+	int ret;
+	
+	ret = copy_cpu_node(guest, vcpu, cpulist, cpulist_len, &node);
+	if (ret < 0)
+		return ret;
+
+	if (vcpu == 0)
 		return dt_set_prop_string(node, "status", "okay");
 
 	ret = dt_set_prop_string(node, "status", "disabled");
@@ -492,7 +462,7 @@ static int create_guest_spin_table_cpu(dt_node_t *node, void *arg)
 	if (ret < 0)
 		return ret;
 
-	spin_addr = 0xfffff000 + pcpu * sizeof(struct boot_spin_table);
+	spin_addr = 0xfffff000 + vcpu * sizeof(struct boot_spin_table);
 	return dt_set_prop(node, "cpu-release-addr", &spin_addr, 8);
 }
 
@@ -502,12 +472,6 @@ static int create_guest_spin_table(guest_t *guest,
 {
 	unsigned long rpn;
 	int ret, i;
-
-	create_guest_spin_table_ctx_t	ctx = {
-		.guest = guest,
-		.cpulist = cpulist,
-		.cpulist_len = cpulist_len
-	};
 
 	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
 	if (!guest->spintbl)
@@ -523,14 +487,17 @@ static int create_guest_spin_table(guest_t *guest,
 	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
 
-	ret = dt_for_each_prop_value(guest->devtree, "device_type", "cpu", 4,
-	                             create_guest_spin_table_cpu, &ctx);
+	for (i = 0; i < guest->cpucnt; i++) {
+		ret = create_guest_spin_table_cpu(guest, i, cpulist, cpulist_len);
 
-	if (ret < 0)
-		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
-		         "create_guest_spin_table: error %d\n", ret);
+		if (ret < 0) {
+			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			         "%s: error %d\n", __func__, ret);
+			return ret;
+		}
+	}
 
-	return ret;
+	return 0;
 }
 
 /**
