@@ -647,9 +647,9 @@ error:
  * If the image is an ELF, then 'length' is used only to verify the image
  * data.  To skip verification, set length to -1.
  */
-static int load_image_from_flash(guest_t *guest, phys_addr_t image,
-                                 phys_addr_t guest_phys, size_t length,
-                                 register_t *entry)
+static int load_image(guest_t *guest, phys_addr_t image,
+                      phys_addr_t guest_phys, size_t *length,
+                      register_t *entry)
 {
 	int ret;
 
@@ -663,16 +663,11 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image,
 
 	/* Neither an ELF image nor uImage, so it must be a binary. */
 
-	if (!length || (length == (size_t) -1)) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "load_image_from_flash: missing or invalid image size\n");
-		return ERR_BADTREE;
-	}
-
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-	         "loading binary image from flash\n");
+	         "loading binary image from %#llx to %#llx\n",
+	         image, guest_phys);
 
-	if (copy_phys_to_gphys(guest->gphys, guest_phys, image, length) != length)
+	if (copy_phys_to_gphys(guest->gphys, guest_phys, image, *length) != *length)
 		return ERR_BADADDR;
 
 	if (entry)
@@ -681,57 +676,87 @@ static int load_image_from_flash(guest_t *guest, phys_addr_t image,
 	return 0;
 }
 
-/**
- * If an ELF or binary image exists, load it.  This must be called after
- * map_guest_reg_all(), because that function creates some of the TLB
- * mappings we need.
- *
- * Returns 1 if the image is loaded successfully, 0 if no image, negative on
- * error.
- */
-static int load_image(guest_t *guest)
+static int load_image_table(guest_t *guest, const char *table,
+                            int entry, int rootfs)
 {
-	int ret, first = 1;
+	int ret;
 	dt_prop_t *prop;
-	const uint32_t *entry, *end;
+	const uint32_t *data, *end;
 	uint64_t image_addr;
 	uint64_t guest_addr;
-	uint64_t length;
+	size_t length;
 
-	prop = dt_get_prop(guest->partition, "load-image-table", 0);
+	prop = dt_get_prop(guest->partition, table, 0);
 	if (!prop)
 		return 0;
 
-	entry = prop->data;
+	data = prop->data;
 	end = (const uint32_t *)((uintptr_t)prop->data + prop->len);
 
-	while (entry + rootnaddr + rootnaddr + rootnsize <= end) {
-		image_addr = int_from_tree(&entry, rootnaddr);
-		guest_addr = int_from_tree(&entry, rootnaddr);
-		length = int_from_tree(&entry, rootnsize);
+	while (data + rootnaddr + rootnaddr + rootnsize <= end) {
+		image_addr = int_from_tree(&data, rootnaddr);
+		guest_addr = int_from_tree(&data, rootnaddr);
+		length = int_from_tree(&data, rootnsize);
 
 		if (length != (size_t)length) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "load_image: guest %s: invalid length %#llx\n",
+			         "load_image: guest %s: invalid length %#zx\n",
 			         guest->name, length);
 			continue;
 		}
 
-		ret = load_image_from_flash(guest, image_addr, guest_addr,
-		                            length ? length : -1,
-		                            first ? &guest->entry : NULL);
+		ret = load_image(guest, image_addr, guest_addr,
+		                 &length, entry ? &guest->entry : NULL);
 		if (ret < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "guest %s: could not load image\n", guest->name);
 			return ret;
 		}
 
-		first = 0;
+		if (rootfs) {
+			dt_node_t *chosen = dt_get_subnode(guest->devtree, "chosen", 1);
+			if (!chosen)
+				goto nomem;
+				
+			ret = dt_set_prop(chosen, "linux,initrd-start",
+			                  &guest_addr, sizeof(guest_addr));
+			if (ret < 0)
+				goto nomem;
+
+			guest_addr += length;
+
+			ret = dt_set_prop(chosen, "linux,initrd-end",
+			                  &guest_addr, sizeof(guest_addr));
+			if (ret < 0)
+				goto nomem;
+		}
+
+		if (entry || rootfs) {
+			if (data != end)
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: ignoring junk at end of %s in %s\n",
+				         __func__, table, guest->partition->name);
+
+			return 1;
+		}
 	}
 	
 	return 1;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+
+	return ERR_NOMEM;
 }
-		
+
+static int load_images(guest_t *guest)
+{
+	load_image_table(guest, "load-image-table", 0, 0);
+	load_image_table(guest, "linux-rootfs", 0, 1);
+	return load_image_table(guest, "guest-image", 1, 0);
+}
+
 static const uint32_t hv_version[4] = {
 	CONFIG_HV_MAJOR_VERSION,
 	CONFIG_HV_MINOR_VERSION,
@@ -1081,7 +1106,7 @@ static void start_guest_primary(void)
 
 	assert(guest->state == guest_starting);
 
-	ret = load_image(guest);
+	ret = load_images(guest);
 	if (ret <= 0) {
 		guest->state = guest_stopped;
 
@@ -1341,7 +1366,7 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	dt_node_t *node;
 	const uint32_t *propdata;
 	int gpir;
-	char buf[32];
+	char buf[64];
 
 	/* count number of cpus for this partition and alloc data struct */
 	guest->cpucnt = count_cpus(cpus, cpus_len);
@@ -1379,7 +1404,10 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	if (ret < 0)
 		goto fail;
 
-	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform%csimple-bus", 0);
+	/* FIXME: hardcoded p4080 */
+	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform-p4080%csimple-bus", 0);
+	assert(ret < sizeof(buf));
+	
 	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1); 
 	if (ret < 0)
 		goto fail;
@@ -1454,6 +1482,15 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	// Get the watchdog timeout options
 	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
+
+	node = dt_get_subnode(guest->partition, "node-update", 0);
+	if (node) {
+		ret = dt_merge_tree(guest->devtree, node, 1);
+		if (ret < 0)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: error %d merging partition node-update\n",
+			         __func__, ret);
+	}
 
 	start_guest_primary();
 	return 0;

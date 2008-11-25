@@ -35,6 +35,7 @@ $guest_image[2]  = "rootfs.ext2.gz"
 $guest_addr[2]   = 0x01000000
 
 $kernel_image  = "hv.uImage"
+$kernel_cmdline = "config-addr=0xe8f00000"
 
 add-directory "%script%" -prepend
 add-directory "%script%/../sim" -prepend

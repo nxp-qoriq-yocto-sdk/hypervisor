@@ -98,7 +98,7 @@ int is_elf(void *image)
  * Per ePAPR spec, the destination address encoded in the ELF file is
  * ignored.
  */
-int load_elf(guest_t *guest, phys_addr_t image, unsigned long length,
+int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
              phys_addr_t target, register_t *entry)
 {
 	struct elf_header hdr;
@@ -113,7 +113,8 @@ int load_elf(guest_t *guest, phys_addr_t image, unsigned long length,
 		return ERR_UNHANDLED;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-	         "loading ELF image from flash\n");
+	         "loading ELF image from %#llx to %#llx\n",
+	         image, target);
 
 	/* We only support 32-bit for now */
 	if (hdr.ident[EI_CLASS] != ELFCLASS32) {
@@ -144,7 +145,7 @@ int load_elf(guest_t *guest, phys_addr_t image, unsigned long length,
 			return ERR_BADIMAGE;
 		}
 
-		if (phdr.offset + phdr.memsz > length) {
+		if (phdr.offset + phdr.memsz > *length) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "load_elf: image size exceeds target window\n");
 			return ERR_BADIMAGE;

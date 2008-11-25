@@ -9,12 +9,12 @@
 	pma0:pma0 {
 		compatible = "phys-mem-area";
 		addr = <0x0 0x00000000>;
-		size = <0x0 0x20000000>;  // 256MB
+		size = <0x0 0x20000000>;  // 512MB
 	};
 	pma1:pma1 {
 		compatible = "phys-mem-area";
 		addr = <0x0 0x20000000>;
-		size = <0x0 0x20000000>;  // 256MB
+		size = <0x0 0x20000000>;  // 512MB
 	};
 
 	// =====================================================
@@ -34,7 +34,7 @@
 		};
 
 		mpic {
-			device = "/soc@fe000000/mpic";
+			device = "/soc/pic";
 		};
 	};
 
@@ -56,14 +56,17 @@
 		gpma0 {
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma1>;
-			guest-addr = <0x0>;
+			guest-addr = <0 0>;
 		};
 
 		node-update {
-		        chosen {
-		                linux,stdout-path = "/ccsr@fe000000/serial@11d500";
-		                bootargs = "console=ttyS0,115200";
-		        };
+			chosen {
+				/* We should probably provide fixup for linux,stdout-path
+				 * similar to aliases.
+				 */
+				linux,stdout-path = "/serial2";
+				bootargs = "console=ttyS0,115200";
+			};
 		};
 	};
 };

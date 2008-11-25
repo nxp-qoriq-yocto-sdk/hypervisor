@@ -62,42 +62,6 @@ struct image_header {
 };
 
 /**
- * Add linux,initrd-start and linux,initrd-end properties into chosen
- * node of guest device tree.
- *
- * @initrd_start: guest physical start address of initrd image.
- * @initrd_end: guest physical end address of initrd image.
- */
-static int add_initrd_start_end_to_guest_dt(guest_t *guest,
-					    phys_addr_t initrd_start,
-					    phys_addr_t initrd_end)
-{
-	dt_node_t *chosen;
-	int ret = ERR_NOMEM;
-
-	chosen = dt_get_subnode(guest->devtree, "chosen", 1);
-	if (!chosen)
-		goto err;
-
-	ret = dt_set_prop(chosen, "linux,initrd-start",
-	                  &initrd_start, sizeof(initrd_start));
-	if (ret < 0)
-		goto err;
-
-	ret = dt_set_prop(chosen, "linux,initrd-end",
-	                  &initrd_end, sizeof(initrd_end));
-	if (ret < 0)
-		goto err;
-
-	return 0;
-
-err:
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "%s: error %d\n", __func__, ret);
-	return ret;
-}
-
-/**
  * Parse uImage, generated using mkimage and load it in guest memory
  *
  * @image: Pointer to the uimage, generated using mkimage
@@ -105,7 +69,7 @@ err:
  * @target: guest physical address of the destination
  * @entry: guest phys address of entry point, if not NULL
  */
-int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
+int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
                 phys_addr_t target, register_t *entry)
 {
 	struct image_header hdr;
@@ -119,21 +83,17 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
 		return ERR_UNHANDLED;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-	         "Loading uImage from flash\n");
+	         "Loading uImage from %#llx to %#llx\n",
+	         image_phys, target);
 
 	size = cpu_from_be32(hdr.size);
-	if (length < size) {
+	if (*length < size) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "load_uimage: image size exceeds target window\n");
 		return ERR_BADIMAGE;
 	}
 
-	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_RAMDISK) {
-		ret = add_initrd_start_end_to_guest_dt(guest, target,
-						       target + size);
-		if (ret < 0)
-			return ret;
-	}
+	*length = size;
 
 	ret = copy_phys_to_gphys(guest->gphys, target,
 	                         image_phys + sizeof(hdr), size);

@@ -32,7 +32,7 @@
 #include <percpu.h>
 #include <libos/libos.h>
 
-int load_uimage(guest_t *guest, phys_addr_t image_phys, unsigned long length,
+int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 		phys_addr_t target, register_t *entry);
 
 #endif
