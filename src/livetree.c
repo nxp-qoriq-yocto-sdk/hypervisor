@@ -561,7 +561,7 @@ static int print_pre(dt_node_t *tree, void *arg)
 		qprintf(ctx->out, "\t");
 
 	if (ctx->depth == 0)
-		qprintf(ctx->out, "{\n");
+		qprintf(ctx->out, "/ {\n");
 	else
 		qprintf(ctx->out, "%s {\n", tree->name);
 
@@ -616,7 +616,7 @@ static int print_post(dt_node_t *tree, void *arg)
 	for (int i = 0; i < ctx->depth; i++)
 		qprintf(ctx->out, "\t");
 
-	qprintf(ctx->out, "}\n");
+	qprintf(ctx->out, "};\n");
 	return 0;
 }
 
