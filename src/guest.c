@@ -1303,9 +1303,6 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	list_for_each(&guest->dev_list, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
 
-		if (owner->guest != guest) {
-			printf("%s %p %p\n", owner->hwnode->name, owner->guest, guest);
-		}
 		assert(owner->guest == guest);
 		map_device_to_guest(guest, owner->hwnode, owner->cfgnode);
 	}
