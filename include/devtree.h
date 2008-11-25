@@ -54,6 +54,7 @@ typedef struct dt_node {
 	device_t dev; /** libos device */
 	list_t owners;
 	struct guest *irq_owner;
+	struct pma *pma;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -186,5 +187,11 @@ dt_node_t *get_cpu_node(dt_node_t *tree, int cpu);
 
 int open_stdout_chardev(dt_node_t *node);
 int open_stdout_bytechan(dt_node_t *node);
+
+typedef struct pma {
+	phys_addr_t start, size;
+} pma_t;
+
+pma_t *get_pma(dt_node_t *node);
 
 #endif

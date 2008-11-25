@@ -898,6 +898,7 @@ int assign_callback(dt_node_t *node, void *arg)
 
 	owner->cfgnode = node;
 	owner->hwnode = hwnode;
+	owner->guest = ctx->guest;
 
 	spin_lock(&owner_lock);
 
@@ -1144,3 +1145,86 @@ void dt_lookup_irqs(dt_node_t *node)
 	spin_unlock(&owner_lock);
 }
 
+pma_t *get_pma(dt_node_t *node)
+{
+	dt_node_t *pma_node;
+	dt_prop_t *prop;
+	pma_t *pma;
+
+	prop = dt_get_prop(node, "phys-mem", 0);
+	if (!prop || prop->len != 4 ||
+	    !(pma_node = dt_lookup_phandle(config_tree,
+	                                   *(const uint32_t *)prop->data))) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: %s has bad/missing phys-mem phandle\n",
+		         __func__, node->name);
+
+		return NULL;
+	}
+
+	spin_lock(&owner_lock);
+
+	pma = pma_node->pma;
+	if (pma)
+		goto out;
+
+	if (!dt_node_is_compatible(pma_node, "phys-mem-area")) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: %s's phys-mem points to %s, which is not a phys-mem-area\n",
+		         __func__, node->name, pma_node->name);
+
+		goto out;
+	}
+
+	pma = alloc_type(pma_t);
+	if (!pma) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		goto out;
+	}
+
+	prop = dt_get_prop(pma_node, "addr", 0);
+	if (!prop || prop->len != 8) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys-mem-area %s has bad/missing addr\n",
+		         __func__, pma_node->name);
+
+		goto out_free;
+	}
+	pma->start = *(const uint64_t *)prop->data;
+
+	prop = dt_get_prop(pma_node, "size", 0);
+	if (!prop || prop->len != 8) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys-mem-area %s has bad/missing size\n",
+		         __func__, pma_node->name);
+
+		goto out_free;
+	}
+	pma->size = *(const uint64_t *)prop->data;
+
+	if (pma->size & (pma->size - 1)) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys-mem-area %s is not a power of two\n",
+		         __func__, pma_node->name);
+
+		goto out_free;
+	}
+
+	if (pma->start & (pma->size - 1)) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys-mem-area %s is not naturally aligned\n",
+		         __func__, pma_node->name);
+
+		goto out_free;
+	}
+
+out:
+	spin_unlock(&owner_lock);
+	return pma;
+
+out_free:
+	spin_unlock(&owner_lock);
+	free(pma);
+	return NULL;
+}

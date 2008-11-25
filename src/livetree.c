@@ -30,6 +30,27 @@
 #include <errors.h>
 #include <devtree.h>
 
+dt_node_t *create_dev_tree(void)
+{
+	dt_node_t *node;
+
+	node = alloc_type(dt_node_t);
+	if (!node)
+		return NULL;
+
+	list_init(&node->children);
+	list_init(&node->props);
+	list_init(&node->owners);
+
+	node->name = strdup("");
+	if (!node->name) {
+		free(node);
+		return NULL;
+	}
+
+	return node;
+}
+
 dt_node_t *unflatten_dev_tree(const void *fdt)
 {
 	int offset = 0, next;

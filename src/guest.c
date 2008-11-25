@@ -124,84 +124,91 @@ static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
 }
 
-static int map_guest_reg_one(guest_t *guest, dt_node_t *node,
-                             dt_node_t *partition, const uint32_t *reg,
-                             uint32_t naddr, uint32_t nsize)
+static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
 {
-	phys_addr_t gaddr, size;
-	uint32_t addrbuf[MAX_ADDR_CELLS];
-	phys_addr_t rangesize, addr, offset = 0;
-	int maplen, ret;
-	dt_prop_t *prop;
-	const uint32_t *physaddrmap;
+	if (rootnaddr == 2)
+		*reg++ = start >> 32;
 
-	prop = dt_get_prop(partition, "fsl,hv-physaddr-map", 0);
-	if (!prop || prop->len & 3) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
-		return ERR_BADTREE;
-	}
-
-	physaddrmap = prop->data;
-	maplen = prop->len;
-
-	ret = xlate_reg_raw(node, reg, addrbuf, &size, naddr, nsize);
-	if (ret < 0) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
-		return ret;	
-	}
-
-	gaddr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
-
-	// Is this an I2C node?
-#ifdef CONFIG_VIRTUAL_I2C
-	ret = virtualize_i2c_node(guest, node, gaddr, size);
-	if (ret < 0)
-		// An error probably indicates that the device tree is borked,
-		// so we can't printlog any meaningful information about the
-		// node.  Just return an error.
-		return ret;
-	if (ret > 0)
-		// This node is an I2C node and it was virtualized, so we're
-		// done here.
-		return 0;
-#endif
-
-	while (offset < size) {
-		val_from_int(addrbuf, gaddr + offset);
-
-		ret = xlate_one(addrbuf, physaddrmap, maplen, rootnaddr, rootnsize,
-		                guest->naddr, guest->nsize, &rangesize);
-		if (ret == ERR_NOTFOUND) {
-			// FIXME: It is assumed that if the beginning of the reg is not
-			// in physaddrmap, then none of it is.
-
-			map_guest_addr_range(guest, gaddr + offset,
-			                     gaddr + offset, size - offset);
-			return 0;
-		}
+	*reg++ = start & 0xffffffff;
 		
-		if (ret < 0) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS, "%s: %d %s\n", __func__, __LINE__, node->name);
-			return ret;
-		}
+	if (rootnsize == 2)
+		*reg++ = size >> 32;
 
-		if (addrbuf[0] || addrbuf[1])
-			return ERR_BADTREE;
+	*reg++ = size & 0xffffffff;
 
-		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
-
-		if (rangesize > size - offset)
-			rangesize = size - offset;
-		
-		map_guest_addr_range(guest, gaddr + offset, addr, rangesize);
-		offset += rangesize;
-	}
-
-	return 0;
+	return reg;
 }
 
-static int map_guest_ranges(guest_t *guest, dt_node_t *node,
-                            dt_node_t *partition)
+static int map_gpma_callback(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	dt_prop_t *prop;
+	dt_node_t *gnode, *mixin;
+	pma_t *pma;
+	phys_addr_t gaddr;
+	uint32_t reg[4];
+	char buf[32];
+
+	pma = get_pma(node);
+	if (!pma)
+		return 0;
+
+	prop = dt_get_prop(node, "guest-addr", 0);
+	if (prop) {
+		if (prop->len != 8) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad guest-addr in %s\n", __func__, node->name);
+			return 0;
+		}
+
+		gaddr = *(uint64_t *)prop->data;
+
+		if (gaddr & (pma->size - 1)) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: guest phys %s is not naturally aligned\n",
+			         __func__, node->name);
+
+			return 0;
+		}
+	} else {
+		gaddr = pma->start;
+	}
+
+	map_guest_addr_range(guest, gaddr, pma->start, pma->size);
+
+	snprintf(buf, sizeof(buf), "memory@%llx", gaddr);
+
+	gnode = dt_get_subnode(guest->devtree, buf, 1);
+	if (!gnode)
+		goto nomem;
+
+	if (dt_set_prop(gnode, "device_type", "memory", 7))
+		goto nomem;
+
+	write_reg(reg, gaddr, pma->size);
+	if (dt_set_prop(gnode, "reg", reg, (rootnaddr + rootnsize) * 4))
+		goto nomem;
+
+	mixin = dt_get_subnode(node, "node-update", 0);
+	if (mixin && dt_merge_tree(gnode, mixin, 1))
+		goto nomem;
+	
+	return 0;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
+}
+
+static void map_guest_mem(guest_t *guest)
+{
+	dt_for_each_compatible(guest->partition, "guest-phys-mem-area",
+	                       map_gpma_callback, guest);
+}
+
+static int map_guest_ranges(guest_t *guest, dt_node_t *hwnode,
+                            dt_node_t *cfgnode)
 {
 	size_t len;
 	uint32_t naddr, nsize, caddr, csize;
@@ -209,130 +216,98 @@ static int map_guest_ranges(guest_t *guest, dt_node_t *node,
 	const uint32_t *ranges;
 	int ret;
 
-	prop = dt_get_prop(node, "fsl,hv-map-ranges", 0);
+	prop = dt_get_prop(cfgnode, "map-ranges", 0);
 	if (!prop)
 		return 0;
 
-	prop = dt_get_prop(node, "ranges", 0);
+	prop = dt_get_prop(hwnode, "ranges", 0);
 	if (!prop)
 		return 0;
 
-	if (prop->len & 3) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-		         "Unaligned ranges length %d in %s\n", prop->len, prop->name);
+	dt_node_t *parent = hwnode->parent;
+	if (!parent)
 		return ERR_BADTREE;
-	}
+
+	ret = get_addr_format_nozero(parent, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	ret = get_addr_format_nozero(hwnode, &caddr, &csize);
+	if (ret < 0)
+		return ret;
 
 	ranges = prop->data;
-	len = prop->len / 4;
+	len = prop->len / ((caddr + naddr + csize) * 4);
 
-	dt_node_t *parent = node->parent;
-	if (!parent)
-		return ERR_BADTREE;
-
-	ret = get_addr_format_nozero(parent, &naddr, &nsize);
-	if (ret < 0)
-		return ret;
-
-	ret = get_addr_format_nozero(node, &caddr, &csize);
-	if (ret < 0)
-		return ret;
+	if (prop->len % ((caddr + naddr + csize) * 4) != 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: Ignoring junk at end of ranges in %s\n",
+		         __func__, hwnode->name);
+	}
 
 	for (int i = 0; i < len; i += caddr + naddr + csize) {
-		if (i + caddr + naddr + csize > len) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			         "Incomplete ranges entry in %s\n", prop->name);
-			return ERR_BADTREE;
-		}
-
-		ret = map_guest_reg_one(guest, node, partition,
-		                        ranges + i + caddr, naddr, csize);
-		if (ret < 0 && ret != ERR_NOTRANS)
-			return ret;
+		// fixme map range
 	}
 
 	return 0;
 }
 
-static int map_guest_reg(guest_t *guest, dt_node_t *node, dt_node_t *partition)
+static int map_guest_reg(guest_t *guest, dt_node_t *hwnode, dt_node_t *cfgnode)
 {
-	int len, ret;
-	uint32_t naddr, nsize;
-	const uint32_t *reg;
-	dt_prop_t *prop;
-	dt_node_t *parent;
-	
-	prop = dt_get_prop(node, "reg", 0);
-	if (!prop)
-		return 0;
+	mem_resource_t *regs = hwnode->dev.regs;
+	dt_node_t *gnode, *mixin;
+	uint32_t *reg, *regp;
+	int num = hwnode->dev.num_regs;
+	int regsize = (rootnaddr + rootnsize) * 4;
+	int ret;
 
-	if (prop->len & 3) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-		         "Unaligned ranges length %d in %s\n", prop->len, prop->name);
-		return ERR_BADTREE;
+	reg = regp = malloc(num * regsize);
+	if (!reg)
+		return ERR_NOMEM;
+
+	for (int i = 0; i < num; i++) {
+		map_guest_addr_range(guest, regs[i].start, regs[i].start,
+		                     regs[i].size);
+
+		regp = write_reg(regp, regs[i].start, regs[i].size);
 	}
 
-	reg = prop->data;
-	len = prop->len / 4;
+	gnode = dt_get_subnode(guest->devtree, cfgnode->name, 1);
+	if (!gnode)
+		return ERR_NOMEM;
 
-	parent = node->parent;
-	if (!parent)
-		return ERR_BADTREE;
-
-	if (parent->parent && !dt_node_is_compatible(parent, "simple-bus"))
-		return 0;
-
-	ret = get_addr_format_nozero(parent, &naddr, &nsize);
+	ret = dt_merge_tree(gnode, hwnode, 0);
 	if (ret < 0)
 		return ret;
 
-	for (int i = 0; i < len; i += naddr + nsize) {
-		if (i + naddr + nsize > len) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			         "Incomplete reg entry in %s\n", prop->name);
-			return ERR_BADTREE;
-		}
+	ret = dt_set_prop(gnode, "reg", reg, num * regsize);
+	if (ret < 0)
+		return ret;
 
-		ret = map_guest_reg_one(guest, node, partition,
-		                        reg + i, naddr, nsize);
-		if (ret < 0 && ret != ERR_NOTRANS)
-			return ret;
-	}
+	mixin = dt_get_subnode(cfgnode, "node-update", 0);
+	if (mixin)
+		return dt_merge_tree(gnode, mixin, 1);
 
 	return 0;
 }
 
-typedef struct map_guest_ctx {
-	guest_t *guest;
-	dt_node_t *partition;
-} map_guest_ctx_t;
-
-static int map_guest_one(dt_node_t *node, void *arg)
+static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
+                                dt_node_t *cfgnode)
 {
-	map_guest_ctx_t *ctx = arg;
 	int ret;
-	
-	ret = map_guest_reg(ctx->guest, node, ctx->partition);
+
+	dt_lookup_regs(hwnode);
+	dt_lookup_irqs(hwnode);
+
+	ret = map_guest_reg(guest, hwnode, cfgnode);
 	if (ret < 0)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "map_guest_reg: error %d in %s\n", ret, node->name);
+		         "map_guest_reg: error %d in %s\n", ret, hwnode->name);
 
-	ret = map_guest_ranges(ctx->guest, node, ctx->partition); 
+	ret = map_guest_ranges(guest, hwnode, cfgnode);
 	if (ret < 0)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "map_guest_ranges: error %d in %s\n", ret, node->name);
-
-	return 0;
-}
-
-static int map_guest_reg_all(guest_t *guest)
-{
-	map_guest_ctx_t ctx = {
-		.guest = guest,
-		.partition = guest->partition
-	};
-
-	return dt_for_each_node(guest->devtree, &ctx, map_guest_one, NULL);
+		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
 }
 
 static void reset_spintbl(guest_t *guest)
@@ -644,17 +619,17 @@ static int load_image(guest_t *guest)
 	uint64_t guest_addr;
 	uint64_t length;
 
-	prop = dt_get_prop(guest->partition, "fsl,hv-load-image-table", 0);
+	prop = dt_get_prop(guest->partition, "load-image-table", 0);
 	if (!prop)
 		return 0;
 
 	entry = prop->data;
 	end = (const uint32_t *)((uintptr_t)prop->data + prop->len);
 
-	while (entry + rootnaddr + guest->naddr + guest->nsize <= end) {
+	while (entry + rootnaddr + rootnaddr + rootnsize <= end) {
 		image_addr = int_from_tree(&entry, rootnaddr);
-		guest_addr = int_from_tree(&entry, guest->naddr);
-		length = int_from_tree(&entry, guest->nsize);
+		guest_addr = int_from_tree(&entry, rootnaddr);
+		length = int_from_tree(&entry, rootnsize);
 
 		if (length != (size_t)length) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -691,10 +666,10 @@ static int process_partition_handle(dt_node_t *node, void *arg)
 	int ret;
 
 	// Find the end-point partition node in the hypervisor device tree
-	const char *s = dt_get_prop_string(node, "fsl,endpoint");
+	const char *s = dt_get_prop_string(node, "endpoint");
 	if (!s) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "process_partition_handle: partition node missing fsl,endpoint\n");
+		         "process_partition_handle: partition node missing endpoint\n");
 		return 0;
 	}
 
@@ -789,34 +764,21 @@ int restart_guest(guest_t *guest)
 	return ret;
 }
 
-/* Process configuration options in the hypervisor's
- * chosen and hypervisor nodes.
+/* Process configuration options in the partition node 
  */
 static int partition_config(guest_t *guest)
 {
-	dt_node_t *node;
-	int ret;
+	dt_node_t *node = guest->partition;
 	
-	node = dt_get_subnode(guest->devtree, "hypervisor", 1);
-	if (!node)
-		return ERR_NOMEM;
-
 	/* guest cache lock mode */
-	if (dt_get_prop(node, "fsl,hv-guest-cache-lock", 0))
+	if (dt_get_prop(node, "guest-cache-lock", 0))
 		guest->guest_cache_lock = 1;
 
 	/* guest debug mode */
-	if (dt_get_prop(node, "fsl,hv-guest-debug", 0))
+	if (dt_get_prop(node, "guest-debug", 0))
 		guest->guest_debug_mode = 1;
 
-	if (mpic_coreint) {
-		ret = dt_set_prop(node, "fsl,hv-pic-coreint", NULL, 0);
-		if (ret < 0)
-			return ret;
-	}
-
-	return dt_set_prop(node, "fsl,hv-partition-label",
-	                   guest->name, strlen(guest->name) + 1);
+	return 0;
 }
 
 uint32_t start_guest_lock;
@@ -827,9 +789,9 @@ guest_t *node_to_partition(dt_node_t *partition)
 	char *name;
 
 	// Verify that 'partition' points to a compatible node
-	if (!dt_node_is_compatible(partition, "fsl,hv-partition")) {
+	if (!dt_node_is_compatible(partition, "partition")) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: invalid partition node", __FUNCTION__);
+		         "%s: invalid partition node\n", __FUNCTION__);
 		return NULL;
 	}
 
@@ -1000,7 +962,8 @@ static void start_guest_primary_nowait(void)
 	send_doorbells(guest->dbell_state_change);
 	cpu->traplevel = 0;
 
-	if (dt_get_prop(guest->partition, "fsl,hv-dbg-wait-at-start", 0)
+	/* FIXME: check for prop in debug stub node */
+	if (dt_get_prop(guest->partition, "dbg-pre-boot-hook", 0)
 	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
@@ -1117,7 +1080,7 @@ static void start_guest_secondary(void)
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	if (dt_get_prop(guest->partition, "fsl,hv-dbg-wait-at-start", 0)
+	if (dt_get_prop(guest->partition, "dbg-wait-at-start", 0)
 	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
@@ -1258,8 +1221,10 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 {
 	int ret;
 	dt_prop_t *prop;
+	dt_node_t *node;
 	const uint32_t *propdata;
 	int gpir;
+	char buf[32];
 
 	/* count number of cpus for this partition and alloc data struct */
 	guest->cpucnt = count_cpus(cpus, cpus_len);
@@ -1270,44 +1235,56 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
 	assert(gpir == 0);
 
-	prop = dt_get_prop(guest->partition, "fsl,hv-dtb", 0);
+	prop = dt_get_prop(guest->partition, "dtb-window", 0);
 	if (!prop) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest_primary: guest missing property fsl,hv-dtb\n");
+		         "init_guest_primary: Guest missing property dtb-window\n");
 		return ERR_BADTREE;
 	}
 
-	guest->devtree = unflatten_dev_tree(prop->data);
-	if (!guest->devtree) {
+	if (prop->len != (rootnaddr + rootnsize) * 4) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest_primary: Can't unflatten guest device tree\n");
+		         "init_guest_primary: Invalid property len for dtb-window\n");
 		return ERR_BADTREE;
 	}
 
-	ret = get_addr_format_nozero(guest->devtree, &guest->naddr, &guest->nsize);
+	guest->devtree = create_dev_tree();
+	ret = dt_set_prop(guest->devtree, "label",
+	                  guest->name, strlen(guest->name) + 1);
 	if (ret < 0)
 		goto fail;
 
-	prop = dt_get_prop(guest->partition, "fsl,hv-dtb-window", 0);
-	if (!prop) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest_primary: Guest missing property fsl,hv-dtb-window\n");
-		return ERR_BADTREE;
+	ret = dt_set_prop(guest->devtree, "#address-cells", &rootnaddr, 4);
+	if (ret < 0)
+		goto fail;
+
+	ret = dt_set_prop(guest->devtree, "#size-cells", &rootnsize, 4);
+	if (ret < 0)
+		goto fail;
+
+	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform%csimple-bus", 0);
+	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1); 
+	if (ret < 0)
+		goto fail;
+
+	node = dt_get_subnode(guest->devtree, "hypervisor", 1);
+	if (!node)
+		goto nomem;
+
+	if (mpic_coreint) {
+		ret = dt_set_prop(node, "fsl,hv-pic-coreint", NULL, 0);
+		if (ret < 0)
+			goto fail;
 	}
 
-	if (prop->len != (guest->naddr + guest->nsize) * 4) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest_primary: Invalid property len for fsl,hv-dtb-window\n");
-		return ERR_BADTREE;
-	}
+	// FIXME: not in spec
+	ret = dt_set_prop(node, "fsl,hv-version", hv_version, 16);
+	if (ret < 0)
+		goto fail;
 
 	propdata = prop->data;
-	guest->dtb_gphys = int_from_tree(&propdata, guest->naddr);
-	guest->dtb_window_len = int_from_tree(&propdata, guest->nsize);
-	
-	ret = dt_set_prop(guest->devtree, "fsl,hv-version", hv_version, 16);
-	if (ret < 0)
-		goto fail;
+	guest->dtb_gphys = int_from_tree(&propdata, rootnaddr);
+	guest->dtb_window_len = int_from_tree(&propdata, rootnsize);
 
 	guest->gphys = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
@@ -1318,10 +1295,25 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	if (ret < 0)
 		goto fail;
 
+	map_guest_mem(guest);
+
+	list_init(&guest->dev_list);
+	dt_assign_devices(guest->partition, guest);
+
+	list_for_each(&guest->dev_list, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+
+		if (owner->guest != guest) {
+			printf("%s %p %p\n", owner->hwnode->name, owner->guest, guest);
+		}
+		assert(owner->guest == guest);
+		map_device_to_guest(guest, owner->hwnode, owner->cfgnode);
+	}
+
 	send_dbell_partition_init(guest);
 	recv_dbell_partition_init(guest);
 
-	ret = dt_for_each_compatible(guest->devtree, "fsl,hv-partition-handle",
+	ret = dt_for_each_compatible(guest->partition, "managed-partition",
 	                             process_partition_handle, guest);
 	if (ret < 0)
 		goto fail;
@@ -1340,16 +1332,12 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	list_init(&guest->vf_list);
 #endif
 
-	ret = map_guest_reg_all(guest);
-	if (ret < 0)
-		goto fail;
-
 #ifdef CONFIG_PAMU
 	pamu_partition_init(guest);
 #endif
 
 	// Get the watchdog timeout options
-	prop = dt_get_prop(guest->partition, "fsl,hv-wd-mgr-notify", 0);
+	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
 
 	start_guest_primary();
@@ -1380,12 +1368,12 @@ static int init_guest_one(dt_node_t *node, void *arg)
 	guest_t *guest;
 	dt_prop_t *prop;
 
-	prop = dt_get_prop(node, "fsl,hv-cpus", 0);
+	prop = dt_get_prop(node, "cpus", 0);
 	if (!prop) {
 		char buf[MAX_PATH];
 		dt_get_path(node, buf, sizeof(buf));
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest: No fsl,hv-cpus in guest %s\n", buf);
+		         "init_guest: No cpus in guest %s\n", buf);
 		return 0;
 	}
 
@@ -1415,7 +1403,7 @@ __attribute__((noreturn)) void init_guest(void)
 	int pir = mfspr(SPR_PIR);
 	init_guest_ctx_t ctx = {};
 
-	dt_for_each_compatible(hw_devtree, "fsl,hv-partition",
+	dt_for_each_compatible(config_tree, "partition",
 	                       init_guest_one, &ctx);
 
 	if (ctx.guest) {

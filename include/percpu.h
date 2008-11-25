@@ -124,9 +124,6 @@ typedef struct guest {
 	/** guest debug mode **/
 	int guest_debug_mode;
 	
-	/** #address-cells and #size-cells at root of guest tree */
-	uint32_t naddr, nsize;
-
 	stub_ops_t *stub_ops;
 	uint32_t state_lock, inv_lock;
 	gstate_t state;
