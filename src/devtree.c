@@ -943,6 +943,49 @@ int assign_callback(dt_node_t *node, void *arg)
 	return 0;
 }
 
+/** Read aliases and attach them to the nodes they point to. */
+void dt_read_aliases(void)
+{
+	dt_node_t *aliases;
+	
+	aliases = dt_get_subnode(hw_devtree, "aliases", 0);
+	if (!aliases)
+		return;
+
+	list_for_each(&aliases->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+		dt_node_t *node;
+		alias_t *alias;
+		const char *str = prop->data;
+
+		if (prop->len == 0 || str[prop->len - 1] != 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: Bad alias value in %s\n", __func__, prop->name);
+			continue;
+		}
+
+		node = dt_lookup_path(hw_devtree, str, 0);
+		if (!node) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: Alias %s points to non-existent %s\n",
+			         __func__, prop->name, str);
+			continue;
+		}
+
+		alias = malloc(sizeof(alias_t));
+		if (!alias) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: out of memory\n", __func__);
+
+			return;
+		}
+
+		alias->name = prop->name;
+		list_add(&node->aliases, &alias->list_node);
+	}
+}
+
+
 /** Assign children of a subtree to the specified partition.
  *
  * @param[in] tree a partition or hv-config node

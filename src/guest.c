@@ -252,10 +252,11 @@ static int map_guest_ranges(guest_t *guest, dt_node_t *hwnode,
 	return 0;
 }
 
-static int map_guest_reg(guest_t *guest, dt_node_t *hwnode, dt_node_t *cfgnode)
+static int map_guest_reg(guest_t *guest, dt_node_t *gnode,
+                         dt_node_t *hwnode, dt_node_t *cfgnode)
 {
 	mem_resource_t *regs = hwnode->dev.regs;
-	dt_node_t *gnode, *mixin;
+	dt_node_t *mixin;
 	uint32_t *reg, *regp;
 	int num = hwnode->dev.num_regs;
 	int regsize = (rootnaddr + rootnsize) * 4;
@@ -272,14 +273,6 @@ static int map_guest_reg(guest_t *guest, dt_node_t *hwnode, dt_node_t *cfgnode)
 		regp = write_reg(regp, regs[i].start, regs[i].size);
 	}
 
-	gnode = dt_get_subnode(guest->devtree, cfgnode->name, 1);
-	if (!gnode)
-		return ERR_NOMEM;
-
-	ret = dt_merge_tree(gnode, hwnode, 0);
-	if (ret < 0)
-		return ret;
-
 	ret = dt_set_prop(gnode, "reg", reg, num * regsize);
 	if (ret < 0)
 		return ret;
@@ -291,23 +284,109 @@ static int map_guest_reg(guest_t *guest, dt_node_t *hwnode, dt_node_t *cfgnode)
 	return 0;
 }
 
+typedef struct create_alias_ctx {
+	dt_node_t *aliases;
+	dt_node_t *tree;
+	char path_buf[MAX_PATH];
+	int path_len;
+} create_alias_ctx_t;
+
+static int create_aliases(dt_node_t *node, void *arg)
+{
+	create_alias_ctx_t *ctx = arg;
+	int len = ctx->path_len;
+
+	if (node != ctx->tree) {
+		/* If this is a child of the hw node that was assigned,
+		 * append the path relative to the assigned node.
+		 */
+		len += dt_get_path(ctx->tree, node,
+		                   &ctx->path_buf[ctx->path_len - 1],
+		                   sizeof(ctx->path_buf) - ctx->path_len + 1) - 1;
+		if (len > sizeof(ctx->path_buf)) {
+			ctx->path_buf[ctx->path_len - 1] = 0;
+			printlog(LOGTYPE_DEVTREE, LOGTYPE_MISC,
+	 		         "%s: %s path too long for alias\n",
+	 		         __func__, node->name);
+
+			return 0;
+		}
+	}
+
+	list_for_each(&node->aliases, i) {
+		alias_t *alias = to_container(i, alias_t, list_node);
+		
+		dt_set_prop(ctx->aliases, alias->name, ctx->path_buf, len);
+	}
+
+	/* Reset the buffer to the assigned node path */
+	ctx->path_buf[ctx->path_len - 1] = 0;
+	return 0;
+}
+
 static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
                                 dt_node_t *cfgnode)
 {
+	create_alias_ctx_t ctx;
+	dt_node_t *gnode;
 	int ret;
+
+	ctx.aliases = dt_get_subnode(guest->devtree, "aliases", 1);
+	if (!ctx.aliases)
+		goto nomem;
 
 	dt_lookup_regs(hwnode);
 	dt_lookup_irqs(hwnode);
 
-	ret = map_guest_reg(guest, hwnode, cfgnode);
-	if (ret < 0)
+	/* FIXME: handle children of other assigned nodes */
+	gnode = dt_get_subnode(guest->devtree, cfgnode->name, 1);
+	if (!gnode)
+		goto nomem;
+
+	ret = dt_merge_tree(gnode, hwnode, 0);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: error %d merging %s\n", __func__, ret, hwnode->name);
+		return;
+	}
+
+	ctx.path_len = dt_get_path(NULL, gnode, ctx.path_buf,
+	                           sizeof(ctx.path_buf));
+	if (ctx.path_len > sizeof(ctx.path_buf)) {
+		printlog(LOGTYPE_DEVTREE, LOGTYPE_MISC,
+ 		         "%s: %s path too long for alias\n",
+ 		         __func__, hwnode->name);
+
+		return;
+	}
+
+	ctx.tree = hwnode;
+	dt_for_each_node(hwnode, &ctx, create_aliases, NULL);
+	ctx.tree = cfgnode;
+	dt_for_each_node(cfgnode, &ctx, create_aliases, NULL);
+
+	/* FIXME: map children */
+	ret = map_guest_reg(guest, gnode, hwnode, cfgnode);
+	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "map_guest_reg: error %d in %s\n", ret, hwnode->name);
+		dt_delete_node(gnode);
+		return;
+	}
 
 	ret = map_guest_ranges(guest, hwnode, cfgnode);
-	if (ret < 0)
+	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
+		dt_delete_node(gnode);
+		return;
+	}
+
+	return;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
 }
 
 static void reset_spintbl(guest_t *guest)
@@ -832,7 +911,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 				return NULL;
 			}
 
-			ret = dt_get_path(partition, name, MAX_PATH);
+			ret = dt_get_path(NULL, partition, name, MAX_PATH);
 			if (ret > MAX_PATH)
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "node_to_partition: path name too long\n");
@@ -1216,6 +1295,44 @@ int start_guest(guest_t *guest)
 	return ret;
 }
 
+static void read_phandle_aliases(guest_t *guest)
+{
+	dt_node_t *aliases;
+	
+	aliases = dt_get_subnode(guest->partition, "aliases", 0);
+	if (!aliases)
+		return;
+
+	list_for_each(&aliases->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+		dt_node_t *node;
+		alias_t *alias;
+
+		/* It could be a string alias rather than a phandle alias.
+		 * Note that there is a possibility of ambiguity, if a
+		 * 3-letter string alias gets interpreted as a valid phandle;
+		 * however, the odds of this actually happening are very low.
+		 */
+		if (prop->len != 4)
+			continue;
+
+		node = dt_lookup_phandle(config_tree, *(const uint32_t *)prop->data);
+		if (!node)
+			continue;
+
+		alias = malloc(sizeof(alias_t));
+		if (!alias) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: out of memory\n", __func__);
+
+			return;
+		}
+
+		alias->name = prop->name;
+		list_add(&node->aliases, &alias->list_node);
+	}
+}
+
 static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
                               int cpus_len)
 {
@@ -1298,6 +1415,7 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	map_guest_mem(guest);
 
 	list_init(&guest->dev_list);
+ 	read_phandle_aliases(guest);
 	dt_assign_devices(guest->partition, guest);
 
 	list_for_each(&guest->dev_list, i) {
@@ -1368,7 +1486,7 @@ static int init_guest_one(dt_node_t *node, void *arg)
 	prop = dt_get_prop(node, "cpus", 0);
 	if (!prop) {
 		char buf[MAX_PATH];
-		dt_get_path(node, buf, sizeof(buf));
+		dt_get_path(NULL, node, buf, sizeof(buf));
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "init_guest: No cpus in guest %s\n", buf);
 		return 0;

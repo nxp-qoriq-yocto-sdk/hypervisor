@@ -205,7 +205,7 @@ static int process_standard_liodn(dt_node_t *node, void *arg)
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 	         "processing standard liodns...\n");
 
-	ret = dt_get_path(node, pathbuf, 256);
+	ret = dt_get_path(NULL, node, pathbuf, 256);
 	if (ret > 256) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: node %s path too long\n", __func__, node->name);

@@ -41,6 +41,7 @@ dt_node_t *create_dev_tree(void)
 	list_init(&node->children);
 	list_init(&node->props);
 	list_init(&node->owners);
+	list_init(&node->aliases);
 
 	node->name = strdup("");
 	if (!node->name) {
@@ -87,6 +88,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 			list_init(&node->children);
 			list_init(&node->props);
 			list_init(&node->owners);
+			list_init(&node->aliases);
 			break;
 		}
 
@@ -902,8 +904,10 @@ uint32_t dt_get_phandle(dt_node_t *node)
 	return *(const uint32_t *)prop->data;
 }
 
-/** Retrieve the full path of a node.
+/** Retrieve the full path of a node, or a path relative to a subtree
  *
+ * @param[in] tree root node of subtree to find path relative to, or NULL
+ *   to find full path.
  * @param[in] node node of which to retrieve path
  * @param[in] buf buffer in which to place path
  * @param[in] buflen length of buf, including null terminator
@@ -911,20 +915,15 @@ uint32_t dt_get_phandle(dt_node_t *node)
  *
  * The function succeeds if the return value <= buflen.
  */
-size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen)
+size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen)
 {
 	size_t len = 1, used_pos = buflen - 1, pos = buflen - 1;
 
 	if (buflen != 0)
 		buf[buflen - 1] = 0;
 	
-	while (1) {
-		size_t namelen;
-
-		if (!node->parent)
-			break;
-
-		namelen = strlen(node->name);
+	while (node != tree && node->parent) {
+		size_t namelen = strlen(node->name);
 
 		pos -= namelen + 1;
 		len += namelen + 1;

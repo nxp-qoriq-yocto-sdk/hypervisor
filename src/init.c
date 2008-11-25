@@ -434,6 +434,7 @@ static void assign_hv_devs(void)
 {
 	dt_node_t *node = dt_get_first_compatible(config_tree, "hv-config");
 
+	dt_read_aliases();
 	dt_assign_devices(node, NULL);
 	find_hv_console(node);
 

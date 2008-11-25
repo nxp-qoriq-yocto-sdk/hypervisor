@@ -40,6 +40,11 @@ struct guest;
 
 extern list_t hv_devs;
 
+typedef struct alias {
+	list_t list_node;
+	const char *name;
+} alias_t;
+
 typedef struct dev_owner {
 	list_t dev_node, guest_node;
 	struct guest *guest; /* if NULL, owned by hypervisor */
@@ -55,6 +60,8 @@ typedef struct dt_node {
 	list_t owners;
 	struct guest *irq_owner;
 	struct pma *pma;
+
+	list_t aliases;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -97,7 +104,7 @@ int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
                            const void *value, size_t len,
                            dt_callback_t callback, void *arg);
 
-size_t dt_get_path(dt_node_t *node, char *buf, size_t buflen);
+size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen);
 
 dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name);
 dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);
@@ -106,6 +113,7 @@ dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 uint32_t dt_get_phandle(dt_node_t *node);
 
 int dt_owned_by(dt_node_t *node, struct guest *guest);
+void dt_read_aliases(void);
 
 /** Hardware device tree passed by firmware */
 extern dt_node_t *hw_devtree;
