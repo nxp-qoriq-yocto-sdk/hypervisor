@@ -566,6 +566,9 @@ static int is_strlist(const char *str, size_t len)
 {
 	int last_was_null = 0;
 
+	if (len == 0)
+		return 0;
+
 	if (str[len - 1] != 0)
 		return 0;
 
