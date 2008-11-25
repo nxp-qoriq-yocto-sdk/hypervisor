@@ -1117,8 +1117,8 @@ static void start_guest_secondary(void)
 	atomic_add(&guest->active_cpus, 1);
 
 	while (guest->spintbl[gpir].addr_lo & 1) {
-		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
-		asm volatile("dcbi 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
+		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
+		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
 
 		if (cpu->ret_user_hook)
