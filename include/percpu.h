@@ -197,6 +197,7 @@ typedef struct gcpu {
 	unsigned long gevent_pending;
 	int gcpu_num, waiting_for_gevent;
 	vpic_cpu_t vpic;
+	register_t tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
 
 	/* Fields after this point are cleared on reset -- do not
 	 * insert new fields before gdbell_pending.

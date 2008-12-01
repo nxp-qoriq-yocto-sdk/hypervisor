@@ -180,6 +180,7 @@ void start(void)
 
 	printf("\n\nWatchdog test\n");
 
+	printf("TSR[WRS] = %lu\n", mfspr(SPR_TSR) >> 28);
 	mtspr(SPR_TCR, TCR_WRC_NOP);
 
 	if (test1())
