@@ -65,7 +65,7 @@ void start(unsigned long devtree_ptr)
 #endif
 	if (status & L1CSR0_DCUL) {
 		mtspr(SPR_L1CSR0, status & ~L1CSR0_DCUL);
-		printf(" > did dcbtls, failed: ");
+		printf(" > did dcbtls, didn't work: ");
 		if (!guest_cache_lock_mode)
 			printf("PASSED\n");
 		else
