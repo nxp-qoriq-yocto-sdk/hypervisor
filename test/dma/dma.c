@@ -120,4 +120,6 @@ void start(unsigned long devtree_ptr)
 	printf("actual liodn = %ld\n", *liodnp);
 
 	test_dma_memcpy();
+
+	printf("Test Complete\n");
 }
