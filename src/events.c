@@ -101,7 +101,14 @@ void ret_to_guest(trapframe_t *frameptr)
 		gevent_table[bit](frameptr);
 	}
 
-	gcpu->waiting_for_gevent = waiting;
+	/* If we interrupted a waiting context, we want it to still
+	 * be waiting.  However, if we interrupted a non-waiting context,
+	 * but the gevent is returning to a wait loop, we want to keep
+	 * the new setting of waiting_for_gevent.
+	 */
+	if (!gcpu->waiting_for_gevent)
+		gcpu->waiting_for_gevent = waiting;
+
 	assert(!(mfmsr() & MSR_CE));
 }
 
