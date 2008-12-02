@@ -1,0 +1,16 @@
+$console_capture = 1
+
+add-directory "%script%/" -prepend
+
+run-command-file "run.simics"
+
+script-branch {
+    con1.wait-for-string "watchdog"
+    stop
+    echo "passed"
+    exit 0
+}
+
+rc 3_000_000_000
+echo "failed"
+exit 1
