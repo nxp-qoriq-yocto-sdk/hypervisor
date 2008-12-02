@@ -34,7 +34,10 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 
-extern void init(void);
+void init(void);
+
+extern void (*secondary_startp)(void);
+void release_secondary_cores(void);
 
 volatile unsigned int watchdog;
 
@@ -174,13 +177,32 @@ int test6(void)
 	return 0;
 }
 
+void secondary_entry(void)
+{
+	unsigned int cpu_index;
+
+	fh_cpu_whoami(&cpu_index);
+	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, mfspr(SPR_TSR) >> 28);
+
+	test6();
+	printf("\010\010\010\010\010\010FAILED\n");
+	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+	mtspr(SPR_TCR, TCR_WP_SET(0));
+
+	printf("Test Complete\n");
+}
+
 void start(void)
 {
+	unsigned int cpu_index;
+
 	init();
 
 	printf("\n\nWatchdog test\n");
 
-	printf("TSR[WRS] = %lu\n", mfspr(SPR_TSR) >> 28);
+	fh_cpu_whoami(&cpu_index);
+	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, mfspr(SPR_TSR) >> 28);
+
 	mtspr(SPR_TCR, TCR_WRC_NOP);
 
 	if (test1())
@@ -216,10 +238,7 @@ void start(void)
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 	mtspr(SPR_TCR, TCR_WP_SET(0));
 
-	test6();
-	printf("\010\010\010\010\010\010FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
-
-	printf("Test Complete\n");
+	// Finish the test on the second core
+	secondary_startp = secondary_entry;
+	release_secondary_cores();
 }
