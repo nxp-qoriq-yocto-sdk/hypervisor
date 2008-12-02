@@ -86,14 +86,17 @@ int test_dma_memcpy(void)
 void start(unsigned long devtree_ptr)
 {
 	int node = -1;
-	int ret, len;
+	int ret;
+#if 0  // FIXME after handle support implemented
+	int len;
 	unsigned long *liodnp;
+#endif
 
 	init(devtree_ptr);
 
 //	dump_dev_tree();
 
-	enable_extint();
+//	enable_extint();
 
 	printf("DMA test code for guest memcpy\n");
 
@@ -108,6 +111,7 @@ void start(unsigned long devtree_ptr)
 	}
 	node = ret;
 
+#if 0  // FIXME after handle support implemented
 	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-liodn-handle", &len);
 	if (!liodnp) {
 		printf("fsl,liodn property not found\n");
@@ -118,6 +122,7 @@ void start(unsigned long devtree_ptr)
 
 	liodnp = fdt_getprop_w(fdt, node, "fsl,liodn", &len);
 	printf("actual liodn = %ld\n", *liodnp);
+#endif
 
 	test_dma_memcpy();
 
