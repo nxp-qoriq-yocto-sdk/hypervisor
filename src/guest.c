@@ -1472,6 +1472,14 @@ static int init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
+	// Set the ePAPR version string.
+	ret = snprintf(buf, sizeof(buf), "ePAPR-%u.%u", 1, 0);
+	assert(ret < sizeof(buf));
+
+	ret = dt_set_prop(guest->devtree, "epapr-version", buf, ret + 1);
+	if (ret < 0)
+		goto fail;
+
 	node = dt_get_subnode(guest->devtree, "hypervisor", 1);
 	if (!node)
 		goto nomem;
