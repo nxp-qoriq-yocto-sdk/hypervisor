@@ -324,6 +324,10 @@ static int create_aliases(dt_node_t *node, void *arg)
 	return 0;
 }
 
+static const uint8_t vmpic_config_to_intspec[4] = {
+	3, 0, 1, 2
+};
+
 static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
                                 dt_node_t *cfgnode)
 {
@@ -380,6 +384,28 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
 		dt_delete_node(gnode);
 		return;
+	}
+
+	for (int i = 0; i < hwnode->dev.num_irqs; i++) {
+		uint32_t intspec[2];
+		int handle;
+		
+		/* FIXME: handle more than just mpic */
+		handle = vmpic_alloc_mpic_handle(guest, hwnode->dev.irqs[i]);
+		if (handle < 0)
+			continue;
+
+		intspec[0] = handle;
+		intspec[1] = vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
+
+		ret = dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec));
+		if (ret < 0)
+			goto nomem;
+
+		ret = dt_set_prop(gnode, "interrupt-parent",
+		                  &guest->vmpic_phandle, 4);
+		if (ret < 0)
+			goto nomem;
 	}
 
 	return;
@@ -1409,6 +1435,8 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 
 	map_guest_mem(guest);
 
+	vmpic_partition_init(guest);
+
 	list_init(&guest->dev_list);
  	read_phandle_aliases(guest);
 	dt_assign_devices(guest->partition, guest);
@@ -1435,8 +1463,6 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 #ifdef CONFIG_BYTE_CHAN
 	byte_chan_partition_init(guest);
 #endif
-
-	vmpic_partition_init(guest);
 
 #ifdef CONFIG_DEVICE_VIRT
 	list_init(&guest->vf_list);

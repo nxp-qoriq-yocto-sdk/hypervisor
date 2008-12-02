@@ -130,7 +130,7 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 		return ERR_NOMEM;
 	}
 
-	vpic_interrupt_t *virq = vpic_alloc_irq(guest);
+	vpic_interrupt_t *virq = vpic_alloc_irq(guest, 0);
 	if (!virq) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
 		         "%s: out of virqs.\n", __func__);
@@ -138,8 +138,7 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 		goto error;
 	}
 
-	irq[0] = ret = vmpic_alloc_handle(guest, &virq->irq);
-	irq[1] = 0;
+	ret = vpic_alloc_handle(virq, irq);
 	if (ret < 0) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
 		         "%s: can't alloc vmpic irqs\n", __func__);

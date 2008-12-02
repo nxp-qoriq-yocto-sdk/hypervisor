@@ -168,7 +168,7 @@ static vpic_interrupt_t *__vpic_iack(void)
 				gcpu->vpic.active |= 1 << irqnum;
 				virq->active = 1;
 
-				if (!virq->level) {
+				if (!virq->config & IRQ_LEVEL) {
 					gcpu->vpic.pending &= ~(1 << irqnum);
 					virq->pending = 0;
 				}
@@ -318,7 +318,7 @@ int_ops_t vpic_ops = {
 	.is_active = vpic_irq_is_active,
 };
 
-vpic_interrupt_t *vpic_alloc_irq(guest_t *guest)
+vpic_interrupt_t *vpic_alloc_irq(guest_t *guest, int config)
 {
 	register_t save;
 	vpic_interrupt_t *virq = NULL;
@@ -334,8 +334,24 @@ vpic_interrupt_t *vpic_alloc_irq(guest_t *guest)
 		virq->irq.ops = &vpic_ops;
 		virq->guest = guest;
 		virq->irqnum = irq;
+		virq->config = config;
 	}
 
 	spin_unlock_critsave(&guest->vpic.lock,save);
 	return virq;
+}
+
+int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec)
+{
+	int handle = vmpic_alloc_handle(vpic->guest, &vpic->irq,
+	                                vpic->config);
+	if (handle < 0)
+		return handle;
+
+	if (intspec) {
+		intspec[0] = handle;
+		intspec[1] = vpic->config;
+	}
+
+	return handle;
 }

@@ -180,7 +180,7 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 	vpic_interrupt_t *virq;
 	const uint32_t *prop;
 	uint32_t irq_prop[2];
-	int vpic_handle, vmpic_handle;
+	int vmpic_handle;
 	dt_node_t *controller;
 	int ret;
 	phys_addr_t paddr;
@@ -214,17 +214,15 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 
 	// Allocate a software (virtual) irq.  This is what we use to send an
 	// interrupt to the guest when the I2C device sends us an interrupt.
-	virq = vpic_alloc_irq(guest);
+	// Make it level-sensitive, like the real I2C.
+	virq = vpic_alloc_irq(guest, IRQ_LEVEL);
 	if (!virq)
 		return ERR_NOMEM;
-	virq->level = 1;	// make it level-sensitive, like the real I2C
 
 	// Now we need a guest handle for this virq.
-	vpic_handle = vmpic_alloc_handle(guest, &virq->irq);
-	if (vpic_handle < 0)
-		return ERR_NOMEM;
-	irq_prop[0] = vpic_handle;
-	irq_prop[1] = IRQ_LEVEL;
+	ret = vpic_alloc_handle(virq, irq_prop);
+	if (ret < 0)
+		return ret;
 
 	// Overwrite the 'interrupts' property with our new virq handle.
 	// The previous handle might be lost forever, but that's okay.

@@ -39,9 +39,16 @@
 
 static uint32_t vmpic_lock;
 
-static void vmpic_reset(interrupt_t *irq)
+static const uint8_t vmpic_intspec_to_config[4] = {
+	IRQ_EDGE | IRQ_HIGH,
+	IRQ_LEVEL | IRQ_LOW,
+	IRQ_LEVEL | IRQ_HIGH,
+	IRQ_EDGE | IRQ_LOW
+};
+
+static void vmpic_reset(vmpic_interrupt_t *vmirq)
 {
-	guest_t *guest = get_gcpu()->guest;
+	interrupt_t *irq = vmirq->irq;
 
 	irq->ops->disable(irq);
 
@@ -51,37 +58,44 @@ static void vmpic_reset(interrupt_t *irq)
 	if (irq->ops == &vpic_ops)
 		irq->ops->set_cpu_dest_mask(irq, 1);
 	else if (irq->ops->set_cpu_dest_mask)
-		irq->ops->set_cpu_dest_mask(irq, 1 << (guest->gcpus[0]->cpu->coreid));
+		irq->ops->set_cpu_dest_mask(irq,
+			1 << (vmirq->guest->gcpus[0]->cpu->coreid));
 
-	/* FIXME: remember initial polarity from devtree? */
 	if (irq->ops->set_config)
-		irq->ops->set_config(irq, IRQ_LEVEL | IRQ_HIGH);
+		irq->ops->set_config(irq, vmpic_intspec_to_config[vmirq->config]);
 	if (irq->ops->set_delivery_type)
 		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
 
 static void vmpic_reset_handle(handle_t *h)
 {
-	vmpic_reset(h->intr->irq);
+	vmpic_reset(h->intr);
 }
 
 handle_ops_t vmpic_handle_ops = {
 	.reset = vmpic_reset_handle,
 };
 
-int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq)
+int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq, int config)
 {
-	vmpic_interrupt_t *vmirq;
+	assert(!irq->priv);
 
-	vmirq = alloc_type(vmpic_interrupt_t);
-	if (!vmirq)
+	vmpic_interrupt_t *vmirq = alloc_type(vmpic_interrupt_t);
+	if (!vmirq) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
 		return ERR_NOMEM;
+	}
 
+	vmirq->guest = guest;
 	vmirq->irq = irq;
 	irq->priv = vmirq;
 
 	vmirq->user.intr = vmirq;
 	vmirq->user.ops = &vmpic_handle_ops;
+
+	vmirq->config = config;
+	vmpic_reset(vmirq);
 
 	vmirq->handle = alloc_guest_handle(guest, &vmirq->user);
 
@@ -96,55 +110,53 @@ void vmpic_global_init(void)
 {
 }
 
-int vmpic_alloc_mpic_handle(guest_t *guest, const uint32_t *irqspec, int ncells)
+int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 {
-	interrupt_t *irq;
+	vmpic_interrupt_t *vmirq;
 	register_t saved;
 	int handle;
 
-	/*
-	 * Handle shared interrupts, check if handle already allocated.
-	 * Currently, the trick to find this is to get the MPIC vector
-	 * and see if this MPIC vector is a valid guest handle & it's
-	 * type is an interrupt type, then simply resuse it.
-	 */
- 	irq = NULL; //get_mpic_irq(irqspec, ncells);
- 	if (!irq)
- 		return ERR_INVALID;
-
-	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
-	         "vmpic: %p is MPIC %d\n",
-	         irq, irqspec[0]);
-
 	saved = spin_lock_critsave(&vmpic_lock);
- 	
- 	handle = mpic_irq_get_vector(irq);
-	if (handle < MAX_HANDLES && guest->handles[handle]) {
-		vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
-		if (vmirq && vmirq->irq == irq) {
+
+	vmirq = irq->priv;
+	if (vmirq) {
+		assert(vmirq->irq == irq);
+
+		if (vmirq->guest != guest) {
 			spin_unlock_critsave(&vmpic_lock, saved);
-			printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
-			         "vmpic reusing shared ghandle %d\n", handle);
-			return handle;
+
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+			         "%s: cannot share IRQ\n",
+			         __func__);
+
+			return ERR_BUSY;
 		}
+
+	 	handle = vmirq->handle;
+	 	assert(handle < MAX_HANDLES);
+		assert(guest->handles[handle]);
+		assert(vmirq == guest->handles[handle]->intr);
+		return handle;
 	}
 
-	vmpic_reset(irq);
-	
-	spin_unlock_critsave(&vmpic_lock, saved);
-
-	handle = vmpic_alloc_handle(guest, irq);
+	handle = vmpic_alloc_handle(guest, irq, irq->config);
 	if (handle < 0)
-		return handle;
+		goto out;
 
 	/*
 	 * update mpic vector to return guest handle directly
 	 * during interrupt acknowledge
+	 *
+	 * FIXME: don't assume MPIC, and handle cascaded IRQs
 	 */
 	mpic_irq_set_vector(irq, handle);
+
+out:
+	spin_unlock_critsave(&vmpic_lock, saved);
 	return handle;
 }
 
+#if 0
 static int calc_new_imaplen(dt_node_t *tree, const uint32_t *imap, int imaplen, int cell_len)
 {
 	uint32_t par_len, new_addr_cell, new_intr_cell;
@@ -338,6 +350,17 @@ typedef struct vmpic_init_ctx {
 	uint32_t vmpic_phandle;
 } vmpic_init_ctx_t;
 
+/* Identify all interrupt nexus nodes and subsequently patch the
+ * interrupt-parent having the "fsl,hv-interrupt-controller"
+ * property.
+ * Identify all interrupt sources that have an interrupt
+ * parent with a "fsl,hv-interrupt-controller" property.  
+ * This indicates that the source is managed by the
+ * vmpic and needs to have a handle allocated.
+ *   -replace mpic as interrupt parent with vmpic
+ *   -for each irq #, alloc mpic handles for each & replace
+ *    property value
+ */
 static int vmpic_init_one(dt_node_t *node, void *arg)
 {
 	vmpic_init_ctx_t *ctx = arg;
@@ -349,58 +372,9 @@ static int vmpic_init_one(dt_node_t *node, void *arg)
 
 	patch_interrupt_map(ctx->guest, node, ctx->vmpic, ctx->vmpic_phandle);
 	
-	prop = dt_get_prop(node, "interrupts", 0);
-	if (!prop)
-		return 0;
-	intspec = prop->data;
-	intlen = prop->len;
-
-	domain = get_interrupt_domain(ctx->guest->devtree, node);
-	if (!domain) {
-		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-		         "vmpic_partition_init: no interrupt domain\n");
-		return 0;
-	}
-	
-	/* identify interrupt sources to transform */
-	if (!dt_get_prop(domain, "fsl,hv-interrupt-controller", 0))
-		return 0;
-
-	for (i = 0; i < intlen / 8; i++) {
-		int handle;
-
-		/* FIXME: support more than just MPIC */
-		handle = vmpic_alloc_mpic_handle(ctx->guest, &intspec[i * 2], 2);
-		if (handle < 0) {
-			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-			         "vmpic_partition_init: error %d allocating handle\n",
-			         handle);
-			
-			return handle == ERR_NOMEM ? ERR_NOMEM : 0;
-		}
-		
-		intspec[i * 2] = handle;
-	}
-	
-	/* set the interrupt parent to the vmpic */
-	ret = dt_set_prop(node, "interrupt-parent", &ctx->vmpic_phandle, 4);
-	if (ret < 0) {
-		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-		         "vmpic_partition_init: error %d setting interrupts\n", ret);
-		return ret;
-	}
-
 	return 0;
 }
-
-static int vmpic_delete_ic(dt_node_t *node, void *arg)
-{
-	if (dt_get_prop(node, "fsl,hv-interrupt-controller", 0))
-		dt_delete_node(node);
-
-	return 0;
-}
-
+#endif
 /**
  * @param[in] pointer to guest device tree
  *
@@ -412,43 +386,54 @@ static int vmpic_delete_ic(dt_node_t *node, void *arg)
  */
 void vmpic_partition_init(guest_t *guest)
 {
+	dt_node_t *hv, *vmpic;
+	uint32_t propdata;
+#if 0
 	vmpic_init_ctx_t ctx = {
 		.guest = guest
 	};
-
-	dt_node_t *tree = guest->devtree;
+#endif
+	hv = dt_get_subnode(guest->devtree, "hypervisor", 1);
+	if (!hv)
+		goto nomem;
 
 	/* find the vmpic node */
-	ctx.vmpic = dt_get_first_compatible(tree, "fsl,hv-vmpic");
-	if (!ctx.vmpic) {
-		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-		         "vmpic_partition_init: no vmpic node found\n");
-		return;
-	}
+	vmpic = dt_get_subnode(hv, "vmpic", 1);
+	if (!vmpic)
+		goto nomem;
 
-	ctx.vmpic_phandle = dt_get_phandle(ctx.vmpic);
-	if (!ctx.vmpic_phandle) {
-		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-		         "vmpic_partition_init: vmpic has no phandle\n");
-		return;
-	}
+	if (dt_set_prop(vmpic, "compatible",
+	                "fsl,hv-vmpic", strlen("fsl,hv-vmpic") + 1) < 0)
+		goto nomem;
 
-	/* Identify all interrupt nexus nodes and subsequently patch the
-	 * interrupt-parent having the "fsl,hv-interrupt-controller"
-	 * property.
-	 * Identify all interrupt sources that have an interrupt
-	 * parent with a "fsl,hv-interrupt-controller" property.  
-	 * This indicates that the source is managed by the
-	 * vmpic and needs to have a handle allocated.
-	 *   -replace mpic as interrupt parent with vmpic
-	 *   -for each irq #, alloc mpic handles for each & replace
-	 *    property value
-	 */
+	propdata = 2;
+	if (dt_set_prop(vmpic, "#interrupt-cells",
+	                &propdata, sizeof(propdata)) < 0)
+		goto nomem;
 
-	dt_for_each_node(tree, &ctx, vmpic_init_one, NULL);
+	propdata = 0;
+	if (dt_set_prop(vmpic, "#address-cells",
+	                &propdata, sizeof(propdata)) < 0)
+		goto nomem;
 
-	/* delete the real mpic node(s) so guests don't get confused */
-	dt_for_each_node(tree, NULL, NULL, vmpic_delete_ic);
+	if (dt_set_prop(vmpic, "interrupt-controller", NULL, 0) < 0)
+		goto nomem;
+
+	/* FIXME: properly allocate a phandle */
+	propdata = guest->vmpic_phandle = 0x564d5043;
+	if (dt_set_prop(vmpic, "phandle",
+	                &propdata, sizeof(propdata)) < 0)
+		goto nomem;
+	if (dt_set_prop(vmpic, "linux,phandle",
+	                &propdata, sizeof(propdata)) < 0)
+		goto nomem;
+
+//	dt_for_each_node(tree, &ctx, vmpic_init_one, NULL);
+	return;
+
+nomem:
+	printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
 }
 
 void fh_vmpic_set_int_config(trapframe_t *regs)

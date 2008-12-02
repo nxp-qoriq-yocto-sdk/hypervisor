@@ -160,6 +160,9 @@ typedef struct guest {
 	/** Emulated SR register */
 	uint8_t i2c_sr;
 #endif
+
+	/** phandle of the guest vmpic node */
+	uint32_t vmpic_phandle;
 } guest_t;
 
 #define MAX_PARTITIONS 8

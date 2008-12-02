@@ -301,6 +301,7 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 	byte_chan_t *bc;
 	uint32_t irq[4];
 	vpic_interrupt_t *virq[2];
+	int ret;
 
 	endpoint = dt_get_prop(node, "fsl,endpoint", 0);
 	if (!endpoint) {
@@ -326,8 +327,8 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	virq[0] = vpic_alloc_irq(guest);
-	virq[1] = vpic_alloc_irq(guest);
+	virq[0] = vpic_alloc_irq(guest, 0);
+	virq[1] = vpic_alloc_irq(guest, 0);
 
 	if (!virq[0] || !virq[1]) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
@@ -335,12 +336,8 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 		return ERR_NOMEM;
 	}
 	
-	irq[0] = vmpic_alloc_handle(guest, &virq[0]->irq);
-	irq[1] = 0;
-	irq[2] = vmpic_alloc_handle(guest, &virq[1]->irq);
-	irq[3] = 0;
-	
-	if (irq[0] < 0 || irq[2] < 0) {
+	if (vpic_alloc_handle(virq[0], &irq[0]) < 0||
+	    vpic_alloc_handle(virq[1], &irq[2]) < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 		         "%s: can't alloc vmpic irqs\n", __func__);
 		return ERR_NOMEM;
@@ -356,7 +353,7 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 	if (ghandle < 0)
 		return ghandle;
 
-	int ret = dt_set_prop(node, "reg", &ghandle, 4);
+	ret = dt_set_prop(node, "reg", &ghandle, 4);
 	if (ret < 0)
 		return ret;
 

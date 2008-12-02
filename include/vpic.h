@@ -37,7 +37,7 @@ typedef struct vpic_interrupt {
 	interrupt_t irq;
 	struct guest *guest;
 	uint32_t destcpu;
-	uint8_t enable, irqnum, pending, active, level;
+	uint8_t enable, irqnum, pending, active, config;
 } vpic_interrupt_t;
 
 typedef struct vpic {
@@ -51,7 +51,9 @@ typedef struct vpic_cpu {
 	uint32_t pending;
 } vpic_cpu_t;
 
-vpic_interrupt_t *vpic_alloc_irq(struct guest *guest);
+vpic_interrupt_t *vpic_alloc_irq(struct guest *guest, int config);
+int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec);
+
 void vpic_assert_vint_rxq(queue_t *q);
 void vpic_assert_vint_txq(queue_t *q);
 void vpic_assert_vint(vpic_interrupt_t *irq);
