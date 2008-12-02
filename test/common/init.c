@@ -101,8 +101,10 @@ void init(unsigned long devtree_ptr)
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (node >= 0) {
-		prop = fdt_getprop(fdt, node, "fsl,hv-pic-coreint", &len);
+		prop = fdt_getprop(fdt, node, "fsl,hv-pic-legacy", &len);
 		if (prop)
+			coreint = 0;
+		else
 			coreint = 1;
 	}
 }
