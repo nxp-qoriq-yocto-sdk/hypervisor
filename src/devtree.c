@@ -442,11 +442,22 @@ int open_stdout_chardev(dt_node_t *node)
 }
 
 #ifdef CONFIG_BYTE_CHAN
+static dt_node_t *stdout_node;
+
 int open_stdout_bytechan(dt_node_t *node)
 {
 	byte_chan_t *bc;
+
+	if (!dt_node_is_compatible(node, "byte-channel"))
+		return ERR_UNHANDLED;
+
+	stdout_node = create_dev_tree();
+	if (!stdout_node)
+		return ERR_NOMEM;
 	
-	bc = ptr_from_node(node, "bc");
+	stdout_node->name = "stdout";
+	
+	bc = other_attach_byte_chan(stdout_node, node);
 	if (!bc)
 		return ERR_INVALID;
 
@@ -936,6 +947,8 @@ int assign_callback(dt_node_t *node, void *arg)
 
 		list_add(&hv_devs, &owner->guest_node);
 	}
+
+	node->endpoint = hwnode;
 
 	list_add(&hwnode->owners, &owner->dev_node);
 	spin_unlock(&owner_lock);

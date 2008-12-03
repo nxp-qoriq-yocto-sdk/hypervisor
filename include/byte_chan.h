@@ -42,13 +42,11 @@ typedef struct byte_chan_handle {
 } byte_chan_handle_t;
 
 /** byte_chan_t - This is a generic byte_chan device description  */
-typedef struct {
+typedef struct byte_chan {
 	queue_t q[2];  /**< queues */
 	byte_chan_handle_t handles[2];
 } byte_chan_t;
 
-void create_byte_channels(void);
-void connect_global_byte_channels(void);
 void byte_chan_partition_init(guest_t *guest);
 
 byte_chan_t *byte_chan_alloc(void);
@@ -60,8 +58,9 @@ ssize_t byte_chan_receive(byte_chan_handle_t *bc,
 
 byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc);
 int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd);
-int byte_chan_attach_guest(byte_chan_t *bc, guest_t *guest,
-                           vpic_interrupt_t *rxirq,
-                           vpic_interrupt_t *txirq);
+
+struct dt_node;
+byte_chan_t *other_attach_byte_chan(struct dt_node *node,
+                                    struct dt_node *endpoint);
 
 #endif

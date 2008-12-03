@@ -339,118 +339,86 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	return 0;
 }
 
+static byte_chan_t *mux_attach_byte_chan(dt_node_t *muxnode, dt_node_t *bcnode)
+{
+	if (dt_node_is_compatible(bcnode, "byte-channel"))
+		return other_attach_byte_chan(bcnode, muxnode);
+
+	return NULL;	
+}
+
+static byte_chan_t *mux_attach_chardev(dt_node_t *muxnode, dt_node_t *cdnode)
+{
+	if (dt_get_prop(cdnode, "device", 0) && cdnode->endpoint) {
+		chardev_t *cd = cdnode->endpoint->dev.chardev;
+		if (!cd)
+			return NULL;
+
+		byte_chan_t *bc = byte_chan_alloc();
+		if (!bc) {
+			printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			         "%s: out of memory\n", __func__);
+			return NULL;
+		}
+
+		int ret = byte_chan_attach_chardev(bc, cd);
+		if (ret < 0) {
+			printf("%s: error %d attaching %s to %s\n",
+			       __func__, ret, muxnode->name, cdnode->name);
+			return NULL;
+		}
+
+		return bc;
+	}
+
+	return NULL;	
+}
+
 int create_mux(dt_node_t *node, void *arg)
 {
 	dt_prop_t *prop;
 	dt_node_t *endpoint;
+	byte_chan_t *bc;
 
-	prop = dt_get_prop(node, "fsl,phys-dev", 0);
+	prop = dt_get_prop(node, "endpoint", 0);
 	if (!prop || prop->len != 4) {
 		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
-		         "%s: missing or bad fsl,phys-dev in %s.\n",
+		         "%s: missing or bad endpoint in %s.\n",
 		         __func__, node->name);
 		return 0;
 	}
 
-	endpoint = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
+	endpoint = dt_lookup_phandle(config_tree, *(const uint32_t *)prop->data);
 	if (!endpoint) {
 		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
-		         "%s: Cannot find phys-dev in %s.\n",
+		         "%s: Cannot find endpoint in %s.\n",
 		         __func__, node->name);
 		return 0;
 	}
 
-	byte_chan_t *bc = ptr_from_node(endpoint, "bc");
+	bc = mux_attach_byte_chan(node, endpoint);
+	if (!bc)
+		bc = mux_attach_chardev(node, endpoint);
 	if (!bc) {
-		chardev_t *cd = ptr_from_node(endpoint, "chardev");
-		if (!cd) {
-			printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
-			         "%s: Unrecognized phys-dev in %s.\n",
-			         __func__, node->name);
-			return 0;
-		}
- 
-		bc = byte_chan_alloc();
-		if (!bc)
-			return ERR_NOMEM;	
-
-		int ret = byte_chan_attach_chardev(bc, cd);
-		if (ret < 0) {
-			printf("%s: error %d attaching to chardev\n", __func__, ret);
-			return 0;
-		}
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+		         "%s: unrecognized endpoint %s in %s\n",
+		         __func__, endpoint->name, node->name);
+		return 0;
 	}
 
 	mux_complex_t *mux = mux_complex_init(bc);
 	if (!mux) 
 		return ERR_NOMEM;
-	
-	return dt_set_prop(node, "fsl,hv-internal-mux-ptr", &mux, sizeof(mux));}
+
+	node->bcmux = mux;	
+	return 0;
+}
 
 void create_muxes(void)
 {
-	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-byte-channel-mux",
+	int ret = dt_for_each_compatible(config_tree, "byte-channel-mux",
 	                                 create_mux, NULL);
 	if (ret < 0)
-		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
 		         "%s: error %d\n", __func__, ret);
 }
-
-#if defined(TEST) && defined(CONFIG_LIBOS_NS16550)
-
-mux_complex_t *vuart_complex;	
-
-void test_byte_chan_mux(void)
-{
-	byte_chan_t *byte_chan0;
-	byte_chan_t *byte_chan1;
-	byte_chan_t *byte_chan_to_lld;
-
-	byte_chan0 = byte_chan_alloc();
-	byte_chan1 = byte_chan_alloc();
-	byte_chan_to_lld = byte_chan_alloc();
-
-	chardev_t *cd = ns16550_init((uint8_t *)CCSRBAR_VA + 0x11c600, 0x24, 0, 16);
-	if (!cd) {
-		printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
-			"test_byte_chan_mux: failed to alloc uart\n");
-		return;
-	}
-
-	if (byte_chan_attach_chardev(&byte_chan_to_lld->handles[0], cd)) {
-		printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
-			"test_byte_chan_mux: Couldn't attach to uart\n");
-		return;
-	}
-
-	mux_complex_init(&byte_chan_to_lld->handles[1], &vuart_complex);
-#if 1
-	mux_complex_add(vuart_complex, &byte_chan0->handles[0], '0');
-	mux_complex_add(vuart_complex, &byte_chan0->handles[1], '1');
-#else	
-	mux_complex_add(vuart_complex, &byte_chan0->handles[1], '0');
-	mux_complex_add(vuart_complex, &byte_chan1->handles[1], '1');
-
-	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"ABCDEF\n\r", 8);
-	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"UUUU", 4);
-	byte_chan_send(&byte_chan0->handles[0], (const uint8_t *)"GGGG", 4);
-	byte_chan_send(&byte_chan1->handles[0], (const uint8_t *)"DDDD", 4);
-
-	while (1) {
-		uint8_t str[10];
-		int num = byte_chan_receive(&byte_chan0->handles[0], str, 1);
-		if (num == 1) {
-			// debug("Chan 0 = %c", str[0]);
-			byte_chan_send(&byte_chan1->handles[0], str, 1);
-		}
-
-		num = byte_chan_receive(&byte_chan1->handles[0], str, 1);
-		if (num == 1) {
-			// debug("Chan 1 = %c", str[0]);
-			byte_chan_send(&byte_chan0->handles[0], str, 1);
-		}
-	}
-#endif
-}
-
-#endif

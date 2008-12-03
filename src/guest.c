@@ -1351,6 +1351,39 @@ static void read_phandle_aliases(guest_t *guest)
 	}
 }
 
+dt_node_t *get_handles_node(guest_t *guest)
+{
+	dt_node_t *hv, *handles;
+	uint32_t propdata;
+	
+	hv = dt_get_subnode(guest->devtree, "hypervisor", 1);
+	if (!hv)
+		return NULL;
+
+	handles = dt_get_subnode(hv, "handles", 0);
+	if (handles)
+		return handles;
+
+	handles = dt_get_subnode(hv, "handles", 1);
+	if (!handles)
+		return NULL;
+
+	propdata = 1;
+	if (dt_set_prop(handles, "#address-cells", &propdata, 4) < 0)
+		return NULL;
+
+	propdata = 0;
+	if (dt_set_prop(handles, "#size-cells", &propdata, 4) < 0)
+		return NULL;
+
+	propdata = guest->vmpic_phandle;
+	if (propdata &&
+	    dt_set_prop(handles, "interrupt-parent", &propdata, 4) < 0)
+		return NULL;
+
+	return handles;
+}
+
 static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
                               int cpus_len)
 {

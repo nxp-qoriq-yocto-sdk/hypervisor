@@ -61,6 +61,11 @@ typedef struct dt_node {
 	struct guest *irq_owner;
 	struct pma *pma;
 
+	struct dt_node *endpoint;
+	struct byte_chan *bc;
+	struct byte_chan_handle *bch;
+	struct mux_complex *bcmux;
+
 	list_t aliases;
 } dt_node_t;
 
@@ -192,6 +197,7 @@ void open_stdin(void);
 extern struct queue *stdin, *stdout;
 
 dt_node_t *get_cpu_node(dt_node_t *tree, int cpu);
+dt_node_t *get_handles_node(struct guest *guest);
 
 int open_stdout_chardev(dt_node_t *node);
 int open_stdout_bytechan(dt_node_t *node);

@@ -512,11 +512,9 @@ void start(unsigned long devtree_ptr)
 	enable_critint();
 
 #ifdef CONFIG_BYTE_CHAN
-	create_byte_channels();
 #ifdef CONFIG_BCMUX
 	create_muxes();
 #endif
-	connect_global_byte_channels();
 
 	open_stdout_bytechan(stdout_node);
 #endif
