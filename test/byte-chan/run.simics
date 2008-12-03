@@ -7,12 +7,16 @@ $guest_image[0]  = "byte-chan"
 $guest_addr[0]   = 0x00200000
 
 $kernel_image  = "hv.uImage"
-$dev_tree_blob  = "hv.dtb"
+
+$guest_image[1] = "hv.dtb"
+$guest_addr[1]  = 0x00100000
 
 $use_uart2 = 1
 
 # uncomment to attach uart2 to network port
 #$use_uart2_net = 1
+
+$kernel_cmdline = "config-addr=0xe8100000"
 
 add-directory "%script%/../sim" -prepend
 add-directory "%script%/../sim/images" -prepend

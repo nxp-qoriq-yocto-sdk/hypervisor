@@ -25,23 +25,19 @@
 # UART0 is the hypervisor
 # UART1 is byte-channel UART MUX
 # UART2 is Linux partition 1
-# UART3 is Linux partition 2
 $use_uart1 = 1
 $use_uart2 = 1
 $use_uart3 = 0
 
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
-$guest_image[1]  = "rootfs.ext2.gz"
-$guest_addr[1]   = 0x01000000
-$guest_image[2]  = "vmlinux"
-$guest_addr[2]   = 0x02000000
-$guest_image[3]  = "rootfs.ext2.gz"
-$guest_addr[3]   = 0x03000000
+$guest_image[1]  = "hv-2p.dtb"
+$guest_addr[1]   = 0x00f00000
+$guest_image[2]  = "rootfs.ext2.gz"
+$guest_addr[2]   = 0x01000000
 
 $kernel_image  = "hv.uImage"
-
-$dev_tree_blob  = "hv-linux-2p.dtb"
+$kernel_cmdline = "config-addr=0xe8f00000"
 
 add-directory "%script%" -prepend
 add-directory "%script%/../sim" -prepend

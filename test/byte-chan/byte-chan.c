@@ -199,7 +199,7 @@ void start(unsigned long devtree_ptr)
 
 	printf("Byte channel test\n");
 
-	ret = get_prop("/handles/byte-channelA", "reg", &prop);
+	ret = get_prop("/hypervisor/handles/byte-channelA", "reg", &prop);
 	if (ret) {
 		printf("get_prop failed\n");
 		return;
@@ -211,7 +211,7 @@ void start(unsigned long devtree_ptr)
 		return;
 	}
 
-	ret = get_prop("/handles/byte-channelB", "reg", &prop);
+	ret = get_prop("/hypervisor/handles/byte-channelB", "reg", &prop);
 	if (ret) {
 		printf("get_prop failed\n");
 		return;
@@ -224,7 +224,7 @@ void start(unsigned long devtree_ptr)
 	}
 
 	ret =
-	    get_prop("/handles/byte-channelA", "interrupts",
+	    get_prop("/hypervisor/handles/byte-channelA", "interrupts",
 		     &prop);
 	if (ret) {
 		printf("get_prop failed\n");
@@ -238,7 +238,7 @@ void start(unsigned long devtree_ptr)
 	}
 
 	ret =
-	    get_prop("/handles/byte-channelB", "interrupts",
+	    get_prop("/hypervisor/handles/byte-channelB", "interrupts",
 		     &prop);
 	if (ret) {
 		printf("get_prop failed\n");
