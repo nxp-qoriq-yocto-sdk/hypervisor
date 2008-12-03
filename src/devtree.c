@@ -914,39 +914,24 @@ int assign_callback(dt_node_t *node, void *arg)
 	spin_lock(&owner_lock);
 
 	/* Hypervisor ownership of a device is exclusive */
-	if (ctx->guest) {
-		if (!list_empty(&hwnode->owners)) {
-			dev_owner_t *other = to_container(hwnode->owners.next,
-			                                  dev_owner_t, dev_node);
+	if (!list_empty(&hwnode->owners)) {
+		dev_owner_t *other = to_container(hwnode->owners.next,
+		                                  dev_owner_t, dev_node);
 
-			if (!other->guest) {
-				spin_unlock(&owner_lock);
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			   	      "%s: device %s in %s already assigned to the hypervisor\n",
-		         		__func__, alias, node->name);
-				free(owner);
-				return 0;
-			}
-		}
-		
-		list_add(&ctx->guest->dev_list, &owner->guest_node);
-	} else {
-		if (!list_empty(&hwnode->owners)) {
-			dev_owner_t *other = to_container(hwnode->owners.next,
-			                                  dev_owner_t, dev_node);
-
-			/* If it's already owned when the hv tries to claim it,
-			 * it can only be the hv itself that already owns it.
-			 */
-			assert(!other->guest);
-			assert(hwnode->owners.next->next == &hwnode->owners);
+		if (!other->guest) {
 			spin_unlock(&owner_lock);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		   	      "%s: device %s in %s already assigned to the hypervisor\n",
+	         		__func__, alias, node->name);
 			free(owner);
 			return 0;
 		}
-
-		list_add(&hv_devs, &owner->guest_node);
 	}
+		
+	if (ctx->guest)
+		list_add(&ctx->guest->dev_list, &owner->guest_node);
+	else
+		list_add(&hv_devs, &owner->guest_node);
 
 	node->endpoint = hwnode;
 
