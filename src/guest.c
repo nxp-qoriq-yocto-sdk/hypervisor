@@ -429,7 +429,7 @@ static void reset_spintbl(guest_t *guest)
 	}
 }
 
-static int copy_cpu_node(guest_t *guest, int vcpu,
+static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
                          const uint32_t *cpulist, int cpulist_len,
                          dt_node_t **nodep)
 {
@@ -458,6 +458,10 @@ static int copy_cpu_node(guest_t *guest, int vcpu,
 		return ERR_NOMEM;
 	
 	ret = dt_merge_tree(gnode, node, 0);
+	if (ret < 0)
+		return ret;
+
+	ret = dt_set_prop(gnode, "reg", &vcpu, 4);
 	if (ret < 0)
 		return ret;
 
