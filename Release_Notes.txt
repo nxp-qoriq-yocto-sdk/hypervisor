@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc6
-Date: 11/20/2008
+Revsion: 0.3-rc7
+Date: 12/4/2008
 
 -------------------------------------------------------
 Contents
@@ -32,6 +32,15 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc7 bug fixes and changes
+      -updates to enable unit tests to be run under swift
+       test harness
+      -ePAPR improvements-- the guest entry point is computed
+       as per the ePAPR
+      -fixed bug 2216: set TSR[WRS] to TCR[WRC] upon watchdog reset
+      -fixed bugs 2353, 2352: watchdog reset does not occur
+       with partition with more than 1 CPU
 
    -Topaz 0.3-rc6 bug fixes and changes
       -added I2C controller virtualization
