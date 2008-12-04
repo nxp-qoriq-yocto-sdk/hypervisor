@@ -33,20 +33,13 @@
 test := linux
 dir := $(testdir)$(test)/
 
-$(test)-dts := $(wildcard $(dir)*.dts)
-$(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
-$(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
-$(test)-part-dts := $(filter-out bin/$(test)/hv-%.dts,$($(test)-bin-dts))
-
-$(test)-hv-dtb := $($(test)-hv-dts:%.dts=%.dtb)
-$(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
-
-$($(test)-hv-dts): $($(test)-part-dtb)
+$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts
+$(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
 include $(src)tools/partman/Makefile
 
 .PHONY: $(test)
-$(test): $($(test)-hv-dtb)
+$(test): $($(test)-dtb)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics

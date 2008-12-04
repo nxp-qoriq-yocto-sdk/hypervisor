@@ -1,6 +1,5 @@
 $(test)-src-y := $(dir)$(test).c
-$(test)-hv-dts-y := bin/$(test)/hv.dts
-$(test)-part-dts-y := $(dir)p1.dts
+$(test)-dts-y := $(wildcard $(dir)*.dts)
 
 $(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           $(libos-src-early-y:%=libos/%) \
@@ -11,10 +10,7 @@ $(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
 
 $(test)-obj := $($(test)-obj:%=bin/%.o)
 
-$(test)-hv-dtb := $($(test)-hv-dts-y:%.dts=%.dtb)
-$(test)-part-dtb := $($(test)-part-dts-y:$(dir)%.dts=bin/$(test)/%.dtb)
-
-$($(test)-hv-dts-y): $($(test)-part-dtb)
+$(test)-hv-dtb := $($(test)-dts-y:$(dir)%.dts=bin/$(test)/%.dtb)
 
 bin/$(test)/$(test): $($(test)-obj)
 	@$(MKDIR) $(@D)

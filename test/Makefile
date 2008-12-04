@@ -40,8 +40,8 @@ config:
 	@$(MAKE) -f $(testdir)Makefile $(goals)
 else
 
-#SUBDIRS = $(wildcard $(src)*)
-SUBDIRS = hello byte-chan linux mcheck gdebug vmpic cache dma fit ipi mmu msgsnd pmr watchdog whoami simtst gdb
+SUBMAKES = $(wildcard $(testdir)*/Makefile)
+SUBDIRS = $(SUBMAKES:$(testdir)%/Makefile=%)
 
 include include/config/auto.conf
 
@@ -58,7 +58,7 @@ CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
         -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H)
 
-include $(SUBDIRS:%=$(testdir)%/Makefile)
+include $(SUBMAKES)
 
 #HDRS := $(shell cd $(testdir); find . -name '*.h')
 
@@ -80,21 +80,10 @@ bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
 	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
-%.dtb : %.dts
-	@$(MKDIR) $(@D)
-	$(call show,build: $<)
-	$(V)$(DTC) -p 1024 -O dtb $< -o $@
-
 bin/%.dtb : $(testdir)%.dts
 	@$(MKDIR) $(@D)
 	$(call show,build: $<)
 	$(V)$(DTC) -p 1024 -O dtb $< -o $@
-
-# This is a hack to work around the lack of an include
-# search path in DTC.
-bin/%.dts : $(testdir)%.dts
-	@$(MKDIR) $(@D)
-	$(V)cp -f $< $@
 
 -include bin/libos/libos_assym.d
 -include $(OBJS:%.o=%.d)
