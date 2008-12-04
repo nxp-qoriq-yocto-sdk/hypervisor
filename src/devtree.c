@@ -983,7 +983,6 @@ void dt_read_aliases(void)
 	}
 }
 
-
 /** Assign children of a subtree to the specified partition.
  *
  * @param[in] tree a partition or hv-config node

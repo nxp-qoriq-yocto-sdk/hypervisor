@@ -51,8 +51,6 @@
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
 
-#define MAX_PATH 256
-
 static int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 {
 	unsigned int i, vcpu_base = 0;
@@ -284,14 +282,47 @@ static int map_guest_reg(guest_t *guest, dt_node_t *gnode,
 	return 0;
 }
 
+void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree)
+{
+	dt_node_t *aliases;
+	char path_buf[MAX_DT_PATH];
+	int len;
+
+	len = dt_get_path(NULL, gnode, path_buf, sizeof(path_buf));
+	if (len > sizeof(path_buf)) {
+		printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
+ 		         "%s: %s path too long for alias\n",
+ 		         __func__, node->name);
+		return;
+	}
+
+	aliases = dt_get_subnode(tree, "aliases", 1);
+	if (!aliases)
+		goto nomem;
+
+	list_for_each(&node->aliases, i) {
+		alias_t *alias = to_container(i, alias_t, list_node);
+		
+		if (dt_set_prop(aliases, alias->name, path_buf, len) < 0)
+			goto nomem;
+	}
+
+	return;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+}
+
+
 typedef struct create_alias_ctx {
 	dt_node_t *aliases;
 	dt_node_t *tree;
-	char path_buf[MAX_PATH];
+	char path_buf[MAX_DT_PATH];
 	int path_len;
 } create_alias_ctx_t;
 
-static int create_aliases(dt_node_t *node, void *arg)
+static int create_hw_aliases(dt_node_t *node, void *arg)
 {
 	create_alias_ctx_t *ctx = arg;
 	int len = ctx->path_len;
@@ -305,7 +336,7 @@ static int create_aliases(dt_node_t *node, void *arg)
 		                   sizeof(ctx->path_buf) - ctx->path_len + 1) - 1;
 		if (len > sizeof(ctx->path_buf)) {
 			ctx->path_buf[ctx->path_len - 1] = 0;
-			printlog(LOGTYPE_DEVTREE, LOGTYPE_MISC,
+			printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
 	 		         "%s: %s path too long for alias\n",
 	 		         __func__, node->name);
 
@@ -316,7 +347,11 @@ static int create_aliases(dt_node_t *node, void *arg)
 	list_for_each(&node->aliases, i) {
 		alias_t *alias = to_container(i, alias_t, list_node);
 		
-		dt_set_prop(ctx->aliases, alias->name, ctx->path_buf, len);
+		if (dt_set_prop(ctx->aliases, alias->name, ctx->path_buf, len) < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: out of memory\n", __func__);
+			return ERR_NOMEM;
+		}
 	}
 
 	/* Reset the buffer to the assigned node path */
@@ -357,7 +392,7 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 	ctx.path_len = dt_get_path(NULL, gnode, ctx.path_buf,
 	                           sizeof(ctx.path_buf));
 	if (ctx.path_len > sizeof(ctx.path_buf)) {
-		printlog(LOGTYPE_DEVTREE, LOGTYPE_MISC,
+		printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
  		         "%s: %s path too long for alias\n",
  		         __func__, hwnode->name);
 
@@ -365,9 +400,9 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 	}
 
 	ctx.tree = hwnode;
-	dt_for_each_node(hwnode, &ctx, create_aliases, NULL);
+	dt_for_each_node(hwnode, &ctx, create_hw_aliases, NULL);
 	ctx.tree = cfgnode;
-	dt_for_each_node(cfgnode, &ctx, create_aliases, NULL);
+	dt_for_each_node(cfgnode, &ctx, create_hw_aliases, NULL);
 
 	/* FIXME: map children */
 	ret = map_guest_reg(guest, gnode, hwnode, cfgnode);
@@ -925,7 +960,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		name = dt_get_prop_string(partition, "label");
 		if (!name) {
 			/* If no label, use the partition node path. */
-			name = malloc(MAX_PATH);
+			name = malloc(MAX_DT_PATH);
 			if (!name) {
 				spin_unlock(&start_guest_lock);
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -933,8 +968,8 @@ guest_t *node_to_partition(dt_node_t *partition)
 				return NULL;
 			}
 
-			ret = dt_get_path(NULL, partition, name, MAX_PATH);
-			if (ret > MAX_PATH)
+			ret = dt_get_path(NULL, partition, name, MAX_DT_PATH);
+			if (ret > MAX_DT_PATH)
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "node_to_partition: path name too long\n");
 		}
@@ -1552,7 +1587,7 @@ static int init_guest_one(dt_node_t *node, void *arg)
 
 	prop = dt_get_prop(node, "cpus", 0);
 	if (!prop) {
-		char buf[MAX_PATH];
+		char buf[MAX_DT_PATH];
 		dt_get_path(NULL, node, buf, sizeof(buf));
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "init_guest: No cpus in guest %s\n", buf);

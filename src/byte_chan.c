@@ -276,6 +276,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 		}
 	}
 
+	create_aliases(node, gnode, guest->devtree);
 	return 0;
 
 nomem:

@@ -366,6 +366,8 @@ dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
 
 		list_init(&subnode->children);
 		list_init(&subnode->props);
+		list_init(&subnode->owners);
+		list_init(&subnode->aliases);
 
 		list_add(&node->children, &subnode->child_node);
 		return subnode;

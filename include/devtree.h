@@ -30,6 +30,8 @@
 #include <libos/list.h>
 #include <libfdt.h>
 
+#define MAX_DT_PATH 256
+
 #define MAX_ADDR_CELLS 4
 #define MAX_SIZE_CELLS 2
 #define MAX_INT_CELLS 4
@@ -198,6 +200,7 @@ extern struct queue *stdin, *stdout;
 
 dt_node_t *get_cpu_node(dt_node_t *tree, int cpu);
 dt_node_t *get_handles_node(struct guest *guest);
+void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree);
 
 int open_stdout_chardev(dt_node_t *node);
 int open_stdout_bytechan(dt_node_t *node);
