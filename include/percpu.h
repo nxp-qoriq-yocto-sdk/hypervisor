@@ -119,6 +119,8 @@ typedef struct guest {
 	register_t tlbivax_count;
 
 	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
+	uint32_t *cpulist;
+	int cpulist_len;
 	uint32_t lpid;
 
 	/** guest debug mode **/

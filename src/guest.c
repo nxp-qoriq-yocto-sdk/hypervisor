@@ -51,7 +51,7 @@
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
 
-static int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
+int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 {
 	unsigned int i, vcpu_base = 0;
 	
@@ -504,15 +504,13 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 	return 0;
 } 
 
-static int create_guest_spin_table_cpu(guest_t *guest, int vcpu,
-                                       const uint32_t *cpulist,
-                                       int cpulist_len)
+static int create_guest_spin_table_cpu(guest_t *guest, int vcpu)
 {
 	uint64_t spin_addr;
 	dt_node_t *node;
 	int ret;
 	
-	ret = copy_cpu_node(guest, vcpu, cpulist, cpulist_len, &node);
+	ret = copy_cpu_node(guest, vcpu, guest->cpulist, guest->cpulist_len, &node);
 	if (ret < 0)
 		return ret;
 
@@ -531,9 +529,7 @@ static int create_guest_spin_table_cpu(guest_t *guest, int vcpu,
 	return dt_set_prop(node, "cpu-release-addr", &spin_addr, 8);
 }
 
-static int create_guest_spin_table(guest_t *guest,
-                                   const uint32_t *cpulist,
-                                   int cpulist_len)
+static int create_guest_spin_table(guest_t *guest)
 {
 	unsigned long rpn;
 	int ret, i;
@@ -553,7 +549,7 @@ static int create_guest_spin_table(guest_t *guest,
 	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
 
 	for (i = 0; i < guest->cpucnt; i++) {
-		ret = create_guest_spin_table_cpu(guest, i, cpulist, cpulist_len);
+		ret = create_guest_spin_table_cpu(guest, i);
 
 		if (ret < 0) {
 			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
@@ -865,10 +861,10 @@ static int process_partition_handle(dt_node_t *node, void *arg)
 	return 0;
 }
 
-static int register_gcpu_with_guest(guest_t *guest, const uint32_t *cpus,
-                                    int len)
+static int register_gcpu_with_guest(guest_t *guest)
 {
-	int gpir = get_gcpu_num(cpus, len, mfspr(SPR_PIR));
+	int gpir = get_gcpu_num(guest->cpulist, guest->cpulist_len,
+	                        mfspr(SPR_PIR));
 	assert(gpir >= 0);
 
 	while (!guest->gcpus)
@@ -1423,8 +1419,7 @@ dt_node_t *get_handles_node(guest_t *guest)
 	return handles;
 }
 
-static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
-                              int cpus_len)
+static int init_guest_primary(guest_t *guest)
 {
 	int ret;
 	dt_prop_t *prop;
@@ -1434,12 +1429,12 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	char buf[64];
 
 	/* count number of cpus for this partition and alloc data struct */
-	guest->cpucnt = count_cpus(cpus, cpus_len);
+	guest->cpucnt = count_cpus(guest->cpulist, guest->cpulist_len);
 	guest->gcpus = alloc(sizeof(long) * guest->cpucnt, sizeof(long));
 	if (!guest->gcpus)
 		goto nomem;
 
-	gpir = register_gcpu_with_guest(guest, cpus, cpus_len);
+	gpir = register_gcpu_with_guest(guest);
 	assert(gpir == 0);
 
 	prop = dt_get_prop(guest->partition, "dtb-window", 0);
@@ -1501,7 +1496,7 @@ static int init_guest_primary(guest_t *guest, const uint32_t *cpus,
 	if (!guest->gphys || !guest->gphys_rev)
 		goto nomem;
 
-	ret = create_guest_spin_table(guest, cpus, cpus_len);
+	ret = create_guest_spin_table(guest);
 	if (ret < 0)
 		goto fail;
 
@@ -1575,7 +1570,6 @@ nomem:
 
 typedef struct init_guest_ctx {
 	guest_t *guest;
-	dt_prop_t *cpulist;
 } init_guest_ctx_t;
 
 static int init_guest_one(dt_node_t *node, void *arg)
@@ -1610,8 +1604,9 @@ static int init_guest_one(dt_node_t *node, void *arg)
 		return 0;
 	}
 
+	guest->cpulist = prop->data;
+	guest->cpulist_len = prop->len;
 	ctx->guest = guest;
-	ctx->cpulist = prop;
 	return 0;
 } 
 
@@ -1624,8 +1619,6 @@ __attribute__((noreturn)) void init_guest(void)
 	                       init_guest_one, &ctx);
 
 	if (ctx.guest) {
-		const uint32_t *cpus = ctx.cpulist->data;
-		int cpus_len = ctx.cpulist->len;
 		guest_t *guest = ctx.guest;
 
 		get_gcpu()->guest = guest;
@@ -1635,11 +1628,11 @@ __attribute__((noreturn)) void init_guest(void)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		         "guest at %s on core %d\n", guest->name, pir);
 
-		if (pir == cpus[0]) {
+		if (pir == guest->cpulist[0]) {
 			/* Boot CPU */
-			init_guest_primary(guest, cpus, cpus_len);
+			init_guest_primary(guest);
 		} else {
-			register_gcpu_with_guest(guest, cpus, cpus_len);
+			register_gcpu_with_guest(guest);
 		}
 	}
 
