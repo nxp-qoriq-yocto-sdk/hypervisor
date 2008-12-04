@@ -168,7 +168,7 @@ static vpic_interrupt_t *__vpic_iack(void)
 				gcpu->vpic.active |= 1 << irqnum;
 				virq->active = 1;
 
-				if (!virq->config & IRQ_LEVEL) {
+				if (!(virq->config & IRQ_LEVEL)) {
 					gcpu->vpic.pending &= ~(1 << irqnum);
 					virq->pending = 0;
 				}
