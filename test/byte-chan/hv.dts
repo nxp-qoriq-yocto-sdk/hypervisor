@@ -58,12 +58,12 @@
 
 			bca: byte-channelA {
 				compatible = "byte-channel";
-				endpoint = <&bca>;
+				endpoint = <&bcb>;
 			};
 
 			bcb: byte-channelB {
 				compatible = "byte-channel";
-				endpoint = <&bcb>;
+				endpoint = <&bca>;
 			};
 
 			aliases {
