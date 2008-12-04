@@ -335,12 +335,8 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 			node->bc = epnode->bc;
 		} else {
 			node->bc = byte_chan_alloc();
-			if (!node->bc) {
-				spin_unlock(&bchan_lock);
-				printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-				         "%s: out of memory\n", __func__);
-				return ERR_NOMEM;
-			}
+			if (!node->bc)
+				goto nomem;
 		}
 
 		if (dt_node_is_compatible(epnode, "byte-channel")) {
@@ -360,6 +356,10 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 		}
 
 		node->endpoint = epnode;
+	} else {
+		node->bc = byte_chan_alloc();
+		if (!node->bc)
+			goto nomem;
 	}
 
 	node->bch = byte_chan_claim(node->bc);
@@ -370,6 +370,12 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 out:
 	spin_unlock(&bchan_lock);
 	return 0;
+
+nomem:
+	spin_unlock(&bchan_lock);
+	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
 }
 
 byte_chan_t *other_attach_byte_chan(dt_node_t *bcnode, dt_node_t *onode)
