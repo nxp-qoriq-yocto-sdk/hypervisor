@@ -151,11 +151,12 @@ int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 static int connect_byte_channel(byte_chan_t *bc, dt_node_t *endpoint,
                                 dt_node_t *bcnode)
 {
-	chardev_t *cd;
+	chardev_t *cd = NULL;
 	mux_complex_t *mux;
 	int ret;
 
-	cd = endpoint->dev.chardev;
+	if (endpoint->endpoint)
+		cd = endpoint->endpoint->dev.chardev;
 	if (cd) {
 		ret = __byte_chan_attach_chardev(bc, cd);
 		if (ret == ERR_BUSY) {
