@@ -188,7 +188,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		goto nomem;
 
 	mixin = dt_get_subnode(node, "node-update", 0);
-	if (mixin && dt_merge_tree(gnode, mixin, 1))
+	if (mixin && dt_merge_tree(gnode, mixin, NULL, 1))
 		goto nomem;
 	
 	return 0;
@@ -277,7 +277,7 @@ static int map_guest_reg(guest_t *guest, dt_node_t *gnode,
 
 	mixin = dt_get_subnode(cfgnode, "node-update", 0);
 	if (mixin)
-		return dt_merge_tree(gnode, mixin, 1);
+		return dt_merge_tree(gnode, mixin, NULL, 1);
 
 	return 0;
 }
@@ -382,7 +382,7 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 	if (!gnode)
 		goto nomem;
 
-	ret = dt_merge_tree(gnode, hwnode, 0);
+	ret = dt_merge_tree(gnode, hwnode, NULL, 0);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: error %d merging %s\n", __func__, ret, hwnode->name);
@@ -492,7 +492,7 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 	if (!gnode)
 		return ERR_NOMEM;
 	
-	ret = dt_merge_tree(gnode, node, 0);
+	ret = dt_merge_tree(gnode, node, NULL, 0);
 	if (ret < 0)
 		return ret;
 
@@ -1561,7 +1561,7 @@ static int init_guest_primary(guest_t *guest)
 
 	node = dt_get_subnode(guest->partition, "node-update", 0);
 	if (node) {
-		ret = dt_merge_tree(guest->devtree, node, 1);
+		ret = dt_merge_tree(guest->devtree, node, NULL, 1);
 		if (ret < 0)
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "%s: error %d merging partition node-update\n",

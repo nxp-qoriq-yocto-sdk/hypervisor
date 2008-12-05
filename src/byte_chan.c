@@ -268,7 +268,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 
 	mixin = dt_get_subnode(node, "node-update", 0);
 	if (mixin) {
-		int ret = dt_merge_tree(gnode, mixin, 1);
+		int ret = dt_merge_tree(gnode, mixin, NULL, 1);
 		if (ret < 0) {
 			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 			         "%s: error %d merging node-update on %s\n",

@@ -498,6 +498,7 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 }
 
 typedef struct merge_ctx {
+	int (*cb)(dt_node_t *dest, dt_node_t *src);
 	dt_node_t *dest;
 	int notfirst;
 } merge_ctx_t;
@@ -513,6 +514,12 @@ static int merge_pre(dt_node_t *src, void *arg)
 
 		if (!ctx->dest)
 			return ERR_NOMEM;
+	}
+
+	if (ctx->cb) {
+		int ret = ctx->cb(ctx->dest, src);
+		if (ret)
+			return ret;
 	}
 
 	list_for_each(&src->props, i) {
@@ -539,6 +546,9 @@ static int merge_post(dt_node_t *src, void *arg)
  *
  * @param[in] dest tree to merge into
  * @param[in] src tree to merge from
+ * @param[in] cb if non-NULL, call this function when first visiting
+ *   a node.  If cb returns a non-zero value, the merge aborts and the
+ *   value is returned to the caller.
  * @param[in] deletion if non-zero, honor delete-node, delete-prop, etc.
  * @return zero on success, non-zero on failure
  *
@@ -552,9 +562,13 @@ static int merge_post(dt_node_t *src, void *arg)
  * if the name does not match, and the name of the resultant tree root
  * will be that of the destination input.
  */
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion)
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src,
+                  int (*cb)(dt_node_t *dest, dt_node_t *src), int deletion)
 {
-	merge_ctx_t ctx = { .dest = dest };
+	merge_ctx_t ctx = {
+		.dest = dest,
+		.cb = cb,
+	};
 
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
 }
