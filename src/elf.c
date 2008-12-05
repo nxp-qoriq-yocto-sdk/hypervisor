@@ -37,7 +37,11 @@
 #include <percpu.h>
 #include <libos/errors.h>
 
-#define PT_NULL      0
+/* Elf file types that we support */
+#define ET_EXEC   2
+#define ET_DYN    3
+
+/* Program header types that we support */
 #define PT_LOAD      1
 
 #define EI_CLASS     4  /* File class */
@@ -95,15 +99,25 @@ int is_elf(void *image)
  * @target: guest physical address of the destination
  * @entry: guest phys address of entry point, if not NULL
  *
- * Per ePAPR spec, the destination address encoded in the ELF file is
- * ignored.
+ * Note: the destination address encoded in the ELF file is ignored.  This
+ * will change when we support variable address (ET_DYN) ELF images.
+ *
+ * The "entry segment" is the phdr segment that contains the entry address
+ * for the ELF image.  Usually, this is the first segment.  'entry_paddr'
+ * contains the starting physical address of this segment.  'vbase' contains
+ * the virtual address of this segment.
+ *
+ * 'plowest' contains the starting physical address of the segment that has
+ * the lowest starting physical address.
  */
 int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
              phys_addr_t target, register_t *entry)
 {
 	struct elf_header hdr;
 	struct program_header phdr;
-	unsigned long base = -1;
+	unsigned long plowest = -1;
+	unsigned long entry_paddr = 0;
+	unsigned long vbase = -1;
 	unsigned int i, ret;
 
 	if (copy_from_phys(&hdr, image, sizeof(hdr)) != sizeof(hdr))
@@ -130,10 +144,17 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		return ERR_BADIMAGE;
 	}
 
+	/* We only support ET_EXEC images for now */
+	if (hdr.type != ET_EXEC) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "load_elf: only fixed address ELF images are supported\n");
+		return ERR_BADIMAGE;
+	}
+
 	/*
 	 * Test the program segment sizes and find the base address at the
-	 * same time.  The base address is the smallest vaddr of all PT_LOAD
-	 * segments.
+	 * same time.  The base load address is the smallest paddr of all
+	 * PT_LOAD segments.  Note that since we don't support ET_DYN
 	 */
 
 	for (i = 0; i < hdr.phnum; i++) {
@@ -145,9 +166,9 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 			return ERR_BADIMAGE;
 		}
 
-		if (phdr.offset + phdr.memsz > *length) {
+		if (phdr.offset + phdr.filesz > *length) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "load_elf: image size exceeds target window\n");
+			         "load_elf: truncated ELF image\n");
 			return ERR_BADIMAGE;
 		}
 
@@ -157,9 +178,32 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 			return ERR_BADIMAGE;
 		}
 
-		if ((phdr.type == PT_LOAD) && (phdr.vaddr < base))
-			base = phdr.vaddr;
+		if (phdr.type == PT_LOAD) {
+			if (phdr.paddr < plowest)
+				plowest = phdr.paddr;
+
+			// The virtual base address is the virtual address of
+			// the phdr that contains the ELF entry point.
+			if ((phdr.vaddr <= hdr.entry) &&
+			    (hdr.entry < (phdr.vaddr + phdr.memsz))) {
+				vbase = phdr.vaddr;
+				entry_paddr = phdr.paddr;
+			}
+		}
 	}
+
+	if (plowest == -1) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "load_elf: no PT_LOAD program headers in ELF image\n");
+		return ERR_BADIMAGE;
+	}
+
+	if (vbase == -1) {
+		printf("%s: ELF image has invalid entry address %x\n",
+		       __func__, hdr.entry);
+		return ERR_BADIMAGE;
+	}
+
 
 	/* Copy each PT_LOAD segment to memory */
 
@@ -173,7 +217,7 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		}
 
 		if (phdr.type == PT_LOAD) {
-			phys_addr_t seg_target = target + phdr.vaddr - base;
+			phys_addr_t seg_target = target + phdr.paddr - plowest;
 
 			ret = copy_phys_to_gphys(guest->gphys, seg_target,
 			                         image + phdr.offset,
@@ -196,9 +240,16 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		}
 	}
 
-	/* Return the entry point for the image if requested */
+	/* Return the entry point for the image if requested.  'target' is
+	 * where the lowest segment is written to.  'entry_paddr - plowest' is
+	 * the offset from that address to the entry segment. 'hdr.entry -
+	 * vbase' is the offset of the entry point within the entry segment.
+	 * Therefore, the entry address is equal to the target address plus the
+	 * offset to the entry segment plus the offset within the entry segment
+	 * of the original entry point.
+	 */
 	if (entry)
-		*entry = target - base + hdr.entry;
+		*entry = target + (entry_paddr - plowest) + (hdr.entry - vbase);
 
 	return 0;
 }

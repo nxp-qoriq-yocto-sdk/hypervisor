@@ -45,3 +45,24 @@ add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
 run-command-file "boot.simics"
+
+run-python-file "exc.py"
+
+$branch_count=1
+
+script-branch {
+	while $branch_count > 0 {
+        	$con3:con.wait-for-string "BENCH START"
+		@clear_mode_stats()
+		@print_stat()
+        	cpu0.print-time
+	}
+}
+
+script-branch {
+	while $branch_count > 0 {
+        	$con3:con.wait-for-string "BENCH STOP"
+		@print_stat()
+        	cpu0.print-time
+	}
+}

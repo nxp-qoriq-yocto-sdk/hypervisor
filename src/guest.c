@@ -713,6 +713,7 @@ static int load_image_table(guest_t *guest, const char *table,
 	uint64_t image_addr;
 	uint64_t guest_addr;
 	size_t length;
+	unsigned int row = 1;
 
 	prop = dt_get_prop(guest->partition, table, 0);
 	if (!prop)
@@ -732,6 +733,13 @@ static int load_image_table(guest_t *guest, const char *table,
 			         guest->name, length);
 			continue;
 		}
+
+		// We want everyone to put a length field in the device tree
+		if (!length)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+				 "load_image: guest %s: "
+				 "image #%u should specify a non-zero length\n",
+				 guest->name, row);
 
 		ret = load_image(guest, image_addr, guest_addr,
 		                 &length, entry ? &guest->entry : NULL);
@@ -767,6 +775,7 @@ static int load_image_table(guest_t *guest, const char *table,
 
 			return 1;
 		}
+		row++;
 	}
 	
 	return 1;
@@ -1099,10 +1108,9 @@ static void start_guest_primary_nowait(void)
 	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
 		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
 
-	// FIXME: This isn't exactly ePAPR compliant.  For starters, we only
-	// map 1GiB, so we don't support loading/booting an OS above that
-	// address.  Also, we pass the guest physical address even though it
-	// should be a guest virtual address, but since we program the TLBs
+	// We only map 1GiB, so we don't support loading/booting an OS above
+	// that address.  We pass the guest physical address even though
+	// it should be a guest virtual address, but since we program the TLBs
 	// such that guest virtual == guest physical at boot time, this works. 
 
 	r3 = guest->dtb_gphys;

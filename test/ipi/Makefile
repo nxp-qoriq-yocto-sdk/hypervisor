@@ -75,3 +75,8 @@ $(test): bin/$(test)/ipi bin/$(test)/ipi1 $($(test)-hv-dtb)
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
+$(test)-check-A: $(test)-run-A-batch
+	$(testdir)common/check-results 2
+
+$(test)-check-B: $(test)-run-B-batch
+	$(testdir)common/check-results 1 2

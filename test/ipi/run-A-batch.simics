@@ -2,7 +2,7 @@ $console_capture = 1
 
 add-directory "%script%/" -prepend
 
-run-command-file "run.simics"
+run-command-file "run-A.simics"
 
 script-branch {
     con1.wait-for-string "Test Complete"

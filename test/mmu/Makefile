@@ -26,3 +26,6 @@ test := mmu
 dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
+
+mmu-check: mmu-run-batch
+	$(testdir)common/check-results 2

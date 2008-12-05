@@ -1,0 +1,47 @@
+#!/usr/local/bin/perl
+
+use Getopt::Std;
+
+if ($#ARGV < 0)  {
+	usage();
+}
+
+%options = ();
+getopts("h:",\%options);
+
+if (defined $options{h} )  {
+	$hv_uart = $options{h};
+}
+
+foreach (@ARGV) {
+	$logfile = "uart".$_."-log.txt";
+	system("mv /tmp/$logfile .") == 0 || die "Missing $logfile file";
+	open(FILE, "$logfile") or die "Can't open $logfile";
+	$output = do { local $/; <FILE> };
+	close($FILE);
+	system("rm -f $logfile") == 0 || die "Unable to delete $logfile";
+
+	if ($output !~ /PASSED/i) {
+		die "no PASSED result";
+	}
+
+	if ($output =~ /FAIL/i) {
+		die "FAIL found";
+	}
+
+	# check for crash
+	if ($output =~ /Prev trap level/i) {
+		die "test appears to have crashed";
+	}
+}
+
+# success
+exit(0);
+
+sub usage
+{
+	printf("usage: check-results [-h hv-uart#] [output-uart#s] \n");
+	printf("e.g. check-results 2 3   # checks test output on uarts 2 and 3\n");
+	exit;
+}
+
