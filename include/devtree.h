@@ -99,7 +99,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 int dt_set_prop_string(dt_node_t *node, const char *name, const char *str);
 
 int dt_merge_tree(dt_node_t *dest, dt_node_t *src,
-                  int (*cb)(dt_node_t *dest, dt_node_t *src), int deletion);
+                  int (*cb)(dt_node_t *dest, dt_node_t *src), int special);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
 int dt_node_is_compatible(dt_node_t *node, const char *compat);

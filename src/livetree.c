@@ -189,7 +189,9 @@ nomem:
  *
  * The callback is performed on each node of the tree.  In postvisit, it
  * is safe to remove nodes as they are visited, but it is not safe to
- * remove the parent or any sibling of the visited node.
+ * remove the parent or any sibling of the visited node.  In previsit,
+ * it is safe to remove children of the visited node, but not the visited
+ * node itself.
  *
  * If a callback returns non-zero, the traversal is aborted, and the
  * return code propagated.
@@ -518,7 +520,7 @@ static const char *strlist_iterate(const char *strlist, size_t len,
 typedef struct merge_ctx {
 	int (*cb)(dt_node_t *dest, dt_node_t *src);
 	dt_node_t *dest;
-	int notfirst;
+	int notfirst, special;
 } merge_ctx_t;
 
 static int merge_pre(dt_node_t *src, void *arg)
@@ -534,6 +536,15 @@ static int merge_pre(dt_node_t *src, void *arg)
 			return ERR_NOMEM;
 	}
 
+	if (ctx->special) {
+		if (dt_get_prop(src, "delete-subnodes", 0)) {
+			list_for_each_delsafe(&ctx->dest->children, i, next) {
+				dt_node_t *node = to_container(i, dt_node_t, child_node);
+				dt_delete_node(node);
+			}
+		}
+	}
+
 	if (ctx->cb) {
 		int ret = ctx->cb(ctx->dest, src);
 		if (ret)
@@ -542,6 +553,17 @@ static int merge_pre(dt_node_t *src, void *arg)
 
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+
+      if (ctx->special) {
+	      if (!strcmp(prop->name, "delete-node"))
+		      continue;
+	      if (!strcmp(prop->name, "delete-subnodes"))
+		      continue;
+	      if (!strcmp(prop->name, "delete-prop"))
+		     continue;
+	      if (!strcmp(prop->name, "prepend-strlist"))
+		      continue;
+      }
 
 		int ret = dt_set_prop(ctx->dest, prop->name, prop->data, prop->len);
 		if (ret)
@@ -567,7 +589,7 @@ static int merge_post(dt_node_t *src, void *arg)
  * @param[in] cb if non-NULL, call this function when first visiting
  *   a node.  If cb returns a non-zero value, the merge aborts and the
  *   value is returned to the caller.
- * @param[in] deletion if non-zero, honor delete-node, delete-prop, etc.
+ * @param[in] special if non-zero, honor delete-node, delete-prop, etc.
  * @return zero on success, non-zero on failure
  *
  * The contents of src are merged into dest, recursively.
@@ -581,11 +603,12 @@ static int merge_post(dt_node_t *src, void *arg)
  * will be that of the destination input.
  */
 int dt_merge_tree(dt_node_t *dest, dt_node_t *src,
-                  int (*cb)(dt_node_t *dest, dt_node_t *src), int deletion)
+                  int (*cb)(dt_node_t *dest, dt_node_t *src), int special)
 {
 	merge_ctx_t ctx = {
 		.dest = dest,
 		.cb = cb,
+		.special = special,
 	};
 
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
