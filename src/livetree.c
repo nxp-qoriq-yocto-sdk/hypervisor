@@ -523,6 +523,48 @@ typedef struct merge_ctx {
 	int notfirst, special;
 } merge_ctx_t;
 
+static void delete_nodes_by_strlist(dt_node_t *node,
+                                    const char *strlist, size_t len)
+{
+	size_t pos = 0;
+	const char *str = strlist;
+	dt_node_t *child;
+
+	for (;;) {	
+		str = strlist_iterate(strlist, len, &pos);
+		if (!str)
+			return;
+
+		child = dt_get_subnode(node, str, 0);
+		if (child) {
+			dt_delete_node(child);
+			
+			/* Rewind to try this name again; it may have lacked a unit address,
+			 * and thus hit more than one node.
+			 */
+			pos = str - strlist;
+		}
+	}
+}
+
+static void delete_props_by_strlist(dt_node_t *node,
+                                    const char *strlist, size_t len)
+{
+	size_t pos = 0;
+	const char *str = strlist;
+	dt_prop_t *prop;
+
+	for (;;) {	
+		str = strlist_iterate(strlist, len, &pos);
+		if (!str)
+			return;
+
+		prop = dt_get_prop(node, str, 0);
+		if (prop)
+			destroy_prop(prop);
+	}
+}
+
 static int merge_pre(dt_node_t *src, void *arg)
 {
 	merge_ctx_t *ctx = arg;
@@ -537,12 +579,22 @@ static int merge_pre(dt_node_t *src, void *arg)
 	}
 
 	if (ctx->special) {
+		dt_prop_t *prop;
+	 
 		if (dt_get_prop(src, "delete-subnodes", 0)) {
 			list_for_each_delsafe(&ctx->dest->children, i, next) {
 				dt_node_t *node = to_container(i, dt_node_t, child_node);
 				dt_delete_node(node);
 			}
 		}
+
+		prop = dt_get_prop(src, "delete-node", 0);
+		if (prop && prop->len > 0)
+			delete_nodes_by_strlist(ctx->dest, prop->data, prop->len);
+
+		prop = dt_get_prop(src, "delete-prop", 0);
+		if (prop && prop->len > 0)
+			delete_props_by_strlist(ctx->dest, prop->data, prop->len);
 	}
 
 	if (ctx->cb) {
