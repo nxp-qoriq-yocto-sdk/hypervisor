@@ -497,6 +497,24 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 	return dt_set_prop(node, name, str, strlen(str) + 1);
 }
 
+static const char *strlist_iterate(const char *strlist, size_t len,
+                                   size_t *pos)
+{
+	const char *next, *ret;
+
+	if (*pos >= len)
+		return NULL;
+
+	next = memchr(strlist + *pos, 0, len - *pos);
+	if (!next)
+		return NULL;
+
+	ret = strlist + *pos;
+	*pos = next - strlist + 1;
+
+	return ret;
+}
+
 typedef struct merge_ctx {
 	int (*cb)(dt_node_t *dest, dt_node_t *src);
 	dt_node_t *dest;
@@ -692,21 +710,23 @@ void dt_print_tree(dt_node_t *tree, queue_t *out)
  */
 int dt_node_is_compatible(dt_node_t *node, const char *compat)
 {
-	dt_prop_t *prop = dt_get_prop(node, "compatible", 0);
+	dt_prop_t *prop;
+	const char *str;
+	size_t pos = 0;
+	
+	prop = dt_get_prop(node, "compatible", 0);
 	if (!prop)
 		return 0;
 
-	const char *str = prop->data;
-	const char *end = prop->data + prop->len;
+	str = prop->data;
+	for (;;) {
+		str = strlist_iterate(str, prop->len, &pos);
+		if (!str)
+			return 0;
 
-	while (str && str < end) {
-		if (!strncmp(compat, str, end - str + 1))
+		if (!strcmp(compat, str))
 			return 1;
-
-		str = memchr(str, 0, end - str + 1) + 1;
 	}
-
-	return 0;
 }
 
 typedef struct compat_ctx {
