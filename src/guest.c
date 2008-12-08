@@ -421,8 +421,14 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 		return;
 	}
 
+	if (hwnode->dev.num_irqs <= 0)
+		return;
+
+	uint32_t *intspec = malloc(hwnode->dev.num_irqs * 8);
+	if (!intspec)
+		goto nomem;
+
 	for (int i = 0; i < hwnode->dev.num_irqs; i++) {
-		uint32_t intspec[2];
 		int handle;
 		
 		/* FIXME: handle more than just mpic */
@@ -430,18 +436,21 @@ static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
 		if (handle < 0)
 			continue;
 
-		intspec[0] = handle;
-		intspec[1] = vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
-
-		ret = dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec));
-		if (ret < 0)
-			goto nomem;
-
-		ret = dt_set_prop(gnode, "interrupt-parent",
-		                  &guest->vmpic_phandle, 4);
-		if (ret < 0)
-			goto nomem;
+		intspec[i * 2 + 0] = handle;
+		intspec[i * 2 + 1] =
+			vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
 	}
+
+	ret = dt_set_prop(gnode, "interrupts", intspec,
+	                  hwnode->dev.num_irqs * 8);
+	free(intspec);
+	if (ret < 0)
+		goto nomem;
+
+	ret = dt_set_prop(gnode, "interrupt-parent",
+	                  &guest->vmpic_phandle, 4);
+	if (ret < 0)
+		goto nomem;
 
 	return;
 
