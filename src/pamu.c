@@ -48,7 +48,7 @@ static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 		addrspace_size = 1 << (LONG_BITS - 1 -
 				(count_msb_zeroes(addrspace_size)));
 
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			"dma address space size not power of 2, rounding down to next power of 2 = 0x%lx\n", addrspace_size);
 	}
 
@@ -82,7 +82,7 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 						 PTE_PHYS_LEVELS);
 		if (!(attr & PTE_VALID)) {
 			if (start_rpn == ULONG_MAX) {
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 						"invalid rpn\n");
 				return ULONG_MAX;
 			} else {
@@ -93,14 +93,14 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 		if (start_rpn == ULONG_MAX) {
 			start_rpn = rpn;
 		} else if (rpn != next_rpn) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
 				"rpn = 0x%lx, size = 0x%lx\n",
 				start_rpn, mach_phys_contig_size);
 			break;
 		}
 
 		if (!(attr & (PTE_SW | PTE_UW))) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				"dma-window not writeable!\n");
 			return ULONG_MAX;
 		}
@@ -112,12 +112,80 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 	}
 
 	if (size > mach_phys_contig_size) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: dma-window size error\n", __func__);
 		return ULONG_MAX;
 	}
 
 	return start_rpn;
+}
+
+#define L1 1
+#define L2 2
+#define L3 3
+
+/*
+ * Given the stash-dest enumeration value and a hw node of the device
+ * being configured, return the cache-stash-id property value for
+ * the associated cpu.  Assumption is that a cpu-handle property
+ * points to that cpu.
+ *
+ * stash-dest values in the config tree are defined as:
+ *    1 : L1 cache
+ *    2 : L2 cache
+ *    3 : L3/CPC cache
+ *
+ */
+static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
+{
+	dt_prop_t *prop;
+	dt_node_t *node;
+
+	prop = dt_get_prop(hwnode, "cpu-phandle", 0);
+	if (!prop || prop->len != 4)
+		return -1;  /* if no cpu-phandle assume that this is
+			      not a per-cpu portal */
+
+	node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
+	if (!node) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: bad cpu phandle reference in %s \n",
+		          __func__, hwnode->name);
+		return -1;
+	}
+
+	/* find the hwnode that represents the cache */
+	for (int cache_level = L1; cache_level <= L3; cache_level++) {
+		if (stash_dest == cache_level) {
+			prop = dt_get_prop(node, "cache-stash-id", 0);
+			if (!prop || prop->len != 4) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: missing/bad cache-stash-id at %s \n",
+				          __func__, node->name);
+				return -1;
+			}
+			break;  /* found it */
+		}
+
+		prop = dt_get_prop(node, "next-level-cache", 0);
+		if (!prop || prop->len != 4) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: can't find next-level-cache at %s \n",
+			          __func__, node->name);
+			return -1;  /* can't traverse any further */
+		}
+
+		/* advance to next node in cache hierarchy */
+		node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
+		if (!node) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: bad cpu phandle reference in %s \n",
+			          __func__, hwnode->name);
+			return -1;
+		}
+	}
+
+	return *(const uint32_t *)prop->data;
 }
 
 /*
@@ -138,26 +206,27 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	dt_node_t *dma_window;
 	phys_addr_t window_addr = -1;
 	phys_addr_t window_size = 0;
+	uint32_t stash_dest = -1;
 
 // TODO implement subwindows
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
 	if (!prop || prop->len != 4) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: warning: missing dma-window\n", __func__);
 		return -1;
 	}
 
 	dma_window = dt_lookup_phandle(config_tree, *(const uint32_t *)prop->data);
 	if (!dma_window) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: warning: bad dma-window phandle ref at %s\n",
 		         __func__, cfgnode->name);
 		return ERR_BADTREE;
 	}
 	gaddr = dt_get_prop(dma_window, "guest-addr", 0);
 	if (!gaddr || gaddr->len != 8) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: warning: missing/bad guest-addr at %s\n",
 		         __func__, dma_window->name);
 		return ERR_BADTREE;
@@ -166,7 +235,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 
 	size = dt_get_prop(dma_window, "size", 0);
 	if (!size || size->len != 8) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: warning: missing/bad size prop at %s\n",
 		         __func__, dma_window->name);
 		return ERR_BADTREE;
@@ -183,14 +252,36 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 
 	setup_default_xfer_to_host_ppaace(ppaace);
 
-	ppaace->wbah = 0;
+	ppaace->wbah = 0;   // FIXME: 64-bit
 	ppaace->wbal = window_addr >> PAGE_SHIFT;
 	ppaace->wse  = map_addrspace_size_to_wse(window_size);
 
 	ppaace->atm = PAACE_ATM_WINDOW_XLATE;
 
-	ppaace->twbah = 0;
+	ppaace->twbah = 0;  // FIXME: 64-bit
 	ppaace->twbal = rpn;
+
+	/* set up operation mapping if it's configured */
+	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
+	if (prop && prop->len == 4) {
+		uint32_t omi = *(const uint32_t *)prop->data;
+		if (omi <= OMI_MAX) {
+			ppaace->otm = PAACE_OTM_INDEXED;
+			ppaace->op_encode.index_ot.omi = omi;
+		} else {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: warning: bad operation mapping index at %s\n",
+			         __func__, cfgnode->name);
+		}
+	}
+
+	/* configure stash id */
+	prop = dt_get_prop(cfgnode, "stash-dest", 0);
+	if (prop && prop->len == 4) {
+		stash_dest = get_stash_dest(*(const uint32_t *)prop->data, hwnode);
+		if (stash_dest != -1)
+			ppaace->impl_attr.cid = stash_dest;
+	}
 
 	smp_lwsync();
 
@@ -257,6 +348,45 @@ int pamu_disable_liodn(unsigned int handle)
 	return 0;
 }
 
+void setup_omt(void)
+{
+	ome_t *ome;
+
+	/* Configure OMI_QMAN */
+	ome = pamu_get_ome(OMI_QMAN);
+	if (!ome) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: failed to read operation mapping table\n", __func__);
+		return;
+	}
+
+	ome->moe[IOE_READ_IDX] = EOE_VALID | EOE_READ;
+	ome->moe[IOE_EREAD0_IDX] = EOE_VALID | EOE_RSA;
+	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+	ome->moe[IOE_EWRITE0_IDX] = EOE_VALID | EOE_WWSAO;
+
+	/*
+	 * When it comes to stashing DIRECTIVEs, the QMan BG says
+	 * (1.5.6.7.1:  FQD Context_A field used for dequeued etc.
+	 * etc. stashing control):
+	 * - AE/DE/CE == 0:  don't stash exclusive.  Use DIRECT0,
+	 *                   which should be a non-PE LOADEC.
+	 * - AE/DE/CE == 1:  stash exclusive via DIRECT1, i.e.
+	 *                   LOADEC-PE
+	 * If one desires to alter how the three different types of
+	 * stashing are done, please alter rx_conf.exclusive in
+	 * ipfwd_a.c (that specifies the 3-bit AE/DE/CE field), and
+	 * do not alter the settings here.  - bgrayson
+	 */
+	ome->moe[IOE_DIRECT0_IDX] = EOE_VALID | EOE_LDEC;
+	ome->moe[IOE_DIRECT1_IDX] = EOE_VALID | EOE_LDECPE;
+
+	/* Configure OMI_FMAN */
+	ome = pamu_get_ome(OMI_FMAN);
+	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
+	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+}
+
 #define PAMUBYPENR 0x604
 void pamu_global_init(void)
 {
@@ -275,28 +405,28 @@ void pamu_global_init(void)
 	/* find the pamu node */
 	pamu_node = dt_get_first_compatible(hw_devtree, "fsl,p4080-pamu");
 	if (!pamu_node) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
 		         "%s: warning: no pamu node found\n", __func__);
 		return;
 	}
 
 	ret = dt_get_reg(pamu_node, 0, &addr, &size);
 	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: no pamu reg found\n", __func__);
 		return;
 	}
 
 	guts_node = dt_get_first_compatible(hw_devtree, "fsl,p4080-guts");
 	if (!guts_node) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: pamu present, but no guts node found\n", __func__);
 		return;
 	}
 
 	ret = dt_get_reg(guts_node, 0, &guts_addr, &guts_size);
 	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: no guts reg found\n", __func__);
 		return;
 	}
@@ -322,6 +452,8 @@ void pamu_global_init(void)
 		/* Disable PAMU bypass for this PAMU */
 		pamubypenr &= ~pamu_counter;
 	}
+
+	setup_omt();
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);

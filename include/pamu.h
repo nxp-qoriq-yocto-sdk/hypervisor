@@ -34,6 +34,11 @@ typedef struct pamu_handle {
 	handle_t user;
 } pamu_handle_t;
 
+/* define indexes for each operation mapping scenario */
+#define OMI_QMAN        0x00
+#define OMI_FMAN        0x01
+#define OMI_MAX         0x01  /* define the max index defined */
+
 void pamu_global_init(void);
 void pamu_partition_init(guest_t *guest);
 
