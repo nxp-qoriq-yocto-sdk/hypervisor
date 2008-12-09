@@ -997,16 +997,25 @@ int assign_callback(dt_node_t *node, void *arg)
 
 	spin_lock(&owner_lock);
 
-	/* Hypervisor ownership of a device is exclusive */
 	if (!list_empty(&hwnode->owners)) {
 		dev_owner_t *other = to_container(hwnode->owners.next,
 		                                  dev_owner_t, dev_node);
 
+		/* Hypervisor ownership of a device is exclusive */
 		if (!other->guest) {
 			spin_unlock(&owner_lock);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		   	      "%s: device %s in %s already assigned to the hypervisor\n",
 	         		__func__, alias, node->name);
+			free(owner);
+			return 0;
+		}
+
+		if (other->guest == ctx->guest) {
+			spin_unlock(&owner_lock);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		   	      "%s: device %s in %s already assigned to %s\n",
+	         		__func__, alias, node->name, ctx->guest->name);
 			free(owner);
 			return 0;
 		}
