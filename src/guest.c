@@ -285,6 +285,127 @@ static int map_guest_ranges(dev_owner_t *owner)
 	                   (newranges - newranges_base) * sizeof(newranges[0]));
 }
 
+static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
+{
+	dt_prop_t *prop;
+
+	if (!dt_node_is_compatible(hwnode->parent, "fsl,qman-portal")) {
+		return owner->cfgnode;  /* normal case */
+	}
+
+	/* if parent of hwnode is fsl,qman-portal its a special case */
+
+	/* iterate over all children of the config node */
+	list_for_each(&owner->cfgnode->children, i) {
+		dt_node_t *config_child = to_container(i, dt_node_t, child_node);
+
+		/* look for nodes with a "device" property */
+		const char *s = dt_get_prop_string(config_child, "device");
+		if (s) {
+			dt_node_t *devnode = dt_lookup_alias(hw_devtree, s);
+			if (!devnode) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: missing device (%s) reference at %s\n",
+				         __func__, s, config_child->name);
+				return NULL;
+			}
+			uint32_t hw_phandle_cfg = dt_get_phandle(devnode);
+
+			prop = dt_get_prop(hwnode, "dev-handle", 0);
+			if (prop) {
+				if (prop->len != 4) {
+					printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					         "%s: missing/bad dev-handle on %s\n",
+					         __func__, owner->hwnode->name);
+				}
+				uint32_t hw_phandle = *(const uint32_t *)prop->data;
+
+				if (hw_phandle == hw_phandle_cfg)
+					return config_child; /* found match */
+			}
+		}
+	}
+
+	return NULL;
+}
+
+typedef struct search_liodn_ctx {
+	dt_node_t *cfgnode;
+	int liodn_index;
+} search_liodn_ctx_t;
+
+static int search_liodn_index(dt_node_t *cfgnode, void *arg)
+{
+	search_liodn_ctx_t *ctx = arg;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(cfgnode, "liodn-index", 0);
+	if (prop) {
+		if (prop->len != 4) {
+			ctx->cfgnode = NULL;
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad liodn-index on %s\n",
+			         __func__, cfgnode->name);
+			return 0;
+		}
+		if (ctx->liodn_index == *(const uint32_t *)prop->data) {
+			ctx->cfgnode = cfgnode;
+			return 1; /* found match */
+		}
+	}
+
+	return 0;
+}
+
+int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
+{
+	dt_node_t *cfgnode;
+	dt_prop_t *liodn_prop = NULL;
+	const uint32_t *liodn;
+	int liodn_cnt;
+	int ret;
+
+	cfgnode = find_cfgnode(hwnode, owner);
+	if (!cfgnode)
+		return 0;
+
+	/* get the liodn property on the hw node */
+	liodn_prop = dt_get_prop(hwnode, "fsl,liodn", 0);
+	if (!liodn_prop)
+		return 0;  /* continue */
+
+	if (liodn_prop->len & 3 || liodn_prop->len == 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: bad liodn on %s\n",
+		         __func__, hwnode->name);
+		return 0;
+	}
+	liodn = (const uint32_t *)liodn_prop->data;
+
+	/* get a count of liodns */
+	liodn_cnt = liodn_prop->len / 4;
+
+	for (int i = 0; i < liodn_cnt; i++) {
+		search_liodn_ctx_t ctx;
+
+		/* search for an liodn-index that matches this liodn */
+		ctx.liodn_index = i;
+		ctx.cfgnode = cfgnode;  /* default */
+		dt_for_each_node(cfgnode, &ctx, search_liodn_index, NULL);
+
+		if (!ctx.cfgnode)  /* error */
+			continue;
+
+		ret = pamu_config_liodn(owner->guest, liodn[i], hwnode, ctx.cfgnode);
+		if (ret < 0)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: config of liodn failed (rc=%d)\n",
+			         __func__, ret);
+	}
+
+	return 0;
+}
+
 static int map_guest_reg(dev_owner_t *owner)
 {
 	mem_resource_t *regs;
@@ -406,6 +527,8 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 
 		return 0;
 	}
+
+	configure_dma(hwnode, owner);
 
 	if (hwnode->dev.num_irqs <= 0)
 		return 0;
@@ -1850,10 +1973,6 @@ static int init_guest_primary(guest_t *guest)
 
 #ifdef CONFIG_DEVICE_VIRT
 	list_init(&guest->vf_list);
-#endif
-
-#ifdef CONFIG_PAMU
-	pamu_partition_init(guest);
 #endif
 
 	// Get the watchdog timeout options
