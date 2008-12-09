@@ -27,6 +27,7 @@
 #define __PAMU_H_
 
 #include <percpu.h>
+#include <devtree.h>
 
 typedef struct pamu_handle {
 	unsigned long assigned_liodn;
@@ -38,5 +39,6 @@ void pamu_partition_init(guest_t *guest);
 
 int pamu_enable_liodn(unsigned int liodn);
 int pamu_disable_liodn(unsigned int liodn);
+int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode);
 
 #endif

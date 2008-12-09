@@ -38,6 +38,7 @@
 #include <errors.h>
 #include <devtree.h>
 #include <paging.h>
+#include <limits.h>
 
 int pamu_global_init_done;
 
@@ -55,15 +56,21 @@ static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 	return count_lsb_zeroes(addrspace_size >> PAGE_SHIFT) + 11;
 }
 
-static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, uint32_t *gpa_range, uint32_t *gpa_size)
+/*
+ * Given a guest physical page number and size, return
+ * the real (true physical) page number
+ *
+ * return values
+ *    ULONG_MAX on failure
+ *    rpn value on success
+ */
+static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t size)
 {
-	struct ppaace_t *current_ppaace;
 	unsigned long attr;
 	unsigned long mach_phys_contig_size = 0;
-	unsigned long start_rpn = 0;
-	unsigned long grpn = gpa_range[3] >> PAGE_SHIFT; /* vptbl needs pfn */
+	unsigned long start_rpn = ULONG_MAX;
 	unsigned long size_pages;
-	unsigned long next_rpn = 0;
+	unsigned long next_rpn = ULONG_MAX;
 
 	while (1) {
 
@@ -71,22 +78,19 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 		 * Need to iterate over vptbl_xlate(), as it returns a single
 		 * mapping upto max. TLB page size on each call.
 		 */
-
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr,
 						 PTE_PHYS_LEVELS);
-
 		if (!(attr & PTE_VALID)) {
-			if (!start_rpn) {
+			if (start_rpn == ULONG_MAX) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 						"invalid rpn\n");
-				return -1;
-			}
-			else {
+				return ULONG_MAX;
+			} else {
 				break;
 			}
 		}
 
-		if (!start_rpn) {
+		if (start_rpn == ULONG_MAX) {
 			start_rpn = rpn;
 		} else if (rpn != next_rpn) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
@@ -97,8 +101,8 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 
 		if (!(attr & (PTE_SW | PTE_UW))) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"dma-ranges not writeable!\n");
-			return -1;
+				"dma-window not writeable!\n");
+			return ULONG_MAX;
 		}
 
 		size_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
@@ -107,24 +111,92 @@ static int pamu_config_assigned_liodn(guest_t *guest, uint32_t assigned_liodn, u
 		next_rpn = rpn + size_pages;
 	}
 
-	current_ppaace = get_ppaace(assigned_liodn);
-	if (!current_ppaace)
+	if (size > mach_phys_contig_size) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: dma-window size error\n", __func__);
+		return ULONG_MAX;
+	}
+
+	return start_rpn;
+}
+
+/*
+ * Given a device liodn and a device config node setup
+ * the paace entry for this device.
+ *
+ * Before this function is called the caller should have
+ * established whether there is an associated dma-window
+ * so it is an error if a dma-window prop is not found.
+ */
+int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode)
+{
+	struct ppaace_t *ppaace;
+	unsigned long rpn;
+	dt_prop_t *prop;
+	dt_prop_t *gaddr;
+	dt_prop_t *size;
+	dt_node_t *dma_window;
+	phys_addr_t window_addr = -1;
+	phys_addr_t window_size = 0;
+
+// TODO implement subwindows
+
+	prop = dt_get_prop(cfgnode, "dma-window", 0);
+	if (!prop || prop->len != 4) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: warning: missing dma-window\n", __func__);
+		return -1;
+	}
+
+	dma_window = dt_lookup_phandle(config_tree, *(const uint32_t *)prop->data);
+	if (!dma_window) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: warning: bad dma-window phandle ref at %s\n",
+		         __func__, cfgnode->name);
+		return ERR_BADTREE;
+	}
+	gaddr = dt_get_prop(dma_window, "guest-addr", 0);
+	if (!gaddr || gaddr->len != 8) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: warning: missing/bad guest-addr at %s\n",
+		         __func__, dma_window->name);
+		return ERR_BADTREE;
+	}
+	window_addr = *(const phys_addr_t *)gaddr->data;
+
+	size = dt_get_prop(dma_window, "size", 0);
+	if (!size || size->len != 8) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: warning: missing/bad size prop at %s\n",
+		         __func__, dma_window->name);
+		return ERR_BADTREE;
+	}
+	window_size = *(const phys_addr_t *)size->data;
+
+	rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
+	if (rpn == ULONG_MAX)
 		return -1;
 
-	setup_default_xfer_to_host_ppaace(current_ppaace);
+	ppaace = pamu_get_ppaace(liodn);
+	if (!ppaace)
+		return -1;
 
-	current_ppaace->wbah = 0;
-	current_ppaace->wbal = (gpa_range[3]) >> PAGE_SHIFT;
-	current_ppaace->wse  = map_addrspace_size_to_wse(mach_phys_contig_size);
+	setup_default_xfer_to_host_ppaace(ppaace);
 
-	current_ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+	ppaace->wbah = 0;
+	ppaace->wbal = window_addr >> PAGE_SHIFT;
+	ppaace->wse  = map_addrspace_size_to_wse(window_size);
 
-	current_ppaace->twbah = 0;
-	current_ppaace->twbal = start_rpn; /* vptbl functions return pfn's */
+	ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+
+	ppaace->twbah = 0;
+	ppaace->twbal = rpn;
+
+	smp_lwsync();
 
 	/* PAACE is invalid, validated by enable hcall */
-	current_ppaace->v = 1;  // FIXME: for right now we are leaving PAACE
-                                // entries enabled by default.
+	ppaace->v = 1; // FIXME: for right now we are leaving PAACE
+	               // entries enabled by default.
 
 	return 0;
 }
@@ -148,7 +220,7 @@ int pamu_enable_liodn(unsigned int handle)
 
 	liodn = pamu_handle->assigned_liodn;
 
-	current_ppaace = get_ppaace(liodn);
+	current_ppaace = pamu_get_ppaace(liodn);
 	current_ppaace->v = 1;
 
 	return 0;
@@ -173,7 +245,7 @@ int pamu_disable_liodn(unsigned int handle)
 
 	liodn = pamu_handle->assigned_liodn;
 
-	current_ppaace = get_ppaace(liodn);
+	current_ppaace = pamu_get_ppaace(liodn);
 	current_ppaace->v = 0;
 
 	/*
@@ -183,137 +255,6 @@ int pamu_disable_liodn(unsigned int handle)
 	 */
 
 	return 0;
-}
-
-static int process_standard_liodn(dt_node_t *node, void *arg)
-{
-	guest_t *guest = arg;
-	int ret;
-	const uint32_t *dma_ranges;
-	uint32_t cas_addrbuf[MAX_ADDR_CELLS];	/* child address space */
-	uint32_t pas_addrbuf[MAX_ADDR_CELLS];	/* parent address space */
-	uint32_t cas_sizebuf[MAX_SIZE_CELLS];
-	uint32_t  c_naddr, c_nsize, p_naddr, p_nsize;
-	dt_node_t *parent;
-	dt_node_t *hwnode;
-	char pathbuf[256];
-	unsigned long assigned_liodn;
-	pamu_handle_t *pamu_handle;
-	dt_prop_t *prop;
-	int32_t ghandle;
-
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-	         "processing standard liodns...\n");
-
-	ret = dt_get_path(NULL, node, pathbuf, 256);
-	if (ret > 256) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: node %s path too long\n", __func__, node->name);
-		return 0;
-	}
-
-	/* FIXME: paths are not necessarily the same in hw and guest trees */
-	hwnode = dt_lookup_path(hw_devtree, pathbuf, 0);
-	if (!hwnode) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: no matching hw node for %s\n", __func__, pathbuf);
-		return 0;
-	}
-	
-	prop = dt_get_prop(hwnode, "fsl,liodn", 0);
-	if (!prop || prop->len != 4) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: bad/missing liodn in hw node for %s\n",
-		         __func__, pathbuf);
-		return 0;
-	}
-	assigned_liodn = *(const uint32_t *)prop->data;
-
-	prop = dt_get_prop(node, "dma-ranges", 0);
-	if (!prop) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: no dma-ranges property in %s\n",
-		         __func__, pathbuf);
-		return 0;
-	}
-	// Valid length check?
-	if (prop->len == 0)
-		return 0;
-
-	dma_ranges = prop->data;
-
-	ret = get_addr_format_nozero(node, &c_naddr, &c_nsize);
-	if (ret < 0)
-		return 0;
-
-	copy_val(cas_addrbuf, dma_ranges, c_naddr);
-
-	dma_ranges += c_naddr;
-
-	parent = node->parent;
-	if (!parent) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: liodn at root node\n", __func__);
-		return 0;
-	}
-
-	ret = get_addr_format_nozero(parent, &p_naddr, &p_nsize);
-	if (ret < 0)
-		return 0;
-
-	copy_val(pas_addrbuf, dma_ranges, p_naddr);
-
-	/*
-	* Current assumption is that child dma address space is
-	* directly mapped to parent dma address space
-	*/
-
-	dma_ranges += p_naddr;
-
-	copy_val(cas_sizebuf, dma_ranges, c_nsize);
-
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-	         "Assigned standard liodn = %ld\n", assigned_liodn);
-
-	ret = pamu_config_assigned_liodn(guest,
-			assigned_liodn,
-			cas_addrbuf, cas_sizebuf);
-	if (ret < 0)
-		return 0;
-
-	pamu_handle = alloc_type(pamu_handle_t);
-	if (!pamu_handle)
-		return ERR_NOMEM;
-	
-	pamu_handle->user.pamu = pamu_handle;
-	pamu_handle->assigned_liodn = assigned_liodn;
-
-	ghandle = alloc_guest_handle(guest, &pamu_handle->user);
-	if (ghandle < 0)
-		return ERR_BUSY;
-
-	ret = dt_set_prop(node, "fsl,hv-liodn-handle", &ghandle, 4);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * Pass-thru "fsl,liodn" to the guest device tree
-	 */
-	return dt_set_prop(node, "fsl,liodn", &assigned_liodn, 4);
-}
-
-void pamu_process_standard_liodns(guest_t *guest)
-{
-	dt_for_each_prop_value(guest->devtree, "fsl,liodn",
-	                       NULL, 0, process_standard_liodn, guest);
-}
-
-void pamu_partition_init(guest_t *guest)
-{
-	if (!pamu_global_init_done)
-		return;
-
-	pamu_process_standard_liodns(guest);
 }
 
 #define PAMUBYPENR 0x604
@@ -384,5 +325,8 @@ void pamu_global_init(void)
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
+
+	smp_mbar();
+
 	pamu_global_init_done = 1;
 }
