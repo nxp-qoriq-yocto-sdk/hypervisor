@@ -871,7 +871,7 @@ static int assign_portal_callback(dt_node_t *node, void *arg)
 	dt_node_t *cpu;
 	dt_prop_t *cpu_reg;
 
-	cpu_handle = dt_get_prop(node, "cpu-phandle", 0);
+	cpu_handle = dt_get_prop(node, "cpu-handle", 0);
 	if (!cpu_handle || cpu_handle->len != 4)
 		return 0;  /* if no cpu-phandle assume that this is
 			      not a per-cpu portal */
