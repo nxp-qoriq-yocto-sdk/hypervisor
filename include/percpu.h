@@ -154,6 +154,11 @@ typedef struct guest {
 	/** List of owned devices (dev_owner_t objects) */
 	list_t dev_list;
 
+	/** The doorbell handle to use by a manager partition to send a shutdown
+	 *  request to this partition
+	 */
+	struct ipi_doorbell *dbell_shutdown;
+
 #ifdef CONFIG_DEVICE_VIRT
 	/** List of virtualized devices (vf_list_t objects). */
 	list_t vf_list;

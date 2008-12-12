@@ -88,7 +88,7 @@ void create_doorbells(void)
 		         "%s: error %d.\n", __func__, ret);
 }
 
-static int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
+int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
 {
 	struct ipi_doorbell_handle *db_handle;
 

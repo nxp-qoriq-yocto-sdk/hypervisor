@@ -583,30 +583,28 @@ static int create_guest_spin_table(guest_t *guest)
 }
 
 /**
- * create_sdbell_handle - craete the receive handles for a special doorbell
+ * create_recv_dbell_handle - create the receive handle for a special doorbell
  * @kind - the doorbell name
  * @guest - guest device tree
  * @offset - pointer to the partition node in the guest device tree
  * @dbell - pointer to special doorbell to use
  *
- * This function creates a doorbell receive handle node (under the partition
- * node for each managed partition in a the manager's device tree) for a
- * particular special doorbell.
+ * This function creates a doorbell receive handle node (under the specified
+ * node) for a particular special doorbell.
  *
  * 'kind' is a string that is used to both name the special doorbell and to
  * create the compatible property for the receive handle node.
  *
  * This function must be called after recv_dbell_partition_init() is called,
- * because it creates receive doorbell handles that do not have an fsl,endpoint
+ * because it creates receive doorbell handles that do not have an endpoint
  * property.  recv_dbell_partition_init() considers receive doorbell handle
- * nodes without and endpoint to be an error.  And endpoint is required in
- * doorbell handle nodes only when the doorbell is defined in the hypervisor
- * DTS.  Special doorbells are created by the hypervisor in
- * create_guest_special_doorbells(), so they don't exist in any DTS.
+ * configuration nodes without an endpoint to be an error.  An endpoint is
+ * required in doorbell handle nodes only when the doorbell is defined in
+ * the configuration DTS.  Special doorbells are created by the hypervisor
+ * in create_guest_special_doorbells(), so they don't exist in any DTS.
  */
-static int create_sdbell_handle(const char *kind,
-                                guest_t *guest, dt_node_t *node,
-                                struct ipi_doorbell *dbell)
+static int create_recv_dbell_handle(const char *kind, guest_t *guest,
+				    dt_node_t *node, struct ipi_doorbell *dbell)
 {
 	char s[96];	// Should be big enough
 	int ret, length;
@@ -616,7 +614,7 @@ static int create_sdbell_handle(const char *kind,
 	if (!node)
 		return ERR_NOMEM;
 
-	// 'offset' is now the offset of the new doorbell receive handle node
+	// 'node' is now a pointer to the new doorbell receive handle node
 
 	// Write the 'compatible' property to the doorbell receive handle node
 	// We can't embed a \0 in the format string, because that will confuse
@@ -631,6 +629,81 @@ static int create_sdbell_handle(const char *kind,
 	ret = attach_receive_doorbell(guest, dbell, node);
 
 	return ret;
+}
+
+/**
+ * create_send_dbell_handle - create the send handles for a special doorbell
+ * @kind - the doorbell name
+ * @guest - guest device tree
+ * @offset - pointer to the partition node in the guest device tree
+ * @dbell - pointer to special doorbell to use
+ *
+ * This function creates a doorbell send handle node (under the 'handles'
+ * node in each partition) for a particular special doorbell.  The node is
+ * created in all partitions, even if there is no manager for this
+ * partition.
+ *
+ * 'kind' is a string that is used to both name the special doorbell and to
+ * create the compatible property for the send handle node.
+ *
+ * This function must be called after send_dbell_partition_init() is called,
+ * because it creates send doorbell handles that do not have an endpoint
+ * property.  send_dbell_partition_init() considers send doorbell handle
+ * configuration nodes without and endpoint to be an error.  An endpoint is
+ * required in doorbell handle nodes only when the doorbell is defined in
+ * the configuration DTS.  Special doorbells are created by the hypervisor
+ * in create_guest_special_doorbells(), so they don't exist in any DTS.
+ */
+static int create_send_dbell_handle(const char *kind, guest_t *guest,
+				    dt_node_t *node, struct ipi_doorbell *dbell)
+{
+	char s[96];	// Should be big enough
+	int ret, length;
+	int32_t handle;
+
+	// Create the special doorbell send handle node.
+	node = dt_get_subnode(node, kind, 1);
+	if (!node)
+		return ERR_NOMEM;
+
+	// 'node' is now a pointer to the new doorbell send handle node
+
+	// Write the 'compatible' property to the doorbell send handle node
+	// We can't embed a \0 in the format string, because that will confuse
+	// snprintf (it will stop scanning when it sees the \0), so we use %c.
+	length = snprintf(s, sizeof(s),
+		"fsl,hv-%s-doorbell%cfsl,hv-doorbell-send-handle", kind, 0);
+
+	ret = dt_set_prop(node, "compatible", s, length + 1);
+	if (ret < 0)
+		return ret;
+
+	handle = doorbell_attach_guest(dbell, guest);
+	if (handle < 0)
+		return handle;
+
+	return dt_set_prop(node, "reg", &handle, sizeof(handle));
+}
+
+/**
+ * create_sdbell_receive_handles - create the receive handles for this guest
+ *
+ * This function creates the receive handles for the special doorbells.
+ */
+static int create_sdbell_receive_handles(guest_t *guest)
+{
+	dt_node_t *node;
+
+	// Find the 'handles' node in the target partition
+	node = get_handles_node(guest);
+	if (!node) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "guest %s: cannot create 'handles' node\n", guest->name);
+		return 0;
+	}
+
+	return create_recv_dbell_handle("shutdown", guest, node,
+					guest->dbell_shutdown);
 }
 
 /**
@@ -668,13 +741,22 @@ static int create_guest_special_doorbells(guest_t *guest)
 		goto error;
 	}
 
+	guest->dbell_shutdown = alloc_type(ipi_doorbell_t);
+	if (!guest->dbell_shutdown) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"%s: out of memory\n", __func__);
+		goto error;
+	}
+
 	return 0;
 
 error:
+	free(guest->dbell_shutdown);
 	free(guest->dbell_restart_request);
 	free(guest->dbell_watchdog_expiration);
 	free(guest->dbell_restart_request);
 
+	guest->dbell_shutdown = NULL;
 	guest->dbell_restart_request = NULL;
 	guest->dbell_watchdog_expiration = NULL;
 	guest->dbell_restart_request = NULL;
@@ -913,9 +995,10 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 		return ret;
 	}
 
-	// Create special doorbell handles
+	// Create the receive handles for the special doorbells that this
+	// manager receives *from* the managed partitions.
 
-	ret = create_sdbell_handle("state-change", guest, node,
+	ret = create_recv_dbell_handle("state-change", guest, node,
 				   target_guest->dbell_state_change);
 	if (ret) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -924,7 +1007,7 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 		return ret;
 	}
 
-	ret = create_sdbell_handle("watchdog-expiration", guest, node,
+	ret = create_recv_dbell_handle("watchdog-expiration", guest, node,
 				   target_guest->dbell_watchdog_expiration);
 	if (ret) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -933,7 +1016,7 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 		return ret;
 	}
 
-	ret = create_sdbell_handle("reset-request", guest, node,
+	ret = create_recv_dbell_handle("reset-request", guest, node,
 				   target_guest->dbell_restart_request);
 	if (ret) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -941,6 +1024,25 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 			 __func__, guest->name, node->name, "reset-request");
 		return ret;
 	}
+
+	// Create the send handles for the special doorbells that this manager
+	// sends *to* to the managed partitions.
+
+	ret = create_send_dbell_handle("shutdown", guest, node,
+				       target_guest->dbell_shutdown);
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' doorbell handle\n",
+			 __func__, guest->name, node->name, "shutdown");
+		return ret;
+	}
+
+	// Ideally, here we would create the receive handles in the target
+	// (managed) guest for the special doorbells that that manager sends.
+	// This would ensure that only managed guests get those receive handles.
+	// Unfortunately, target_guest->devtree is NULL, so we can't do that.
+	// Instead, we have to create those handles later in all guests during
+	// a call to create_sdbell_receive_handles().
 
 	return 0;
 }
@@ -1734,6 +1836,11 @@ static int init_guest_primary(guest_t *guest)
 		goto fail;
 
 	ret = partition_config(guest);
+	if (ret < 0)
+		goto fail;
+
+	// Create the receive doorbell handles for this guest.
+	ret = create_sdbell_receive_handles(guest);
 	if (ret < 0)
 		goto fail;
 

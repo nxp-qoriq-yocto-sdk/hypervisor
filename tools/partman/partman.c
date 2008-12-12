@@ -178,6 +178,9 @@ static void usage(void)
 	printf("\t\t<file> is a shell script or program to run on every doorbell.\n");
 	printf("\t\tThe first parameter to the script is the doorbell handle.\n\n");
 
+	printf("Ring a doorbell:\n\tpartman -d -h <handle>\n");
+	printf("\t\t<handle> is the doorbell send handle for the doorbell to ring.\n\n");
+
 	printf("Specify -v for verbose output\n\n");
 }
 
@@ -837,11 +840,27 @@ static int cmd_doorbells(struct parameters *p)
 	char command[PATH_MAX + 32];
 	char temp[PATH_MAX + 1];
 
-	if (!p->f_specified) {
+	// Either -h or -f, but not both, must be specified
+
+	if ((p->h_specified && p->f_specified) ||
+	    (!p->h_specified && !p->f_specified)) {
 		usage();
 		return EINVAL;
 	}
 
+	// If -h is specified, user wants to send a doorbell
+	if (p->h_specified) {
+		struct fsl_hv_ioctl_doorbell im;
+
+		im.doorbell = p->h;
+		ret = hv(FSL_HV_IOCTL_DOORBELL, (void *) &im);
+		if (ret)
+			printf("Hypervisor returned error %i\n", ret);
+
+		return ret;
+	}
+
+	// The user specified -f, so he wants to monitor doorbells.
 	// Verify that the passed-in script exists and can actually be
 	// executed.
 	snprintf(command, sizeof(command), "test -x %s", p->f);

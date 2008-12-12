@@ -146,6 +146,18 @@ union fsl_hv_ioctl_param {
 		__u64 remote_paddr;
 		__u64 count;
 	} memcpy;
+
+	/**
+	 * struct fsl_hv_ioctl_doorbell: ring a doorbell
+	 * @ret: return error code from the hypervisor
+	 * @doorbell: the handle of the doorbell to ring doorbell
+	 *
+	 * Used by FSL_HV_IOCTL_DOORBELL
+	 */
+	struct fsl_hv_ioctl_doorbell {
+		__u32 ret;
+		__u32 doorbell;
+	} doorbell;
 };
 
 /*
@@ -157,4 +169,5 @@ enum {
 	FSL_HV_IOCTL_PARTITION_START = 3, /* Boot another partition */
 	FSL_HV_IOCTL_PARTITION_STOP = 4, /* Stop this or another partition */
 	FSL_HV_IOCTL_MEMCPY = 5, /* Copy data from one partition to another */
+	FSL_HV_IOCTL_DOORBELL = 6, /* Ring a doorbell */
 };

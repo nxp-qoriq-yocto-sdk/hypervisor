@@ -45,6 +45,7 @@ struct dt_node;
 
 /* Prototypes for functions in ipi_doorbell.c */
 int send_doorbells(struct ipi_doorbell *dbell);
+int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest);
 int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
                             struct dt_node *node);
 void create_doorbells(void);

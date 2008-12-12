@@ -59,10 +59,15 @@ endef
 
 # Add vmlinux and partman to the rootfs
 bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.gz
+# We want partman on the managed partition, so that we can send and listen
+# for doorbells
+	$(call mount,rootfs)
+	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
+	$(call unmount,bin/linux/rootfs)
 	$(call mount,rootfs-partman)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)sim/images/vmlinux bin/linux/rootfs-partman/
-	sudo cp -af $(testdir)linux/rootfs.ext2.gz bin/linux/rootfs-partman/
+	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	$(call unmount,bin/linux/rootfs-partman)
 
 bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(dir)rootfs-hello.ext2.gz

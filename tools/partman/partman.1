@@ -13,6 +13,8 @@ partman \- manage a Freescale Embedded Hypervisor partition
 .br
 \fBpartman\fR [ \fB\-v\fR ] \fB\-d\fR \fB\-f\fR file
 .br
+\fBpartman\fR [ \fB\-v\fR ] \fB\-d\fR \fB\-h\fR handle
+.br
 .SH DESCRIPTION
 .PP
 The Freescale Embedded Hypervisor provides a Linux-based partition management
@@ -34,10 +36,13 @@ Start a partition.
 Stop a partition.
 .TP
 \fB\-d\fR
-Listen for doorbells.
+Listen for doorbells (if \fB\-f\fR specified), or ring a doorbell
+(if \fB\-h\fR specified).
 .TP
 \fB\-h\fR handle
-Handle of the target partition.
+For the \fB\-d\fR command, this specifies the send handle of the doorbell
+to ring.  For all other commands, this specifies the handle of the target
+partition.
 .TP
 \fB\-f\fR filename
 For the \fB\-d\fR command, this specifies the program to run when a doorbell
@@ -70,5 +75,4 @@ Copyright \(co 2008 Freescale Semiconductor
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-The full documentation for \fIpartman\fR can be found in the Freescale P4080
-Embedded Hypervisor Software User's Manual
+The Freescale P4080 Embedded Hypervisor Software User's Manual
