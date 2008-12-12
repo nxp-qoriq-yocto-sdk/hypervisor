@@ -189,7 +189,9 @@ nomem:
  *
  * The callback is performed on each node of the tree.  In postvisit, it
  * is safe to remove nodes as they are visited, but it is not safe to
- * remove the parent or any sibling of the visited node.
+ * remove the parent or any sibling of the visited node.  In previsit,
+ * it is safe to remove children of the visited node, but not the visited
+ * node itself.
  *
  * If a callback returns non-zero, the traversal is aborted, and the
  * return code propagated.
@@ -242,7 +244,7 @@ int dt_for_each_node(dt_node_t *tree, void *arg,
 	}
 }
 
-static void destroy_prop(dt_prop_t *prop)
+void dt_delete_prop(dt_prop_t *prop)
 {
 	list_del(&prop->prop_node);
 
@@ -255,7 +257,7 @@ static int destroy_node(dt_node_t *node, void *arg)
 {
 	list_for_each_delsafe(&node->props, i, next) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
-		destroy_prop(prop);
+		dt_delete_prop(prop);
 	}
 
 	if (node->parent)
@@ -467,7 +469,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 		newdata = malloc(len);
 		if (!newdata) {
 			if (!prop->data)
-				destroy_prop(prop);
+				dt_delete_prop(prop);
 
 			return ERR_NOMEM;
 		}
@@ -497,10 +499,70 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 	return dt_set_prop(node, name, str, strlen(str) + 1);
 }
 
+static const char *strlist_iterate(const char *strlist, size_t len,
+                                   size_t *pos)
+{
+	const char *next, *ret;
+
+	if (*pos >= len)
+		return NULL;
+
+	next = memchr(strlist + *pos, 0, len - *pos);
+	if (!next)
+		return NULL;
+
+	ret = strlist + *pos;
+	*pos = next - strlist + 1;
+
+	return ret;
+}
+
 typedef struct merge_ctx {
 	dt_node_t *dest;
-	int notfirst;
+	int notfirst, special;
 } merge_ctx_t;
+
+static void delete_nodes_by_strlist(dt_node_t *node,
+                                    const char *strlist, size_t len)
+{
+	size_t pos = 0;
+	const char *str = strlist;
+	dt_node_t *child;
+
+	for (;;) {	
+		str = strlist_iterate(strlist, len, &pos);
+		if (!str)
+			return;
+
+		child = dt_get_subnode(node, str, 0);
+		if (child) {
+			dt_delete_node(child);
+			
+			/* Rewind to try this name again; it may have lacked a unit address,
+			 * and thus hit more than one node.
+			 */
+			pos = str - strlist;
+		}
+	}
+}
+
+static void delete_props_by_strlist(dt_node_t *node,
+                                    const char *strlist, size_t len)
+{
+	size_t pos = 0;
+	const char *str = strlist;
+	dt_prop_t *prop;
+
+	for (;;) {	
+		str = strlist_iterate(strlist, len, &pos);
+		if (!str)
+			return;
+
+		prop = dt_get_prop(node, str, 0);
+		if (prop)
+			dt_delete_prop(prop);
+	}
+}
 
 static int merge_pre(dt_node_t *src, void *arg)
 {
@@ -515,8 +577,41 @@ static int merge_pre(dt_node_t *src, void *arg)
 			return ERR_NOMEM;
 	}
 
+	if (!ctx->dest->upstream)
+		ctx->dest->upstream = src;
+
+	if (ctx->special) {
+		dt_prop_t *prop;
+	 
+		if (dt_get_prop(src, "delete-subnodes", 0)) {
+			list_for_each_delsafe(&ctx->dest->children, i, next) {
+				dt_node_t *node = to_container(i, dt_node_t, child_node);
+				dt_delete_node(node);
+			}
+		}
+
+		prop = dt_get_prop(src, "delete-node", 0);
+		if (prop && prop->len > 0)
+			delete_nodes_by_strlist(ctx->dest, prop->data, prop->len);
+
+		prop = dt_get_prop(src, "delete-prop", 0);
+		if (prop && prop->len > 0)
+			delete_props_by_strlist(ctx->dest, prop->data, prop->len);
+	}
+
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+
+      if (ctx->special) {
+	      if (!strcmp(prop->name, "delete-node"))
+		      continue;
+	      if (!strcmp(prop->name, "delete-subnodes"))
+		      continue;
+	      if (!strcmp(prop->name, "delete-prop"))
+		     continue;
+	      if (!strcmp(prop->name, "prepend-strlist"))
+		      continue;
+      }
 
 		int ret = dt_set_prop(ctx->dest, prop->name, prop->data, prop->len);
 		if (ret)
@@ -539,7 +634,7 @@ static int merge_post(dt_node_t *src, void *arg)
  *
  * @param[in] dest tree to merge into
  * @param[in] src tree to merge from
- * @param[in] deletion if non-zero, honor delete-node, delete-prop, etc.
+ * @param[in] special if non-zero, honor delete-node, delete-prop, etc.
  * @return zero on success, non-zero on failure
  *
  * The contents of src are merged into dest, recursively.
@@ -552,9 +647,12 @@ static int merge_post(dt_node_t *src, void *arg)
  * if the name does not match, and the name of the resultant tree root
  * will be that of the destination input.
  */
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion)
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
 {
-	merge_ctx_t ctx = { .dest = dest };
+	merge_ctx_t ctx = {
+		.dest = dest,
+		.special = special,
+	};
 
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
 }
@@ -678,21 +776,23 @@ void dt_print_tree(dt_node_t *tree, queue_t *out)
  */
 int dt_node_is_compatible(dt_node_t *node, const char *compat)
 {
-	dt_prop_t *prop = dt_get_prop(node, "compatible", 0);
+	dt_prop_t *prop;
+	const char *str;
+	size_t pos = 0;
+	
+	prop = dt_get_prop(node, "compatible", 0);
 	if (!prop)
 		return 0;
 
-	const char *str = prop->data;
-	const char *end = prop->data + prop->len;
+	str = prop->data;
+	for (;;) {
+		str = strlist_iterate(str, prop->len, &pos);
+		if (!str)
+			return 0;
 
-	while (str && str < end) {
-		if (!strncmp(compat, str, end - str + 1))
+		if (!strcmp(compat, str))
 			return 1;
-
-		str = memchr(str, 0, end - str + 1) + 1;
 	}
-
-	return 0;
 }
 
 typedef struct compat_ctx {

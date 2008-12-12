@@ -116,6 +116,13 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 	register_t saved;
 	int handle;
 
+	if (irq->actions) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: cannot share IRQ with the hypervisor\n",
+		         __func__);
+		return ERR_BUSY;
+	}
+
 	saved = spin_lock_critsave(&vmpic_lock);
 
 	vmirq = irq->priv;
@@ -136,6 +143,8 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 	 	assert(handle < MAX_HANDLES);
 		assert(guest->handles[handle]);
 		assert(vmirq == guest->handles[handle]->intr);
+
+		spin_unlock_critsave(&vmpic_lock, saved);
 		return handle;
 	}
 

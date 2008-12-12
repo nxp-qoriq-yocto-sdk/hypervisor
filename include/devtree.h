@@ -41,6 +41,7 @@
 struct guest;
 
 extern list_t hv_devs;
+extern uint32_t dt_owner_lock;
 
 typedef struct alias {
 	list_t list_node;
@@ -50,7 +51,8 @@ typedef struct alias {
 typedef struct dev_owner {
 	list_t dev_node, guest_node;
 	struct guest *guest; /* if NULL, owned by hypervisor */
-	struct dt_node *hwnode, *cfgnode;
+	struct dt_node *hwnode, *cfgnode, *gnode;
+	struct dev_owner *direct; /**< nearest ancestor which is directly assigned */
 } dev_owner_t;
 
 typedef struct dt_node {
@@ -64,6 +66,7 @@ typedef struct dt_node {
 	struct pma *pma;
 
 	struct dt_node *endpoint;
+	struct dt_node *upstream; /** Node that this node was merged from */
 	struct byte_chan *bc;
 	struct byte_chan_handle *bch;
 	struct mux_complex *bcmux;
@@ -83,6 +86,7 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt_window, size_t fdt_len);
 
 dt_node_t *create_dev_tree(void);
 void dt_delete_node(dt_node_t *tree);
+void dt_delete_prop(dt_prop_t *tree);
 
 typedef int (*dt_callback_t)(dt_node_t *node, void *arg);
 
@@ -98,7 +102,7 @@ char *dt_get_prop_string(dt_node_t *node, const char *name);
 int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len);
 int dt_set_prop_string(dt_node_t *node, const char *name, const char *str);
 
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int deletion);
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
 int dt_node_is_compatible(dt_node_t *node, const char *compat);
@@ -119,7 +123,7 @@ dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 
 uint32_t dt_get_phandle(dt_node_t *node);
 
-int dt_owned_by(dt_node_t *node, struct guest *guest);
+dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest);
 void dt_read_aliases(void);
 
 /** Hardware device tree passed by firmware */

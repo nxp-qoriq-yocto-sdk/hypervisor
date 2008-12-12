@@ -250,38 +250,43 @@ static int map_guest_ranges(guest_t *guest, dt_node_t *hwnode,
 	return 0;
 }
 
-static int map_guest_reg(guest_t *guest, dt_node_t *gnode,
-                         dt_node_t *hwnode, dt_node_t *cfgnode)
+static int map_guest_reg(dev_owner_t *owner)
 {
-	mem_resource_t *regs = hwnode->dev.regs;
-	dt_node_t *mixin;
+	mem_resource_t *regs;
 	uint32_t *reg, *regp;
-	int num = hwnode->dev.num_regs;
+	dt_node_t *hwnode = owner->hwnode;
 	int regsize = (rootnaddr + rootnsize) * 4;
-	int ret;
+	int num, ret = 0;
+
+	if (hwnode->parent->parent &&
+	    !dt_node_is_compatible(hwnode->parent, "simple-bus"))
+		return 0;
+
+	dt_lookup_regs(hwnode);
+
+	regs = hwnode->dev.regs;
+	num = hwnode->dev.num_regs;
+	
+	if (num == 0)
+		return 0;
 
 	reg = regp = malloc(num * regsize);
 	if (!reg)
 		return ERR_NOMEM;
 
 	for (int i = 0; i < num; i++) {
-		map_guest_addr_range(guest, regs[i].start, regs[i].start,
+		map_guest_addr_range(owner->guest, regs[i].start, regs[i].start,
 		                     regs[i].size);
 
 		regp = write_reg(regp, regs[i].start, regs[i].size);
 	}
 
-	if (num) {
-		ret = dt_set_prop(gnode, "reg", reg, num * regsize);
-		if (ret < 0)
-			return ret;
-	}
+	/* Only change reg if this is a top-level guest node */
+ 	if (!owner->gnode->parent->parent)
+		ret = dt_set_prop(owner->gnode, "reg", reg, num * regsize);
 
-	mixin = dt_get_subnode(cfgnode, "node-update", 0);
-	if (mixin)
-		return dt_merge_tree(gnode, mixin, 1);
-
-	return 0;
+	free(reg);
+	return ret;
 }
 
 void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree)
@@ -316,140 +321,99 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-
-typedef struct create_alias_ctx {
-	dt_node_t *aliases;
-	dt_node_t *tree;
-	char path_buf[MAX_DT_PATH];
-	int path_len;
-} create_alias_ctx_t;
-
-static int create_hw_aliases(dt_node_t *node, void *arg)
-{
-	create_alias_ctx_t *ctx = arg;
-	int len = ctx->path_len;
-
-	if (node != ctx->tree) {
-		/* If this is a child of the hw node that was assigned,
-		 * append the path relative to the assigned node.
-		 */
-		len += dt_get_path(ctx->tree, node,
-		                   &ctx->path_buf[ctx->path_len - 1],
-		                   sizeof(ctx->path_buf) - ctx->path_len + 1) - 1;
-		if (len > sizeof(ctx->path_buf)) {
-			ctx->path_buf[ctx->path_len - 1] = 0;
-			printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
-	 		         "%s: %s path too long for alias\n",
-	 		         __func__, node->name);
-
-			return 0;
-		}
-	}
-
-	list_for_each(&node->aliases, i) {
-		alias_t *alias = to_container(i, alias_t, list_node);
-		
-		if (dt_set_prop(ctx->aliases, alias->name, ctx->path_buf, len) < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: out of memory\n", __func__);
-			return ERR_NOMEM;
-		}
-	}
-
-	/* Reset the buffer to the assigned node path */
-	ctx->path_buf[ctx->path_len - 1] = 0;
-	return 0;
-}
-
 static const uint8_t vmpic_config_to_intspec[4] = {
 	3, 0, 1, 2
 };
 
-static void map_device_to_guest(guest_t *guest, dt_node_t *hwnode,
-                                dt_node_t *cfgnode)
+static int map_device_to_guest(dt_node_t *node, void *arg)
 {
-	create_alias_ctx_t ctx;
-	dt_node_t *gnode;
+	guest_t *guest = arg;
+	dt_node_t *hwnode;
+	dev_owner_t *owner;
 	int ret;
 
-	ctx.aliases = dt_get_subnode(guest->devtree, "aliases", 1);
-	if (!ctx.aliases)
-		goto nomem;
+	hwnode = node->upstream;
+	if (!hwnode)
+		return 0;
 
-	dt_lookup_regs(hwnode);
+	owner = dt_owned_by(hwnode, guest);
+	if (!owner)
+		return 0;
+	
+	assert(hwnode == owner->hwnode);
+
 	dt_lookup_irqs(hwnode);
 
-	/* FIXME: handle children of other assigned nodes */
-	gnode = dt_get_subnode(guest->devtree, cfgnode->name, 1);
-	if (!gnode)
-		goto nomem;
+	assert(owner->gnode);
 
-	ret = dt_merge_tree(gnode, hwnode, 0);
+	create_aliases(hwnode, owner->gnode, guest->devtree);
+	create_aliases(owner->cfgnode, owner->gnode, guest->devtree);
+
+	ret = map_guest_reg(owner);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: error %d merging %s\n", __func__, ret, hwnode->name);
-		return;
+		         "map_guest_reg: error %d in %s\n",
+		         ret, hwnode->name);
+
+		if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
+			return ERR_NOMEM;
+
+		return 0;
 	}
 
-	ctx.path_len = dt_get_path(NULL, gnode, ctx.path_buf,
-	                           sizeof(ctx.path_buf));
-	if (ctx.path_len > sizeof(ctx.path_buf)) {
-		printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
- 		         "%s: %s path too long for alias\n",
- 		         __func__, hwnode->name);
-
-		return;
-	}
-
-	ctx.tree = hwnode;
-	dt_for_each_node(hwnode, &ctx, create_hw_aliases, NULL);
-	ctx.tree = cfgnode;
-	dt_for_each_node(cfgnode, &ctx, create_hw_aliases, NULL);
-
-	/* FIXME: map children */
-	ret = map_guest_reg(guest, gnode, hwnode, cfgnode);
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "map_guest_reg: error %d in %s\n", ret, hwnode->name);
-		dt_delete_node(gnode);
-		return;
-	}
-
-	ret = map_guest_ranges(guest, hwnode, cfgnode);
+	ret = map_guest_ranges(owner->guest, hwnode, owner->cfgnode);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
-		dt_delete_node(gnode);
-		return;
+
+		if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
+			return ERR_NOMEM;
+
+		return 0;
 	}
 
+	if (hwnode->dev.num_irqs <= 0)
+		return 0;
+
+	uint32_t *intspec = malloc(hwnode->dev.num_irqs * 8);
+	if (!intspec)
+		return ERR_NOMEM;
+
 	for (int i = 0; i < hwnode->dev.num_irqs; i++) {
-		uint32_t intspec[2];
 		int handle;
 		
 		/* FIXME: handle more than just mpic */
 		handle = vmpic_alloc_mpic_handle(guest, hwnode->dev.irqs[i]);
-		if (handle < 0)
-			continue;
+		if (handle < 0) {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+			         "%s: couldn't grant interrupts for %s\n",
+			         __func__, hwnode->name);
 
-		intspec[0] = handle;
-		intspec[1] = vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
+			dt_prop_t *prop = dt_get_prop(owner->gnode, "interrupts", 0);
+			if (prop)
+				dt_delete_prop(prop);
 
-		ret = dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec));
-		if (ret < 0)
-			goto nomem;
+			free(intspec);
+			return 0;
+		}
 
-		ret = dt_set_prop(gnode, "interrupt-parent",
-		                  &guest->vmpic_phandle, 4);
-		if (ret < 0)
-			goto nomem;
+		intspec[i * 2 + 0] = handle;
+		intspec[i * 2 + 1] =
+			vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
 	}
 
-	return;
+	ret = dt_set_prop(owner->gnode, "interrupts", intspec,
+	                  hwnode->dev.num_irqs * 8);
+	free(intspec);
+	if (ret < 0)
+		return ERR_NOMEM;
 
-nomem:
-	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "%s: out of memory\n", __func__);
+	ret = dt_set_prop(owner->gnode, "interrupt-parent",
+	                  &guest->vmpic_phandle, 4);
+	if (ret < 0)
+		return ERR_NOMEM;
+
+	return 0;
 }
 
 static void reset_spintbl(guest_t *guest)
@@ -1503,6 +1467,129 @@ dt_node_t *get_handles_node(guest_t *guest)
 	return handles;
 }
 
+static dev_owner_t *get_direct_owner(dt_node_t *node, guest_t *guest)
+{
+	dev_owner_t *owner;
+
+	while (node) {
+		owner = dt_owned_by(node, guest);
+		if (owner && owner->direct == owner)
+			return owner;
+		
+		node = node->parent;
+	}
+
+	return NULL;
+}
+
+static int assign_child(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	dev_owner_t *direct = get_direct_owner(node->upstream, guest);
+	dev_owner_t *owner;
+
+	owner = dt_owned_by(node->upstream, guest);
+	if (!owner) {
+		owner = malloc(sizeof(dev_owner_t));
+		if (!owner)
+			return ERR_NOMEM;
+
+		spin_lock(&dt_owner_lock);
+
+		list_add(&node->upstream->owners, &owner->dev_node);
+		list_add(&guest->dev_list, &owner->guest_node);
+
+		owner->guest = guest;
+		owner->hwnode = node->upstream;
+
+		spin_unlock(&dt_owner_lock);
+	}
+
+	owner->cfgnode = direct->cfgnode;
+	owner->direct = direct;
+	owner->gnode = node;
+
+	return 0;
+}
+
+static int merge_guest_dev(dt_node_t *hwnode, void *arg)
+{
+	guest_t *guest = arg;
+	dev_owner_t *owner;
+	dt_node_t *parent = guest->devtree;
+	const char *name;
+	int ret;
+
+	owner = dt_owned_by(hwnode, guest);
+	if (!owner || owner->direct != owner)
+		return 0;
+
+	assert(owner->hwnode == hwnode);
+
+	/* If a parent of this node was owned, then replace the gnode. */
+	if (owner->gnode) {
+		parent = owner->gnode->parent;
+		dt_delete_node(owner->gnode);
+		name = hwnode->name;
+	} else {
+		name = owner->cfgnode->name;
+	}
+
+	owner->gnode = dt_get_subnode(parent, name, 1);
+	if (!owner->gnode)
+		goto out;
+	
+	ret = dt_merge_tree(owner->gnode, hwnode, 0);
+	if (ret < 0) 
+		goto out_gnode;
+
+	dt_node_t *mixin = dt_get_subnode(owner->cfgnode, "node-update", 0);
+	if (mixin) {
+		ret = dt_merge_tree(owner->gnode, mixin, 1);
+		if (ret < 0)
+			goto out_gnode;
+	}
+
+	ret = dt_for_each_node(owner->gnode, guest, assign_child, NULL);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+
+out_gnode:
+	dt_delete_node(owner->gnode);
+	owner->gnode = NULL;
+
+out:
+	return ERR_NOMEM;
+}
+
+static int init_guest_devs(guest_t *guest)
+{
+	int ret;
+
+	dt_assign_devices(guest->partition, guest);
+
+	/* First, merge each assigned device and its sub-tree, and
+	 * apply node-update.  It is done with dt_for_each_node rather
+	 * than traversing the device list, so that parents are processed
+	 * before children.  Each sub-device is added to the device list,
+	 * with its cfgnode pointing to its nearest directly assigned
+	 * ancestor.
+	 */
+
+	ret = dt_for_each_node(hw_devtree, guest, merge_guest_dev, NULL);
+	if (ret < 0)
+		return ret;
+
+	/* Second, traverse the assigned nodes (including children)
+	 * and assign resources and fix up device tree nodes.
+	 */
+
+	return dt_for_each_node(guest->devtree, guest,
+	                        map_device_to_guest, NULL);
+}
+
 static int init_guest_primary(guest_t *guest)
 {
 	int ret;
@@ -1598,14 +1685,10 @@ static int init_guest_primary(guest_t *guest)
 
 	list_init(&guest->dev_list);
  	read_phandle_aliases(guest);
-	dt_assign_devices(guest->partition, guest);
 
-	list_for_each(&guest->dev_list, i) {
-		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
-
-		assert(owner->guest == guest);
-		map_device_to_guest(guest, owner->hwnode, owner->cfgnode);
-	}
+	ret = init_guest_devs(guest);
+	if (ret < 0)
+		goto fail;
 
 	send_dbell_partition_init(guest);
 	recv_dbell_partition_init(guest);
