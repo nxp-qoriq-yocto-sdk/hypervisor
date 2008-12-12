@@ -366,3 +366,100 @@ static command_t paact = {
 };
 shell_cmd(paact);
 #endif
+
+static void start_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	guest = &guests[num];
+	if (start_guest(guest))
+		qprintf(shell->out, "Couldn't start partition.\n");
+}
+
+static command_t start = {
+	.name = "start",
+	.action = start_fn,
+	.shorthelp = "Start a partition",
+	.longhelp = "  Usage: start <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(start);
+
+static void restart_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	guest = &guests[num];
+	if (restart_guest(guest))
+		qprintf(shell->out, "Couldn't restart partition.\n");
+}
+
+static command_t restart = {
+	.name = "restart",
+	.action = restart_fn,
+	.shorthelp = "Start a partition",
+	.longhelp = "  Usage: restart <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(restart);
+
+static void stop_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	guest = &guests[num];
+	if (stop_guest(guest))
+		qprintf(shell->out, "Couldn't stop partition.\n");
+}
+
+
+static command_t stop = {
+	.name = "stop",
+	.action = stop_fn,
+	.shorthelp = "Stop a partition",
+	.longhelp = "  Usage: stop <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(stop);

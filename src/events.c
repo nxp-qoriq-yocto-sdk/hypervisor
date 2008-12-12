@@ -70,21 +70,24 @@ void setgevent(gcpu_t *gcpu, int event)
 	smp_mbar();
 	atomic_or(&gcpu->gevent_pending, (1 << event));
 	smp_mbar();
-	gcpu->cpu->ret_user_hook = 1;
+	gcpu->cpu->ret_hook = 1;
 
 	if (gcpu->cpu != cpu)
 		send_crit_doorbell(gcpu->cpu->coreid);
 }
 
-void ret_to_guest(trapframe_t *frameptr)
+void return_hook(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	int waiting = gcpu->waiting_for_gevent;
 
-	assert(!(mfmsr() & MSR_CE));
-	assert(cpu->ret_user_hook);
+	if (unlikely(!(regs->srr1 & MSR_GS)) && !waiting)
+		return;
 
-	cpu->ret_user_hook = 0;
+	assert(!(mfmsr() & MSR_CE));
+	assert(cpu->ret_hook);
+
+	cpu->ret_hook = 0;
 	gcpu->waiting_for_gevent = 0;
 	
 	while (gcpu->gevent_pending) {
@@ -98,7 +101,7 @@ void ret_to_guest(trapframe_t *frameptr)
 		smp_lwsync();
 
 		/* invoke the function */
-		gevent_table[bit](frameptr);
+		gevent_table[bit](regs);
 	}
 
 	/* If we interrupted a waiting context, we want it to still
@@ -112,7 +115,7 @@ void ret_to_guest(trapframe_t *frameptr)
 	assert(!(mfmsr() & MSR_CE));
 }
 
-void critical_doorbell_int(trapframe_t *frameptr)
+void critical_doorbell_int(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	assert(!(mfmsr() & MSR_CE));
@@ -128,11 +131,8 @@ void critical_doorbell_int(trapframe_t *frameptr)
 		smp_lwsync();
 
 		/* invoke the function */
-		event_table[bit](frameptr);
+		event_table[bit](regs);
 	}
-
-	if (cpu->ret_user_hook && gcpu->waiting_for_gevent)
-		ret_to_guest(frameptr);
 }
 
 /** Wait for a guest event, discarding current state.
@@ -158,6 +158,6 @@ void wait_for_gevent(trapframe_t *regs)
 	/* If a gevent has already been sent, send another now
 	 * that critints are disabled.
 	 */
-	if (cpu->ret_user_hook)
+	if (cpu->ret_hook)
 		send_crit_doorbell(cpu->coreid);
 }

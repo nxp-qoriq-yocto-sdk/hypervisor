@@ -95,7 +95,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
 
-#define LIBOS_RET_USER_HOOK ret_to_guest
+#define LIBOS_RET_HOOK return_hook
 
 #define LOGTYPE_GUEST_MMU    (CLIENT_BASE_LOGTYPE + 0)
 #define LOGTYPE_EMU          (CLIENT_BASE_LOGTYPE + 1)

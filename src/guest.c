@@ -1065,7 +1065,7 @@ static void start_guest_primary_nowait(void)
 	
 	disable_critint();
 
-	if (cpu->ret_user_hook)
+	if (cpu->ret_hook)
 		return;
 
 	assert(guest->state == guest_starting);
@@ -1119,7 +1119,7 @@ static void start_guest_primary_nowait(void)
 			         "guest %s waiting for cpu %d...\n", guest->name, i);
 		
 			while (!guest->gcpus[i]) {
-				if (cpu->ret_user_hook) {
+				if (cpu->ret_hook) {
 					disable_critint();
 					return;
 				}
@@ -1177,7 +1177,7 @@ static void start_guest_primary(void)
 
 	enable_critint();
 
-	if (cpu->ret_user_hook)
+	if (cpu->ret_hook)
 		return;
 
 	assert(guest->state == guest_starting);
@@ -1230,12 +1230,12 @@ static void start_guest_secondary(void)
 		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
 
-		if (cpu->ret_user_hook)
+		if (cpu->ret_hook)
 			break;
 	}
 
 	disable_critint();
-	if (cpu->ret_user_hook)
+	if (cpu->ret_hook)
 		return;
 
 	guest_core_init(guest);
