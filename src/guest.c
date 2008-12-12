@@ -472,6 +472,7 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 {
 	dt_node_t *node, *gnode;
 	int pcpu, ret;
+	uint32_t cells;
 	char buf[32];
 	
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
@@ -489,8 +490,27 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 		return ERR_RANGE;
 	}
 
+	// The "cpu" nodes go under the /cpus node, which need the
+	// #address-cells and #size-cells properties.
+	//
+	gnode = dt_get_subnode(guest->devtree, "cpus", 1);
+	if (!gnode)
+		return ERR_NOMEM;
+
+	cells = 1;
+	ret = dt_set_prop(gnode, "#address-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
+
+	cells = 0;
+	ret = dt_set_prop(gnode, "#size-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
+
+	// Create the "cpu" node for this CPU.
+
 	snprintf(buf, sizeof(buf), "cpu@%x", vcpu);
-	gnode = dt_get_subnode(guest->devtree, buf, 1);
+	gnode = dt_get_subnode(gnode, buf, 1);
 	if (!gnode)
 		return ERR_NOMEM;
 	
