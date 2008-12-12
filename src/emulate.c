@@ -775,8 +775,8 @@ static int emu_rfdi(trapframe_t *regs, uint32_t insn)
 		return 1;
 
 	regs->srr0 = gcpu->dsrr0;
-	regs->srr1 = (regs->srr1 & MSR_HVPRIV) |
-		(gcpu->dsrr1 & ~MSR_HVPRIV_GDEBUG);
+	regs->srr1 = (regs->srr1 & MSR_HVPRIV_GDEBUG) |
+	             (gcpu->dsrr1 & ~MSR_HVPRIV_GDEBUG);
 
 	return 0;
 }
