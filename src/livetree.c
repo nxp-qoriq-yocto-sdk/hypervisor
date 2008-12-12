@@ -329,7 +329,7 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt, size_t fdt_len)
  *   need to be null-terminated
  * @param[in] namelen length of name in bytes
  * @param[in] create if non-zero, create the subnode if not found
- * @return pointer to subnode, or NULL if not found
+ * @return pointer to subnode, or NULL if not found (or out of memory)
  */
 dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
                                   size_t namelen, int create)
@@ -398,7 +398,7 @@ dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create)
  * @param[in] node node in which to find/create the property
  * @param[in] name name of the property to get
  * @param[in] create if non-null, create the property if not found
- * @return a pointer to the property, or NULL if not found
+ * @return a pointer to the property, or NULL if not found (or out of mem)
  */
 dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create)
 {
@@ -454,7 +454,7 @@ char *dt_get_prop_string(dt_node_t *node, const char *name)
  * @param[in] name name of the property to set
  * @param[in] data new contents of the property
  * @param[in] len new length of the property
- * @return zero on success
+ * @return zero on success, ERR_NOMEM on failure
  */
 int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 {
