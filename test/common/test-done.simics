@@ -1,0 +1,11 @@
+
+script-branch {
+    con1.wait-for-string "Test Complete"
+    stop
+    echo "completed"
+    exit 0
+}
+
+rc 3_000_000_000
+echo "hung"
+exit 1

@@ -98,6 +98,9 @@ static void fh_partition_restart(trapframe_t *regs)
 		return;
 	}
 	
+	// TSR[WRS] is reset to zero during a normal restart
+	get_gcpu()->tsr = 0;
+
 	regs->gpregs[3] = restart_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
@@ -402,6 +405,9 @@ static void fh_partition_stop(trapframe_t *regs)
 		regs->gpregs[3] = EINVAL;
 		return;
 	}
+
+	// TSR[WRS] is reset to zero during a normal restart
+	get_gcpu()->tsr = 0;
 
 	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }

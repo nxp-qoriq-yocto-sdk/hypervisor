@@ -871,7 +871,7 @@ static int assign_portal_callback(dt_node_t *node, void *arg)
 	dt_node_t *cpu;
 	dt_prop_t *cpu_reg;
 
-	cpu_handle = dt_get_prop(node, "cpu-phandle", 0);
+	cpu_handle = dt_get_prop(node, "cpu-handle", 0);
 	if (!cpu_handle || cpu_handle->len != 4)
 		return 0;  /* if no cpu-phandle assume that this is
 			      not a per-cpu portal */
@@ -901,7 +901,7 @@ static int assign_portal_callback(dt_node_t *node, void *arg)
 	return 0;
 }
 
-dt_node_t *assign_qman_portal(dt_node_t *cfgnode, guest_t *guest)
+dt_node_t *assign_portal(dt_node_t *cfgnode, guest_t *guest, const char *compat)
 {
 	dt_node_t *hwnode;
 	dt_prop_t *vcpu;
@@ -928,8 +928,7 @@ dt_node_t *assign_qman_portal(dt_node_t *cfgnode, guest_t *guest)
 	ctx.pcpu_num = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, vcpu_num);
 	ctx.hwnode = NULL;
 
-	dt_for_each_compatible(hw_devtree, "fsl,qman-portal",
-	                       assign_portal_callback, &ctx);
+	dt_for_each_compatible(hw_devtree, compat, assign_portal_callback, &ctx);
 
 	hwnode = ctx.hwnode;
 	return hwnode;
@@ -958,7 +957,9 @@ int assign_callback(dt_node_t *node, void *arg)
 	 * portal 0 goes with phys cpu 0.
 	 */
 	if (strcmp(alias, "qman-portal") == 0)
-		hwnode = assign_qman_portal(node, ctx->guest);
+		hwnode = assign_portal(node, ctx->guest, "fsl,qman-portal");
+	else if (strcmp(alias, "bman-portal") == 0)
+		hwnode = assign_portal(node, ctx->guest, "fsl,bman-portal");
 	else
 		hwnode = dt_lookup_alias(hw_devtree, alias);
 

@@ -180,6 +180,9 @@ void watchdog_trap(trapframe_t *regs)
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 				"Watchdog: restarting partition\n");
 
+			// Save the current value of TCR[WRC]
+			gcpu->tsr = gcpu->timer_flags & TCR_WRC;
+
 			restart_guest(guest);
 		}
 		return;
@@ -325,6 +328,11 @@ void set_tsr(uint32_t tsr)
 	mtspr(SPR_TSR, tsr);
 	mtspr(SPR_TCR, tcr);
 
+	// Since we're setting TSR, we don't want to remember the value of
+	// TCR upon a watchdog reset any more.  gcpu->tsr is non-zero only if
+	// the system was reset by a watchdog.
+	gcpu->tsr = 0;
+
 	restore_critint(saved);
 }
 
@@ -349,6 +357,10 @@ uint32_t get_tsr(void)
 	 */
 	if (gcpu->watchdog_timeout)
 		val |= TSR_WIS;
+
+	// gcpu->tsr is non-zero only if the system was reset by a watchdog.
+	if (gcpu->tsr)
+		val = (val & ~TSR_WRS) | (gcpu->tsr & TSR_WRS);
 
 	return val;
 }

@@ -436,6 +436,7 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 {
 	dt_node_t *node, *gnode;
 	int pcpu, ret;
+	uint32_t cells;
 	char buf[32];
 	
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
@@ -453,8 +454,27 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 		return ERR_RANGE;
 	}
 
+	// The "cpu" nodes go under the /cpus node, which need the
+	// #address-cells and #size-cells properties.
+	//
+	gnode = dt_get_subnode(guest->devtree, "cpus", 1);
+	if (!gnode)
+		return ERR_NOMEM;
+
+	cells = 1;
+	ret = dt_set_prop(gnode, "#address-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
+
+	cells = 0;
+	ret = dt_set_prop(gnode, "#size-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
+
+	// Create the "cpu" node for this CPU.
+
 	snprintf(buf, sizeof(buf), "cpu@%x", vcpu);
-	gnode = dt_get_subnode(guest->devtree, buf, 1);
+	gnode = dt_get_subnode(gnode, buf, 1);
 	if (!gnode)
 		return ERR_NOMEM;
 	
@@ -767,23 +787,36 @@ static const uint32_t hv_version[4] = {
 	FH_API_COMPAT_VERSION
 };
 
-static int process_partition_handle(dt_node_t *node, void *arg)
+/**
+ * manager_partition_init_one - init the managed guests for one manager
+ * @node: pointer to manager's "managed-partition" node
+ * @arg: guest_t
+ *
+ * This function finds and initializes all of the managed guests for the
+ * given manager partition.
+ */
+static int process_managed_partition_node(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
+	dt_prop_t *prop;
+	uint32_t phandle;
 	int ret;
 
-	// Find the end-point partition node in the hypervisor device tree
-	const char *s = dt_get_prop_string(node, "endpoint");
-	if (!s) {
+	// The 'partition' property has a phandle to the managed node
+	prop = dt_get_prop(node, "partition", 0);
+	if (!prop || (prop->len != 4)) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "process_partition_handle: partition node missing endpoint\n");
+			 "%s: guest %s: node %s has missing/invalid 'partition' property\n",
+			 __func__, guest->name, node->name);
 		return 0;
 	}
+	phandle = *(const uint32_t *)prop->data;
 
-	dt_node_t *endpoint = dt_lookup_alias(hw_devtree, s);
+	dt_node_t *endpoint = dt_lookup_phandle(config_tree, phandle);
 	if (!endpoint) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "process_partition_handle: partition %s does not exist\n", s);
+			 "%s: guest %s: node %s has invalid phandle in 'partition' property\n",
+			 __func__, guest->name, node->name);
 		return 0;
 	}
 
@@ -791,7 +824,8 @@ static int process_partition_handle(dt_node_t *node, void *arg)
 	guest_t *target_guest = node_to_partition(endpoint);
 	if (!target_guest) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "process_partition_handle: %s is not a partition\n", s);
+			 "%s: guest %s: node %s is not a partition\n",
+			 __func__, guest->name, endpoint->name);
 		return 0;
 	}
 
@@ -802,36 +836,76 @@ static int process_partition_handle(dt_node_t *node, void *arg)
 	int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
 	if (ghandle < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "guest %s: too many handles\n", guest->name);
+			 "%s: guest %s: too many handles\n",
+			 __func__, guest->name);
 		return ghandle;
+	}
+
+	// Get a pointer to the manager's 'handles' node
+	node = get_handles_node(guest);
+	if (!node)
+		return ERR_NOMEM;
+
+	// Find or create the pointer to the managed partition's subnode
+	node = dt_get_subnode(node, target_guest->name, 1);
+	if (!node)
+		return ERR_NOMEM;
+
+	// Insert the 'compatible' property.
+	ret = dt_set_prop_string(node, "compatible", "fsl,hv-partition-handle");
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, node->name, "compatible");
+		return ret;
 	}
 
 	// Insert a 'reg' property into the partition-handle node of the
 	// guest device tree
 	ret = dt_set_prop(node, "reg", &ghandle, sizeof(ghandle));
-	if (ret)
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, node->name, "reg");
 		return ret;
+	}
 
 	ret = dt_set_prop_string(node, "label", target_guest->name);
-	if (ret)
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, node->name, "label");
 		return ret;
+	}
 
-	// Create special doorbells
+	// Create special doorbell handles
 
 	ret = create_sdbell_handle("state-change", guest, node,
-	                           target_guest->dbell_state_change);
-	if (ret)
+				   target_guest->dbell_state_change);
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' doorbell handle\n",
+			 __func__, guest->name, node->name, "state-change");
 		return ret;
+	}
 
 	ret = create_sdbell_handle("watchdog-expiration", guest, node,
-	                           target_guest->dbell_watchdog_expiration);
-	if (ret)
+				   target_guest->dbell_watchdog_expiration);
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' doorbell handle\n",
+			 __func__, guest->name, node->name, "watchdog-expiration");
 		return ret;
+	}
 
 	ret = create_sdbell_handle("reset-request", guest, node,
-	                           target_guest->dbell_restart_request);
-	if (ret)
+				   target_guest->dbell_restart_request);
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' doorbell handle\n",
+			 __func__, guest->name, node->name, "reset-request");
 		return ret;
+	}
 
 	return 0;
 }
@@ -1620,7 +1694,7 @@ static int init_guest_primary(guest_t *guest)
 	recv_dbell_partition_init(guest);
 
 	ret = dt_for_each_compatible(guest->partition, "managed-partition",
-	                             process_partition_handle, guest);
+				     process_managed_partition_node, guest);
 	if (ret < 0)
 		goto fail;
 

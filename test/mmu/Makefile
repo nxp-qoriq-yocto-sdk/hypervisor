@@ -27,5 +27,8 @@ dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
 
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics
+
 mmu-check: mmu-run-batch
 	$(testdir)common/check-results 2

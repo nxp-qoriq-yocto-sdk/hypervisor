@@ -1,242 +1,415 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080";
-	model = "fsl,hv-partman";
-	#address-cells = <2>;
-	#size-cells = <2>;
+	compatible = "fsl,hv-config";
 
-	aliases {
-		stdout = &uart0;
-		stdin = &uart0;
-		serial0 = &uart0;
-		uartmux = &uartmux;
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0:pma0 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x00000000>;
+		size = <0x0 0x20000000>;  // 512MB
 	};
 
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
+	pma1:pma1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x20000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
 
-		cpu@0 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <0>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "okay";
-		};
-		cpu@1 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <1>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
+	pma2:pma2 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x40000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
 
-		cpu@2 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <2>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
-
-		cpu@3 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <3>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
-
-		cpu@4 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <4>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
-
-		cpu@5 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <5>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
-
-		cpu@6 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <6>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
-		};
-
-		cpu@7 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <7>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-			status = "disabled";
-			enable-method = "spin-table";
+	dma-windows {
+		window0: window0 {
+			compatible = "dma-window";
+			guest-addr = <0 0x0>;
+			size = <0 0x20000000>;
 		};
 	};
 
-	memory {
-		reg = <0 0 0 0x100000>;
-		device_type = "memory";
-	};
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv:hypervisor-config {
+		compatible = "hv-config";
+		stdout = <&serial0>;
 
-	ccsr@fe000000 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "fsl,p4080-ccsr", "simple-bus";
-		ranges = <0 0 0xfe000000 0x400000>;
-
-		mpic: pic@40000 {
-			clock-frequency = <0>;
-			interrupt-controller;
-			#address-cells = <0>;
-			#interrupt-cells = <2>;
-			reg = <0x40000 0x40000>;
-			compatible = "fsl,p4080-mpic", "fsl,mpic",
-			             "chrp,open-pic";
-			device_type = "open-pic";
-			big-endian;
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
 		};
 
-		uart0: serial@11c500 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
-			reg = <0x11c500 0x100>;
-			clock-frequency = <0>;
+		serial0:serial0 {
+			device = "serial0";
 		};
 
-		uart1: serial@11c600 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
-			reg = <0x11c600 0x100>;
-			clock-frequency = <0>;
+		serial1:serial1 {
+			device = "serial1";
 		};
 
-		global-utilities@e0000 {	//global utilities block
-			compatible = "fsl,p4080-guts";
-			reg = <0xe0000 0x1000>;
-			fsl,has-rstcr;
+		mpic {
+			device = "/soc/pic";
 		};
 	};
 
 	uartmux: uartmux {
-		compatible = "fsl,hv-byte-channel-mux";
-		fsl,phys-dev = <&uart1>;
+		compatible = "byte-channel-mux";
+		endpoint = <&serial1>;
 	};
 
-	byte-channels {
-		bc0: byte-channel0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <0>;
+	part1 {
+		compatible = "partition";
+		label = "p1-linux";
+		cpus = <0 2>;
+		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
+		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+
+		serial2 {
+			device = "serial2";
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		partition@1 {
+			compatible = "managed-partition";
+			partition = <&part2>;
+		};
+
+		bman-portalA {
+			device = "bman-portal";
+			vcpu = <0>;
+		};
+
+		bman-portalB {
+			device = "bman-portal";
+			vcpu = <1>;
+		};
+
+		qman-portalA {
+			device = "qman-portal";
+			vcpu = <0>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+				snoop-cpu-only;
+			};
+
+		};
+
+		qman-portalB {
+			device = "qman-portal";
+			vcpu = <1>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+				snoop-cpu-only;
+			};
+		};
+
+		qman-pool@1 {
+			device = "/qman-portals/qman-pool@1";
+		};
+
+		qman-pool@2 {
+			device = "/qman-portals/qman-pool@2";
+		};
+
+		qman-pool@3 {
+			device = "/qman-portals/qman-pool@3";
+		};
+
+		qman-pool@4 {
+			device = "/qman-portals/qman-pool@4";
+		};
+
+		qman-pool@5 {
+			device = "/qman-portals/qman-pool@5";
+		};
+
+		qman-pool@6 {
+			device = "/qman-portals/qman-pool@6";
+		};
+
+		qman-pool@7 {
+			device = "/qman-portals/qman-pool@7";
+		};
+
+		qman-pool@8 {
+			device = "/qman-portals/qman-pool@8";
+		};
+
+		qman-pool@9 {
+			device = "/qman-portals/qman-pool@9";
+		};
+
+		qman-pool@10 {
+			device = "/qman-portals/qman-pool@10";
+		};
+
+		qman-pool@11 {
+			device = "/qman-portals/qman-pool@11";
+		};
+
+		qman-pool@12 {
+			device = "/qman-portals/qman-pool@12";
+		};
+
+		qman-pool@13 {
+			device = "/qman-portals/qman-pool@13";
+		};
+
+		qman-pool@14 {
+			device = "/qman-portals/qman-pool@14";
+		};
+
+		qman-pool@15 {
+			device = "/qman-portals/qman-pool@15";
+		};
+
+		node-update {
+			chosen {
+				/* We should probably provide fixup for linux,stdout-path
+				 * similar to aliases.
+				 */
+				linux,stdout-path = "/serial2";
+				bootargs = "console=ttyS0,115200";
+			};
 		};
 	};
 
-	doorbells {
-		doorbell@0 {
-			// part2 state change notification
-			// in the future, the HV will create this node automatically
-			compatible = "fsl,hv-doorbell";
-		};
-		doorbell@1 {
-			// part2 watchdog expiration notification
-			// in the future, the HV will create this node automatically
-			compatible = "fsl,hv-doorbell";
-		};
-		doorbell@2 {
-			// part2 reset request
-			// in the future, the HV will create this node automatically
-			compatible = "fsl,hv-doorbell";
-		};
-	};
+	part2:part2 {
+		compatible = "partition";
+		label = "p2-linux";
+		cpus = <2 2>;
+		dtb-window = <0 0x1000000 0 0x10000>;
 
-	partitions {
-		part1 {
-			compatible = "fsl,hv-partition";
-			label = "linux p1";
-			fsl,hv-cpus = <0 2>;
-			fsl,hv-dtb = /incbin/("partman-p1.dtb");
-			fsl,hv-physaddr-map = <0 0 0 0x1000000 0 0x18000000>;
-			fsl,hv-load-image-table = <0 0xe8100000 0 0 0 0
-			                           0 0xe9000000 0 0x01300000 0 0x00800000>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+		aliases {
+			stdout = <&bc0>;
 		};
 
-		part2 {
-			compatible = "fsl,hv-partition";
-			label = "linux p2";
-			fsl,hv-cpus = <2 4>;
-			fsl,hv-dtb = /incbin/("partman-p2.dtb");
-			fsl,hv-physaddr-map = <0 0 0 0x21000000 0 0x04000000>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+		bc0: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
 		};
-	};
 
-	chosen {
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
+		};
+
+		bman-portalA {
+			device = "bman-portal";
+			vcpu = <0>;
+		};
+
+		bman-portalB {
+			device = "bman-portal";
+			vcpu = <1>;
+		};
+
+		qman-portalA {
+			device = "qman-portal";
+			vcpu = <0>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+				snoop-cpu-only;
+			};
+
+		};
+
+		qman-portalB {
+			device = "qman-portal";
+			vcpu = <1>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+				snoop-cpu-only;
+			};
+		};
+
+		qman-pool@1 {
+			device = "/qman-portals/qman-pool@1";
+		};
+
+		qman-pool@2 {
+			device = "/qman-portals/qman-pool@2";
+		};
+
+		qman-pool@3 {
+			device = "/qman-portals/qman-pool@3";
+		};
+
+		qman-pool@4 {
+			device = "/qman-portals/qman-pool@4";
+		};
+
+		qman-pool@5 {
+			device = "/qman-portals/qman-pool@5";
+		};
+
+		qman-pool@6 {
+			device = "/qman-portals/qman-pool@6";
+		};
+
+		qman-pool@7 {
+			device = "/qman-portals/qman-pool@7";
+		};
+
+		qman-pool@8 {
+			device = "/qman-portals/qman-pool@8";
+		};
+
+		qman-pool@9 {
+			device = "/qman-portals/qman-pool@9";
+		};
+
+		qman-pool@10 {
+			device = "/qman-portals/qman-pool@10";
+		};
+
+		qman-pool@11 {
+			device = "/qman-portals/qman-pool@11";
+		};
+
+		qman-pool@12 {
+			device = "/qman-portals/qman-pool@12";
+		};
+
+		qman-pool@13 {
+			device = "/qman-portals/qman-pool@13";
+		};
+
+		qman-pool@14 {
+			device = "/qman-portals/qman-pool@14";
+		};
+
+		qman-pool@15 {
+			device = "/qman-portals/qman-pool@15";
+		};
+
+		/* Currently, the hypervisor does not support updating the
+		 * chosen node based on images loaded via partman.  This is
+		 * because there's no mechanism for partman to tell the
+		 * hypervisor that a particular image is a root file system.
+		 * So we need to hard-code the memory ranges used for the
+		 * rootfs here.  To load the rootfs, use:
+		 * "partman -l -a X ...", where X is the value of
+		 * linux,initrd-start below.
+		 */
+		node-update {
+			chosen {
+				linux,initrd-start = <0x01300000>;
+				linux,initrd-end = <0x02000000>;
+			};
+		};
 	};
 };
