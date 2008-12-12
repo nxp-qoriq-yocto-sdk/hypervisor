@@ -244,7 +244,7 @@ int dt_for_each_node(dt_node_t *tree, void *arg,
 	}
 }
 
-static void destroy_prop(dt_prop_t *prop)
+void dt_delete_prop(dt_prop_t *prop)
 {
 	list_del(&prop->prop_node);
 
@@ -257,7 +257,7 @@ static int destroy_node(dt_node_t *node, void *arg)
 {
 	list_for_each_delsafe(&node->props, i, next) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
-		destroy_prop(prop);
+		dt_delete_prop(prop);
 	}
 
 	if (node->parent)
@@ -469,7 +469,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 		newdata = malloc(len);
 		if (!newdata) {
 			if (!prop->data)
-				destroy_prop(prop);
+				dt_delete_prop(prop);
 
 			return ERR_NOMEM;
 		}
@@ -518,7 +518,6 @@ static const char *strlist_iterate(const char *strlist, size_t len,
 }
 
 typedef struct merge_ctx {
-	int (*cb)(dt_node_t *dest, dt_node_t *src);
 	dt_node_t *dest;
 	int notfirst, special;
 } merge_ctx_t;
@@ -561,7 +560,7 @@ static void delete_props_by_strlist(dt_node_t *node,
 
 		prop = dt_get_prop(node, str, 0);
 		if (prop)
-			destroy_prop(prop);
+			dt_delete_prop(prop);
 	}
 }
 
@@ -577,6 +576,9 @@ static int merge_pre(dt_node_t *src, void *arg)
 		if (!ctx->dest)
 			return ERR_NOMEM;
 	}
+
+	if (!ctx->dest->upstream)
+		ctx->dest->upstream = src;
 
 	if (ctx->special) {
 		dt_prop_t *prop;
@@ -595,12 +597,6 @@ static int merge_pre(dt_node_t *src, void *arg)
 		prop = dt_get_prop(src, "delete-prop", 0);
 		if (prop && prop->len > 0)
 			delete_props_by_strlist(ctx->dest, prop->data, prop->len);
-	}
-
-	if (ctx->cb) {
-		int ret = ctx->cb(ctx->dest, src);
-		if (ret)
-			return ret;
 	}
 
 	list_for_each(&src->props, i) {
@@ -638,9 +634,6 @@ static int merge_post(dt_node_t *src, void *arg)
  *
  * @param[in] dest tree to merge into
  * @param[in] src tree to merge from
- * @param[in] cb if non-NULL, call this function when first visiting
- *   a node.  If cb returns a non-zero value, the merge aborts and the
- *   value is returned to the caller.
  * @param[in] special if non-zero, honor delete-node, delete-prop, etc.
  * @return zero on success, non-zero on failure
  *
@@ -654,12 +647,10 @@ static int merge_post(dt_node_t *src, void *arg)
  * if the name does not match, and the name of the resultant tree root
  * will be that of the destination input.
  */
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src,
-                  int (*cb)(dt_node_t *dest, dt_node_t *src), int special)
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
 {
 	merge_ctx_t ctx = {
 		.dest = dest,
-		.cb = cb,
 		.special = special,
 	};
 
