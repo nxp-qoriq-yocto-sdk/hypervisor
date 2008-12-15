@@ -205,26 +205,26 @@ static void map_guest_mem(guest_t *guest)
 	                       map_gpma_callback, guest);
 }
 
-static int map_guest_ranges(guest_t *guest, dt_node_t *hwnode,
-                            dt_node_t *cfgnode)
+static int map_guest_ranges(dev_owner_t *owner)
 {
 	size_t len;
 	uint32_t naddr, nsize, caddr, csize;
 	dt_prop_t *prop;
 	const uint32_t *ranges;
+	uint32_t *newranges, *newranges_base;
+	dt_node_t *hwnode = owner->hwnode;
 	int ret;
-
-	prop = dt_get_prop(cfgnode, "map-ranges", 0);
-	if (!prop)
-		return 0;
 
 	prop = dt_get_prop(hwnode, "ranges", 0);
 	if (!prop)
 		return 0;
 
 	dt_node_t *parent = hwnode->parent;
-	if (!parent)
+	if (!parent) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: Cannot have ranges in root node\n", __func__);
 		return ERR_BADTREE;
+	}
 
 	ret = get_addr_format_nozero(parent, &naddr, &nsize);
 	if (ret < 0)
@@ -243,11 +243,46 @@ static int map_guest_ranges(guest_t *guest, dt_node_t *hwnode,
 		         __func__, hwnode->name);
 	}
 
-	for (int i = 0; i < len; i += caddr + naddr + csize) {
-		// fixme map range
+	newranges = alloc(len * (caddr + rootnaddr + csize) * 4, 8);
+	if (!newranges)
+		return ERR_NOMEM;
+
+	newranges_base = newranges;
+	for (int i = 0; i < len; i++, ranges += caddr + naddr + csize) {
+		uint32_t addrbuf[MAX_ADDR_CELLS];
+		phys_addr_t addr, size;
+
+		ret = xlate_reg_raw(hwnode, ranges + caddr, addrbuf, &size,
+		                    naddr, csize);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d on range %d in %s\n",
+			         __func__, ret, i, hwnode->name);
+			continue;
+		}
+
+		assert(!addrbuf[0] && !addrbuf[1]);
+		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
+
+		if (dt_get_prop(owner->cfgnode, "map-ranges", 0))
+			map_guest_addr_range(owner->guest, addr, addr, size);
+
+		memcpy(newranges, ranges, caddr * 4);
+		newranges += caddr;
+
+		memcpy(newranges, addrbuf + 4 - rootnaddr, rootnaddr * 4);
+		newranges += rootnaddr;
+
+		memcpy(newranges, ranges + caddr + naddr, csize * 4);
+		newranges += csize;
 	}
 
-	return 0;
+	/* Only change ranges if this is a top-level guest node */
+ 	if (owner->gnode->parent->parent)
+ 		return 0;
+
+	return dt_set_prop(owner->gnode, "ranges", newranges_base,
+	                   (newranges - newranges_base) * sizeof(newranges[0]));
 }
 
 static int map_guest_reg(dev_owner_t *owner)
@@ -275,8 +310,8 @@ static int map_guest_reg(dev_owner_t *owner)
 		return ERR_NOMEM;
 
 	for (int i = 0; i < num; i++) {
-		map_guest_addr_range(owner->guest, regs[i].start, regs[i].start,
-		                     regs[i].size);
+		map_guest_addr_range(owner->guest, regs[i].start,
+		                     regs[i].start, regs[i].size);
 
 		regp = write_reg(regp, regs[i].start, regs[i].size);
 	}
@@ -361,7 +396,7 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	ret = map_guest_ranges(owner->guest, hwnode, owner->cfgnode);
+	ret = map_guest_ranges(owner);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
