@@ -564,6 +564,60 @@ static void delete_props_by_strlist(dt_node_t *node,
 	}
 }
 
+static void prepend_strlist(dt_node_t *dest, dt_node_t *src)
+{
+	dt_prop_t *prop, *destprop;
+	size_t pos = 0;
+
+	prop = dt_get_prop(src, "prepend-strlist", 0);
+	if (!prop)
+		return;
+
+	while (1) {		
+		const char *pname, *pdata;
+		char *newstr, *olddata;
+		size_t ppos;
+		
+		pname = strlist_iterate(prop->data, prop->len, &pos);
+		if (!pname)
+			return;
+
+		ppos = pos;
+		pdata = strlist_iterate(prop->data, prop->len, &pos);
+		if (!pdata) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: ignoring junk '%s' at end of "
+			         "prepend-strlist in %s\n",
+			         __func__, pname, src->name);
+			return;
+		}
+
+		destprop = dt_get_prop(dest, pname, 1);
+		if (!destprop)
+			goto nomem;
+
+		newstr = malloc(pos - ppos + destprop->len);
+		if (!newstr)
+			goto nomem;
+
+		memcpy(newstr, pdata, pos - ppos);
+
+		if (destprop->len)
+			memcpy(newstr + pos - ppos, destprop->data, destprop->len);
+
+		olddata = destprop->data;
+
+		destprop->data = newstr;
+		destprop->len += pos - ppos;
+
+		free(olddata);
+	}
+
+nomem:
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+}
+
 static int merge_pre(dt_node_t *src, void *arg)
 {
 	merge_ctx_t *ctx = arg;
@@ -617,6 +671,9 @@ static int merge_pre(dt_node_t *src, void *arg)
 		if (ret)
 			return ret;
 	}
+
+	if (ctx->special)
+		prepend_strlist(ctx->dest, src);
 
 	return 0;
 }
