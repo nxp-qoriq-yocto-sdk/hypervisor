@@ -81,8 +81,9 @@ static int create_doorbell(dt_node_t *node, void *arg)
 
 void create_doorbells(void)
 {
-	int ret = dt_for_each_compatible(hw_devtree, "fsl,hv-doorbell",
-	                                 create_doorbell, NULL);
+	int ret = dt_for_each_compatible(config_tree, "doorbell",
+					 create_doorbell, NULL);
+
 	if (ret < 0)
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
 		         "%s: error %d.\n", __func__, ret);
@@ -109,7 +110,7 @@ int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
  * attach_receive_doorbell - attach a doorbell to a receive handle
  * @guest: the guest to update
  * @dbell: the doorbell to attach
- * @offset: offset in the guest device tree of the receive handle node
+ * @node: the receive handle node in the guest device tree
  *
  * Attach a doorbell to an existing doorbell receive handle node.  This
  * function also allocates a virq and creates an "interrupts" property in the
@@ -177,26 +178,26 @@ static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
 	dt_prop_t *endpoint;
 	dt_node_t *epnode;
 
-	endpoint = dt_get_prop(node, "fsl,endpoint", 0);
-	if (!endpoint) {
+	endpoint = dt_get_prop(node, "endpoint", 0);
+	if (!endpoint || (endpoint->len != 4)) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
 		         "%s: %s has no endpoint\n", __func__, node->name);
 		return NULL;
 	}
 
-	epnode = dt_lookup_alias(hw_devtree, endpoint->data);
+	epnode = dt_lookup_phandle(config_tree, *(const uint32_t *)endpoint->data);
 	if (!epnode) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-		         "%s: endpoint %s of %s not found\n", __func__,
-		         node->name, (const char *)endpoint->data);
+		         "%s: endpoint from %s not found\n", __func__,
+		         node->name);
 		return NULL;
 	}
 
 	/* Get the pointer corresponding to hv-internal-doorbell-ptr */
 	dbell = ptr_from_node(epnode, "doorbell");
 	if (!dbell) {
-		printf("%s: endpoint %s of %s not a doorbell\n", __func__,
-		       node->name, (const char *)endpoint->data);
+		printf("%s: node %s (endpoint from %s) is not a doorbell\n", __func__,
+		       epnode->name, node->name);
 		return NULL;
 	}
 
@@ -207,40 +208,111 @@ int send_dbell_init_one(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;
+	dt_node_t *hnode;	// handle node
+	dt_node_t *mixin;
 	int32_t ghandle;
+	int ret;
 
 	dbell = dbell_from_handle_node(node);
 	if (!dbell)
 		return 0;
 
+	// Get a pointer to the guest's 'handles' node
+	hnode = get_handles_node(guest);
+	if (!hnode)
+		return ERR_NOMEM;
+
+	// Find or the pointer to the doorbell subnode, or create it
+	hnode = dt_get_subnode(hnode, node->name, 1);
+	if (!hnode)
+		return ERR_NOMEM;
+
+	// Insert the 'compatible' property.
+	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-send-handle");
+	if (ret)
+		// Out of memory
+		return ret;
+
 	ghandle = doorbell_attach_guest(dbell, guest);
 	if (ghandle < 0)
 		return ghandle;
 
-	return dt_set_prop(node, "reg", &ghandle, 4);
+	ret = dt_set_prop(hnode, "reg", &ghandle, 4);
+	if (ret)
+		// Out of memory
+		return ret;
+
+	mixin = dt_get_subnode(node, "node-update", 0);
+	if (mixin) {
+		int ret = dt_merge_tree(hnode, mixin, 1);
+		if (ret < 0) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+				 "%s: error %d merging node-update on %s\n",
+				 __func__, ret, node->name);
+			return ret;
+		}
+	}
+
+	create_aliases(node, hnode, guest->devtree);
+
+	return 0;
 }
 
 int recv_dbell_init_one(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;
-	int32_t ghandle;
+	dt_node_t *hnode;	// handle node
+	dt_node_t *mixin;
+	int ret;
 
 	dbell = dbell_from_handle_node(node);
 	if (!dbell)
 		return 0;
 
-	ghandle = attach_receive_doorbell(guest, dbell, node);
-	if (ghandle < 0)
-		return ghandle;
+	// Get a pointer to the guest's 'handles' node
+	hnode = get_handles_node(guest);
+	if (!hnode)
+		return ERR_NOMEM;
 
-	return dt_set_prop(node, "reg", &ghandle, 4);
+	// Find or the pointer to the doorbell subnode, or create it
+	hnode = dt_get_subnode(hnode, node->name, 1);
+	if (!hnode)
+		return ERR_NOMEM;
+
+	// Insert the 'compatible' property.
+	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-receive-handle");
+	if (ret)
+		// Out of memory
+		return ret;
+
+	ret = attach_receive_doorbell(guest, dbell, hnode);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: cannot attach doorbell to hnode %s\n",
+			 __func__, guest->name, hnode->name);
+		return ret;
+	}
+
+	mixin = dt_get_subnode(node, "node-update", 0);
+	if (mixin) {
+		int ret = dt_merge_tree(hnode, mixin, 1);
+		if (ret < 0) {
+			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+				 "%s: error %d merging node-update on %s\n",
+				 __func__, ret, node->name);
+			return ret;
+		}
+	}
+
+	create_aliases(node, hnode, guest->devtree);
+
+	return ret;
 }
 
 void send_dbell_partition_init(guest_t *guest)
 {
-	int ret = dt_for_each_compatible(guest->devtree,
-	                                 "fsl,hv-doorbell-send-handle",
+	int ret = dt_for_each_compatible(config_tree, "send-doorbell",
 	                                 send_dbell_init_one, guest);
 	if (ret < 0)
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
@@ -249,8 +321,7 @@ void send_dbell_partition_init(guest_t *guest)
 
 void recv_dbell_partition_init(guest_t *guest)
 {
-	int ret = dt_for_each_compatible(guest->devtree,
-	                                 "fsl,hv-doorbell-receive-handle",
+	int ret = dt_for_each_compatible(config_tree, "receive-doorbell",
 	                                 recv_dbell_init_one, guest);
 	if (ret < 0)
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
