@@ -1239,6 +1239,87 @@ static int partition_config(guest_t *guest)
 	return 0;
 }
 
+static void get_cpulist(guest_t *guest)
+{
+	dt_node_t *node = guest->partition;
+	dt_prop_t *prop;
+	static int next_cpu;
+	static int fixed_cpus;
+
+	prop = dt_get_prop(node, "cpu-count", 0);
+	if (prop) {
+		if (fixed_cpus) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: cpu-count in %s, but fixed cpus already assigned\n",
+			         __func__, node->name);
+			return;
+		}
+
+		if (prop->len != 4) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad cpu-count property in %s\n",
+			         __func__, node->name);
+			return;
+		}
+
+		uint32_t count = *(const uint32_t *)prop->data;
+		if (next_cpu + count <= next_cpu) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad cpu-count property in %s\n",
+			         __func__, node->name);
+			return;
+		}
+
+		guest->cpulist = malloc(8);
+		if (!guest->cpulist)
+			goto nomem;
+		
+		guest->cpulist_len = 8;
+
+		guest->cpulist[0] = next_cpu;
+		guest->cpulist[1] = count;
+		
+		next_cpu += count;
+	}
+
+	prop = dt_get_prop(node, "cpus", 0);
+	if (prop) {
+		if (next_cpu != 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: cpus in %s, but dynamic cpus already assigned\n",
+			         __func__, node->name);
+			return;
+		}
+
+		if (prop->len == 0 || (prop->len % 8) != 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad cpus property in %s\n",
+			         __func__, node->name);
+
+			return;
+		}
+
+		guest->cpulist = malloc(prop->len);
+		if (!guest->cpulist)
+			goto nomem;
+
+		memcpy(guest->cpulist, prop->data, prop->len);
+		guest->cpulist_len = prop->len;
+		fixed_cpus = 1;
+	}
+
+	if (!guest->cpulist) 
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: No cpus or cpu-count in guest %s\n",
+		         __func__, node->name);
+
+	return;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+}
+
 uint32_t start_guest_lock;
 
 guest_t *node_to_partition(dt_node_t *partition)
@@ -1300,6 +1381,8 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].state = guest_starting;
 		guests[i].partition = partition;
 		guests[i].lpid = ++last_lpid;
+
+		get_cpulist(&guests[i]);
 	}
 	
 	spin_unlock(&start_guest_lock);
@@ -2040,19 +2123,6 @@ static int init_guest_one(dt_node_t *node, void *arg)
 	init_guest_ctx_t *ctx = arg;
 	int pir = mfspr(SPR_PIR);
 	guest_t *guest;
-	dt_prop_t *prop;
-
-	prop = dt_get_prop(node, "cpus", 0);
-	if (!prop) {
-		char buf[MAX_DT_PATH];
-		dt_get_path(NULL, node, buf, sizeof(buf));
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "init_guest: No cpus in guest %s\n", buf);
-		return 0;
-	}
-
-	if (!cpu_in_cpulist(prop->data, prop->len, pir))
-		return 0;
 
 	guest = node_to_partition(node);
 	if (!guest) {
@@ -2061,14 +2131,15 @@ static int init_guest_one(dt_node_t *node, void *arg)
 		return ERR_NOMEM;
 	}
 
+	if (!cpu_in_cpulist(guest->cpulist, guest->cpulist_len, pir))
+		return 0;
+
 	if (ctx->guest) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "init_guest: extra guest %s on core %d\n", guest->name, pir);
 		return 0;
 	}
 
-	guest->cpulist = prop->data;
-	guest->cpulist_len = prop->len;
 	ctx->guest = guest;
 	return 0;
 } 
