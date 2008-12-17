@@ -65,7 +65,7 @@
 	part1 {
 		compatible = "partition";
 		label = "p1-linux";
-		cpus = <0 2>;
+		cpu-count = <2>;
 		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
 		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
@@ -233,7 +233,7 @@
 	part2 {
 		compatible = "partition";
 		label = "p2-linux";
-		cpus = <2 2>;
+		cpu-count = <4>;
 		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
 		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
