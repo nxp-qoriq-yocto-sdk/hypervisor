@@ -455,6 +455,13 @@ static int map_guest_reg(dev_owner_t *owner)
 	return ret;
 }
 
+/** Convert aliases in the config or hardware tree to aliases in the guest tree.
+ *
+ * @param[in] node config or hardware node which may have aliases
+ * @param[in] gnode guest node that corresponds to node, to which
+ *    the new aliases should point
+ * @param[in] tree tree in which to create the aliases
+ */
 void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree)
 {
 	dt_node_t *aliases;
