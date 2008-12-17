@@ -1805,6 +1805,14 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 		name = hwnode->name;
 	} else {
 		name = owner->cfgnode->name;
+
+		if (hwnode->parent->parent &&
+		    !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: don't know how to assign device %s on bus %s\n",
+			         __func__, hwnode->name, hwnode->parent->name);
+			return 0;
+		}
 	}
 
 	owner->gnode = dt_get_subnode(parent, name, 1);

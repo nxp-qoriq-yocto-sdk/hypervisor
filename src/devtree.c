@@ -977,14 +977,6 @@ int assign_callback(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	if (hwnode->parent->parent &&
-	    !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: don't know how to assign device %s on bus %s\n",
-		         __func__, alias, hwnode->parent->name);
-		return 0;
-	}
-
 	dev_owner_t *owner = malloc(sizeof(dev_owner_t));
 	if (!owner) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
