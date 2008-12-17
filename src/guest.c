@@ -213,10 +213,21 @@ static int map_guest_ranges(dev_owner_t *owner)
 	const uint32_t *ranges;
 	uint32_t *newranges, *newranges_base;
 	dt_node_t *hwnode = owner->hwnode;
+	int map = 0;
 	int ret;
 
 	prop = dt_get_prop(hwnode, "ranges", 0);
 	if (!prop)
+		return 0;
+
+	if (dt_get_prop(owner->cfgnode, "map-ranges", 0) &&
+	    owner->direct == owner)
+		map = 1;
+
+	/* Don't parse the ranges at all if it's a non-reparented child
+	 * without map-ranges.
+	 */
+	if (!map && owner->gnode->parent->parent)
 		return 0;
 
 	dt_node_t *parent = hwnode->parent;
@@ -264,7 +275,6 @@ static int map_guest_ranges(dev_owner_t *owner)
 		assert(!addrbuf[0] && !addrbuf[1]);
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
-		if (dt_get_prop(owner->cfgnode, "map-ranges", 0))
 			map_guest_addr_range(owner->guest, addr, addr, size);
 
 		memcpy(newranges, ranges, caddr * 4);
