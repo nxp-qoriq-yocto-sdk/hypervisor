@@ -33,7 +33,7 @@
 test := linux
 dir := $(testdir)$(test)/
 
-$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts $(dir)hv-partman.dts
+$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts $(dir)hv-partman.dts $(dir)hv-demo.dts
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
 include $(src)tools/partman/Makefile
@@ -83,7 +83,7 @@ $(test)-run-hello: bin/$(test)/rootfs-hello.ext2.gz
 	xterm -e "telnet localhost 9000" &
 	$(SIMICS) $(testdir)linux/run-hello.simics
 
-$(test)-run-demo: bin/$(test)/rootfs-partman.ext2.gz
+$(test)-run-demo: $(test) bin/$(test)/rootfs-partman.ext2.gz
 	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
 	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
 	xterm -geometry 80x25+150+0 -title "telnet : partition 2" -e "telnet localhost 9001"  &
