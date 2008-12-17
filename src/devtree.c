@@ -205,7 +205,7 @@ static int find_range(const uint32_t *reg, const uint32_t *ranges,
 			return ERR_BADTREE;
 		}
 
-		copy_val(range_addr, ranges + i, naddr);
+		copy_val(range_addr, ranges + i, nregaddr);
 		copy_val(range_size, ranges + i + nregaddr + naddr, nsize);
 
 		if (compare_reg(reg, range_addr, range_size))
