@@ -1354,11 +1354,13 @@ static void start_guest_primary_nowait(void)
 		return;
 	}
 
-	assert(fdt_totalsize(fdt) <= guest->dtb_window_len);
+	size_t fdtsize = fdt_totalsize(fdt);
+	assert(fdtsize <= guest->dtb_window_len);
 
 	ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
-	                    fdt, fdt_totalsize(fdt));
-	if (ret != fdt_totalsize(fdt)) {
+	                    fdt, fdtsize);
+	free(fdt);
+	if (ret != fdtsize) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: cannot copy device tree to guest\n", __func__);
 		return;
