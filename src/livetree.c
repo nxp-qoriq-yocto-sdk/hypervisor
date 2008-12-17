@@ -569,7 +569,7 @@ static void prepend_strlist(dt_node_t *dest, dt_node_t *src)
 	dt_prop_t *prop, *destprop;
 	size_t pos = 0;
 
-	prop = dt_get_prop(src, "prepend-strlist", 0);
+	prop = dt_get_prop(src, "prepend-stringlist", 0);
 	if (!prop)
 		return;
 
@@ -587,7 +587,7 @@ static void prepend_strlist(dt_node_t *dest, dt_node_t *src)
 		if (!pdata) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			         "%s: ignoring junk '%s' at end of "
-			         "prepend-strlist in %s\n",
+			         "prepend-stringlist in %s\n",
 			         __func__, pname, src->name);
 			return;
 		}
@@ -663,7 +663,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 		      continue;
 	      if (!strcmp(prop->name, "delete-prop"))
 		     continue;
-	      if (!strcmp(prop->name, "prepend-strlist"))
+	      if (!strcmp(prop->name, "prepend-stringlist"))
 		      continue;
       }
 
