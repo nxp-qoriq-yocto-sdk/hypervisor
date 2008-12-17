@@ -2072,8 +2072,8 @@ static int init_guest_primary(guest_t *guest)
 	if (!node)
 		goto nomem;
 
-	if (mpic_coreint) {
-		ret = dt_set_prop(node, "fsl,hv-pic-coreint", NULL, 0);
+	if (!mpic_coreint) {
+		ret = dt_set_prop(node, "fsl,hv-pic-legacy", NULL, 0);
 		if (ret < 0)
 			goto fail;
 	}

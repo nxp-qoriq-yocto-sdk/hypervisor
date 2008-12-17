@@ -148,12 +148,12 @@ static driver_t __driver mpic_driver = {
 
 static int mpic_probe(driver_t *drv, device_t *dev)
 {
-	int coreint = 0;
-	dt_node_t *chosen;
+	int coreint = 1;
+	dt_node_t *node;
 
-	chosen = dt_get_subnode(hw_devtree, "chosen", 0);
-	if (chosen && dt_get_prop(chosen, "fsl,hv-pic-coreint", 0))
-		coreint = 1;
+	node = dt_get_first_compatible(config_tree, "hv-config");
+	if (node && dt_get_prop(node, "legacy-interrupts", 0))
+		coreint = 0;
 
 	mpic_init(coreint);
 
