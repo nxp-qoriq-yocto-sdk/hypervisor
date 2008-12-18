@@ -216,7 +216,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	int map = 0;
 	int ret;
 
-	prop = dt_get_prop(hwnode, "ranges", 0);
+	prop = dt_get_prop(owner->gnode, "ranges", 0);
 	if (!prop)
 		return 0;
 
