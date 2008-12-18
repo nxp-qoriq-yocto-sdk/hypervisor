@@ -107,6 +107,12 @@ void init(unsigned long devtree_ptr)
 		else
 			coreint = 1;
 	}
+
+	/* FIXME: tmp hack because the hypervisor patch to support
+	 * the "legacy-interrupts" property is not applied.
+	 */
+	coreint = 0;
+
 }
 
 static void core_init(void)
