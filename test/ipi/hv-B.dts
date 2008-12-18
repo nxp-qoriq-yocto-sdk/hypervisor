@@ -98,12 +98,12 @@
 
 			doorbell0 {
 				compatible = "receive-doorbell";
-				endpoint = <&dbell0>;
+				global-doorbell = <&dbell0>;
 			};
 
 			doorbell1 {
 				compatible = "send-doorbell";
-				endpoint = <&dbell0>;
+				global-doorbell = <&dbell0>;
 			};
 
 			aliases {
@@ -133,7 +133,7 @@
 
 			doorbell2 {
 				compatible = "receive-doorbell";
-				endpoint = <&dbell0>;
+				global-doorbell = <&dbell0>;
 			};
 
 			serial3: serial3 {

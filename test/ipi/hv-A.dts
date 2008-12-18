@@ -81,12 +81,12 @@
 
 			doorbell0 {
 				compatible = "receive-doorbell";
-				endpoint = <&dbell0>;
+				global-doorbell = <&dbell0>;
 			};
 
 			dbell1: doorbell1 {
 				compatible = "send-doorbell";
-				endpoint = <&dbell0>;
+				global-doorbell = <&dbell0>;
 			};
 
 			aliases {
