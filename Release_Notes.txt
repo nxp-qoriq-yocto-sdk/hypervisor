@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc7
-Date: 12/4/2008
+Revsion: 0.3-rc8
+Date: 12/18/2008
 
 -------------------------------------------------------
 Contents
@@ -23,15 +23,22 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc6
-      -is compatible with P4080 4.0.20 / 4.0.pre5 and later
-       versions of Simics
+   -Topaz 0.3-rc8 is compatible with Simics 4.0.29 / pre14 and
+    later
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.82
+    0.83
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc8 bug fixes and changes
+      -implements the new partition definition scheme specified
+       in version 0.83 of the hypervisor spec
+      -bug 1866: Issue with partition device tree when more than
+       32 bytechannels are attached to mux
+      -bug 2126: DE bit in emulation of debug interrupt and
+       rfci/rfmci
 
    -Topaz 0.3-rc7 bug fixes and changes
       -updates to enable unit tests to be run under swift
@@ -128,11 +135,6 @@ Contents
 
  B. CPU Feature Limitations
 
-   -MMU
-      -If the guest-to-real address mapping is sufficiently
-       misaligned, TLB1 entries can be depleted, causing
-       a hypervisor panic.
-
    -physical addresses greater than 32 bits are not supported
 
    -CPU core performance monitor support
@@ -148,15 +150,29 @@ Contents
       -Support for coherence subdomains is not implemented.  All
        memory is globally coherent.
 
-   -L3 / Platform Cache configuration is not implemented
+   -L3 / Platform Cache configuration is not implemented (i.e. the
+    "allocate-cpc-ways" property is not supported on PMAs)
 
    -platform error interrupts
       -In the platform MPIC multiple error interrupts are multiplexed
        to interrupt 0.  De-multiplexing and routing of platform
        error interrupts to partitions is not implemented.
 
+   -PAMU related
+      -support for PAMU operation mapping table is implemented but
+       not tested
+      -dma subwindows are not supported
+
  D. Configuration
-   -the hypervisor must be loaded and run from physical address 0x0
+
+      -the "legacy-interrupts" property on the hypervisor configuration
+       node is not supported
+      -the "guest-cache-lock" property is not supported on partition nodes
+      -the "guest-debug" property is not supported on partition nodes
+      -the "snoop-cpu-only" is not supported on device configuration 
+       nodes
+      -the debug stub configuration nodes (compatible = "gdb-stub")
+       are not supported
 
  E. Hypervisor Services
 
@@ -168,9 +184,5 @@ Contents
 
  F. ePAPR Related Notes
 
-    -The hypervisor does not currently comply with the ePAPR 
-     ELF loading requirements with respect to the physical
-     load address of the image.  The ET_EXEC and ET_DYN
-     flags are ignored and guest images is loaded at the specified
-     address address (fsl,hv-load-image-table property or 
-     partman utility)
+    -The hypervisor only supports ET_EXC as per the
+     ePAPR.  The ET_DYN flag is not supported. 
