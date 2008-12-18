@@ -40,16 +40,14 @@
 #include <paging.h>
 #include <limits.h>
 
-int pamu_global_init_done;
-
 static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 {
 	if (addrspace_size & (addrspace_size - 1)) {
 		addrspace_size = 1 << (LONG_BITS - 1 -
 				(count_msb_zeroes(addrspace_size)));
 
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"dma address space size not power of 2, rounding down to next power of 2 = 0x%lx\n", addrspace_size);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
+			"%s: dma address space size not power of 2 (0x%lx)\n", __func__, addrspace_size);
 	}
 
 	/* window size is 2^(WSE+1) bytes */
@@ -83,7 +81,7 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 		if (!(attr & PTE_VALID)) {
 			if (start_rpn == ULONG_MAX) {
 				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-						"invalid rpn\n");
+						"%s: invalid rpn\n", __func__);
 				return ULONG_MAX;
 			} else {
 				break;
@@ -94,8 +92,8 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 			start_rpn = rpn;
 		} else if (rpn != next_rpn) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-				"rpn = 0x%lx, size = 0x%lx\n",
-				start_rpn, mach_phys_contig_size);
+				"%s: rpn = 0x%lx, size = 0x%lx\n",
+				__func__, start_rpn, mach_phys_contig_size);
 			break;
 		}
 
@@ -143,7 +141,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 
 	prop = dt_get_prop(hwnode, "cpu-phandle", 0);
 	if (!prop || prop->len != 4)
-		return -1;  /* if no cpu-phandle assume that this is
+		return ULONG_MAX ;  /* if no cpu-phandle assume that this is
 			      not a per-cpu portal */
 
 	node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
@@ -151,7 +149,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: bad cpu phandle reference in %s \n",
 		          __func__, hwnode->name);
-		return -1;
+		return ULONG_MAX;
 	}
 
 	/* find the hwnode that represents the cache */
@@ -162,9 +160,9 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 				         "%s: missing/bad cache-stash-id at %s \n",
 				          __func__, node->name);
-				return -1;
+				return ULONG_MAX;
 			}
-			break;  /* found it */
+			return *(const uint32_t *)prop->data;
 		}
 
 		prop = dt_get_prop(node, "next-level-cache", 0);
@@ -172,7 +170,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			         "%s: can't find next-level-cache at %s \n",
 			          __func__, node->name);
-			return -1;  /* can't traverse any further */
+			return ULONG_MAX;  /* can't traverse any further */
 		}
 
 		/* advance to next node in cache hierarchy */
@@ -181,11 +179,14 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			         "%s: bad cpu phandle reference in %s \n",
 			          __func__, hwnode->name);
-			return -1;
+			return ULONG_MAX;
 		}
 	}
 
-	return *(const uint32_t *)prop->data;
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "%s: stash dest not found for %d on %s \n",
+	          __func__, stash_dest, hwnode->name);
+	return ULONG_MAX;
 }
 
 /*
@@ -263,11 +264,17 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 
 	/* set up operation mapping if it's configured */
 	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
-	if (prop && prop->len == 4) {
-		uint32_t omi = *(const uint32_t *)prop->data;
-		if (omi <= OMI_MAX) {
-			ppaace->otm = PAACE_OTM_INDEXED;
-			ppaace->op_encode.index_ot.omi = omi;
+	if (prop) {
+		if (prop->len == 4) {
+			uint32_t omi = *(const uint32_t *)prop->data;
+			if (omi <= OMI_MAX) {
+				ppaace->otm = PAACE_OTM_INDEXED;
+				ppaace->op_encode.index_ot.omi = omi;
+			} else {
+				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				         "%s: warning: bad operation mapping index at %s\n",
+				         __func__, cfgnode->name);
+			}
 		} else {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			         "%s: warning: bad operation mapping index at %s\n",
@@ -283,7 +290,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 			ppaace->impl_attr.cid = stash_dest;
 	}
 
-	smp_lwsync();
+	lwsync();
 
 	/* PAACE is invalid, validated by enable hcall */
 	ppaace->v = 1; // FIXME: for right now we are leaving PAACE
@@ -458,7 +465,4 @@ void pamu_global_init(void)
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
 
-	smp_mbar();
-
-	pamu_global_init_done = 1;
 }

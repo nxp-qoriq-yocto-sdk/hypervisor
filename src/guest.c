@@ -222,7 +222,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 
 	if (dt_get_prop(owner->cfgnode, "map-ranges", 0) &&
 	    owner->direct == owner)
-		map = 1; 
+		map = 1;
 
 	/* Don't parse the ranges at all if it's a non-reparented child
 	 * without map-ranges.
@@ -303,7 +303,7 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 		return owner->cfgnode;  /* normal case */
 	}
 
-	/* if parent of hwnode is fsl,qman-portal its a special case */
+	/* if parent of hwnode is fsl,qman-portal it's a special case */
 
 	/* iterate over all children of the config node */
 	list_for_each(&owner->cfgnode->children, i) {
@@ -311,30 +311,36 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 
 		/* look for nodes with a "device" property */
 		const char *s = dt_get_prop_string(config_child, "device");
-		if (s) {
-			dt_node_t *devnode = dt_lookup_alias(hw_devtree, s);
-			if (!devnode) {
+		if (!s)
+			continue;
+
+		dt_node_t *devnode = dt_lookup_alias(hw_devtree, s);
+		if (!devnode) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: missing device (%s) reference at %s\n",
+			         __func__, s, config_child->name);
+			continue;
+		}
+		uint32_t hw_phandle_cfg = dt_get_phandle(devnode);
+
+		prop = dt_get_prop(hwnode, "dev-handle", 0);
+		if (prop) {
+			if (prop->len != 4) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				         "%s: missing device (%s) reference at %s\n",
-				         __func__, s, config_child->name);
-				return NULL;
+				         "%s: missing/bad dev-handle on %s\n",
+				         __func__, owner->hwnode->name);
+				continue;
 			}
-			uint32_t hw_phandle_cfg = dt_get_phandle(devnode);
+			uint32_t hw_phandle = *(const uint32_t *)prop->data;
 
-			prop = dt_get_prop(hwnode, "dev-handle", 0);
-			if (prop) {
-				if (prop->len != 4) {
-					printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-					         "%s: missing/bad dev-handle on %s\n",
-					         __func__, owner->hwnode->name);
-				}
-				uint32_t hw_phandle = *(const uint32_t *)prop->data;
-
-				if (hw_phandle == hw_phandle_cfg)
-					return config_child; /* found match */
-			}
+			if (hw_phandle == hw_phandle_cfg)
+				return config_child; /* found match */
 		}
 	}
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: no config node found for %s\n",
+	         __func__, owner->hwnode->name);
 
 	return NULL;
 }
@@ -1273,12 +1279,12 @@ static void get_cpulist(guest_t *guest)
 		guest->cpulist = malloc(8);
 		if (!guest->cpulist)
 			goto nomem;
-		
+
 		guest->cpulist_len = 8;
 
 		guest->cpulist[0] = next_cpu;
 		guest->cpulist[1] = count;
-		
+
 		next_cpu += count;
 	}
 
@@ -1308,7 +1314,7 @@ static void get_cpulist(guest_t *guest)
 		fixed_cpus = 1;
 	}
 
-	if (!guest->cpulist) 
+	if (!guest->cpulist)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: No cpus or cpu-count in guest %s\n",
 		         __func__, node->name);
