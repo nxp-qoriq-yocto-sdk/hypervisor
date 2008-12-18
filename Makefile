@@ -45,7 +45,7 @@ $(O).config $(O)include/config/auto.conf.cmd: ;
 
 -include $(O)include/config/auto.conf.cmd
 
-CONFIGS := config xconfig gconfig menuconfig oldconfig silentoldconfig randconfig defconfig allyesconfig allnoconfig
+CONFIGS := config xconfig gconfig menuconfig oldconfig silentoldconfig randconfig defconfig allyesconfig allnoconfig %_defconfig
 
 $(O)include/config/auto.conf: $(O).config $(O)include/config/auto.conf.cmd Kconfig $(LIBOS_DIR)/Kconfig
 	@$(MAKE) silentoldconfig

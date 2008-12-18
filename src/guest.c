@@ -216,7 +216,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	int map = 0;
 	int ret;
 
-	prop = dt_get_prop(hwnode, "ranges", 0);
+	prop = dt_get_prop(owner->gnode, "ranges", 0);
 	if (!prop)
 		return 0;
 
@@ -430,6 +430,9 @@ static int map_guest_reg(dev_owner_t *owner)
 	int regsize = (rootnaddr + rootnsize) * 4;
 	int num, ret = 0;
 
+	if (!dt_get_prop(owner->gnode, "reg", 0))
+		return 0;
+
 	if (hwnode->parent->parent &&
 	    !dt_node_is_compatible(hwnode->parent, "simple-bus"))
 		return 0;
@@ -504,54 +507,15 @@ static const uint8_t vmpic_config_to_intspec[4] = {
 	3, 0, 1, 2
 };
 
-static int map_device_to_guest(dt_node_t *node, void *arg)
+static int map_guest_irqs(dev_owner_t *owner)
 {
-	guest_t *guest = arg;
-	dt_node_t *hwnode;
-	dev_owner_t *owner;
+	dt_node_t *hwnode = owner->hwnode;
 	int ret;
 
-	hwnode = node->upstream;
-	if (!hwnode)
+	if (!dt_get_prop(owner->gnode, "interrupts", 0))
 		return 0;
-
-	owner = dt_owned_by(hwnode, guest);
-	if (!owner)
-		return 0;
-	
-	assert(hwnode == owner->hwnode);
 
 	dt_lookup_irqs(hwnode);
-
-	assert(owner->gnode);
-
-	create_aliases(hwnode, owner->gnode, guest->devtree);
-	create_aliases(owner->cfgnode, owner->gnode, guest->devtree);
-
-	ret = map_guest_reg(owner);
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "map_guest_reg: error %d in %s\n",
-		         ret, hwnode->name);
-
-		if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
-			return ERR_NOMEM;
-
-		return 0;
-	}
-
-	ret = map_guest_ranges(owner);
-	if (ret < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "map_guest_ranges: error %d in %s\n", ret, hwnode->name);
-
-		if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
-			return ERR_NOMEM;
-
-		return 0;
-	}
-
-	configure_dma(hwnode, owner);
 
 	if (hwnode->dev.num_irqs <= 0)
 		return 0;
@@ -564,13 +528,15 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		int handle;
 		
 		/* FIXME: handle more than just mpic */
-		handle = vmpic_alloc_mpic_handle(guest, hwnode->dev.irqs[i]);
+		handle = vmpic_alloc_mpic_handle(owner->guest,
+		                                 hwnode->dev.irqs[i]);
 		if (handle < 0) {
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 			         "%s: couldn't grant interrupts for %s\n",
 			         __func__, hwnode->name);
 
-			dt_prop_t *prop = dt_get_prop(owner->gnode, "interrupts", 0);
+			dt_prop_t *prop = dt_get_prop(owner->gnode,
+			                              "interrupts", 0);
 			if (prop)
 				dt_delete_prop(prop);
 
@@ -590,8 +556,60 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		return ERR_NOMEM;
 
 	ret = dt_set_prop(owner->gnode, "interrupt-parent",
-	                  &guest->vmpic_phandle, 4);
+	                  &owner->guest->vmpic_phandle, 4);
 	if (ret < 0)
+		return ERR_NOMEM;
+
+	return 0;
+}
+
+static int map_device_to_guest(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	dt_node_t *hwnode;
+	dev_owner_t *owner;
+	const char *failstr = NULL;
+	int ret;
+
+	hwnode = node->upstream;
+	if (!hwnode)
+		return 0;
+
+	owner = dt_owned_by(hwnode, guest);
+	if (!owner)
+		return 0;
+	
+	assert(hwnode == owner->hwnode);
+
+	create_aliases(hwnode, owner->gnode, guest->devtree);
+	create_aliases(owner->cfgnode, owner->gnode, guest->devtree);
+
+	ret = map_guest_reg(owner);
+	if (ret < 0) {
+		failstr = "map_guest_reg";
+		goto fail;
+	}
+
+	ret = map_guest_ranges(owner);
+	if (ret < 0) {
+		failstr = "map_guest_ranges";
+		goto fail;
+	}
+
+	ret = map_guest_irqs(owner);
+	if (ret < 0) {
+		failstr = "map_guest_irqs";
+		goto fail;
+	}
+
+	configure_dma(hwnode, owner);
+	return 0;
+
+fail:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: error %d in %s\n", failstr, ret, hwnode->name);
+
+	if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
 		return ERR_NOMEM;
 
 	return 0;

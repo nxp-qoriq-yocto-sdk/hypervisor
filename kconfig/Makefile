@@ -78,11 +78,11 @@ ifeq ($(KBUILD_DEFCONFIG),)
 	$< -d $(Kconfig)
 else
 	@echo "*** Default configuration is based on '$(KBUILD_DEFCONFIG)'"
-	$(Q)$< -D arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
+	$(Q)$< -D configs/$(KBUILD_DEFCONFIG) $(Kconfig)
 endif
 
 %_defconfig: bin/conf
-	$(Q)$< -D arch/$(SRCARCH)/configs/$@ $(Kconfig)
+	$(Q)$< -D configs/$@ $(Kconfig)
 
 # Help text used by make help
 help:
