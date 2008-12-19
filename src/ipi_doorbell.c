@@ -175,29 +175,29 @@ error:
 static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
 {
 	ipi_doorbell_t *dbell;
-	dt_prop_t *endpoint;
-	dt_node_t *epnode;
+	dt_prop_t *global;
+	dt_node_t *gdnode;
 
-	endpoint = dt_get_prop(node, "endpoint", 0);
-	if (!endpoint || (endpoint->len != 4)) {
+	global = dt_get_prop(node, "global-doorbell", 0);
+	if (!global || (global->len != 4)) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-		         "%s: %s has no endpoint\n", __func__, node->name);
+		         "%s: %s has no global-doorbell\n", __func__, node->name);
 		return NULL;
 	}
 
-	epnode = dt_lookup_phandle(config_tree, *(const uint32_t *)endpoint->data);
-	if (!epnode) {
+	gdnode = dt_lookup_phandle(config_tree, *(const uint32_t *)global->data);
+	if (!gdnode) {
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-		         "%s: endpoint from %s not found\n", __func__,
+		         "%s: global-doorbell from %s not found\n", __func__,
 		         node->name);
 		return NULL;
 	}
 
 	/* Get the pointer corresponding to hv-internal-doorbell-ptr */
-	dbell = ptr_from_node(epnode, "doorbell");
+	dbell = ptr_from_node(gdnode, "doorbell");
 	if (!dbell) {
-		printf("%s: node %s (endpoint from %s) is not a doorbell\n", __func__,
-		       epnode->name, node->name);
+		printf("%s: node %s (global-doorbell from %s) is not a doorbell\n",
+		       __func__, gdnode->name, node->name);
 		return NULL;
 	}
 
