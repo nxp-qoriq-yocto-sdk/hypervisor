@@ -394,6 +394,34 @@ void setup_omt(void)
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 }
 
+static int pamu_av_isr(void *arg)
+{
+	device_t *dev = arg;
+	void *reg_base = dev->regs[0].virt;
+	phys_addr_t reg_size = dev->regs[0].size;
+	unsigned long reg_off;
+	int ret = -1;
+
+	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
+		void *reg = reg_base + reg_off;
+
+		uint32_t pics = in32((uint32_t *)(reg + PAMU_PICS));
+		if (pics & PAMU_ACCESS_VIOLATION_STAT) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, 
+			         "PAMU access violation on PAMU#%ld\n",
+			         reg_off / PAMU_OFFSET);
+
+			/* De-assert access violation pin */
+			out32((uint32_t *)(reg + PAMU_PICS),
+			      PAMU_ACCESS_VIOLATION_STAT);
+
+			ret = 0;
+		}
+	}
+
+	return ret;
+}
+
 #define PAMUBYPENR 0x604
 void pamu_global_init(void)
 {
@@ -403,6 +431,7 @@ void pamu_global_init(void)
 	dt_node_t *guts_node, *pamu_node;
 	phys_addr_t guts_addr, guts_size;
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
+	device_t *dev;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -416,6 +445,8 @@ void pamu_global_init(void)
 		         "%s: warning: no pamu node found\n", __func__);
 		return;
 	}
+
+	dev = &pamu_node->dev;
 
 	ret = dt_get_reg(pamu_node, 0, &addr, &size);
 	if (ret < 0) {
@@ -462,7 +493,12 @@ void pamu_global_init(void)
 
 	setup_omt();
 
+	if (dev->num_irqs >= 1) {
+		interrupt_t *irq = dev->irqs[0];
+		if (irq && irq->ops->register_irq)
+			irq->ops->register_irq(irq, pamu_av_isr, dev);
+	}
+
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
-
 }
