@@ -54,7 +54,7 @@
 		label = "p1-linux";
 		cpus = <0 1>;
 		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
-		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
+		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x04000000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 
 		serial2 {
@@ -220,7 +220,7 @@
 				 * similar to aliases.
 				 */
 				linux,stdout-path = "/serial2";
-				bootargs = "console=ttyS0,115200";
+				bootargs = "console=ttyS0,115200 ramdisk_size=350000";
 			};
 		};
 	};
