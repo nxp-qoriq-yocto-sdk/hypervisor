@@ -208,6 +208,7 @@ typedef struct gcpu {
 	int gcpu_num, waiting_for_gevent;
 	vpic_cpu_t vpic;
 	register_t tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
+	void *debug_stub_data;
 
 	/* Fields after this point are cleared on reset -- do not
 	 * insert new fields before gdbell_pending.
@@ -225,7 +226,6 @@ typedef struct gcpu {
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
 	
 	unsigned int stats[num_gcpu_stats];
-	void *debug_stub_data;
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
