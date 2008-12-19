@@ -1251,14 +1251,32 @@ int restart_guest(guest_t *guest)
 static int partition_config(guest_t *guest)
 {
 	dt_node_t *node = guest->partition;
+	dt_node_t *hv_node;
+	int ret;
 	
 	/* guest cache lock mode */
-	if (dt_get_prop(node, "guest-cache-lock", 0))
+	if (dt_get_prop(node, "guest-cache-lock", 0)) {
 		guest->guest_cache_lock = 1;
+		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
+		if (!hv_node)
+			return -1;
+
+		ret = dt_set_prop(node, "fsl,hv-guest-cache-lock", NULL, 0);
+		if (ret < 0)
+			return -1;
+	}
 
 	/* guest debug mode */
-	if (dt_get_prop(node, "guest-debug", 0))
+	if (dt_get_prop(node, "guest-debug", 0)) {
 		guest->guest_debug_mode = 1;
+		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
+		if (!hv_node)
+			return -1;
+
+		ret = dt_set_prop(node, "fsl,hv-guest-debug", NULL, 0);
+		if (ret < 0)
+			return -1;
+	}
 
 	return 0;
 }
