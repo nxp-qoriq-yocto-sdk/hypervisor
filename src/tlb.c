@@ -258,8 +258,12 @@ void gtlb0_to_mas(int index, int way)
 
 static void guest_inv_tlb0_all(void)
 {
-	memset(cpu->client.tlbcache, 0,
-	       sizeof(tlbcset_t) << cpu->client.tlbcache_bits);
+	if (!get_gcpu()->clean_tlb) {
+		memset(cpu->client.tlbcache, 0,
+		       sizeof(tlbcset_t) << cpu->client.tlbcache_bits);
+
+		get_gcpu()->clean_tlb = 1;
+	}
 }
 
 static void guest_inv_tlb0_pid(int pid)
@@ -361,6 +365,8 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	entry->tsize = 1;
 	entry->mas8 = mas8 >> 30;
 	entry->gmas3 = guest_mas3flags;
+
+	get_gcpu()->clean_tlb = 0;
 
 	set->tag[way] = tag;
 	return 0;
