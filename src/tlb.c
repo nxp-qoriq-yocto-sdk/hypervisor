@@ -256,7 +256,13 @@ void gtlb0_to_mas(int index, int way)
 	}
 }
 
-static void guest_inv_tlb0_all(int pid)
+static void guest_inv_tlb0_all(void)
+{
+	memset(cpu->client.tlbcache, 0,
+	       sizeof(tlbcset_t) << cpu->client.tlbcache_bits);
+}
+
+static void guest_inv_tlb0_pid(int pid)
 {
 	tlbcset_t *set = cpu->client.tlbcache;
 	unsigned int num_sets = 1 << cpu->client.tlbcache_bits;
@@ -602,10 +608,14 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 
 	if (flags & INV_TLB0) {
 #ifdef CONFIG_TLB_CACHE
-		if (global)
-			guest_inv_tlb0_all(pid);
-		else
+		if (global) {
+			if (pid < 0)
+				guest_inv_tlb0_all();
+			else
+				guest_inv_tlb0_pid(pid);
+		} else {
 			guest_inv_tlb0_va(va, pid);
+		}
 #endif
 
 		if (global) {
