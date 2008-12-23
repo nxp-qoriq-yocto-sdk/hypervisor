@@ -1273,11 +1273,10 @@ void dt_lookup_irqs(dt_node_t *node)
 	spin_unlock(&dt_owner_lock);
 }
 
-pma_t *get_pma(dt_node_t *node)
+dt_node_t *get_pma_node(dt_node_t *node)
 {
 	dt_node_t *pma_node;
 	dt_prop_t *prop;
-	pma_t *pma;
 
 	prop = dt_get_prop(node, "phys-mem", 0);
 	if (!prop || prop->len != 4 ||
@@ -1289,6 +1288,20 @@ pma_t *get_pma(dt_node_t *node)
 
 		return NULL;
 	}
+
+	return pma_node;
+}
+
+pma_t *get_pma(dt_node_t *node)
+{
+	dt_node_t *pma_node;
+	dt_prop_t *prop;
+	pma_t *pma;
+
+	pma_node = get_pma_node(node);
+
+	if (!pma_node)
+		return NULL;
 
 	spin_lock(&dt_owner_lock);
 

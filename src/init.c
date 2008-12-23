@@ -34,6 +34,7 @@
 #include <libos/interrupts.h>
  
 #include <hv.h>
+#include <p4080.h>
 #include <percpu.h>
 #include <paging.h>
 #include <byte_chan.h>
@@ -63,6 +64,12 @@ cpu_t cpu0 = {
 
 cpu_t secondary_cpus[MAX_CORES - 1];
 uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
+
+unsigned long LAWBASE_VA;
+unsigned long CCMBASE_VA;
+unsigned long CCMREG_BASE;
+unsigned long LAWREG_BASE;
+uint32_t csid_map;
 
 static void core_init(void);
 static void release_secondary_cores(void);
@@ -457,6 +464,202 @@ static void assign_hv_devs(void)
 	}
 }
 
+int get_sizebit(phys_addr_t size)
+{
+	if (size >> 32)
+		return count_lsb_zeroes((uint32_t) (size >> 32)) + 32;
+	else
+		return count_lsb_zeroes((uint32_t) size);
+}
+
+/* Target ID should be DDR1, DDR2 or interleaved memory. It has to be non zero. */
+uint32_t get_law_target(pma_t pma)
+{
+	phys_addr_t addr, size;
+	uint32_t val;
+	int lawidx;
+	law_t *laws;
+
+	laws = (law_t *)LAWREG_BASE;
+
+	for (lawidx = 0; lawidx < MAXLAWS; lawidx++) {
+		val = in32(&(laws[lawidx].attr));
+		if (val & LAW_ENABLE) {
+			val = in32(&(laws[lawidx].high));
+			addr = ((phys_addr_t)val) << 32 |
+				 in32(&(laws[lawidx].low));
+			val =  in32(&(laws[lawidx].attr));
+			size = 1ULL << ((val & LAW_SIZE_MASK) + 1);
+			if ((pma.start >= addr) &&
+				(pma.start + pma.size <=  addr + size))
+				return (val & LAW_TARGETID_MASK);
+		}
+	}
+
+	return 0;
+}
+
+int set_law(pma_t pma, int csid)
+{
+	int lawidx, sizebit;
+	uint32_t val, tgt;
+	law_t *laws;
+
+	/* Alignment checks */
+	if (pma.size & (pma.size - 1)) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				 "%s: pma size is not a power of 2\n",
+					 __func__);
+		return ERR_BADTREE;
+	}
+
+	sizebit = get_sizebit(pma.size) - 1;
+	if ((sizebit < LAW_SIZE_4KB) || (sizebit > LAW_SIZE_64GB)) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				"%s: pma size out of LAW range\n", __func__);
+		return ERR_BADTREE;
+	}
+
+	if ((pma.start & (pma.start - 1)) || (pma.start & ((1 << PAGE_SHIFT) - 1))
+		 || (pma.start & (pma.size - 1))) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				"%s: pma address is not naturally aligned\n",
+					 __func__);
+		return ERR_BADTREE;
+	}
+
+	tgt = get_law_target(pma);
+	if (!tgt) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				 "%s: pma not mapped to valid target DDR1, DDR2 or interleaved memory\n",
+					__func__);
+		return ERR_BADTREE;
+	}
+
+	/* Assigning the base address of LAW registers in CCSR */
+	laws = (law_t *)LAWREG_BASE;
+
+	for (lawidx = 0; lawidx < MAXLAWS; lawidx++) {
+
+		val = in32(&(laws[lawidx].attr));
+
+		if (!(val & LAW_ENABLE)) {
+			val = in32(&(laws[lawidx].high));
+			/* set the lower 4 bits of the LAWBARHn */
+			val |= ((uint32_t)(pma.start >> 32)) >> 28;
+			out32(&(laws->high), val);
+
+			val = in32(&(laws[lawidx].low));
+			val |= (uint32_t)pma.start;
+			out32(&(laws[lawidx].low), val);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_DEBUG,
+			         "LAW[%d]->low = %x \n", lawidx, val);
+
+			val = LAW_ENABLE | (csid << LAWAR_CSDID_SHIFT)
+				| sizebit | tgt;
+			out32(&(laws[lawidx].attr), val);
+
+			/* For synchronization */
+			in32(&(laws[lawidx].attr));
+			isync();
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_DEBUG,
+			         "LAW[%d]->attr = %x \n", lawidx, val);
+
+			return lawidx;
+		}
+	}
+
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			"%s:No free LAW found \n", __func__);
+	return -1;
+}
+
+int get_free_csid(void)
+{
+	int csid;
+	uint32_t val;
+	uint32_t *ccm;
+
+	/* Base address for CCM CSID registers in CCSR */
+	ccm = (uint32_t *)CCMREG_BASE;
+	for (csid = MAXCSIDS - count_msb_zeroes(csid_map); csid < MAXCSIDS; csid++) {
+		val = in32(&ccm[csid]);
+		if (val == 0) {
+			csid_map |= (1 << csid);
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
+			         "Free csid index %x\n", csid);
+			return csid;
+		}
+	}
+
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			"%s:No free CSID found \n", __func__);
+	return -1;
+}
+
+static inline void release_csid(int csid)
+{
+	csid_map &= ~(1 << csid);
+}
+
+static inline void release_law(int lawidx)
+{
+	law_t *laws;
+	uint32_t val;
+
+	laws = (law_t *)LAWREG_BASE;
+	val = in32(&(laws[lawidx].attr));
+	out32(&(laws[lawidx].attr), (val & ~LAW_ENABLE));
+
+	/* For synchronization */
+	in32(&(laws[lawidx].attr));
+}
+
+int setup_csd(dt_node_t *node, void *arg)
+{
+	pma_t pma;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "addr", 0);
+	if (prop && prop->len == 8) {
+		pma.start = *(const uint64_t *)prop->data;
+
+		prop = dt_get_prop(node, "size", 0);
+		if (prop && prop->len == 8)
+			pma.size = *(const uint64_t *)prop->data;
+		else
+			goto fail;
+
+		int csid = get_free_csid();
+		if (csid == -1)
+			goto fail;
+
+		int lawid = set_law(pma, csid);
+		if (lawid == -1) {
+			release_csid(csid);
+			goto fail;
+		}
+		node->csd = alloc_type(csd_info_t);
+		if (!node->csd) {
+			release_csid(csid);
+			release_law(lawid);
+			goto fail;
+		}
+
+		node->csd->law_id = lawid;
+		node->csd->csid = csid;
+
+		return 0;
+	}
+
+fail:
+	node->csd = NULL;
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			"%s:coherency sub domain setup failed for pma %s \n",
+				 __func__, node->name);
+	return 1;
+}
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t cfg_addr = 0;
@@ -510,6 +713,22 @@ void start(unsigned long devtree_ptr)
 
 	assign_hv_devs(); 
 	enable_critint();
+
+	/* FIXME : Appropriate nodes need to be created in the master device tree
+	* for this to comply with the hypervisor device model.
+	*/
+	LAWBASE_VA = (unsigned long)map(CCSRBAR_PA, 4 * 1024,
+					TLB_MAS2_IO, TLB_MAS3_KERN);
+	LAWREG_BASE = LAWBASE_VA + 0x0c00;
+
+	CCMBASE_VA = (unsigned long)map(CCSRBAR_PA + 0x018000, 4 * 1024,
+					TLB_MAS2_IO, TLB_MAS3_KERN);
+	CCMREG_BASE = CCMBASE_VA + 0x0600;
+
+	/*set up coherency sub domains based on the available pmas in the config_tree*/
+	dt_for_each_compatible(config_tree, "phys-mem-area",
+	                       setup_csd, NULL);
+
 
 #ifdef CONFIG_BYTE_CHAN
 #ifdef CONFIG_BCMUX
