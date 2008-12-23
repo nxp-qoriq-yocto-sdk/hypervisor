@@ -44,23 +44,9 @@ CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
 
 export CC_OPTS_NODEP := -include include/config/autoconf.h
 
-export CC_OPTS_C= -Wall \
-  -Wundef \
-  -Wstrict-prototypes \
-  -Wno-trigraphs \
-  -fno-strict-aliasing \
-  -fno-common \
-  -O2 -g3 \
-  -msoft-float \
-  -pipe \
-  -ffixed-r2 \
-  -mmultiple \
-  -mno-altivec \
-  -funit-at-a-time \
-  -mno-string \
-  -fomit-frame-pointer \
-  -Werror \
-  -include libfdt_env.h
+export CC_OPTS_C= -Wall -Werror -fno-strict-aliasing -fno-common -O2 -g3 \
+                  -msoft-float -pipe -ffixed-r2 -mmultiple -mno-altivec \
+                  -funit-at-a-time -mcpu=e500mc -include libfdt_env.h
 
 export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
 export CC_OPTS_ASM_HV=$(CC_OPTS_ASM) -include bin/hv_assym.s
