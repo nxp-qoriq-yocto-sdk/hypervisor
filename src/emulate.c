@@ -37,29 +37,6 @@
 #include <greg.h>
 #include <events.h>
 
-#ifdef CONFIG_STATISTICS
-static inline int get_tlb_ivax_stat(unsigned long va)
-{
-	if (va & TLBIVAX_TLB1) {
-		if (va & TLBIVAX_INV_ALL)
-			return stat_emu_tlbivax_tlb1_all;
-		else
-			return stat_emu_tlbivax_tlb1;
-	} else {
-		if (va & TLBIVAX_INV_ALL)
-			return stat_emu_tlbivax_tlb0_all;
-		else
-			return stat_emu_tlbivax_tlb0;
-	}
-
-}
-#else
-static inline int get_tlb_ivax_stat(unsigned long va)
-{
-	return 0;
-}
-#endif
-
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
 	int ra = (insn >> 16) & 31;
@@ -229,6 +206,21 @@ void tlbivax_ipi(trapframe_t *regs)
 	atomic_add(&guest->tlbivax_count, -1);
 }
 
+static inline int get_tlb_ivax_stat(unsigned long va)
+{
+	if (va & TLBIVAX_TLB1) {
+		if (va & TLBIVAX_INV_ALL)
+			return stat_emu_tlbivax_tlb1_all;
+		else
+			return stat_emu_tlbivax_tlb1;
+	} else {
+		if (va & TLBIVAX_INV_ALL)
+			return stat_emu_tlbivax_tlb0_all;
+		else
+			return stat_emu_tlbivax_tlb0;
+	}
+}
+
 static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 {
 	unsigned long va = get_ea_indexed(regs, insn);
@@ -237,7 +229,6 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	int i;
 
 	inc_stat(stat_emu_tlbivax);
-
 	inc_stat(get_tlb_ivax_stat(va));
 	
 	if (va & TLBIVAX_RESERVED) {

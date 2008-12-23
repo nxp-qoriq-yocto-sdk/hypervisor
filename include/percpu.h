@@ -255,7 +255,6 @@ static inline void inc_stat(int stat)
 #else
 static inline void inc_stat(int stat)
 {
-
 }
 #endif
 

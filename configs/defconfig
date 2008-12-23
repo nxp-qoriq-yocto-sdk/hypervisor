@@ -1,9 +1,9 @@
 #
 # Automatically generated make config: don't edit
-# Topaz version: 0.3-rc7-00101-g96bc513-dirty
-# Thu Dec 18 15:15:21 2008
+# Topaz version: 0.3-rc8-00013-gdc26c0c-dirty
+# Tue Dec 23 13:08:26 2008
 #
-CONFIG_HV_VERSION="0.3-rc7-00101-g96bc513-dirty"
+CONFIG_HV_VERSION="0.3-rc8-00013-gdc26c0c-dirty"
 CONFIG_HV_MAJOR_VERSION=0
 CONFIG_HV_MINOR_VERSION=3
 CONFIG_LIBOS_INIT=y
@@ -37,3 +37,4 @@ CONFIG_PAMU=y
 CONFIG_TLB_CACHE=y
 CONFIG_DEVICE_VIRT=y
 CONFIG_VIRTUAL_I2C=y
+CONFIG_STATISTICS=y

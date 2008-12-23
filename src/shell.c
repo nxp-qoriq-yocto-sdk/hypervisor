@@ -210,9 +210,8 @@ static void print_stat(shell_t *shell, guest_t *guest,
 	for (i = 0; i < guest->cpucnt; i++) {
 		gcpu_t *gcpu = guest->gcpus[i];
 		
-		if (gcpu) {
+		if (gcpu)
 			total += guest->gcpus[i]->stats[stat];
-		}
 	}
 
 	qprintf(shell->out, "%s %-10u\n", str, total);
@@ -239,44 +238,44 @@ static void pi_fn(shell_t *shell, char *args)
 	guest = &guests[num];
 	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
 	print_stat(shell, guest, stat_emu_total,
-	           "Total emulated instructions: 		");
+	           "Total emulated instructions:          ");
 	print_stat(shell, guest, stat_emu_tlbwe,
-	           "Emulated TLB writes:			");
+	           "Emulated TLB writes:                  ");
 	print_stat(shell, guest, stat_emu_spr,
-	           "Emulated SPR accesses:       		");
+	           "Emulated SPR accesses:                ");
 	print_stat(shell, guest, stat_decr,
-	           "Decrementer interrupts:      		");
+	           "Decrementer interrupts:               ");
 	print_stat(shell, guest, stat_emu_tlbivax,
-	           "Emulated TLB invalidates:      		");
+	           "Emulated TLB invalidates:             ");
 	print_stat(shell, guest, stat_emu_msgsnd,
-	           "Emulated msgsnd instructions:      		");
+	           "Emulated msgsnd instructions:         ");
 	print_stat(shell, guest, stat_emu_msgclr,
-	           "Emulated msgclr instructions:      		");
+	           "Emulated msgclr instructions:         ");
 	print_stat(shell, guest, stat_emu_tlbilx,
-	           "Emulated tlbilx instructions:      		");
+	           "Emulated tlbilx instructions:         ");
 	print_stat(shell, guest, stat_emu_tlbre,
-	           "Emulated TLB reads:      			");
+	           "Emulated TLB reads:                   ");
 	print_stat(shell, guest, stat_emu_tlbsx,
-	           "Emulated TLB search:      			");
+	           "Emulated TLB serch:                   ");
 	print_stat(shell, guest, stat_emu_tlbsync,
-	           "Emulated TLB syncs:      			");
+	           "Emulated TLB syncs:                   ");
 	print_stat(shell, guest, stat_emu_tlbivax_tlb0_all,
-	           "Emulated TLB invalidate all for tlb0:	");
+	           "Emulated TLB invalidate all for tlb0: ");
 	print_stat(shell, guest, stat_emu_tlbivax_tlb0,
-	           "Emulated TLB invalidate for tlb0:      	");
+	           "Emulated TLB invalidate for tlb0:     ");
 	print_stat(shell, guest, stat_emu_tlbivax_tlb1_all,
-	           "Emulated TLB invalidate all for tlb1:      	");
+	           "Emulated TLB invalidate all for tlb1: ");
 	print_stat(shell, guest, stat_emu_tlbivax_tlb1,
-	           "Emulated TLB invalidate for tlb1:      	");
+	           "Emulated TLB invalidate for tlb1:     ");
 	print_stat(shell, guest, stat_emu_tlbwe_tlb0,
-	           "Emulated TLB writes for tlb0:      		");
+	           "Emulated TLB writes for tlb0:         ");
 	print_stat(shell, guest, stat_emu_tlbwe_tlb1,
-	           "Emulated TLB writes for tlb1:      		");
+	           "Emulated TLB writes for tlb1:         ");
 #ifdef CONFIG_TLB_CACHE
 	print_stat(shell, guest, stat_tlb_miss_count,
-	           "Total TLB miss interrupts handled: 	        ");
+	           "Total TLB miss interrupts handled:    ");
 	print_stat(shell, guest, stat_tlb_miss_reflect,
-	           "TLB miss interrupts reflected:      	");
+	           "TLB miss interrupts reflected:        ");
 #endif
 }
 

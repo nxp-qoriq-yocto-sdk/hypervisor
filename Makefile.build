@@ -63,6 +63,8 @@ export CC_OPTS_C= -Wall \
   -include libfdt_env.h
 
 export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
+export CC_OPTS_ASM_HV=$(CC_OPTS_ASM) -include bin/hv_assym.s
+
 export LD=$(CROSS_COMPILE)ld
 export LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 export KCONFIG=y
@@ -142,10 +144,10 @@ bin/%.o : $(src)src/%.c bin/%.d
 	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 bin/%.d : $(src)src/%.S bin/libos/assym.s bin/hv_assym.s
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM))
+	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM_HV))
 
 bin/%.o : $(src)src/%.S bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM) -include bin/hv_assym.s)
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM_HV))
 
 bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
