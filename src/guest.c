@@ -34,7 +34,6 @@
 #include <libos/mpic.h>
 
 #include <hv.h>
-#include <p4080.h>
 #include <paging.h>
 #include <timers.h>
 #include <byte_chan.h>
@@ -48,14 +47,10 @@
 #include <events.h>
 #include <doorbell.h>
 #include <gdb-stub.h>
+#include <ccm.h>
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
-
-
-extern unsigned long LAWREG_BASE;
-extern unsigned long CCMREG_BASE;
-extern uint32_t csid_map;
 
 int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 {
@@ -143,109 +138,6 @@ static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
 	return reg;
 }
 
-static inline int disable_law(int lawidx)
-{
-	law_t *laws;
-	uint32_t val;
-
-	if (lawidx < 0 || lawidx > MAXLAWS - 1) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: invalid law index %d \n", __func__, lawidx);
-		return -1;
-	}
-
-	laws = (law_t *)LAWREG_BASE;
-	val = in32(&(laws[lawidx].attr));
-	val &= ~LAW_ENABLE;
-	out32(&(laws[lawidx].attr), val);
-	/*For Synchronization*/
-	in32(&(laws[lawidx].attr));
-
-	return 0;
-}
-
-static inline void enable_law(int lawidx)
-{
-	law_t *laws;
-	uint32_t val;
-
-	if (lawidx < 0 || lawidx > MAXLAWS - 1) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: invalid law index %d \n", __func__, lawidx);
-		return;
-	}
-
-	laws = (law_t *)LAWREG_BASE;
-	val = in32(&(laws[lawidx].attr));
-	val |= LAW_ENABLE;
-	out32(&(laws[lawidx].attr), val);
-	/*For Synchronization*/
-	in32(&(laws[lawidx].attr));
-}
-
-static int add_cpus_to_csid(uint32_t *cpulist,int len, int csid)
-{
-	uint32_t *ccm, val, i, core, base, num;
-
-	if (csid < 0 || csid > MAXCSIDS - 1) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: invalid csid index %d \n", __func__, csid);
-		return -1;
-	}
-
-	if (!(csid_map & (1 << csid))) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: csid index not reserved %d \n", __func__, csid);
-		return -1;
-	}
-
-	ccm = (uint32_t *)CCMREG_BASE;
-	val = in32(&ccm[csid]);
-
-	for (i = 0; i < len / 4; i += 2) {
-		base = cpulist[i];
-		num = cpulist[i + 1];
-		for (core = base; core < base + num; core++) {
-			if (core < 0 || core > 7) {
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
-				         "core id = %d doesn't match any valid ccm port\n"
-				         , core);
-				return -1;
-			}
-			val |= (1 << core);
-		}
-	}
-
-	out32(&ccm[csid], val);
-
-	return 0;
-}
-
-void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
-{
-	int ret = 0, failed = 0;
-
-	if (node->csd == NULL) {
-		failed = 1;
-		goto fail;
-	}
-
-	spin_lock(&node->csd->csd_lock);
-	ret = disable_law(node->csd->law_id);
-	if (!ret) {
-		ret = add_cpus_to_csid(guest->cpulist, guest->cpulist_len, node->csd->csid);
-		if (ret == -1)
-			failed = 1;
-		enable_law(node->csd->law_id);
-	}
-	spin_unlock(&node->csd->csd_lock);
-
-fail:
-	if (ret || failed)
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: add cpu to csd failed %s\n", __func__, node->name);
-}
-
 static int map_gpma_callback(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
@@ -256,9 +148,11 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	uint32_t reg[4];
 	char buf[32];
 
-	pma = get_pma(node);
-	if (!pma)
+	pma_node = get_pma_node(node);
+	if (!pma_node || !pma_node->pma)
 		return 0;
+
+	pma = pma_node->pma;
 
 	prop = dt_get_prop(node, "guest-addr", 0);
 	if (prop) {
@@ -283,9 +177,6 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 
 	map_guest_addr_range(guest, gaddr, pma->start, pma->size);
 
-	pma_node = get_pma_node(node);
-	if (!pma_node)
-		return 0;
 	add_cpus_to_csd(guest, pma_node);
 
 	snprintf(buf, sizeof(buf), "memory@%llx", gaddr);

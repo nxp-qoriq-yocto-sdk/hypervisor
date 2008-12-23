@@ -26,13 +26,13 @@
 #ifndef HV_P4080_H
 #define HV_P4080_H
 
-#define MAXLAWS 32
+#define NUMLAWS 32
 
 #define LAW_ENABLE 0x80000000
 #define LAWAR_TARGETID_SHIFT 20
 #define LAWAR_CSDID_SHIFT 12
 #define LAW_TARGETID_MASK 0x0ff00000
-#define LAW_SIZE_MASK 0x3f 
+#define LAW_SIZE_MASK 0x3f
 
 #define LAW_SIZE_4KB 11
 #define LAW_SIZE_64GB 35
@@ -45,6 +45,6 @@ typedef struct {
 	uint32_t high, low, attr, reserved;
 } law_t;
 
-#define MAXCSIDS 32
+#define NUMCSDS 32
 
 #endif

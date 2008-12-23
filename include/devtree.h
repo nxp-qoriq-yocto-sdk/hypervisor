@@ -55,10 +55,6 @@ typedef struct dev_owner {
 	struct dev_owner *direct; /**< nearest ancestor which is directly assigned */
 } dev_owner_t;
 
-typedef struct csd_info {
-	uint32_t law_id, csid, csd_lock;
-} csd_info_t;
-
 typedef struct dt_node {
 	struct dt_node *parent;
 	list_t children, child_node, props;
@@ -218,8 +214,5 @@ int open_stdout_bytechan(dt_node_t *node);
 typedef struct pma {
 	phys_addr_t start, size;
 } pma_t;
-
-dt_node_t *get_pma_node(dt_node_t *node);
-pma_t *get_pma(dt_node_t *node);
 
 #endif
