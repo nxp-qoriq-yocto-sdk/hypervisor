@@ -348,6 +348,8 @@ void tlb_miss(trapframe_t *regs)
 		if (guest) {
 			assert(ret == TLB_MISS_REFLECT);
 
+			inc_stat(stat_tlb_miss_reflect);
+
 			mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
 			asm volatile("tlbsx 0, %0" : : "r" (vaddr));
 		

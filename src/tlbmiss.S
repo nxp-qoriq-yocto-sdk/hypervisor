@@ -95,6 +95,12 @@
 
 	.balign	64
 tlb_miss_fast_common:
+#ifdef CONFIG_STATISTICS
+	LOAD	%r9, CLIENT_GCPU(%r2)
+	LOAD	%r10, TLB_MISS_COUNT(%r9)
+	addi	%r10, %r10, 1
+	STORE	%r10, TLB_MISS_COUNT(%r9)
+#endif
 	add	%r3, %r3, %r4		// r3 = tlbset_t address
 	LOAD	%r9, LONGBYTES*0(%r3)	// Load the tag words
 	andis.	%r10, %r6, MSR_GS@h	// HV misses always take the slow path

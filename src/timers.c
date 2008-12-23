@@ -43,7 +43,8 @@
 void decrementer(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gcpu->stats[stat_decr]++;
+
+	inc_stat(stat_decr);
 
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 

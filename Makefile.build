@@ -30,6 +30,9 @@ export DTC_DIR := $(src)dtc
 export LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := $(src)include/libos-client.h
+
+GENASSYM=$(libos)lib/genassym.sh
+
 export libos := $(src)libos/
 
 export CC=$(CROSS_COMPILE)gcc
@@ -138,11 +141,11 @@ bin/%.d : $(src)src/%.c
 bin/%.o : $(src)src/%.c bin/%.d
 	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
-bin/%.d : $(src)src/%.S bin/libos/assym.s
+bin/%.d : $(src)src/%.S bin/libos/assym.s bin/hv_assym.s
 	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM))
 
 bin/%.o : $(src)src/%.S bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM))
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM) -include bin/hv_assym.s)
 
 bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
@@ -150,9 +153,19 @@ bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
 	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
+# No $(CC_OPTS_C), as we want the symbols to go in common rather than BSS.
+bin/hv_assym.o: $(src)src/hv_assym.c bin/hv_assym.d
+	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS))
+
+bin/hv_assym.s: bin/hv_assym.o
+	@$(MKDIR) $(@D)
+	$(call show,genassym: $(<:$(src)%=%))
+	$(V)$(GENASSYM) -o $@ $<
+
 # include the dependecy files
 ifneq ($(MAKECMDGOALS),clean)
 -include bin/libos/libos_assym.d
+-include bin/hv_assym.d
 -include $(HDRS:include/%.h=bin/include/%.d)
 -include $(OBJS:%.o=%.d)
 endif

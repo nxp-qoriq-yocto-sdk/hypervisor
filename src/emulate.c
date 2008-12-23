@@ -37,6 +37,29 @@
 #include <greg.h>
 #include <events.h>
 
+#ifdef CONFIG_STATISTICS
+static inline int get_tlb_ivax_stat(unsigned long va)
+{
+	if (va & TLBIVAX_TLB1) {
+		if (va & TLBIVAX_INV_ALL)
+			return stat_emu_tlbivax_tlb1_all;
+		else
+			return stat_emu_tlbivax_tlb1;
+	} else {
+		if (va & TLBIVAX_INV_ALL)
+			return stat_emu_tlbivax_tlb0_all;
+		else
+			return stat_emu_tlbivax_tlb0;
+	}
+
+}
+#else
+static inline int get_tlb_ivax_stat(unsigned long va)
+{
+	return 0;
+}
+#endif
+
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
 	int ra = (insn >> 16) & 31;
@@ -59,6 +82,8 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	guest_t *guest = get_gcpu()->guest;
 	unsigned long lpid = guest->lpid;
 	unsigned int type = msg >> 27;
+
+	inc_stat(stat_emu_msgsnd);
 
 	/*
 	 * Validate the message type, and convert it to the corresponding
@@ -130,6 +155,8 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 	uint32_t msg = regs->gpregs[rb];
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int type = msg >> 27;
+
+	inc_stat(stat_emu_msgclr);
 
 	/*
 	 * Validate the message type, and convert it to the corresponding
@@ -208,6 +235,10 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	int i;
+
+	inc_stat(stat_emu_tlbivax);
+
+	inc_stat(get_tlb_ivax_stat(va));
 	
 	if (va & TLBIVAX_RESERVED) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -245,6 +276,8 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	saved = disable_critint_save(); 
 	save_mas(gcpu);
 
+	inc_stat(stat_emu_tlbilx);
+
 	pid = (gcpu->mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT;
 
 	switch (type) {
@@ -278,6 +311,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 /* No-op, as we never actually execute a tlbivax */
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
+	inc_stat(stat_emu_tlbsync);
 	return 0;
 }
 
@@ -323,6 +357,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	uint32_t va = get_ea_indexed(regs, insn);
 	register_t mas1, mas6;
 
+	inc_stat(stat_emu_tlbsx);
 	disable_critint();
 	
 	mas6 = mfspr(SPR_MAS6);
@@ -374,6 +409,8 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
+	inc_stat(stat_emu_tlbre);
+
 	tlb = MAS0_GET_TLBSEL(mas0);
 	if (tlb == 0) {
 		disable_critint();
@@ -424,7 +461,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
 	       (mas3 >> MAS3_RPN_SHIFT);
 
-	gcpu->stats[stat_emu_tlbwe]++;
+	inc_stat(stat_emu_tlbwe);
 
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		restore_mas(gcpu);
@@ -599,7 +636,9 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			         regs->srr0, entry, TLB1_GSIZE);
 			return 1;
 		}
-		
+
+		inc_stat(stat_emu_tlbwe_tlb1);
+
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
 	} else {
@@ -620,6 +659,8 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 		gmas3 = mas3 & PTE_MAS3_MASK;
 		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
+
+		inc_stat(stat_emu_tlbwe_tlb0);
 
 		ret = guest_set_tlb0(mas0, mas1, mas2, mas3, rpn, mas8, gmas3);
 		if (unlikely(ret == ERR_BUSY)) {
@@ -650,12 +691,11 @@ static int get_spr(uint32_t insn)
 
 static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = get_gcpu();
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t ret;
 
-	gcpu->stats[stat_emu_spr]++;
+	inc_stat(stat_emu_spr);
 
 	if (read_gspr(regs, spr, &ret)) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -670,12 +710,11 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 
 static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = get_gcpu();
 	int spr = get_spr(insn);
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
 
-	gcpu->stats[stat_emu_spr]++;
+	inc_stat(stat_emu_spr);
 
 	if (write_gspr(regs, spr, val)) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -890,7 +929,7 @@ void hvpriv(trapframe_t *regs)
 	int fault = 1;
 	int ret;
 
-	get_gcpu()->stats[stat_emu_total]++;
+	inc_stat(stat_emu_total);
 
 	guestmem_set_insn(regs);
 	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,
