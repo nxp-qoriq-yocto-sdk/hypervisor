@@ -63,10 +63,12 @@
 
 		qman {
 			device = "qman";
+			dma-window = <&window0>;
 		};
 
 		bman {
 			device = "bman";
+			dma-window = <&window0>;
 		};
 
 		bman-portalA {
@@ -77,6 +79,10 @@
 		bman-portalB {
 			device = "bman-portal";
 			vcpu = <1>;
+		};
+
+		buffer-pool@0 {
+			device = "/bman-portals/buffer-pool@0";
 		};
 
 		qman-portalA {
