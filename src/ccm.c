@@ -61,11 +61,12 @@ static void enable_law(unsigned int lawidx)
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 {
 	uint32_t val, i, core, base, num;
+	uint32_t cpus = 0;
 
-	spin_lock(&ccm_lock);
-	disable_law(node->csd->law_id);
-
-	val = in32(&csdids[node->csd->csd_id]);
+	if (guest == NULL) {
+		cpus = ((1 << MAX_CORES) - 1) << (32 - MAX_CORES);
+		goto hv;
+	}
 
 	for (i = 0; i < guest->cpulist_len / 4; i += 2) {
 		base = guest->cpulist[i];
@@ -73,7 +74,6 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 
 		for (core = base; core < base + num; core++) {
 			if (core >= MAX_CORES) {
-				spin_unlock(&ccm_lock);
 				printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 				         "%s: core %d doesn't match any valid ccm port\n",
 				         __func__, core);
@@ -82,9 +82,16 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 				return;
 			}
 
-			val |= 1 << core;
+			cpus |= 1 << (31 - core);
 		}
 	}
+
+hv:
+	spin_lock(&ccm_lock);
+	disable_law(node->csd->law_id);
+
+	val = in32(&csdids[node->csd->csd_id]);
+	val |= cpus;
 
 	out32(&csdids[node->csd->csd_id], val);
 	enable_law(node->csd->law_id);
@@ -317,6 +324,8 @@ fail:
 
 void ccm_init(void)
 {
+	dt_node_t *node;
+
 	/* FIXME: Appropriate nodes need to be created in the master device tree. */
 	laws = map(CCSRBAR_PA + 0xc00, sizeof(law_t) * NUMLAWS,
 	           TLB_MAS2_IO, TLB_MAS3_KERN);
@@ -334,6 +343,10 @@ void ccm_init(void)
 	 */
 	dt_for_each_compatible(config_tree, "phys-mem-area",
 	                       setup_csd, NULL);
+
+	node = dt_get_first_compatible(config_tree, "hv-memory");
+	node = get_pma_node(node);
+	add_cpus_to_csd(NULL, node);
 }
 
 dt_node_t *get_pma_node(dt_node_t *node)
