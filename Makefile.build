@@ -22,7 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-export SIMICS=simics
+export SIMICS ?= simics
 export MKDIR=mkdir -p
 export DTC := dtc
 
