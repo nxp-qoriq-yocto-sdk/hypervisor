@@ -243,19 +243,26 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	}
 	window_size = *(const phys_addr_t *)size->data;
 
-	rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
-	if (rpn == ULONG_MAX)
-		return -1;
-
 	ppaace = pamu_get_ppaace(liodn);
 	if (!ppaace)
-		return -1;
+		return ERR_NOMEM;
+
+	if (ppaace->wse) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: liodn %d or device in use\n", __func__, liodn);
+		return ERR_BUSY;
+	}
+
+	ppaace->wse = map_addrspace_size_to_wse(window_size);
+
+	rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
+	if (rpn == ULONG_MAX)
+		return ERR_NOTRANS;
 
 	setup_default_xfer_to_host_ppaace(ppaace);
 
 	ppaace->wbah = 0;   // FIXME: 64-bit
 	ppaace->wbal = window_addr >> PAGE_SHIFT;
-	ppaace->wse  = map_addrspace_size_to_wse(window_size);
 
 	ppaace->atm = PAACE_ATM_WINDOW_XLATE;
 
