@@ -57,6 +57,9 @@ void debug_handler(trapframe_t *frameptr)
 		case DBCR0_DAC2W:
 			dac2_write_hit_pc = frameptr->srr0;
 			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_DAC2W);
+			break;
+		case DBCR0_BRT:
+			frameptr->srr0 += 4;
 	}
 
 	mtspr(SPR_DBSR, val);
@@ -73,6 +76,12 @@ static inline uint32_t get_pc(void)
 	     "mtlr %%r0;" : "=r" (retval) : :"r0","memory" );
 
 	return retval;
+}
+
+static inline int infinite_loop(void)
+{
+	asm volatile ("1: b 1b;" : : );
+	return 0;
 }
 
 void hwbreaktestfunc(void)
@@ -130,6 +139,15 @@ void start(unsigned long devtree_ptr)
 	printf("Testing DAC1/DAC2 Debug event : ");
 	if (dac2_write_hit_pc == 8 + data_watchpoint_cmp)
 		printf("PASSED\n");
+
+	printf("Testing Branch taken (BRT) Debug event : ");
+
+	mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) | DBCR0_BRT);
+
+	if (!infinite_loop()) {
+		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_BRT);
+		printf("PASSED\n");
+	}
 
 	printf("Test Complete\n");
 }
