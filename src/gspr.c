@@ -656,8 +656,8 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 	case SPR_DBCR0:
 		if (!gcpu->guest->guest_debug_mode)
 			return 1;
-		/* we don't want guest access to DBCR0[RST] */
-		val &= ~DBCR0_RST;
+		/* we don't want guest access to DBCR0[RST,RET,IRPT,FT] */
+		val &= ~(DBCR0_RST | DBCR0_RET | DBCR0_IRPT | DBCR0_FT);
 		mtspr(SPR_DBCR0, val);
 		break;
 
