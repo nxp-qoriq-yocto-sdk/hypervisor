@@ -54,7 +54,7 @@ static void  core_init(void);
 int get_uart_offset(void);
 
 void *fdt;
-int coreint;
+int coreint = 1;
 
 /* FIXME: do proper reg/ranges parsing, and don't assume it's in CCSR */
 int get_uart_offset()
@@ -82,8 +82,7 @@ int get_uart_offset()
 
 void init(unsigned long devtree_ptr)
 {
-	int node, len;
-	const uint32_t *prop;
+	int node;
 	core_init();
 
 	/* alloc the heap */
@@ -100,19 +99,8 @@ void init(unsigned long devtree_ptr)
 		console_init(ns16550_init((uint8_t *)CCSRBAR_VA + node, 0, 0, 16));
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
-	if (node >= 0) {
-		prop = fdt_getprop(fdt, node, "fsl,hv-pic-legacy", &len);
-		if (prop)
-			coreint = 0;
-		else
-			coreint = 1;
-	}
-
-	/* FIXME: tmp hack because the hypervisor patch to support
-	 * the "legacy-interrupts" property is not applied.
-	 */
-	coreint = 0;
-
+	if (node >= 0)
+		coreint = !fdt_get_property(fdt, node, "fsl,hv-pic-legacy", NULL);
 }
 
 static void core_init(void)

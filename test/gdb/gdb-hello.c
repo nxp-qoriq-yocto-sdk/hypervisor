@@ -36,14 +36,19 @@ void init(unsigned long devtree_ptr);
 
 int irq;
 extern void *fdt;
+extern int coreint;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
 	unsigned int vector;
-	fh_vmpic_iack(&vector);
+
+	if (coreint)
+		vector = mfspr(SPR_EPR);
+	else
+		fh_vmpic_iack(&vector);
+
 	// printf("ext int %d\n",vector);
 	fh_vmpic_eoi(irq);
-
 }
 
 int X = 9;

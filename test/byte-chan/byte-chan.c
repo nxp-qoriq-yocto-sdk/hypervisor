@@ -33,6 +33,7 @@
 #include <libfdt.h>
 
 extern void init(unsigned long devtree_ptr);
+extern int coreint;
 
 #define debug(X...)
 //#define debug(X...) printf(X)
@@ -117,7 +118,11 @@ void ext_int_handler(trapframe_t *frameptr)
 	uint32_t txavail;
 	int ret;
 
-	fh_vmpic_iack(&vector);
+	if (coreint)
+		vector = mfspr(SPR_EPR);
+	else
+		fh_vmpic_iack(&vector);
+
 	debug("external interrupt ... vector  %d\n", vector);
 	if (vector == irq1[0]) {
 		debug("byte channel 1 rx interrupt\n");
