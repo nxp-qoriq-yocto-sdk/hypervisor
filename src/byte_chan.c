@@ -340,7 +340,16 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 		}
 
 		if (dt_node_is_compatible(epnode, "byte-channel")) {
-			assert(!epnode->endpoint);
+			assert(epnode->endpoint != node);
+			
+			if (epnode->endpoint) {
+				printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+				         "%s: %s (endpoint of %s) is busy, other endpoint %s\n",
+				         __func__, epnode->name, node->name,
+				         epnode->endpoint->name);
+				goto out;
+			}
+
 			epnode->endpoint = node;
 			epnode->bc = node->bc;
 		} else {
