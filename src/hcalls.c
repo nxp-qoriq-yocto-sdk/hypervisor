@@ -177,7 +177,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 		   memory. */
 		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
 				    bytes_to_copy) != bytes_to_copy) {
-			regs->gpregs[3] = EINVAL;
+			regs->gpregs[3] = EFAULT;
 			spin_unlock(&sg_lock);
 			return;
 		}
@@ -192,7 +192,7 @@ static void fh_partition_memcpy(trapframe_t *regs)
 				sg_list[i].size);
 
 			if (size != sg_list[i].size) {
-				regs->gpregs[3] = EINVAL;
+				regs->gpregs[3] = EFAULT;
 				spin_unlock(&sg_lock);
 				return;
 			}
