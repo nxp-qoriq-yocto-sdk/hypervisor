@@ -1265,8 +1265,7 @@ static int partition_config(guest_t *guest)
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
 		if (!hv_node)
 			return -1;
-
-		ret = dt_set_prop(node, "fsl,hv-guest-cache-lock", NULL, 0);
+		ret = dt_set_prop(hv_node, "fsl,hv-guest-cache-lock", NULL, 0);
 		if (ret < 0)
 			return -1;
 	}
@@ -1278,7 +1277,7 @@ static int partition_config(guest_t *guest)
 		if (!hv_node)
 			return -1;
 
-		ret = dt_set_prop(node, "fsl,hv-guest-debug", NULL, 0);
+		ret = dt_set_prop(hv_node, "fsl,hv-guest-debug", NULL, 0);
 		if (ret < 0)
 			return -1;
 	}

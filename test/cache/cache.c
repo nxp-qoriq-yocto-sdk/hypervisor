@@ -30,26 +30,108 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
 extern void init(unsigned long devtree_ptr);
 
-int irq;
 extern void *fdt;
+volatile char *arr;
+
+/* Eviction buffer, to evict L1 cache. Our L1 cache implements
+ * seperate 32K 8 way set associative instruction and data cache.
+ * Here we are evicting the data cache. As the L1 is a PLRU cache
+ * we would have calcualte the ways per set required for eviction
+ * This is given by the following formula :
+ * evict(PLRU)(k) = 2k - sqroot(2K): if k = 2(pow (2i + 1))
+ *                or 2k - 3/2 sqroot(k) : otherwise
+ * As ours is a 32K 8 way set associative cache data cache
+ * k = 8, so evict(PLRU)(k) = 2*(8) - sqroot(2 * 8)
+ *                          = 16 - 4 = 12
+ * so, cache size for eviction = numsets * num ways per set * cache block size
+ *                             = 64 * 12 * 64
+ *                             = 48K
+ * The above formula has been obtained from the following research paper :
+ * Predictability of Cache Replacement Policies by Jan Reineke, Daniel Grund,
+ * Christoph Berg and Reinhard Wilhelm
+ */
+volatile char evict_buf[48 * 1024];
+
+void evict_cache(void)
+{
+	int i;
+
+	for(i = 0; i < sizeof(evict_buf); i++)
+		evict_buf[i] = i;
+}
+
+int get_diff(void)
+{
+	volatile register_t val;
+	int diff;
+
+	val = mfspr(SPR_ATBL);
+	/*Following add operations create a data dependency on load*/
+	arr[0] = arr[0] + arr[100];
+	arr[1] = arr [1] + arr[200];
+	diff  = mfspr(SPR_ATBL) - val;
+
+	return diff;
+}
+
+void cache_lock_perf_test(void)
+{
+	uint32_t ct = 0;
+	int diff, diff1, i;
+
+	arr = valloc(4096, 4096);
+	if (!arr) {
+		printf("valloc failed \n");
+		return;
+	}
+
+	tlb1_set_entry(1, (unsigned long)arr, (phys_addr_t)0x1600000, TLB_TSIZE_4K, 0, TLB_MAS3_KERN, 0, 0, 0);
+
+	for (i = 0; i< 4096; i += 64) {
+		asm volatile("dcbtls %0, 0, %1" : : "i" (ct),"r" (&arr[i]): "memory");
+		if(mfspr(SPR_L1CSR0) & L1CSR0_DCUL) {
+			mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR0) & ~L1CSR0_DCUL);
+			printf("Unable to lock cache line -- FAILED\n");
+			return;
+		}
+	}
+
+	for(i = 0; i < 4096; i++)
+		arr[i] = i + 10;
+
+	/* Following function call ensures that the function is in instruction cache */
+	i = get_diff();
+
+	evict_cache();
+
+	diff = get_diff();
+
+	for (i = 0; i< 4096; i += 64)
+		asm volatile("dcblc %0, 0, %1" : : "i" (ct),"r" (&arr[i]): "memory");
+
+	evict_cache();
+
+	diff1  = get_diff();
+
+	printf("Cache locking performance test -- %s\n", (diff1 > diff)? "PASSED" : "FAILED");
+}
 
 void start(unsigned long devtree_ptr)
 {
 	uint32_t ct = 0;
 	uint32_t status;
 	char str[16] = "cache lock test";
-	char buf[16];
 	int guest_cache_lock_mode = 0, ret, len;
 	const uint32_t *prop;
 
 	printf("cache lock test\n");
 
 	init(devtree_ptr);
-
 	ret = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (ret != -FDT_ERR_NOTFOUND) {
 		prop = fdt_getprop(fdt, ret, "fsl,hv-guest-cache-lock", &len);
@@ -65,7 +147,7 @@ void start(unsigned long devtree_ptr)
 #endif
 	if (status & L1CSR0_DCUL) {
 		mtspr(SPR_L1CSR0, status & ~L1CSR0_DCUL);
-		printf(" > did dcbtls, didn't work: ");
+		printf(" > did dcbtls, failed: ");
 		if (!guest_cache_lock_mode)
 			printf("PASSED\n");
 		else
@@ -74,11 +156,12 @@ void start(unsigned long devtree_ptr)
 		printf("> did dcbtls, success: ");
 		if (!guest_cache_lock_mode)
 			printf("FAILED\n");
-		else
+		else {
 			printf("PASSED\n");
+			asm volatile("dcblc %0, 0, %1" : : "i" (ct),"r" (&str): "memory");
+			cache_lock_perf_test();
+		}
 	}
-
-	memcpy(buf, str, 16);
 
 	printf("Test Complete\n");
 }
