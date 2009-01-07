@@ -88,12 +88,7 @@ typedef struct breakpoint
  */
 typedef struct gdb_stub_core_context {
 
-	/**
-	 * The byte channel for the GDB stub. All communication in and out of
-	 * the GDB stub flows through this byte channel.
-	 */
-	const byte_chan_t *byte_channel;
-	byte_chan_handle_t *byte_channel_handle;
+	dt_node_t *node;  /* the config node in the dev tree for this stub */
 
 	/* These two packets contain the command received from GDB and the
 	 * response to be sent to GDB. cmd must always contain a command whose
@@ -116,7 +111,7 @@ typedef struct gdb_stub_core_context {
 
 } gdb_stub_core_context_t;
 
-int gdb_stub_init(void);
+void gdb_stub_init(void);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 int gdb_stub_process_trap(trapframe_t *trap_frame);
 void gdb_wait_at_start(uint32_t entry, register_t msr);

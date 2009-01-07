@@ -50,13 +50,14 @@
 	"%s@[%s, %d]: " fmt "\n", \
 	__func__, __FILE__, __LINE__, ## info)
 
-static const byte_chan_t *find_stub_byte_channel(char *compatible);
-static int register_callbacks(void);
+static dt_node_t *find_stub_config_node(char *compatible);
+static void rx(queue_t *q);
 
 #define CHECK_MEM(p) \
 	if (!p) { \
-		TRACE("Out of memory?"); \
-		return GDB_STUB_INIT_FAILURE; \
+		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR, \
+		         "Out of memory?\n"); \
+		return; \
 	}
 
 static stub_ops_t stub_ops = {
@@ -64,7 +65,7 @@ static stub_ops_t stub_ops = {
         .wait_at_start_hook = gdb_wait_at_start,
 };
 
-int gdb_stub_init(void)
+void gdb_stub_init(void)
 {
 	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub;
@@ -75,7 +76,24 @@ int gdb_stub_init(void)
 	CHECK_MEM(stub);
 	memset(stub, 0, sizeof(gdb_stub_core_context_t));
 
-	stub->byte_channel = find_stub_byte_channel("fsl,hv-gdb-stub");
+	/* find the config node for this stub & vcpu */
+	stub->node = find_stub_config_node("gdb-stub");
+	if (!stub->node) {
+		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR,
+		         "%s: missing debug stub node\n",
+		         __func__);
+		return;
+	}
+
+	init_byte_channel(stub->node);
+	/* note: the byte-channel handle is returned in node->bch */
+	if (!stub->node->bch) {
+		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR,
+		         "%s: gdb stub byte chan allocation failed\n",
+		         __func__);
+		return;
+	}
+
 	stub->cbuf = malloc(BUFMAX*sizeof(uint8_t));
 	CHECK_MEM(stub->cbuf);
 	memset(stub->cbuf, 0, BUFMAX*sizeof(uint8_t));
@@ -97,7 +115,11 @@ int gdb_stub_init(void)
 	if (!gcpu->guest->stub_ops)
 		gcpu->guest->stub_ops = &stub_ops;
 
-	return register_callbacks();
+	/* register the callbacks */
+	stub->node->bch->rx->data_avail = rx;
+	stub->node->bch->rx->consumer = gcpu;
+
+	return; 
 }
 
 static int find_stub_by_vcpu(dt_node_t *node, void *arg)
@@ -105,9 +127,9 @@ static int find_stub_by_vcpu(dt_node_t *node, void *arg)
 	dt_node_t **ret = arg;
 	dt_prop_t *prop;
 
-	prop = dt_get_prop(node, "fsl,hv-dbg-cpus", 0);
+	prop = dt_get_prop(node, "debug-cpus", 0);
 	if (!prop) {
-		TRACE("Did not find fsl,hv-dbg-cpus in gdb-stub node in the device tree.");
+		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR, "Missing debug-cpus at %s\n", node->name);
 		return 0;
 	}
 
@@ -127,50 +149,16 @@ static int find_stub_by_vcpu(dt_node_t *node, void *arg)
  * is connected to.
  * @return pointer to the byte-channel with the gdb-stub as it's end-point.
  */
-static const byte_chan_t *find_stub_byte_channel(char *compatible)
+static dt_node_t *find_stub_config_node(char *compatible)
 {
 	gcpu_t *gcpu = get_gcpu();
-	uint32_t bc_phandle;
-	dt_node_t *bcnode;
-	byte_chan_t *bc;
 	dt_node_t *node = NULL;
-	dt_prop_t *prop;
+	int rc;
 
-	dt_for_each_compatible(gcpu->guest->partition, compatible,
+	rc = dt_for_each_compatible(gcpu->guest->partition, compatible,
 	                       find_stub_by_vcpu, &node);
 
-	if (!node)
-		return NULL;
-
-	/* Get value of fsl,endpoint (a phandle), which gives you the offset of
-	 * the byte-channel in the device tree.
-	 */
-	prop = dt_get_prop(node, "fsl,endpoint", 0);
-	if (!prop || prop->len != 4) {
-		TRACE("Bad/missing fsl,endpoint in gdb-stub node in the device tree.");
-		return NULL;
-	}
-
-	bc_phandle = *(const uint32_t *)prop->data;
-	bcnode = dt_lookup_phandle(hw_devtree, bc_phandle);
-	if (!bcnode) {
-		TRACE("Bad fsl,endpoint phandle in gdb-stub node in the device tree.");
-		return NULL;
-	}
-
-	/* Get value of the internally created property: fsl,hv-internal-bc-ptr.
-	 * The value is a pointer to the byte-channel as obtained upon a
-	 * byte_chan_alloc()
-	 */
-	bc = ptr_from_node(bcnode, "bc");	
-	TRACE("bc: %p", bc);
-	if (!bc) {
-		TRACE("endpoint is not a byte channel");
-		return NULL;
-	}
-
-	/* OK, we have a good byte-channel to use. */
-	return bc;
+	return node;
 }
 
 /**
@@ -204,27 +192,6 @@ static void rx(queue_t *q)
 	 */
 }
 
-static int register_callbacks(void)
-{
-	gcpu_t *gcpu = get_gcpu();
-	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
-	TRACE();
-	if (stub->byte_channel != NULL) {
-		stub->byte_channel_handle = byte_chan_claim((byte_chan_t *) stub->byte_channel);
-		if (stub->byte_channel_handle == NULL) {
-			TRACE("gdb-stub failed to claim gdb-stub byte-channel.");
-			return GDB_STUB_INIT_FAILURE;
-		}
-
-		/* No callback on a TX, since we're polling. Register RX callback. */
-		stub->byte_channel_handle->rx->data_avail = rx;
-		stub->byte_channel_handle->rx->consumer = gcpu;
-		return GDB_STUB_INIT_SUCCESS;
-	}
-	else
-		return GDB_STUB_INIT_FAILURE;
-}
-
 /* get_debug_char() and put_debug_char() are our
  * means of communicating with the outside world,
  * one character at a time.
@@ -236,7 +203,7 @@ static uint8_t get_debug_char(gdb_stub_core_context_t *stub)
 	uint8_t ch;
 	TRACE();
 	do {
-		byte_count = byte_chan_receive(stub->byte_channel_handle, &ch, 1);
+		byte_count = byte_chan_receive(stub->node->bch, &ch, 1);
 		/* internal error if byte_count > len */
 	} while (byte_count <= 0);
 	return ch;
@@ -248,7 +215,7 @@ static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c)
 	uint8_t buf[len];
 	buf[0] = c;
 	TRACE();
-	byte_chan_send(stub->byte_channel_handle, buf, len);
+	byte_chan_send(stub->node->bch, buf, len);
 }
 
 /* TODO: Where do we call this? */
@@ -632,7 +599,7 @@ static void transmit_response(gdb_stub_core_context_t *stub)
 		TRACE("Transmitting response: %s", content(stub->rsp));
 		put_debug_char(stub, '$');
 		/* TODO: Why does this not work?
-		 * qprintf(byte_channel_handle->tx, "%s", content(stub->rsp));
+		 * qprintf(node->bch->tx, "%s", content(stub->rsp));
 		 */
 		i = 0;
 		while (i < pkt_len(stub->rsp) && (c = pkt_read_byte(stub->rsp, i))) {
@@ -1053,7 +1020,7 @@ static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_con
 	pkt_cat_string(stub->rsp, (char *)value);
 	pkt_cat_string(stub->rsp, ";");
 	/* FIXME: This is a HACK. Is this the right fix? */
-	stub->byte_channel_handle->rx->data_avail = NULL;
+	stub->node->bch->rx->data_avail = NULL;
 	transmit_response(stub);
 }
 
@@ -1143,7 +1110,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	stub_start: {
 		TRACE("At stub_start.");
 		/* Deregister call back. */
-		stub->byte_channel_handle->rx->data_avail = NULL;
+		stub->node->bch->rx->data_avail = NULL;
 		enable_critint();
 	}
 	while (1) {
@@ -1165,8 +1132,8 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 				"GOT 'c' PACKET.\n");
 			return_to_guest:
 				disable_critint();
-				stub->byte_channel_handle->rx->data_avail = rx;
-				if (queue_empty(stub->byte_channel_handle->rx)) {
+				stub->node->bch->rx->data_avail = rx;
+				if (queue_empty(stub->node->bch->rx)) {
 					TRACE("Returning to guest.");
 					return;
 				} else {
