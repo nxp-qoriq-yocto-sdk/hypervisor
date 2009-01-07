@@ -286,9 +286,12 @@ nomem:
 	return ERR_NOMEM;
 }
 
-static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
+/* Given a node containing a byte-channel endpoint, initialize
+ * it.  Handles byte-channels connected to char device, uart
+ * mux, or another byte-channel.
+ */
+int init_byte_channel(dt_node_t *node)
 {
-	guest_t *guest = arg;
 	dt_prop_t *endpoint;
 	dt_node_t *epnode = NULL;
 	uint32_t phandle;
@@ -374,8 +377,6 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 	node->bch = byte_chan_claim(node->bc);
 	assert(node->bch);
 
-	byte_chan_attach_guest(node, guest);
-
 out:
 	spin_unlock(&bchan_lock);
 	return 0;
@@ -385,6 +386,22 @@ nomem:
 	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 	         "%s: out of memory\n", __func__);
 	return ERR_NOMEM;
+}
+
+static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
+{
+	guest_t *guest = arg;
+	int ret;
+
+	ret = init_byte_channel(node);
+	if (ret)
+		return ret;
+
+	assert(node->bch);
+
+	byte_chan_attach_guest(node, guest);
+
+	return 0;
 }
 
 byte_chan_t *other_attach_byte_chan(dt_node_t *bcnode, dt_node_t *onode)

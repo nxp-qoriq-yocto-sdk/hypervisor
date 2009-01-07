@@ -31,6 +31,7 @@
 #include <libos/queue.h>
 #include <stdint.h>
 #include <percpu.h>
+#include <devtree.h>
 
 typedef struct byte_chan_handle {
 	queue_t *tx;      /**< queue for transmitting data */
@@ -62,5 +63,7 @@ int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd);
 struct dt_node;
 byte_chan_t *other_attach_byte_chan(struct dt_node *node,
                                     struct dt_node *endpoint);
+
+int init_byte_channel(dt_node_t *node);
 
 #endif
