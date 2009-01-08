@@ -499,27 +499,6 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 	return dt_set_prop(node, name, str, strlen(str) + 1);
 }
 
-static const char *strlist_iterate(const char *strlist, size_t len,
-                                   size_t *pos)
-{
-	const char *next, *ret;
-
-	if (*pos >= len)
-		return NULL;
-
-	next = memchr(strlist + *pos, 0, len - *pos);
-	if (!next) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: strlist not null-terminated\n", __func__);
-		return NULL;
-	}
-
-	ret = strlist + *pos;
-	*pos = next - strlist + 1;
-
-	return ret;
-}
-
 typedef struct merge_ctx {
 	dt_node_t *dest;
 	int notfirst, special;
