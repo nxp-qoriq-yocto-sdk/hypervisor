@@ -1,310 +1,152 @@
 /dts-v1/;
 
 / {
-	compatible = "fsl,hv-platform-p4080";
-	model = "fsl,hv-gdb";
-	#address-cells = <2>;
-	#size-cells = <2>;
+	compatible = "fsl,hv-config";
 
-	aliases {
-		stdout = &uart0;
-		stdin = &uart0;
-		serial0 = &uart0;
-		serial1 = &uart1;
-		uartmux = &uartmux;
-		byte-channel0 = &bc0;
-		byte-channel1 = &bc1;
-		byte-channel2 = &bc2;
-		byte-channel3 = &bc3;
-	};
-
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		cpu@0 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <0>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&uart0>;
+		
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma4>;
 		};
 
-		cpu@1 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <1>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
+		uart0: uart0 {
+			device = "serial0";
 		};
 
-		cpu@2 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <2>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
+		uart1: uart1 {
+			device = "serial1";
 		};
 
-		cpu@3 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <3>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
+		mpic {
+			device = "/soc/pic";
 		};
 
-		cpu@4 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <4>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-		};
-
-		cpu@5 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <5>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-		};
-
-		cpu@6 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <6>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
-		};
-
-		cpu@7 {
-			device_type = "cpu";
-			compatible = "fsl,e500mc";
-			reg = <7>;
-			d-cache-line-size = <64>;
-			i-cache-line-size = <64>;
-			d-cache-size = <32768>;
-			i-cache-size = <32768>;
-			timebase-frequency = <8333333>;
-			bus-frequency = <66666666>;
-			clock-frequency = <66666666>;
+		iommu {
+			device = "/soc/iommu";
 		};
 	};
 
-	memory {
-		reg = <0 0 0 0x100000>;
-		device_type = "memory";
-	};
-
-	ccsr@fe000000 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "fsl,p4080-ccsr", "simple-bus";
-		ranges = <0 0 0xfe000000 0x400000>;
-
-		mpic: pic@40000 {
-			clock-frequency = <0>;
-			interrupt-controller;
-			#address-cells = <0>;
-			#interrupt-cells = <2>;
-			reg = <0x40000 0x40000>;
-			compatible = "fsl,p4080-mpic", "fsl,mpic",
-			             "chrp,open-pic";
-			device_type = "open-pic";
-			big-endian;
+	phys-mem {
+		pma0:pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x10000000>;
 		};
 
-		uart0: serial@11c500 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <0x11c500 0x100>;
-			clock-frequency = <0>;
-			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
+		pma1:pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x10000000>;
+			size = <0 0x10000000>;
 		};
 
-		uart1: serial@11c600 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <0x11c600 0x100>;
-			clock-frequency = <0>;
-			interrupts = <36 2>;
-			interrupt-parent = <&mpic>;
+		pma2:pma2 {
+			compatible = "phys-mem-area";
+			addr = <0 0x20000000>;
+			size = <0 0x10000000>;
 		};
 
-		uart3: serial@11d600 {
-			device_type = "serial";
-			compatible = "fsl,p4080-uart", "fsl,ns16550", "ns16550";
-			reg = <0x11d600 0x100>;
-			clock-frequency = <0>;
-			interrupts = <37 2>;
-			interrupt-parent = <&mpic>;
+		pma3:pma3 {
+			compatible = "phys-mem-area";
+			addr = <0 0x30000000>;
+			size = <0 0x10000000>;
 		};
 
-		global-utilities@e0000 {	//global utilities block
-			compatible = "fsl,p4080-guts";
-			reg = <0xe0000 0x1000>;
-			fsl,has-rstcr;
+		pma4:pma4 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40000000>;
+			size = <0 0x2000000>;
 		};
 	};
 
 	uartmux: uartmux {
-		compatible = "fsl,hv-byte-channel-mux";
-		fsl,phys-dev = <&uart1>;
-	};
-
-	byte-channels {
-		/* bc0 here is a weird case for testing purposes.
-		 * It sets up a loopback in the mux, so that
-		 * data coming in channel 0 goes out channel 1.
-		 * bc0 is _not_ usable by a guest.
-		 */
-		bc0: byte-channel0 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <0>;
-		};
-
-		bc1: byte-channel1 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <1>;
-		};
-
-		bc2: byte-channel2 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <2>;
-		};
-
-		bc3: byte-channel3 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <3>;
-		};
-
-		bc3: byte-channel4 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <4>;
-		};
-
-		bc3: byte-channel5 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <5>;
-		};
-
-		bc3: byte-channel6 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <6>;
-		};
-
-		bc3: byte-channel7 {
-			compatible = "fsl,hv-byte-channel";
-			fsl,endpoint = <&uartmux>;
-			fsl,mux-channel = <7>;
-		};
+		compatible = "byte-channel-mux";
+		endpoint = <&uart1>;
 	};
 
 	partitions {
-		part1 {
-			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <0 1>;
-			fsl,hv-physaddr-map = <0 0 0 0x10000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("p1.dtb");
-			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
 
-			debug-stub0 {
-				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
-				fsl,endpoint = <&bc0>;
+		part1 {
+			compatible = "partition";
+			cpus = <0 1>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
+
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma0>;
+				guest-addr = <0 0>;
+			};
+
+			gdb-stub@0 {
+				compatible = "gdb-stub";
+				endpoint = <&uartmux>;
+				mux-channel = <0>;
+				debug-cpus = <0 1>; //virtual cpu 0
 			};
 		};
 
 		part2 {
-			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <1 1>;
-			fsl,hv-physaddr-map = <0 0 0 0x20000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("p2.dtb");
-			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+			compatible = "partition";
+			cpus = <1 1>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
 
-			debug-stub1 {
-				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
-				fsl,endpoint = <&bc1>;
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma1>;
+				guest-addr = <0 0>;
+			};
+
+			gdb-stub@1 {
+				compatible = "gdb-stub";
+				endpoint = <&uartmux>;
+				mux-channel = <1>;
+				debug-cpus = <0 1>; //virtual cpu 0
 			};
 		};
 
 		part3 {
-			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <2 1>;
-			fsl,hv-physaddr-map = <0 0 0 0x30000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("p3.dtb");
-			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+			compatible = "partition";
+			cpus = <2 1>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
 
-			debug-stub2 {
-				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
-				fsl,endpoint = <&bc2>;
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma2>;
+				guest-addr = <0 0>;
+			};
+
+			gdb-stub@2 {
+				compatible = "gdb-stub";
+				endpoint = <&uartmux>;
+				mux-channel = <2>;
+				debug-cpus = <0 1>; //virtual cpu 0
 			};
 		};
 
 		part4 {
-			compatible = "fsl,hv-partition";
-			fsl,hv-cpus = <3 1>;
-			fsl,hv-physaddr-map = <0 0 0 0x40000000 0 0x10000000>;
-			fsl,hv-dtb = /incbin/("p4.dtb");
-			fsl,hv-load-image-table = <0 0xe8200000 0 0 0 0>;
-			fsl,hv-dtb-window = <0 0x01000000 0 0x10000>;
+			compatible = "partition";
+			cpus = <3 1>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
 
-			debug-stub3 {
-				compatible = "fsl,hv-gdb-stub";
-				fsl,hv-dbg-cpus = <0 1>; // vcpu 0
-				fsl,endpoint = <&bc3>;
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma3>;
+				guest-addr = <0 0>;
+			};
+
+			gdb-stub@3 {
+				compatible = "gdb-stub";
+				endpoint = <&uartmux>;
+				mux-channel = <3>;
+				debug-cpus = <0 1>; //virtual cpu 0
 			};
 		};
-
 	};
 
 	chosen {

@@ -23,8 +23,8 @@
 #
 
 # UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
+# UART1 is guest byte channel console
+# UART2 is guest serial console
 $use_uart1 = 0
 $use_uart1_net = 1
 
@@ -32,7 +32,11 @@ $guest_image[0] = "gdb"
 $guest_addr[0]  = 0x00200000
 
 $kernel_image  = "hv.uImage"
-$dev_tree_blob  = "hv-A.dtb"
+
+$guest_image[1] = "hv-A.dtb"
+$guest_addr[1]  = 0x00100000
+
+$kernel_cmdline = "config-addr=0xe8100000"
 
 add-directory "%script%/../sim" -prepend
 add-directory "%script%/../sim/images" -prepend
