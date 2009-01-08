@@ -508,8 +508,11 @@ static const char *strlist_iterate(const char *strlist, size_t len,
 		return NULL;
 
 	next = memchr(strlist + *pos, 0, len - *pos);
-	if (!next)
+	if (!next) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: strlist not null-terminated\n", __func__);
 		return NULL;
+	}
 
 	ret = strlist + *pos;
 	*pos = next - strlist + 1;
@@ -836,14 +839,13 @@ int dt_node_is_compatible(dt_node_t *node, const char *compat)
 	dt_prop_t *prop;
 	const char *str;
 	size_t pos = 0;
-	
+
 	prop = dt_get_prop(node, "compatible", 0);
 	if (!prop)
 		return 0;
 
-	str = prop->data;
 	for (;;) {
-		str = strlist_iterate(str, prop->len, &pos);
+		str = strlist_iterate(prop->data, prop->len, &pos);
 		if (!str)
 			return 0;
 
