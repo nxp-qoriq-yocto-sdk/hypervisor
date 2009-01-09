@@ -1752,6 +1752,12 @@ void do_stop_core(trapframe_t *regs, int restart)
 	guest_t *guest = gcpu->guest;
 	assert(guest->state == guest_stopping);
 
+#ifdef CONFIG_DEBUG_STUB
+	if (guest->stub_ops && guest->stub_ops->vcpu_stop) {
+		guest->stub_ops->vcpu_stop();
+	}
+#endif
+
 	guest_reset_tlb();
 
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
