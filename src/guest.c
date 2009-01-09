@@ -46,8 +46,8 @@
 #include <uimage.h>
 #include <events.h>
 #include <doorbell.h>
-#include <gdb-stub.h>
 #include <ccm.h>
+#include <debug-stub.h>
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
@@ -1429,6 +1429,11 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].lpid = ++last_lpid;
 
 		get_cpulist(&guests[i]);
+
+#ifdef CONFIG_DEBUG_STUB
+		init_stubops(&guests[i]);
+#endif
+
 	}
 	
 	spin_unlock(&start_guest_lock);
@@ -1459,6 +1464,7 @@ static void guest_core_init(guest_t *guest)
 
 static void start_guest_primary_nowait(void)
 {
+	trapframe_t trapframe;
 	register register_t r3 asm("r3");
 	register register_t r4 asm("r4");
 	register register_t r5 asm("r5");
@@ -1478,10 +1484,6 @@ static void start_guest_primary_nowait(void)
 
 	guest_core_init(guest);
 	reset_spintbl(guest);
-
-#ifdef CONFIG_GDB_STUB
-	gdb_stub_init();
-#endif
 
 	void *fdt = malloc(guest->dtb_window_len);
 	if (!fdt) {
@@ -1551,23 +1553,33 @@ static void start_guest_primary_nowait(void)
 	send_doorbells(guest->dbell_state_change);
 	cpu->traplevel = 0;
 
-	/* FIXME: check for prop in debug stub node */
-	if (dt_get_prop(guest->partition, "dbg-pre-boot-hook", 0)
-	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
-		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
+	trapframe.gpregs[3] = guest->dtb_gphys;
+	trapframe.gpregs[4] = 0;
+	trapframe.gpregs[5] = 0;
+	trapframe.gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
+	trapframe.gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+	trapframe.gpregs[8] = 0;
+	trapframe.gpregs[9] = 0;
+	trapframe.srr0 = guest->entry;
+	trapframe.srr1 = MSR_GS;
+
+#ifdef CONFIG_DEBUG_STUB
+	if (guest->stub_ops && guest->stub_ops->vcpu_start)
+		guest->stub_ops->vcpu_start(&trapframe);
+#endif
 
 	// We only map 1GiB, so we don't support loading/booting an OS above
 	// that address.  We pass the guest physical address even though
 	// it should be a guest virtual address, but since we program the TLBs
 	// such that guest virtual == guest physical at boot time, this works. 
 
-	r3 = guest->dtb_gphys;
-	r4 = 0;
-	r5 = 0;
-	r6 = 0x45504150; // ePAPR Magic for Book-E
-	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
-	r8 = 0;
-	r9 = 0;
+	r3 = trapframe.gpregs[3];
+	r4 = trapframe.gpregs[4];
+	r5 = trapframe.gpregs[5];
+	r6 = trapframe.gpregs[6];
+	r7 = trapframe.gpregs[7];
+	r8 = trapframe.gpregs[8];
+	r9 = trapframe.gpregs[9];
 
 	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
 		     "r" (guest->entry), "r" (MSR_GS),
@@ -1610,6 +1622,7 @@ static void start_guest_primary(void)
 
 static void start_guest_secondary(void)
 {
+	trapframe_t trapframe;
 	register register_t r3 asm("r3");
 	register register_t r4 asm("r4");
 	register register_t r5 asm("r5");
@@ -1648,9 +1661,6 @@ static void start_guest_secondary(void)
 
 	guest_core_init(guest);
 
-#ifdef CONFIG_GDB_STUB
-	gdb_stub_init();
-#endif
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
 	         "secondary %d/%d spun up, addr %lx\n",
 	         pir, gpir, guest->spintbl[gpir].addr_lo);
@@ -1668,17 +1678,26 @@ static void start_guest_secondary(void)
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	if (dt_get_prop(guest->partition, "dbg-wait-at-start", 0)
-	    && guest->stub_ops && guest->stub_ops->wait_at_start_hook)
-		guest->stub_ops->wait_at_start_hook(guest->entry, MSR_GS);
+	trapframe.gpregs[3] = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
+	trapframe.gpregs[4] = 0;
+	trapframe.gpregs[5] = 0;
+	trapframe.gpregs[6] = 0;
+	trapframe.gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+	trapframe.gpregs[8] = 0;
+	trapframe.gpregs[9] = 0;
 
-	r3 = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
-	r4 = 0;
-	r5 = 0;
-	r6 = 0;
-	r7 = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
-	r8 = 0;
-	r9 = 0;
+#ifdef CONFIG_DEBUG_STUB
+	if (guest->stub_ops && guest->stub_ops->vcpu_start)
+		guest->stub_ops->vcpu_start(&trapframe);
+#endif
+
+	r3 = trapframe.gpregs[3];
+	r4 = trapframe.gpregs[4];
+	r5 = trapframe.gpregs[5];
+	r6 = trapframe.gpregs[6];
+	r7 = trapframe.gpregs[7];
+	r8 = trapframe.gpregs[8];
+	r9 = trapframe.gpregs[9];
 
 	cpu->traplevel = 0;
 	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
@@ -2147,6 +2166,16 @@ static int init_guest_primary(guest_t *guest)
 	list_init(&guest->vf_list);
 #endif
 
+#ifdef CONFIG_DEBUG_STUB
+	/* set a pointer to the stub's config node */
+	if (guest->stub_ops && guest->stub_ops->compatible)
+		get_gcpu()->dbgstub_cfg = find_stub_config_node(guest->stub_ops->compatible);
+
+	if (guest->stub_ops && guest->stub_ops->vcpu_init) {
+		guest->stub_ops->vcpu_init();
+	}
+#endif
+
 	// Get the watchdog timeout options
 	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
@@ -2206,6 +2235,8 @@ static int init_guest_one(dt_node_t *node, void *arg)
 	return 0;
 } 
 
+/* init_guest() is called once per CPU
+ */
 __attribute__((noreturn)) void init_guest(void)
 {
 	int pir = mfspr(SPR_PIR);
@@ -2229,6 +2260,16 @@ __attribute__((noreturn)) void init_guest(void)
 			init_guest_primary(guest);
 		} else {
 			register_gcpu_with_guest(guest);
+
+#ifdef CONFIG_DEBUG_STUB
+			/* set a pointer to the stub's config node */
+			if (guest->stub_ops && guest->stub_ops->compatible)
+				get_gcpu()->dbgstub_cfg = find_stub_config_node(guest->stub_ops->compatible);
+
+			if (guest->stub_ops && guest->stub_ops->vcpu_init) {
+				guest->stub_ops->vcpu_init();
+			}
+#endif
 		}
 	}
 

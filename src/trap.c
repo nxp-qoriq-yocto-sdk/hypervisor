@@ -45,11 +45,11 @@
 
 void program_trap(trapframe_t *regs)
 {
-#ifdef CONFIG_GDB_STUB
+#ifdef CONFIG_DEBUG_STUB
 	gcpu_t *gcpu = get_gcpu();
 	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
-	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_int_handler 
-	    && !gcpu->guest->stub_ops->debug_int_handler(regs))
+	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_interrupt
+	    && !gcpu->guest->stub_ops->debug_interrupt(regs))
 		return;
 #endif
 
@@ -86,10 +86,10 @@ void debug_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	if (!gcpu->guest->guest_debug_mode) {
-#ifdef CONFIG_GDB_STUB
+#ifdef CONFIG_DEBUG_STUB
 	if (mfspr(SPR_DBSR) && (regs->srr1 & MSR_GS)
-	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_int_handler 
-	    && !gcpu->guest->stub_ops->debug_int_handler(regs))
+ 	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_interrupt
+ 	    && !gcpu->guest->stub_ops->debug_interrupt(regs))
 		return;
 #endif
 		set_crashing();

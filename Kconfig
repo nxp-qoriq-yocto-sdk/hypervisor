@@ -55,9 +55,16 @@ config BCMUX
 		other things, sharing a single serial port for the
 		consoles of all guests.
 
+config DEBUG_STUB
+	bool "Debug Stub Support"
+	depends on BYTE_CHAN
+	help
+		Enable debug stub support.  This allows you to debug the guest
+		remotely with a host debugger.
+
 config GDB_STUB
 	bool "GDB Stub Support"
-	depends on BYTE_CHAN
+	depends on DEBUG_STUB
 	help
 		Enable GDB stub support.  This allows you to debug the guest 
 		remotely with GDB.  The stub is located in the hypervisor, 

@@ -111,9 +111,8 @@ typedef struct gdb_stub_core_context {
 
 } gdb_stub_core_context_t;
 
-void gdb_stub_init(void);
 void gdb_stub_event_handler(trapframe_t *trap_frame);
 int gdb_stub_process_trap(trapframe_t *trap_frame);
-void gdb_wait_at_start(uint32_t entry, register_t msr);
+void gdb_wait_at_start(trapframe_t *trap_frame);
 
 #endif /* __GDB_STUB_H__ */

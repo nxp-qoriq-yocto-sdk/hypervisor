@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,55 +23,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-ENTRY(_start)
+#ifndef STUBOPS_H
+#define STUBOPS_H
 
-OUTPUT_ARCH(powerpc:common)
+#include <libos/trapframe.h>
 
-SECTIONS
-{
-	. = 0x00100000;
+/** operations for debug stubs
+ */
+typedef struct {
+	const char *compatible;
+	void (*vcpu_init)(void);
+	void (*vcpu_start)( trapframe_t *trapframe);
+	void (*vcpu_stop)(void);
+	int (*debug_interrupt)(trapframe_t *trap_frame);
+} stub_ops_t;
 
-	.text : {
-		*(.text)
-	}
+#define attr_debug_stub __attribute__((section(".hvdbgstub"))) \
+	__attribute__((used))
 
-	.rodata : {
-		*(.rodata)
-		*(.rodata.*)
-	}
 
-	. = ALIGN(4096);
-	.data : {
-		*(.data)
-		*(.sdata)
-		
-		. = ALIGN(8);
-		extable_begin = .;
-		*(.extable)
-		extable_end = .;
-
-		. = ALIGN(8);
-		shellcmd_begin = .;
-		*(.shellcmd)
-		shellcmd_end = .;
-
-		. = ALIGN(8);
-		hvdbgstub_begin = .;
-		*(.hvdbgstub)
-		hvdbgstub_end = .;
-
-		. = ALIGN(8);
-		driver_begin = .;
-		*(.libos.drivers)
-		driver_end = .;
-	}
-
-	. = ALIGN(8);
-	bss_start = .;
-	.bss : {
-		*(.sbss)
-		*(.bss)
-	}
-	bss_end = .;
-	_end = .;
-}
+#endif

@@ -43,26 +43,37 @@
 #include <gdb-stub.h>
 #include <greg.h>
 #include <e500mc-data.h>
+#include <debug-stub.h>
+#include <stubops.h>
 
 #define TRACE(fmt, info...) \
-	printlog(LOGTYPE_GDB_STUB, \
+	printlog(LOGTYPE_DEBUG_STUB, \
 	LOGLEVEL_VERBOSE, \
 	"%s@[%s, %d]: " fmt "\n", \
 	__func__, __FILE__, __LINE__, ## info)
 
-static dt_node_t *find_stub_config_node(char *compatible);
+void gdb_stub_start(trapframe_t *trap_frame);
+void gdb_stub_stop(void);
+void gdb_stub_init(void);
+
 static void rx(queue_t *q);
+static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
+
+void gdb_stub_event_handler(trapframe_t *trap_frame);
 
 #define CHECK_MEM(p) \
 	if (!p) { \
-		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR, \
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, \
 		         "Out of memory?\n"); \
 		return; \
 	}
 
-static stub_ops_t stub_ops = {
-        .debug_int_handler = gdb_stub_process_trap,
-        .wait_at_start_hook = gdb_wait_at_start,
+static stub_ops_t attr_debug_stub stub_ops = {
+        .compatible = "gdb-stub",
+        .vcpu_init = gdb_stub_init,
+        .vcpu_start = gdb_stub_start,
+        .vcpu_stop = gdb_stub_stop,
+        .debug_interrupt =  gdb_stub_process_trap,
 };
 
 void gdb_stub_init(void)
@@ -76,19 +87,12 @@ void gdb_stub_init(void)
 	CHECK_MEM(stub);
 	memset(stub, 0, sizeof(gdb_stub_core_context_t));
 
-	/* find the config node for this stub & vcpu */
-	stub->node = find_stub_config_node("gdb-stub");
-	if (!stub->node) {
-		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR,
-		         "%s: missing debug stub node\n",
-		         __func__);
-		return;
-	}
+	stub->node = gcpu->dbgstub_cfg;
 
 	init_byte_channel(stub->node);
 	/* note: the byte-channel handle is returned in node->bch */
 	if (!stub->node->bch) {
-		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
 		         "%s: gdb stub byte chan allocation failed\n",
 		         __func__);
 		return;
@@ -110,55 +114,47 @@ void gdb_stub_init(void)
 	stub->rsp = &stub->response;
 	stub->breakpoint_table = malloc(MAX_BREAKPOINT_COUNT*sizeof(breakpoint_t));
 	CHECK_MEM (stub->breakpoint_table);
-	gcpu->debug_stub_data = stub;
 
-	if (!gcpu->guest->stub_ops)
-		gcpu->guest->stub_ops = &stub_ops;
-
-	/* register the callbacks */
-	stub->node->bch->rx->data_avail = rx;
-	stub->node->bch->rx->consumer = gcpu;
+	gcpu->dbgstub_cpu_data = stub;
 
 	return; 
 }
 
-static int find_stub_by_vcpu(dt_node_t *node, void *arg)
-{
-	dt_node_t **ret = arg;
-	dt_prop_t *prop;
-
-	prop = dt_get_prop(node, "debug-cpus", 0);
-	if (!prop) {
-		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_ERROR, "Missing debug-cpus at %s\n", node->name);
-		return 0;
-	}
-
-	/* FIXME: Handle multiple vcpus */
-	int vcpu_num = *(const uint32_t *)prop->data;
-	TRACE("VCPU_NUM = %d\n", vcpu_num);
-	TRACE("GCPU_NUM = %d\n", get_gcpu()->gcpu_num);
-	if (vcpu_num == get_gcpu()->gcpu_num) {
-		*ret = node;
-		return 1;
-	}
-
-	return 0;
-}
-
-/** Find in the device-tree, the byte-channel that this instance of the gdb-stub
- * is connected to.
- * @return pointer to the byte-channel with the gdb-stub as it's end-point.
- */
-static dt_node_t *find_stub_config_node(char *compatible)
+void gdb_stub_start(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
-	dt_node_t *node = NULL;
-	int rc;
+	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
+	breakpoint_t *breakpoint;
 
-	rc = dt_for_each_compatible(gcpu->guest->partition, compatible,
-	                       find_stub_by_vcpu, &node);
+	/* register the callbacks */
+	stub->node->bch->rx->consumer = gcpu;
+	smp_lwsync();
+	stub->node->bch->rx->data_avail = rx;
 
-	return node;
+	if (dt_get_prop(gcpu->dbgstub_cfg, "gdb-wait-at-start", 0)) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
+			"setting breakpoint on 1st instruction\n");
+
+		/* set up EPLC and EPSC so we can set our breakpoint */
+		mtspr(SPR_EPLC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
+		mtspr(SPR_EPSC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
+
+		breakpoint = set_breakpoint(stub->breakpoint_table, trap_frame, (uint32_t *)trap_frame->srr0, internal_1st_inst);
+	}
+
+	return;
+}
+
+void gdb_stub_stop(void)
+{
+	gdb_stub_core_context_t *stub = get_gcpu()->dbgstub_cpu_data;
+
+	/* de-register the callbacks */
+	stub->node->bch->rx->consumer = NULL;
+	smp_lwsync();
+	stub->node->bch->rx->data_avail = NULL;
+
+	return; 
 }
 
 /**
@@ -332,9 +328,7 @@ static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
 static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
 static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table);
 static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
-static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint);
-void gdb_stub_event_handler(trapframe_t *trap_frame);
 
 /* Auxiliary routines required by the RSP Engine.
  */
@@ -557,7 +551,7 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 	do {
 		while ((c = get_debug_char(stub)) != '$') {
 			if (c == CTRL_C) {
-				printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "gdb: Got CTRL-C.\n");
+				printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: Got CTRL-C.\n");
 				transmit_stop_reply_pkt_T(trap_frame, stub);
 			} else
 				TRACE("Skipping '%c'. (Expecting '$').", c);
@@ -1027,12 +1021,12 @@ static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_con
 int gdb_stub_process_trap(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
+	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
 	breakpoint_type_t bptype = breakpoint->type;
 
-	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
+	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
 
 	/* register_t esr_reg_value = 0;
 	 * esr_reg_value = mfspr(SPR_ESR);
@@ -1080,7 +1074,7 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 		transmit_stop_reply_pkt_T(trap_frame, stub);
 
 	if (bptype == internal_1st_inst)
-		printlog(LOGTYPE_GDB_STUB, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_NORMAL,
 			"gdb: waiting for host debugger...\n");
 
 	TRACE("Calling: gdb_stub_event_handler().");
@@ -1092,7 +1086,7 @@ int gdb_stub_process_trap(trapframe_t *trap_frame)
 void gdb_stub_event_handler(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
+	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	uint8_t *cur_pos, *sav_pos, *data;
 	uint32_t offset, length;
 	uint8_t err_flag = 0;
@@ -1105,7 +1099,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
 	const char *td; /* td: target description */
-	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 		"gdb: in RSP Engine, main loop.\n");
 	stub_start: {
 		TRACE("At stub_start.");
@@ -1128,7 +1122,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 *   back to the beginning of the gdb_stub_event_handler
 			 *   where interrupts are disabled.
 			 */
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"GOT 'c' PACKET.\n");
 			return_to_guest:
 				disable_critint();
@@ -1143,7 +1137,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_register:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'p' packet.\n");
 			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '\0');
@@ -1153,7 +1147,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_registers:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'g' packet.\n");
 			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
 				read_reg(trap_frame, value, reg_num);
@@ -1163,7 +1157,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_register:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'P' packet.\n");
 			err_flag = 0;
 			cur_pos = content(stub->cmd);
@@ -1182,7 +1176,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_registers:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'G' packet.\n");
 			cur_pos = content(stub->cmd);
 			data = ++cur_pos;
@@ -1204,7 +1198,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case set_thread:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got packet: 'H'\n");
 			cur_pos = content(stub->cmd);
 			cur_pos++;
@@ -1235,7 +1229,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case read_memory:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'm' packet.\n");
 			cur_pos = content(stub->cmd);
 			addr = (uint32_t *)scan_num(&cur_pos, ',');
@@ -1256,7 +1250,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case write_memory:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'M' packet.\n");
 			cur_pos = content(stub->cmd);
 			addr = (uint32_t *) scan_num(&cur_pos, ',');
@@ -1286,7 +1280,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		case remove_breakpoint:
 			cur_pos = content(stub->cmd);
 			aux = *cur_pos;
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got '%c' packet.\n", *cur_pos);
 			err_flag = 0;
 			breakpoint_type = scan_num(&cur_pos, ',');
@@ -1335,7 +1329,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case single_step:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 's' packet.\n");
 			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
@@ -1369,20 +1363,20 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case return_current_thread_id:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'qC' packet.\n");
 			/* For now let pid == 0 */
 			pkt_cat_string(stub->rsp, "QC0");
 			break;
 
 		case get_section_offsets:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'qOffsets' packet.\n");
 			pkt_cat_string(stub->rsp, "Text=0;Data=0;Bss=0");
 			break;
 
 		case supported_features:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'qSupported' packet.\n");
 			pkt_cat_string(stub->rsp, "PacketSize=" BUFMAX_HEX ";");
 			pkt_cat_string(stub->rsp, "qXfer:auxv:read-;"
@@ -1395,7 +1389,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		case qxfer:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'qXfer' packet.\n");
 			cur_pos = content(stub->cmd);
 			cur_pos += 5;
@@ -1438,14 +1432,14 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 * in include/gdb/signals.h
 			 * TODO: Also, signal == 2 For now.
 			 */
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got stop reply packet: '?'\n");
 			pkt_cat_string(stub->rsp, "S");
 			pkt_write_hex_byte_update_cur(stub->rsp, 2);
 			break;
 
 		case detach:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG, "Got 'D' packet.\n");
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'D' packet.\n");
 			dump_breakpoint_table(stub->breakpoint_table);
 			clear_all_breakpoints(stub->breakpoint_table);
 			dump_breakpoint_table(stub->breakpoint_table);
@@ -1456,7 +1450,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			break;
 
 		default:
-			printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Unhandled RSP directive: %s, transmitting response: '%s'\n",
 			       content(stub->cmd), content(stub->rsp));
 			break;
@@ -1464,27 +1458,4 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		transmit_response(stub);
 	}
 }
-
-void gdb_wait_at_start(uint32_t entry, register_t msr)
-{
-	gcpu_t *gcpu = get_gcpu();
-	gdb_stub_core_context_t *stub = gcpu->debug_stub_data;
-	trapframe_t trap_frame;
-	breakpoint_t *breakpoint;
-
-	printlog(LOGTYPE_GDB_STUB, LOGLEVEL_DEBUG,
-		"setting breakpoint on 1st instruction\n");
-
-	/* contruct enough of a trap frame so that set_breakpoint() can
-	 * do its thing.
-	 */
-	trap_frame.srr1 = msr;
-
-	/* set up EPLC and EPSC so we can set our breakpoint */
-	mtspr(SPR_EPLC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
-	mtspr(SPR_EPSC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
-
-	breakpoint = set_breakpoint(stub->breakpoint_table, &trap_frame, (uint32_t *)entry, internal_1st_inst);
-}
-
 

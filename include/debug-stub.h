@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,55 +23,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-ENTRY(_start)
+#ifndef DEBUG_STUB_H
+#define DEBUG_STUB_H
 
-OUTPUT_ARCH(powerpc:common)
+#include <percpu.h>
 
-SECTIONS
-{
-	. = 0x00100000;
+dt_node_t *find_stub_config_node(const char *compatible);
+void init_stubops(guest_t *guest);
 
-	.text : {
-		*(.text)
-	}
-
-	.rodata : {
-		*(.rodata)
-		*(.rodata.*)
-	}
-
-	. = ALIGN(4096);
-	.data : {
-		*(.data)
-		*(.sdata)
-		
-		. = ALIGN(8);
-		extable_begin = .;
-		*(.extable)
-		extable_end = .;
-
-		. = ALIGN(8);
-		shellcmd_begin = .;
-		*(.shellcmd)
-		shellcmd_end = .;
-
-		. = ALIGN(8);
-		hvdbgstub_begin = .;
-		*(.hvdbgstub)
-		hvdbgstub_end = .;
-
-		. = ALIGN(8);
-		driver_begin = .;
-		*(.libos.drivers)
-		driver_end = .;
-	}
-
-	. = ALIGN(8);
-	bss_start = .;
-	.bss : {
-		*(.sbss)
-		*(.bss)
-	}
-	bss_end = .;
-	_end = .;
-}
+#endif

@@ -37,6 +37,8 @@
 #include <hv.h>
 #include <vpic.h>
 #include <tlbcache.h>
+#include <stubops.h>
+#include <devtree.h>
 #endif
 
 #define TLB1_GSIZE 16 /* As seen by the guest */
@@ -72,14 +74,6 @@ typedef struct handle {
 	struct ppid_handle *ppid;
 	struct guest *guest;
 } handle_t;
-
-/** operations for debug stubs
- *
- */
-typedef struct {
-	int (*debug_int_handler)(trapframe_t *trap_frame);
-	void (*wait_at_start_hook)(uint32_t entry, register_t msr);
-} stub_ops_t;
 
 /**
  * Guest states
@@ -126,7 +120,9 @@ typedef struct guest {
 	/** guest debug mode **/
 	int guest_debug_mode;
 	
+#ifdef CONFIG_DEBUG_STUB
 	stub_ops_t *stub_ops;
+#endif
 	uint32_t state_lock, inv_lock;
 	gstate_t state;
 
@@ -225,7 +221,10 @@ typedef struct gcpu {
 	int gcpu_num, waiting_for_gevent;
 	vpic_cpu_t vpic;
 	register_t tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
-	void *debug_stub_data;
+#ifdef CONFIG_DEBUG_STUB
+	void *dbgstub_cpu_data;
+	dt_node_t *dbgstub_cfg;
+#endif
 
 	/* Fields after this point are cleared on reset -- do not
 	 * insert new fields before gdbell_pending.

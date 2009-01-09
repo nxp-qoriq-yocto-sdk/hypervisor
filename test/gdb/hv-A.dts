@@ -67,6 +67,7 @@
 				endpoint = <&uartmux>;  // byte-channel endpoint
 				mux-channel = <0>;
 				debug-cpus = <0 1>; //virtual cpu 0
+				gdb-wait-at-start;
 			};
 
 		};
