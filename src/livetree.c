@@ -1085,3 +1085,34 @@ size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen)
 
 	return len;
 }
+
+/**
+ * dt_copy_properties - copy the properties of a node to another node
+ * @source: the node to copy from
+ * @target: the node to copy to
+ *
+ * This function copies the contents of a node.  The target node can be in
+ * the same tree or another tree.
+ *
+ * If a particular property already exists in the target node, then its
+ * contents are simply overridden by those from the property in the source
+ * code.
+ *
+ * @return 0 for success, or error code
+ */
+int dt_copy_properties(dt_node_t *source, dt_node_t *target)
+{
+	int ret;
+
+	list_for_each(&source->props, i) {
+		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
+
+		ret = dt_set_prop(target, prop->name, prop->data, prop->len);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+

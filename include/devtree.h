@@ -118,6 +118,7 @@ int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
                            dt_callback_t callback, void *arg);
 
 size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen);
+int dt_copy_properties(dt_node_t *source, dt_node_t *target);
 
 dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name);
 dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);

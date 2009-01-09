@@ -1942,8 +1942,24 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 	} else {
 		name = owner->cfgnode->name;
 
-		if (hwnode->parent->parent &&
-		    !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
+		if (dt_node_is_compatible(hwnode->parent, "fsl,dpaa")) {
+			// DPAA nodes belong under the fsl,dpaa container node
+			parent = dt_get_subnode(guest->devtree, hwnode->parent->name, 1);
+			if (!parent) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					 "%s: could not create %s container node\n",
+					 __func__, hwnode->parent->name);
+				return ERR_NOMEM;
+			}
+			ret = dt_copy_properties(hwnode->parent, parent);
+			if (ret) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					 "%s: could not copy properties of %s node\n",
+					 __func__, hwnode->parent->name);
+				return ret;
+			}
+		} else if (hwnode->parent->parent &&
+			   !dt_node_is_compatible(hwnode->parent, "simple-bus")) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "%s: don't know how to assign device %s on bus %s\n",
 			         __func__, hwnode->name, hwnode->parent->name);
