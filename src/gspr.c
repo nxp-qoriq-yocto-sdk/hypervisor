@@ -734,3 +734,183 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 	return 0;
 }
 
+/**
+ * Read performance monitor register
+ *
+ */
+int read_pmr(trapframe_t *regs, int pmr, register_t *val)
+{
+	switch (pmr) {
+	case PMR_UPMC0:
+		*val = mfpmr(PMR_UPMC0);
+		break;
+	case PMR_UPMC1:
+		*val = mfpmr(PMR_UPMC1);
+		break;
+	case PMR_UPMC2:
+		*val = mfpmr(PMR_UPMC2);
+		break;
+	case PMR_UPMC3:
+		*val = mfpmr(PMR_UPMC3);
+		break;
+	case PMR_PMC0:
+		*val = mfpmr(PMR_PMC0);
+		break;
+	case PMR_PMC1:
+		*val = mfpmr(PMR_PMC1);
+		break;
+	case PMR_PMC2:
+		*val = mfpmr(PMR_PMC2);
+		break;
+	case PMR_PMC3:
+		*val = mfpmr(PMR_PMC3);
+		break;
+	case PMR_UPMLCA0:
+		*val = mfpmr(PMR_UPMLCA0);
+		break;
+	case PMR_UPMLCA1:
+		*val = mfpmr(PMR_UPMLCA1);
+		break;
+	case PMR_UPMLCA2:
+		*val = mfpmr(PMR_UPMLCA2);
+		break;
+	case PMR_UPMLCA3:
+		*val = mfpmr(PMR_UPMLCA3);
+		break;
+	case PMR_PMLCA0:
+		*val = mfpmr(PMR_PMLCA0);
+		break;
+	case PMR_PMLCA1:
+		*val = mfpmr(PMR_PMLCA1);
+		break;
+	case PMR_PMLCA2:
+		*val = mfpmr(PMR_PMLCA2);
+		break;
+	case PMR_PMLCA3:
+		*val = mfpmr(PMR_PMLCA3);
+		break;
+	case PMR_UPMLCB0:
+		*val = mfpmr(PMR_UPMLCB0);
+		break;
+	case PMR_UPMLCB1:
+		*val = mfpmr(PMR_UPMLCB1);
+		break;
+	case PMR_UPMLCB2:
+		*val = mfpmr(PMR_UPMLCB2);
+		break;
+	case PMR_UPMLCB3:
+		*val = mfpmr(PMR_UPMLCB3);
+		break;
+	case PMR_PMLCB0:
+		*val = mfpmr(PMR_PMLCB0);
+		break;
+	case PMR_PMLCB1:
+		*val = mfpmr(PMR_PMLCB1);
+		break;
+	case PMR_PMLCB2:
+		*val = mfpmr(PMR_PMLCB2);
+		break;
+	case PMR_PMLCB3:
+		*val = mfpmr(PMR_PMLCB3);
+		break;
+	case PMR_UPMGC0:
+		*val = mfpmr(PMR_UPMGC0);
+		break;
+	case PMR_PMGC0:
+		*val = mfpmr(PMR_PMGC0);
+		break;
+	default:
+		return 1;
+	}
+
+	return 0;
+}
+
+int write_pmr(trapframe_t *regs, int pmr, register_t val)
+{
+	switch (pmr) {
+	case PMR_UPMC0:
+		mtpmr(PMR_UPMC0, val);
+		break;
+	case PMR_UPMC1:
+		mtpmr(PMR_UPMC1, val);
+		break;
+	case PMR_UPMC2:
+		mtpmr(PMR_UPMC2, val);
+		break;
+	case PMR_UPMC3:
+		mtpmr(PMR_UPMC3, val);
+		break;
+	case PMR_PMC0:
+		mtpmr(PMR_PMC0, val);
+		break;
+	case PMR_PMC1:
+		mtpmr(PMR_PMC1, val);
+		break;
+	case PMR_PMC2:
+		mtpmr(PMR_PMC2, val);
+		break;
+	case PMR_PMC3:
+		mtpmr(PMR_PMC3, val);
+		break;
+	case PMR_UPMLCA0:
+		mtpmr(PMR_UPMLCA0, val);
+		break;
+	case PMR_UPMLCA1:
+		mtpmr(PMR_UPMLCA1, val);
+		break;
+	case PMR_UPMLCA2:
+		mtpmr(PMR_UPMLCA2, val);
+		break;
+	case PMR_UPMLCA3:
+		mtpmr(PMR_UPMLCA3, val);
+		break;
+	case PMR_PMLCA0:
+		mtpmr(PMR_PMLCA0, val);
+		break;
+	case PMR_PMLCA1:
+		mtpmr(PMR_PMLCA1, val);
+		break;
+	case PMR_PMLCA2:
+		mtpmr(PMR_PMLCA2, val);
+		break;
+	case PMR_PMLCA3:
+		mtpmr(PMR_PMLCA3, val);
+		break;
+	case PMR_UPMLCB0:
+		mtpmr(PMR_UPMLCB0, val);
+		break;
+	case PMR_UPMLCB1:
+		mtpmr(PMR_UPMLCB1, val);
+		break;
+	case PMR_UPMLCB2:
+		mtpmr(PMR_UPMLCB2, val);
+		break;
+	case PMR_UPMLCB3:
+		mtpmr(PMR_UPMLCB3, val);
+		break;
+	case PMR_PMLCB0:
+		mtpmr(PMR_PMLCB0, val);
+		break;
+	case PMR_PMLCB1:
+		mtpmr(PMR_PMLCB1, val);
+		break;
+	case PMR_PMLCB2:
+		mtpmr(PMR_PMLCB2, val);
+		break;
+	case PMR_PMLCB3:
+		mtpmr(PMR_PMLCB3, val);
+		break;
+	case PMR_UPMGC0:
+		mtpmr(PMR_UPMGC0, val);
+		break;
+	case PMR_PMGC0:
+		mtpmr(PMR_PMGC0, val);
+		break;
+	default:
+		return 1;
+	}
+
+	return 0;
+}
+
