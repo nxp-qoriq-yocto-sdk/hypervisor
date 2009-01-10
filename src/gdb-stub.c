@@ -149,9 +149,7 @@ void gdb_stub_stop(void)
 {
 	gdb_stub_core_context_t *stub = get_gcpu()->dbgstub_cpu_data;
 
-	/* de-register the callbacks */
-	stub->node->bch->rx->consumer = NULL;
-	smp_lwsync();
+	/* de-register the callback */
 	stub->node->bch->rx->data_avail = NULL;
 
 	return; 
