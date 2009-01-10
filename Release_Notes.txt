@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc8
-Date: 12/18/2008
+Revsion: 0.3-rc9
+Date: 1/10/2009
 
 -------------------------------------------------------
 Contents
@@ -23,18 +23,36 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc8 is compatible with Simics 4.0.29 / pre14 and
+   -Topaz 0.3-rc9 is compatible with Simics 4.0.29 / pre14 and
     later
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.83
+    0.85
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
+   -Topaz 0.3-rc9 bug fixes and changes
+      -support guest debug mode (2490)
+      -support guest cache lock mode (bug 2491)
+      -debug stub updates
+         -implement support for debug stub with new-config
+          architecture
+         -implement 0.5 of the Freescale P4080 Topaz Hypervisor
+          Debug Stub API
+         -support pmr reads/writes
+         -don't clear stub data on cpu restart
+         -implement write_gpc()
+      -support coherence subdomains
+      -make 'coreint' the default interrupt configuration
+      -don't panic if a byte channel is attached twice (2534)
+      -print message on PAMU access violation (2259)
+      -support "fsl,dpaa" bus type (2558)
+
    -Topaz 0.3-rc8 bug fixes and changes
       -implements the new partition definition scheme specified
        in version 0.83 of the hypervisor spec
+          -support for stashing through PAMU is implemented
       -bug 1866: Issue with partition device tree when more than
        32 bytechannels are attached to mux
       -bug 2126: DE bit in emulation of debug interrupt and
@@ -145,10 +163,6 @@ Contents
        implemented
 
  C. p4080 Platform Features
-
-   -Coherence subdomains
-      -Support for coherence subdomains is not implemented.  All
-       memory is globally coherent.
 
    -L3 / Platform Cache configuration is not implemented (i.e. the
     "allocate-cpc-ways" property is not supported on PMAs)
