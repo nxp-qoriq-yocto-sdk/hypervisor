@@ -141,7 +141,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_PVR);
 		break;
 
-	case SPR_EHCSR:
+	case SPR_EPCR:
 		/* no-op on 32-bit */
 		*val = 0;
 		break;
@@ -487,7 +487,7 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		         "mtspr@0x%08lx: unsupported write to PIR\n", regs->srr0);
 		return 1;
 
-	case SPR_EHCSR:
+	case SPR_EPCR:
 		/* no-op on 32-bit */
 		break;
 

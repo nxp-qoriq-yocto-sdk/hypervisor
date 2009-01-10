@@ -656,14 +656,14 @@ static void core_init(void)
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
 
 #ifdef CONFIG_TLB_CACHE
-	mtspr(SPR_EHCSR,
-	      EHCSR_EXTGS | EHCSR_DSIGS |
-	      EHCSR_DUVD | EHCSR_DGTMI | EHCSR_DMIUH);
+	mtspr(SPR_EPCR,
+	      EPCR_EXTGS | EPCR_DSIGS |
+	      EPCR_DUVD | EPCR_DGTMI | EPCR_DMIUH);
 
 	tlbcache_init();
 #else
-	mtspr(SPR_EHCSR,
-	      EHCSR_EXTGS | EHCSR_DTLBGS | EHCSR_ITLBGS |
-	      EHCSR_DSIGS | EHCSR_DUVD | EHCSR_DGTMI);
+	mtspr(SPR_EPCR,
+	      EPCR_EXTGS | EPCR_DTLBGS | EPCR_ITLBGS |
+	      EPCR_DSIGS | EPCR_DUVD | EPCR_DGTMI);
 #endif
 }
