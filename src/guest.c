@@ -32,6 +32,8 @@
 #include <libos/io.h>
 #include <libos/bitops.h>
 #include <libos/mpic.h>
+#include <libos/trap_booke.h>
+#include <libos/thread.h>
 
 #include <hv.h>
 #include <paging.h>
@@ -1461,24 +1463,12 @@ static void guest_core_init(guest_t *guest)
 	mtspr(SPR_MSRP, msrp);
 }
 
-static void start_guest_primary_nowait(void)
+static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 {
-	trapframe_t trapframe;
-	register register_t r3 asm("r3");
-	register register_t r4 asm("r4");
-	register register_t r5 asm("r5");
-	register register_t r6 asm("r6");
-	register register_t r7 asm("r7");
-	register register_t r8 asm("r8");
-	register register_t r9 asm("r9");
-	guest_t *guest = get_gcpu()->guest; 
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest; 
 	int ret, i;
 	
-	disable_critint();
-
-	if (cpu->ret_hook)
-		return;
-
 	assert(guest->state == guest_starting);
 
 	guest_core_init(guest);
@@ -1520,21 +1510,14 @@ static void start_guest_primary_nowait(void)
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
 
 	assert(guest->active_cpus == 0);
-	enable_critint();
 
 	for (i = 1; i < guest->cpucnt; i++) {
 		if (!guest->gcpus[i]) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			         "guest %s waiting for cpu %d...\n", guest->name, i);
 		
-			while (!guest->gcpus[i]) {
-				if (cpu->ret_hook) {
-					disable_critint();
-					return;
-				}
-
+			while (!guest->gcpus[i])
 				barrier();
-			}
 		}
 
 		setgevent(guest->gcpus[i], GEV_START);
@@ -1545,59 +1528,36 @@ static void start_guest_primary_nowait(void)
 	while (guest->active_cpus != guest->cpucnt)
 		barrier();
 
-	disable_critint();
-
 	guest->state = guest_running;
 	smp_mbar();
 	send_doorbells(guest->dbell_state_change);
-	cpu->traplevel = 0;
 
-	trapframe.gpregs[3] = guest->dtb_gphys;
-	trapframe.gpregs[4] = 0;
-	trapframe.gpregs[5] = 0;
-	trapframe.gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
-	trapframe.gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
-	trapframe.gpregs[8] = 0;
-	trapframe.gpregs[9] = 0;
-	trapframe.srr0 = guest->entry;
-	trapframe.srr1 = MSR_GS;
-
-#ifdef CONFIG_DEBUG_STUB
-	if (guest->stub_ops && guest->stub_ops->vcpu_start)
-		guest->stub_ops->vcpu_start(&trapframe);
-#endif
+	assert(cpu->traplevel == 0);
+	assert(cpu->thread == &gcpu->thread);
 
 	// We only map 1GiB, so we don't support loading/booting an OS above
 	// that address.  We pass the guest physical address even though
 	// it should be a guest virtual address, but since we program the TLBs
 	// such that guest virtual == guest physical at boot time, this works. 
 
-	r3 = trapframe.gpregs[3];
-	r4 = trapframe.gpregs[4];
-	r5 = trapframe.gpregs[5];
-	r6 = trapframe.gpregs[6];
-	r7 = trapframe.gpregs[7];
-	r8 = trapframe.gpregs[8];
-	r9 = trapframe.gpregs[9];
+	regs->gpregs[1] = 0xdeadbeef;
+	regs->gpregs[3] = guest->dtb_gphys;
+	regs->gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
+	regs->gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
 
-	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
-		     "r" (guest->entry), "r" (MSR_GS),
-		     "r" (r3), "r" (r4), "r" (r5), "r" (r6), "r" (r7),
-		     "r" (r8), "r" (r9)
-		     : "memory");
+	regs->srr0 = guest->entry;
+	regs->srr1 = MSR_GS;
 
-	BUG();
+#ifdef CONFIG_DEBUG_STUB
+	if (guest->stub_ops && guest->stub_ops->vcpu_start)
+		guest->stub_ops->vcpu_start(regs);
+#endif
 }
 
-static void start_guest_primary(void)
+static void start_guest_primary(trapframe_t *regs, void *arg)
 {
 	guest_t *guest = get_gcpu()->guest; 
 	int ret;
-
-	enable_critint();
-
-	if (cpu->ret_hook)
-		return;
 
 	assert(guest->state == guest_starting);
 
@@ -1612,32 +1572,20 @@ static void start_guest_primary(void)
 		// Notify the manager(s) that it needs to load images and
 		// start this guest.
 		send_doorbells(guest->dbell_restart_request);
-
 		return;
 	}
 
-	start_guest_primary_nowait();
+	start_guest_primary_nowait(regs, arg);
 }
 
-static void start_guest_secondary(void)
+static void start_guest_secondary(trapframe_t *regs, void *arg)
 {
-	trapframe_t trapframe;
-	register register_t r3 asm("r3");
-	register register_t r4 asm("r4");
-	register register_t r5 asm("r5");
-	register register_t r6 asm("r6");
-	register register_t r7 asm("r7");
-	register register_t r8 asm("r8");
-	register register_t r9 asm("r9");
-
 	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	int pir = mfspr(SPR_PIR);
 	int gpir = gcpu->gcpu_num;
 
-	enable_critint();
-		
 	mtspr(SPR_GPIR, gpir);
 
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
@@ -1650,13 +1598,18 @@ static void start_guest_secondary(void)
 		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
 
-		if (cpu->ret_hook)
-			break;
-	}
+		/* If we get a stop or a restart, take the gevent from idle state */
+		if (gcpu->gevent_pending & ((1 << GEV_STOP) |
+		                            (1 << GEV_RESTART))) {
+			send_doorbell(cpu->coreid);
+			switch_thread(&idle_thread[cpu->coreid]);
+		}
 
-	disable_critint();
-	if (cpu->ret_hook)
-		return;
+		if (gcpu->gevent_pending & (1 << GEV_PAUSE)) {
+			atomic_and(&gcpu->gevent_pending, ~(1 << GEV_PAUSE));
+			pause_core(regs);
+		}
+	}
 
 	guest_core_init(guest);
 
@@ -1677,35 +1630,20 @@ static void start_guest_secondary(void)
 	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
-	trapframe.gpregs[3] = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
-	trapframe.gpregs[4] = 0;
-	trapframe.gpregs[5] = 0;
-	trapframe.gpregs[6] = 0;
-	trapframe.gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
-	trapframe.gpregs[8] = 0;
-	trapframe.gpregs[9] = 0;
+	assert(cpu->traplevel == 0);
+	assert(cpu->thread == &gcpu->thread);
+
+	regs->gpregs[1] = 0xdeadbeef;
+	regs->gpregs[3] = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
+	regs->gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+
+	regs->srr0 = guest->spintbl[gpir].addr_lo; // FIXME 64-bit
+	regs->srr1 = MSR_GS;
 
 #ifdef CONFIG_DEBUG_STUB
 	if (guest->stub_ops && guest->stub_ops->vcpu_start)
-		guest->stub_ops->vcpu_start(&trapframe);
+		guest->stub_ops->vcpu_start(regs);
 #endif
-
-	r3 = trapframe.gpregs[3];
-	r4 = trapframe.gpregs[4];
-	r5 = trapframe.gpregs[5];
-	r6 = trapframe.gpregs[6];
-	r7 = trapframe.gpregs[7];
-	r8 = trapframe.gpregs[8];
-	r9 = trapframe.gpregs[9];
-
-	cpu->traplevel = 0;
-	asm volatile("mtsrr0 %0; mtsrr1 %1; rfi" : :
-	             "r" (guest->spintbl[gpir].addr_lo), "r" (MSR_GS),
-	             "r" (r3), "r" (r4), "r" (r5), "r" (r6), "r" (r7),
-		     "r" (r8), "r" (r9)
-	             : "memory");
-
-	BUG();
 }
 
 void start_core(trapframe_t *regs)
@@ -1714,15 +1652,18 @@ void start_core(trapframe_t *regs)
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
+	void (*fn)(trapframe_t *regs, void *arg);
 
 	assert(guest->state == guest_starting);
 
 	if (gcpu == guest->gcpus[0])
-		start_guest_primary_nowait();
+		fn = start_guest_primary_nowait;
 	else
-		start_guest_secondary();
+		fn = start_guest_secondary;
 
-	wait_for_gevent(regs);
+	assert(cpu->thread == &idle_thread[cpu->coreid]);
+	new_thread_inplace(&gcpu->thread, gcpu->hvstack, fn, NULL);
+	switch_thread(&gcpu->thread);
 }
 
 void start_wait_core(trapframe_t *regs)
@@ -1735,10 +1676,10 @@ void start_wait_core(trapframe_t *regs)
 	assert(gcpu == guest->gcpus[0]);
 	assert(guest->state == guest_starting);
 
-	start_guest_primary();
-
-	assert(guest->state != guest_running);
-	wait_for_gevent(regs);
+	assert(cpu->thread == &idle_thread[cpu->coreid]);
+	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
+	                   start_guest_primary, NULL);
+	switch_thread(&gcpu->thread);
 }
 
 void do_stop_core(trapframe_t *regs, int restart)
@@ -1757,7 +1698,9 @@ void do_stop_core(trapframe_t *regs, int restart)
 	}
 #endif
 
+	disable_int();
 	guest_reset_tlb();
+	enable_int();
 
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
 		for (i = 0; i < MAX_HANDLES; i++) {
@@ -1777,10 +1720,14 @@ void do_stop_core(trapframe_t *regs, int restart)
 	}
 
 	mpic_reset_core();
+
 	memset(&gcpu->gdbell_pending, 0,
 	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
-	wait_for_gevent(regs);
+	if (cpu->ret_hook)
+		send_doorbell(cpu->coreid);
+
+	switch_thread(&idle_thread[cpu->coreid]);
 }
 
 void stop_core(trapframe_t *regs)
@@ -1788,12 +1735,54 @@ void stop_core(trapframe_t *regs)
 	do_stop_core(regs, 0);
 }
 
+void restart_core(trapframe_t *regs)
+{
+	do_stop_core(regs, 1);
+}
+
+void pause_core(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "pause core\n");
+	assert(guest->state == guest_pausing);
+
+	if (atomic_add(&guest->active_cpus, -1) == 0) {
+		guest->active_cpus = guest->cpucnt;
+		smp_lwsync();
+		guest->state = guest_paused;
+		send_doorbells(guest->dbell_state_change);
+	}
+
+	if (cpu->ret_hook)
+		send_doorbell(cpu->coreid);
+
+	switch_thread(&idle_thread[cpu->coreid]);
+}
+
+void resume_core(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "resume core\n");
+	assert(guest->state == guest_resuming);
+
+	if (atomic_add(&guest->active_cpus, 1) == guest->cpucnt) {
+		guest->state = guest_running;
+		send_doorbells(guest->dbell_state_change);
+	}
+
+	switch_thread(&get_gcpu()->thread);
+}
+
 int stop_guest(guest_t *guest)
 {
 	unsigned int i, ret = 0;
 	spin_lock(&guest->state_lock);
 
-	if (guest->state != guest_running)
+	if (guest->state != guest_running && guest->state != guest_paused)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
@@ -1825,6 +1814,51 @@ int start_guest(guest_t *guest)
 		return ret;
 
 	setgevent(guest->gcpus[0], GEV_START);
+	return ret;
+}
+
+int pause_guest(guest_t *guest)
+{
+	unsigned int i, ret = 0;
+	spin_lock(&guest->state_lock);
+
+	if (guest->state != guest_running)
+		ret = ERR_INVALID;
+	else
+		guest->state = guest_pausing;
+
+	spin_unlock(&guest->state_lock);
+	
+	if (ret)
+		return ret;
+
+	for (i = 0; i < guest->cpucnt; i++)
+		setgevent(guest->gcpus[i], GEV_PAUSE);
+
+	return ret;
+}
+
+int resume_guest(guest_t *guest)
+{
+	int ret = 0, i;
+	spin_lock(&guest->state_lock);
+
+	if (guest->state != guest_paused) {
+		ret = ERR_INVALID;
+	} else {
+		guest->active_cpus = 0;
+		smp_lwsync();
+		guest->state = guest_resuming;
+	}
+
+	spin_unlock(&guest->state_lock);
+	
+	if (ret)
+		return ret;
+
+	for (i = 0; i < guest->cpucnt; i++)
+		setgevent(guest->gcpus[i], GEV_RESUME);
+
 	return ret;
 }
 
@@ -2042,7 +2076,8 @@ static int init_guest_devs(guest_t *guest)
 	                        map_device_to_guest, NULL);
 }
 
-static int init_guest_primary(guest_t *guest)
+/* Don't inline this inside init_guest, to isolate its stack usage. */
+static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 {
 	int ret;
 	dt_prop_t *prop;
@@ -2187,7 +2222,6 @@ static int init_guest_primary(guest_t *guest)
 			 "%s: error %d merging partition node-update\n",
 			 __func__, ret);
 
-	start_guest_primary();
 	return 0;
 
 fail:
@@ -2239,6 +2273,7 @@ __attribute__((noreturn)) void init_guest(void)
 {
 	int pir = mfspr(SPR_PIR);
 	init_guest_ctx_t ctx = {};
+	gcpu_t *gcpu = get_gcpu();
 
 	dt_for_each_compatible(config_tree, "partition",
 	                       init_guest_one, &ctx);
@@ -2246,7 +2281,7 @@ __attribute__((noreturn)) void init_guest(void)
 	if (ctx.guest) {
 		guest_t *guest = ctx.guest;
 
-		get_gcpu()->guest = guest;
+		gcpu->guest = guest;
 
 		mtspr(SPR_LPIDR, guest->lpid);
 
@@ -2255,14 +2290,18 @@ __attribute__((noreturn)) void init_guest(void)
 
 		if (pir == guest->cpulist[0]) {
 			/* Boot CPU */
-			init_guest_primary(guest);
+			if (init_guest_primary(guest) == 0) {
+				guest->state = guest_starting;
+				setgevent(gcpu, GEV_START_WAIT);
+			}
 		} else {
 			register_gcpu_with_guest(guest);
 
 #ifdef CONFIG_DEBUG_STUB
 			/* set a pointer to the stub's config node */
 			if (guest->stub_ops && guest->stub_ops->compatible)
-				get_gcpu()->dbgstub_cfg = find_stub_config_node(guest->stub_ops->compatible);
+				gcpu->dbgstub_cfg =
+					find_stub_config_node(guest->stub_ops->compatible);
 
 			if (guest->stub_ops && guest->stub_ops->vcpu_init) {
 				guest->stub_ops->vcpu_init();
@@ -2271,19 +2310,13 @@ __attribute__((noreturn)) void init_guest(void)
 		}
 	}
 
-	/* Like wait_for_gevent(), but without a
-	 * stack frame to return on.
-	 */
-	register_t new_r1 = (register_t)&cpu->kstack[KSTACK_SIZE - FRAMELEN];
+	gcpu->waiting_for_gevent = 1;
 
-	/* Terminate the callback chain. */
-	cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
+	if (cpu->ret_hook)
+		send_doorbell(cpu->coreid);
 
-	get_gcpu()->waiting_for_gevent = 1;
+	enable_int();
+	idle_loop();
 
-	asm volatile("mtsrr0 %0; mtsrr1 %1; mr %%r1, %2; rfi" : :
-	             "r" (wait_for_gevent_loop),
-	             "r" (mfmsr() | MSR_CE),
-	             "r" (new_r1) : "memory");
 	BUG();
 }

@@ -63,7 +63,7 @@
 	STORE	%r7, LONGBYTES*4(%r2)
 	li	%r6, 1
 
-	mtmsr	%r5			// disable critints
+	mtmsr	%r5			// disable ints
 
 	mfcr	%r4
 	rlwinm	%r5, %r3, 0, 31		// r5 = index bits from SPRG3

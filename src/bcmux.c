@@ -82,7 +82,7 @@ static void mux_get_data(queue_t *q)
 		return;
 	}
 	
-	register_t saved = spin_lock_critsave(&mux->byte_chan->rx_lock);
+	register_t saved = spin_lock_intsave(&mux->byte_chan->rx_lock);
 	
 	/* Add a string to byte channel */
 	while ((ch = queue_readchar(mux->byte_chan->rx)) >= 0) {
@@ -128,7 +128,7 @@ static void mux_get_data(queue_t *q)
 		}
 	}
 
-	spin_unlock_critsave(&mux->byte_chan->rx_lock, saved);
+	spin_unlock_intsave(&mux->byte_chan->rx_lock, saved);
 
 	if (notify)
 		queue_notify_consumer(notify);
@@ -198,7 +198,7 @@ static void mux_send_data_pull(queue_t *q)
 		return;
 	}
 	
-	register_t saved = spin_lock_critsave(&mux->byte_chan->tx_lock);
+	register_t saved = spin_lock_intsave(&mux->byte_chan->tx_lock);
 
 	connected_bc_t *first_cbc = mux->current_tx_bc;
 	if (!first_cbc)
@@ -226,7 +226,7 @@ static void mux_send_data_pull(queue_t *q)
 	if (ret >= 0 && total < 64)
 		q->space_avail = NULL;
 	
-	spin_unlock_critsave(&mux->byte_chan->tx_lock, saved);
+	spin_unlock_intsave(&mux->byte_chan->tx_lock, saved);
 }
 
 static void mux_send_data_push(queue_t *q)
@@ -234,7 +234,7 @@ static void mux_send_data_push(queue_t *q)
 	connected_bc_t *cbc = q->consumer;
 	mux_complex_t *mux = cbc->mux_complex;
 	int lock = !unlikely(cpu->crashing);
-	register_t saved = disable_critint_save();
+	register_t saved = disable_int_save();
 
 	if (lock) {
 		if (spin_lock_held(&mux->byte_chan->tx_lock)) {
@@ -256,7 +256,7 @@ static void mux_send_data_push(queue_t *q)
 	if (lock)
 		spin_unlock(&mux->byte_chan->tx_lock);
 
-	restore_critint(saved);
+	restore_int(saved);
 }
 
 /** Create a byte channel multiplexer.
@@ -318,7 +318,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	handle->tx->space_avail = NULL;
 	handle->rx->data_avail = mux_send_data_push;
 
-	register_t saved = spin_lock_critsave(&mux->byte_chan->rx_lock);
+	register_t saved = spin_lock_intsave(&mux->byte_chan->rx_lock);
 	spin_lock(&mux->byte_chan->tx_lock);
 	
 	if (mux->first_bc == NULL) {
@@ -335,7 +335,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	mux->num_of_channels++;
 
 	spin_unlock(&mux->byte_chan->tx_lock);
-	spin_unlock_critsave(&mux->byte_chan->rx_lock, saved);
+	spin_unlock_intsave(&mux->byte_chan->rx_lock, saved);
 	return 0;
 }
 

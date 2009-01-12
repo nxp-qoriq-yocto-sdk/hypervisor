@@ -91,7 +91,7 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define EXC_GDOORBELLC_HANDLER guest_critical_doorbell
 #define EXC_HCALL_HANDLER hcall
 #define EXC_EHPRIV_HANDLER hvpriv
-#define EXC_DOORBELLC_HANDLER critical_doorbell_int
+#define EXC_DOORBELL_HANDLER doorbell_int
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
 

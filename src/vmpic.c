@@ -123,14 +123,14 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 		return ERR_BUSY;
 	}
 
-	saved = spin_lock_critsave(&vmpic_lock);
+	saved = spin_lock_intsave(&vmpic_lock);
 
 	vmirq = irq->priv;
 	if (vmirq) {
 		assert(vmirq->irq == irq);
 
 		if (vmirq->guest != guest) {
-			spin_unlock_critsave(&vmpic_lock, saved);
+			spin_unlock_intsave(&vmpic_lock, saved);
 
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 			         "%s: cannot share IRQ\n",
@@ -144,7 +144,7 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 		assert(guest->handles[handle]);
 		assert(vmirq == guest->handles[handle]->intr);
 
-		spin_unlock_critsave(&vmpic_lock, saved);
+		spin_unlock_intsave(&vmpic_lock, saved);
 		return handle;
 	}
 
@@ -161,7 +161,7 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 	mpic_irq_set_vector(irq, handle);
 
 out:
-	spin_unlock_critsave(&vmpic_lock, saved);
+	spin_unlock_intsave(&vmpic_lock, saved);
 	return handle;
 }
 

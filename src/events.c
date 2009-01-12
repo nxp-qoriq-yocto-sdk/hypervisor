@@ -33,8 +33,8 @@
 #include <percpu.h>
 
 static eventfp_t event_table[] = {
-	&critdbell_to_gdbell_glue,  /* EV_ASSERT_VINT */
-	&tlbivax_ipi,               /* EV_TLBIVAX */
+	&dbell_to_gdbell_glue,  /* EV_ASSERT_VINT */
+	&tlbivax_ipi,           /* EV_TLBIVAX */
 };
 
 /* Guest events are processed when returning to the guest, but
@@ -50,14 +50,16 @@ static eventfp_t gevent_table[] = {
 #else
 	NULL,                         /* GEV_GDB */
 #endif
+	&pause_core,                  /* GEV_PAUSE */
+	&resume_core,                 /* GEV_RESUME */
 };
 
 void setevent(gcpu_t *gcpu, int event)
 {
 	/* set the event bit */
 	smp_mbar();
-	atomic_or(&gcpu->cdbell_pending, (1 << event));
-	send_crit_doorbell(gcpu->cpu->coreid);
+	atomic_or(&gcpu->dbell_pending, (1 << event));
+	send_doorbell(gcpu->cpu->coreid);
 
 	// TODO optimization -- could check if it's on
 	// the same cpu and just invoke
@@ -72,8 +74,8 @@ void setgevent(gcpu_t *gcpu, int event)
 	smp_mbar();
 	gcpu->cpu->ret_hook = 1;
 
-	if (gcpu->cpu != cpu)
-		send_crit_doorbell(gcpu->cpu->coreid);
+	if (gcpu->cpu != cpu || cpu->traplevel != 0)
+		send_doorbell(gcpu->cpu->coreid);
 }
 
 void return_hook(trapframe_t *regs)
@@ -84,13 +86,21 @@ void return_hook(trapframe_t *regs)
 	if (unlikely(!(regs->srr1 & MSR_GS)) && !waiting)
 		return;
 
-	assert(!(mfmsr() & MSR_CE));
+	if (unlikely(cpu->traplevel != 0))
+		return;
+
 	assert(cpu->ret_hook);
 
-	cpu->ret_hook = 0;
 	gcpu->waiting_for_gevent = 0;
+	enable_int();
 	
 	while (gcpu->gevent_pending) {
+		cpu->ret_hook = 0;
+		smp_sync();
+
+		if (!gcpu->gevent_pending)
+			break;
+
 		/* get the next event */
 		unsigned int bit = count_lsb_zeroes(gcpu->gevent_pending);
 		assert(bit < sizeof(gevent_table) / sizeof(eventfp_t));
@@ -104,60 +114,26 @@ void return_hook(trapframe_t *regs)
 		gevent_table[bit](regs);
 	}
 
-	/* If we interrupted a waiting context, we want it to still
-	 * be waiting.  However, if we interrupted a non-waiting context,
-	 * but the gevent is returning to a wait loop, we want to keep
-	 * the new setting of waiting_for_gevent.
-	 */
-	if (!gcpu->waiting_for_gevent)
-		gcpu->waiting_for_gevent = waiting;
-
-	assert(!(mfmsr() & MSR_CE));
+	disable_int();
+	gcpu->waiting_for_gevent = waiting;
 }
 
-void critical_doorbell_int(trapframe_t *regs)
+void doorbell_int(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
-	assert(!(mfmsr() & MSR_CE));
+	assert(!(mfmsr() & MSR_EE));
 
-	while (gcpu->cdbell_pending) {
+	while (gcpu->dbell_pending) {
 		/* get the next event */
-		int bit = count_lsb_zeroes(gcpu->cdbell_pending);
+		int bit = count_lsb_zeroes(gcpu->dbell_pending);
 		assert(bit < sizeof(event_table) / sizeof(eventfp_t));
 
 		/* clear the event */
-		atomic_and(&gcpu->cdbell_pending, ~(1 << bit));
+		atomic_and(&gcpu->dbell_pending, ~(1 << bit));
 
 		smp_lwsync();
 
 		/* invoke the function */
 		event_table[bit](regs);
 	}
-}
-
-/** Wait for a guest event, discarding current state.
- *
- * This is used to wait for events such as GEV_START.
- * Any previous state, whether guest or hypervisor, on
- * this core will be lost.
- */
-void wait_for_gevent(trapframe_t *regs)
-{
-	disable_critint();
-	get_gcpu()->waiting_for_gevent = 1;
-		
-	regs->srr1 = mfmsr() | MSR_CE;
-	regs->srr0 = (register_t)wait_for_gevent_loop;
-	
-	/* Reset the stack. */
-	regs->gpregs[1] = (register_t)&cpu->kstack[KSTACK_SIZE - FRAMELEN];
-
-	/* Terminate the callback chain. */
-	cpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
-	
-	/* If a gevent has already been sent, send another now
-	 * that critints are disabled.
-	 */
-	if (cpu->ret_hook)
-		send_crit_doorbell(cpu->coreid);
 }

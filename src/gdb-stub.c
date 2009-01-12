@@ -1097,14 +1097,21 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
 	const char *td; /* td: target description */
+
 	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 		"gdb: in RSP Engine, main loop.\n");
-	stub_start: {
-		TRACE("At stub_start.");
-		/* Deregister call back. */
-		stub->node->bch->rx->data_avail = NULL;
-		enable_critint();
+
+stub_start:
+	TRACE("At stub_start.");
+
+	if (queue_empty(stub->node->bch->rx)) {
+		TRACE("Returning to guest.");
+		return;
 	}
+
+	/* Deregister call back. */
+	stub->node->bch->rx->data_avail = NULL;
+
 	while (1) {
 		TRACE("In main loop.");
 		dump_breakpoint_table(stub->breakpoint_table);
@@ -1113,8 +1120,7 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 		switch(tokenize(content(stub->cmd))) {
 
 		case continue_execution:
-			/* o disable_critint() on a continue.
-			 * o Reregister call backs.
+			/* o Reregister call backs.
 			 * o Check byte channel if something arrived in the
 			 *   meanwhile and if something _did_ arrive, loop
 			 *   back to the beginning of the gdb_stub_event_handler
@@ -1122,17 +1128,10 @@ void gdb_stub_event_handler(trapframe_t *trap_frame)
 			 */
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"GOT 'c' PACKET.\n");
-			return_to_guest:
-				disable_critint();
-				stub->node->bch->rx->data_avail = rx;
-				if (queue_empty(stub->node->bch->rx)) {
-					TRACE("Returning to guest.");
-					return;
-				} else {
-					TRACE("Back to stub_start.");
-					goto stub_start;
-				}
-			break;
+return_to_guest:
+			stub->node->bch->rx->data_avail = rx;
+			smp_sync();
+			goto stub_start;
 
 		case read_register:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,

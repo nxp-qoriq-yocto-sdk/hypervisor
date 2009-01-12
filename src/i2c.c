@@ -76,10 +76,10 @@ void i2c_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
 	// vpic_deassert_vint() will de-assert the second interrupt instead of
 	// the first.
 
-	register_t saved = disable_critint_save();
+	register_t saved = disable_int_save();
 
 	if (unlikely(emu_load_store(regs, insn, vaddr, &store, &reg))) {
-		restore_critint(saved);
+		restore_int(saved);
 		regs->exc = EXC_PROGRAM;
 		mtspr(SPR_ESR, ESR_PIL);
 		reflect_trap(regs);
@@ -107,7 +107,7 @@ void i2c_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
 			regs->gpregs[reg] |= guest->i2c_sr;
 	}
 
-	restore_critint(saved);
+	restore_int(saved);
 
 	regs->srr0 += 4;
 }

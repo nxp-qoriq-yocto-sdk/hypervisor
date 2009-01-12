@@ -498,3 +498,69 @@ static command_t stop = {
 	            "  The partition number can be obtained with list-partitions.",
 };
 shell_cmd(stop);
+
+static void pause_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	guest = &guests[num];
+	if (pause_guest(guest))
+		qprintf(shell->out, "Couldn't pause partition.\n");
+}
+
+
+static command_t pause = {
+	.name = "pause",
+	.action = pause_fn,
+	.shorthelp = "Stop a partition",
+	.longhelp = "  Usage: pause <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(pause);
+
+static void resume_fn(shell_t *shell, char *args)
+{
+	char *numstr;
+	unsigned int num;
+	guest_t *guest;
+	
+	args = stripspace(args);
+	numstr = nextword(&args);
+
+	if (!numstr) {
+		qprintf(shell->out, "Usage: partition-info <number>\n");
+		return;
+	}
+	
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	guest = &guests[num];
+	if (resume_guest(guest))
+		qprintf(shell->out, "Couldn't resume partition.\n");
+}
+
+
+static command_t resume = {
+	.name = "resume",
+	.action = resume_fn,
+	.shorthelp = "Stop a partition",
+	.longhelp = "  Usage: resume <number>\n\n"
+	            "  The partition number can be obtained with list-partitions.",
+};
+shell_cmd(resume);

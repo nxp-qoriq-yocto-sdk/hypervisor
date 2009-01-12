@@ -26,15 +26,22 @@
 
 #include <libos/fsl-booke-tlb.h>
 
-/** Wait until a guest-event critical interrupt is delivered.
- *
- * Don't call this directly; only return to it with waiting_for_gevent
- * set, the stack reset, and critical interrupts enabled.
- */
-.global wait_for_gevent_loop
-wait_for_gevent_loop:
+#if 1
+/* 32-bit */
+#define LONGBYTES 4
+#define LOAD lwz
+#define STORE stw
+#else
+/* 64-bit */
+#define LONGBYTES 8
+#define LOAD ld
+#define STORE std
+#endif
+
+.global idle_loop
+idle_loop:
 	wait
-	b	wait_for_gevent_loop
+	b	idle_loop
 
 /** Branch to relocated hypervisor code
  * r3 = bigmap virtual address of new text base

@@ -86,7 +86,10 @@ typedef enum {
 	guest_stopped = 0,
 	guest_running = 1,
 	guest_starting = 2,
-	guest_stopping = 3
+	guest_stopping = 3,
+	guest_pausing = 4,
+	guest_paused = 5,
+	guest_resuming = 6,
 } gstate_t;
 
 typedef struct guest {
@@ -213,10 +216,11 @@ typedef struct gcpu {
 	kstack_t hvstack;
 	guest_t *guest;
 	cpu_t *cpu;
+	thread_t thread;
 	tlbmap_t tlb1_inuse;
 	tlbmap_t tlb1_map[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
-	unsigned long cdbell_pending;
+	unsigned long dbell_pending;
 	unsigned long gevent_pending;
 	int gcpu_num, waiting_for_gevent;
 	vpic_cpu_t vpic;

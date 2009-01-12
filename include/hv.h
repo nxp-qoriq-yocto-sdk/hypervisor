@@ -27,6 +27,8 @@
 #define HV_H
 
 #include <libos/libos.h>
+#include <libos/thread.h>
+#include <libos/trapframe.h>
 
 #define FH_API_VERSION 1
 #define FH_API_COMPAT_VERSION 1
@@ -38,6 +40,8 @@ struct guest;
 int start_guest(struct guest *guest);
 int stop_guest(struct guest *guest);
 int restart_guest(struct guest *guest);
+int pause_guest(struct guest *guest);
+int resume_guest(struct guest *guest);
 phys_addr_t find_lowest_guest_phys(void *fdt);
 
 char *stripspace(const char *str);
@@ -50,5 +54,11 @@ int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu);
 
 void branch_to_reloc(void *bigmap_text_base,
                      register_t mas3, register_t mas7);
+
+extern thread_t idle_thread[MAX_CORES];
+
+thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg), void *arg);
+void new_thread_inplace(thread_t *thread, uint8_t *stack,
+                        void (*func)(trapframe_t *regs, void *arg), void *arg);
 
 #endif

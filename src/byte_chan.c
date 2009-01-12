@@ -141,9 +141,9 @@ int byte_chan_attach_chardev(byte_chan_t *bc, chardev_t *cd)
 	register_t saved;
 	int ret;
 
-	saved = spin_lock_critsave(&bchan_lock);
+	saved = spin_lock_intsave(&bchan_lock);
 	ret = __byte_chan_attach_chardev(bc, cd);
-	spin_unlock_critsave(&bchan_lock, saved);
+	spin_unlock_intsave(&bchan_lock, saved);
 
 	return ret;
 }

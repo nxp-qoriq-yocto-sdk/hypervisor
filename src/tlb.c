@@ -424,7 +424,7 @@ int guest_tlb1_miss(register_t vaddr, int space, int pid)
 		rpn &= ~(mappages - 1);
 		epn &= ~(mappages - 1);
 
-		disable_critint();
+		disable_int();
 		save_mas(gcpu);
 
 		index = alloc_tlb1(i, 1);
@@ -436,7 +436,7 @@ int guest_tlb1_miss(register_t vaddr, int space, int pid)
 		               pid, space, MAS8_GTS);
 
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 		         "guest_tlb1_miss: inserting %d %lx %lx %d %lx %lx %d %d\n",
@@ -476,7 +476,7 @@ int guest_tlb_isi(register_t vaddr, int space, int pid)
 	gcpu_t *gcpu = get_gcpu();
 	int ret = TLB_MISS_REFLECT;
 
-	disable_critint();
+	disable_int();
 	save_mas(gcpu);
 
 	mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
@@ -494,7 +494,7 @@ int guest_tlb_isi(register_t vaddr, int space, int pid)
 	}
 
 	restore_mas(gcpu);
-	enable_critint();
+	enable_int();
 	
 	return ret;
 }
@@ -783,7 +783,7 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
  */
 int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 {
-	unsigned long saved = spin_lock_critsave(&map_lock);
+	unsigned long saved = spin_lock_intsave(&map_lock);
 	unsigned long page = vaddr >> PAGE_SHIFT;
 	int ret = 0;
 
@@ -800,13 +800,13 @@ int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 		break;
 	}
 	
-	spin_unlock_critsave(&map_lock, saved);
+	spin_unlock_intsave(&map_lock, saved);
 	return ret;
 }
 
 void secondary_map_mem(void)
 {
-	unsigned long saved = spin_lock_critsave(&map_lock);
+	unsigned long saved = spin_lock_intsave(&map_lock);
 
 	cpu->client.next_dyn_tlbe = DYN_TLB_START;
 
@@ -818,7 +818,7 @@ void secondary_map_mem(void)
 			insert_map_entry(me, me->start_page << PAGE_SHIFT);
 	}
 	
-	spin_unlock_critsave(&map_lock, saved);
+	spin_unlock_intsave(&map_lock, saved);
 }
 
 /** Create a permanent hypervisor mapping
@@ -839,7 +839,7 @@ void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags)
 	unsigned long start_page = paddr >> PAGE_SHIFT;
 	unsigned long end_page = (paddr + len - 1) >> PAGE_SHIFT;
 
-	saved = spin_lock_critsave(&map_lock);
+	saved = spin_lock_intsave(&map_lock);
 
 	/* Look for an existing region of which this is a subset */
 	list_for_each(&maps, i) {
@@ -883,12 +883,12 @@ void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags)
 	list_add(&maps, &me->map_node);
 
 out:
-	spin_unlock_critsave(&map_lock, saved);
+	spin_unlock_intsave(&map_lock, saved);
 	return (void *)ret;
 
 out_me:
 	free(me);
-	spin_unlock_critsave(&map_lock, saved);
+	spin_unlock_intsave(&map_lock, saved);
 	return (void *)ret;
 }
 
@@ -913,7 +913,7 @@ int map_hv_pma(phys_addr_t paddr, size_t len, int text)
 	int entries = order & 1 ? 2 : 1;
 	int ret = 0;
 	
-	saved = spin_lock_critsave(&map_lock);
+	saved = spin_lock_intsave(&map_lock);
 
 	for (int i = 0; i < entries; i++) {
 		unsigned long page = paddr >> PAGE_SHIFT;
@@ -946,7 +946,7 @@ int map_hv_pma(phys_addr_t paddr, size_t len, int text)
 	}
 
 out:
-	spin_unlock_critsave(&map_lock, saved);
+	spin_unlock_intsave(&map_lock, saved);
 	return ret;
 }
 

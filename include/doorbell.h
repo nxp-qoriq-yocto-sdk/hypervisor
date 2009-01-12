@@ -39,18 +39,8 @@
 #define MSG_GBELL_CRIT 0x18000000
 #define MSG_GBELL_MCHK 0x20000000
 
-/** Send local guest doorbell.
- *
- *  Sends a guest doorbell to the current
- *  cpu.
- *
- */
-static inline void send_local_guest_doorbell(void)
+static inline void send_doorbell_msg(unsigned long msg)
 {
-	unsigned long msg = MSG_GBELL |
-	                    (get_gcpu()->guest->lpid << 14) |
-	                    mfspr(SPR_GPIR);
-
 	/* msgsnd is ordered as a store relative to sync instructions,
 	 * but not as a cacheable store, so we need a full sync
 	 * to order with any previous stores that the doorbell handler
@@ -59,37 +49,45 @@ static inline void send_local_guest_doorbell(void)
 	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
 }
 
+/** Send local guest doorbell.
+ *
+ *  Sends a guest doorbell to the current
+ *  cpu.
+ */
+static inline void send_local_guest_doorbell(void)
+{
+	send_doorbell_msg(MSG_GBELL | (get_gcpu()->guest->lpid << 14) |
+	                  mfspr(SPR_GPIR));
+}
+
 /** Send local critical guest doorbell.
  *
  *  Sends a guest critical doorbell to the current cpu.
- *
  */
 static inline void send_local_crit_guest_doorbell(void)
 {
-	unsigned long msg = MSG_GBELL_CRIT |
-	                    (get_gcpu()->guest->lpid << 14) |
-	                    mfspr(SPR_GPIR);
-
-	/* msgsnd is ordered as a store relative to sync instructions,
-	 * but not as a cacheable store, so we need a full sync
-	 * to order with any previous stores that the doorbell handler
-	 * needs to see.
-	 */
-	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
+	send_doorbell_msg(MSG_GBELL_CRIT | (get_gcpu()->guest->lpid << 14) |
+	                  mfspr(SPR_GPIR));
 }
 
 /** Send critical doorbell.
  *
  *  Always for hypervisor internal use only so
  *  the lpid is always 0.
- *
  */
 static inline void send_crit_doorbell(int cpu)
 {
-	unsigned long msg = MSG_DBELL_CRIT | cpu;
+	send_doorbell_msg(MSG_DBELL_CRIT | cpu);
+}
 
-	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
-
+/** Send doorbell.
+ *
+ *  Always for hypervisor internal use only so
+ *  the lpid is always 0.
+ */
+static inline void send_doorbell(int cpu)
+{
+	send_doorbell_msg(MSG_DBELL | cpu);
 }
 
 #endif

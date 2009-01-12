@@ -48,7 +48,7 @@ void decrementer(trapframe_t *regs)
 
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 
-	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
+	if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS))) {
 		reflect_trap(regs);
 		return;
 	}
@@ -80,7 +80,7 @@ void enable_tcr_die(void)
 
 void fit(trapframe_t *regs)
 {
-	if (__builtin_expect(!!(regs->srr1 & MSR_EE), 1)) {
+	if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS))) {
 		reflect_trap(regs);
 		return;
 	}
@@ -303,7 +303,7 @@ void set_tsr(uint32_t tsr)
 	 * We disable critical interrupts so that watchdog_trap() is not called
 	 * while we're working on TCR.
 	 */
-	saved = disable_critint_save();
+	saved = disable_int_save();
 
 	tcr = mfspr(SPR_TCR);
 
@@ -334,7 +334,7 @@ void set_tsr(uint32_t tsr)
 	// the system was reset by a watchdog.
 	gcpu->tsr = 0;
 
-	restore_critint(saved);
+	restore_int(saved);
 }
 
 uint32_t get_tcr(void)

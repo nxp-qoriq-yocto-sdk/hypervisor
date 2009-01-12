@@ -51,7 +51,7 @@ int send_doorbells(struct ipi_doorbell *dbell)
 	if (!dbell)
 		return -ERR_INVALID;
 
-	saved = spin_lock_critsave(&dbell->dbell_lock);
+	saved = spin_lock_intsave(&dbell->dbell_lock);
 	if (dbell->recv_head) {
 		guest_recv_dbell_list_t *receiver = dbell->recv_head;
 		while (receiver) {
@@ -60,7 +60,7 @@ int send_doorbells(struct ipi_doorbell *dbell)
 			count++;
 		}
 	}
-	spin_unlock_critsave(&dbell->dbell_lock, saved);
+	spin_unlock_intsave(&dbell->dbell_lock, saved);
 
 	return count;
 }
@@ -156,10 +156,10 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 	}
 
 	// Add this receive handle to the list of receive handles for the doorbell
-	register_t saved = spin_lock_critsave(&dbell->dbell_lock);
+	register_t saved = spin_lock_intsave(&dbell->dbell_lock);
 	recv_list->next = dbell->recv_head;
 	dbell->recv_head = recv_list;
-	spin_unlock_critsave(&dbell->dbell_lock, saved);
+	spin_unlock_intsave(&dbell->dbell_lock, saved);
 
 	recv_list->guest_vint = virq;
 

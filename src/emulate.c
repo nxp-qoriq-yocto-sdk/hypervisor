@@ -264,7 +264,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	int ret = 0;
 	register_t saved;
 
-	saved = disable_critint_save(); 
+	saved = disable_int_save(); 
 	save_mas(gcpu);
 
 	inc_stat(stat_emu_tlbilx);
@@ -294,7 +294,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	}
 
 	restore_mas(gcpu);
-	restore_critint(saved);
+	restore_int(saved);
 
 	return ret;
 }
@@ -349,7 +349,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	register_t mas1, mas6;
 
 	inc_stat(stat_emu_tlbsx);
-	disable_critint();
+	disable_int();
 	
 	mas6 = mfspr(SPR_MAS6);
 	mas1 = (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT) |
@@ -364,7 +364,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 		mtspr(SPR_MAS3, gcpu->gtlb1[tlb1].mas3);
 		mtspr(SPR_MAS7, gcpu->gtlb1[tlb1].mas7);
 
-		enable_critint();
+		enable_int();
 		return 0;
 	}
 
@@ -376,7 +376,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 
 	if (find_gtlb_entry(va, tag, &set, &way)) {
 		gtlb0_to_mas(set - cpu->client.tlbcache, way);
-		enable_critint();
+		enable_int();
 		return 0;
 	}
 #endif
@@ -384,7 +384,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
 
-	enable_critint();
+	enable_int();
 	return 0;
 }
 
@@ -404,7 +404,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 	tlb = MAS0_GET_TLBSEL(mas0);
 	if (tlb == 0) {
-		disable_critint();
+		disable_int();
 
 #ifdef CONFIG_TLB_CACHE
 		gtlb0_to_mas((mfspr(SPR_MAS2) >> MAS2_EPN_SHIFT) &
@@ -414,7 +414,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 		asm volatile("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
 #endif
-		enable_critint();
+		enable_int();
 		return 0;
 	}
 
@@ -440,7 +440,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	unsigned long grpn, mas0, mas1, mas2, mas3, mas7;
 	int ret;
 
-	disable_critint();
+	disable_int();
 	save_mas(gcpu);
 	
 	mas0 = gcpu->mas0;
@@ -456,7 +456,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbwe@0x%lx: reserved bits in MAS0: 0x%lx\n",
 		         regs->srr0, mas0);
@@ -465,7 +465,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	if (gcpu->mas1 & MAS1_RESERVED) {
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbwe@0x%lx: reserved bits in MAS1: 0x%lx\n",
 		         regs->srr0, mas0);
@@ -474,7 +474,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	if (gcpu->mas2 & MAS2_RESERVED) {
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbwe@0x%lx: reserved bits in MAS2: 0x%lx\n",
 		         regs->srr0, mas0);
@@ -483,7 +483,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	if (gcpu->mas3 & MAS3_RESERVED) {
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbwe@0x%lx: reserved bits in MAS3: 0x%lx\n",
 		         regs->srr0, mas0);
@@ -492,7 +492,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	if (gcpu->mas7 & MAS7_RESERVED) {
 		restore_mas(gcpu);
-		enable_critint();
+		enable_int();
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 		         "tlbwe@0x%lx: reserved bits in MAS7: 0x%lx\n",
 		         regs->srr0, mas0);
@@ -516,7 +516,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			if (((mas2 >> PAGE_SHIFT) & (pages - 1)) ||
 			    ((mas3 >> PAGE_SHIFT) & (pages - 1))) {
 				restore_mas(gcpu);
-				enable_critint();
+				enable_int();
 
 				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 				         "tlbwe@0x%lx: misaligned: mas0 = 0x%lx, mas1 = 0x%lx,\n"
@@ -538,7 +538,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		int dup = guest_find_tlb1(tlb1esel, mas1, epn);
 		if (dup >= 0) {
 			restore_mas(gcpu);
-			enable_critint();
+			enable_int();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
@@ -594,7 +594,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			}
 
 			restore_mas(gcpu);
-			enable_critint();
+			enable_int();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
@@ -620,7 +620,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 		if (entry >= TLB1_GSIZE) {
 			restore_mas(gcpu);
-			enable_critint();
+			enable_int();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@0x%lx: attempt to write TLB1 entry %d (max %d)\n",
@@ -656,7 +656,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		ret = guest_set_tlb0(mas0, mas1, mas2, mas3, rpn, mas8, gmas3);
 		if (unlikely(ret == ERR_BUSY)) {
 			restore_mas(gcpu);
-			enable_critint();
+			enable_int();
 
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
@@ -670,7 +670,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	}
 
 	restore_mas(gcpu);
-	enable_critint();
+	enable_int();
 	return 0;
 }
 

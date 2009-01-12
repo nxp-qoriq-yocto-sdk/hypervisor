@@ -104,11 +104,6 @@ static void fh_partition_restart(trapframe_t *regs)
 	regs->gpregs[3] = restart_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
-void restart_core(trapframe_t *regs)
-{
-	do_stop_core(regs, 1);
-}
-
 static void fh_partition_get_status(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
@@ -282,7 +277,7 @@ static void fh_byte_channel_send(trapframe_t *regs)
 		return;
 	}
 
-	register_t saved = spin_lock_critsave(&bc->tx_lock);
+	register_t saved = spin_lock_intsave(&bc->tx_lock);
 
 	if (len > queue_get_space(bc->tx))
 		regs->gpregs[3] = EAGAIN;
@@ -293,7 +288,7 @@ static void fh_byte_channel_send(trapframe_t *regs)
 		regs->gpregs[3] = 0;  /* success */
 	}
 
-	spin_unlock_critsave(&bc->tx_lock, saved);
+	spin_unlock_intsave(&bc->tx_lock, saved);
 }
 
 static void fh_byte_channel_receive(trapframe_t *regs)
@@ -321,9 +316,9 @@ static void fh_byte_channel_receive(trapframe_t *regs)
 		return;
 	}
 
-	saved = spin_lock_critsave(&bc->rx_lock);
+	saved = spin_lock_intsave(&bc->rx_lock);
 	regs->gpregs[4] = byte_chan_receive(bc, outbuf, max_receive);
-	spin_unlock_critsave(&bc->rx_lock, saved);
+	spin_unlock_intsave(&bc->rx_lock, saved);
 
 	regs->gpregs[3] = 0;  /* success */
 }
@@ -347,13 +342,13 @@ static void fh_byte_channel_poll(trapframe_t *regs)
 		return;
 	}
 
-	saved = spin_lock_critsave(&bc->rx_lock);
+	saved = spin_lock_intsave(&bc->rx_lock);
 	regs->gpregs[4] = queue_get_avail(bc->rx);
-	spin_unlock_critsave(&bc->rx_lock, saved);
+	spin_unlock_intsave(&bc->rx_lock, saved);
 
-	saved = spin_lock_critsave(&bc->tx_lock);
+	saved = spin_lock_intsave(&bc->tx_lock);
 	regs->gpregs[5] = queue_get_space(bc->tx);
-	spin_unlock_critsave(&bc->tx_lock, saved);
+	spin_unlock_intsave(&bc->tx_lock, saved);
 
 	regs->gpregs[3] = 0;  /* success */
 }

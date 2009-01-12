@@ -69,7 +69,7 @@
  *
  */
 
-void critdbell_to_gdbell_glue(trapframe_t *regs)
+void dbell_to_gdbell_glue(trapframe_t *regs)
 {
 	send_local_guest_doorbell();
 }
@@ -116,7 +116,7 @@ void vpic_assert_vint(vpic_interrupt_t *virq)
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "assert virq %p\n", virq);
 
-	save = spin_lock_critsave(&guest->vpic.lock);
+	save = spin_lock_intsave(&guest->vpic.lock);
 
 	if (!virq->pending)
 		__vpic_assert_vint(virq);
@@ -124,7 +124,7 @@ void vpic_assert_vint(vpic_interrupt_t *virq)
 		printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
 		         "VPIC IRQ %p already pending\n", virq);
 
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 void vpic_deassert_vint(vpic_interrupt_t *virq)
@@ -134,9 +134,9 @@ void vpic_deassert_vint(vpic_interrupt_t *virq)
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "deassert virq %p\n", virq);
 
-	save = spin_lock_critsave(&guest->vpic.lock);
+	save = spin_lock_intsave(&guest->vpic.lock);
 	virq->pending = 0;
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 static vpic_interrupt_t *__vpic_iack(void)
@@ -198,10 +198,10 @@ interrupt_t *vpic_iack(void)
 	guest_t *guest = gcpu->guest;
 	vpic_interrupt_t *virq;
 
-	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	register_t save = spin_lock_intsave(&guest->vpic.lock);
 	atomic_and(&gcpu->gdbell_pending, ~(GCPU_PEND_VIRQ));
 	virq = __vpic_iack();
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic iack: %p\n", virq);
 
@@ -223,17 +223,17 @@ static void vpic_irq_mask(interrupt_t *irq)
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
 	guest_t *guest = virq->guest;
 
-	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	register_t save = spin_lock_intsave(&guest->vpic.lock);
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic mask: %p\n", virq);
 	virq->enable = 0;
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 static void vpic_irq_unmask(interrupt_t *irq)
 {
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
 	guest_t *guest = virq->guest;
-	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	register_t save = spin_lock_intsave(&guest->vpic.lock);
 
 	virq->enable = 1;
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic unmask: %p\n", virq);
@@ -241,7 +241,7 @@ static void vpic_irq_unmask(interrupt_t *irq)
 	if (virq->pending)
 		__vpic_assert_vint(virq);
 	
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 static int vpic_irq_is_disabled(interrupt_t *irq)
@@ -258,9 +258,9 @@ static void vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
 
 	assert(destcpu != 0 && (destcpu & ((1 << guest->cpucnt) - 1)));
 	
-	save = spin_lock_critsave(&guest->vpic.lock);
+	save = spin_lock_intsave(&guest->vpic.lock);
 	virq->destcpu = destcpu;
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 /*
@@ -272,7 +272,7 @@ static void vpic_eoi(interrupt_t *irq)
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
 	guest_t *guest = virq->guest;
 	gcpu_t *gcpu = get_gcpu();
-	register_t save = spin_lock_critsave(&guest->vpic.lock);
+	register_t save = spin_lock_intsave(&guest->vpic.lock);
 
 	assert(gcpu->guest == guest);
 
@@ -285,7 +285,7 @@ static void vpic_eoi(interrupt_t *irq)
 	if (gcpu->vpic.active == 0 && gcpu->vpic.pending)
 		send_vint(gcpu);
 
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
 static uint32_t vpic_irq_get_destcpu(interrupt_t *irq)
@@ -301,9 +301,9 @@ static int vpic_irq_is_active(interrupt_t *irq)
 	register_t save;
 	int ret;
 
-	save = spin_lock_critsave(&guest->vpic.lock);
+	save = spin_lock_intsave(&guest->vpic.lock);
 	ret = virq->pending || virq->active;
-	spin_unlock_critsave(&guest->vpic.lock, save);
+	spin_unlock_intsave(&guest->vpic.lock, save);
 
 	return ret;
 }
@@ -324,7 +324,7 @@ vpic_interrupt_t *vpic_alloc_irq(guest_t *guest, int config)
 	vpic_interrupt_t *virq = NULL;
 	int irq;
 
-	save = spin_lock_critsave(&guest->vpic.lock);
+	save = spin_lock_intsave(&guest->vpic.lock);
 
 	if (guest->vpic.alloc_next < MAX_VINT_CNT) {
 		irq = guest->vpic.alloc_next++;
@@ -337,7 +337,7 @@ vpic_interrupt_t *vpic_alloc_irq(guest_t *guest, int config)
 		virq->config = config;
 	}
 
-	spin_unlock_critsave(&guest->vpic.lock,save);
+	spin_unlock_intsave(&guest->vpic.lock,save);
 	return virq;
 }
 

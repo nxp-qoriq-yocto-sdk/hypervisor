@@ -32,7 +32,9 @@
 #include <libos/mpic.h>
 #include <libos/ns16550.h>
 #include <libos/interrupts.h>
- 
+#include <libos/thread.h>
+#include <libos/trap_booke.h>
+
 #include <hv.h>
 #include <percpu.h>
 #include <paging.h>
@@ -77,6 +79,7 @@ uint32_t hw_devtree_lock;
 void *temp_mapping[2];
 extern char _end;
 uint64_t text_phys, bigmap_phys;
+thread_t idle_thread[MAX_CORES];
 
 static void exclude_phys(phys_addr_t addr, phys_addr_t end)
 {
@@ -465,6 +468,8 @@ void start(unsigned long devtree_ptr)
 	void *fdt;
 	int ret;
 
+	cpu->thread = &idle_thread[0];
+
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 
@@ -511,7 +516,7 @@ void start(unsigned long devtree_ptr)
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	assign_hv_devs(); 
-	enable_critint();
+	enable_int();
 
 	ccm_init();
 
@@ -547,7 +552,7 @@ void secondary_init(void)
 	
 	core_init();
 	mpic_reset_core();
-	enable_critint();
+	enable_int();
 	partition_init();
 }
 
@@ -619,6 +624,10 @@ static int release_secondary(dt_node_t *node, void *arg)
 	newcpu->kstack = secondary_stacks[reg - 1] + KSTACK_SIZE - FRAMELEN;
 	newcpu->client.gcpu = &noguest[reg];
 	newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
+	newcpu->thread = &idle_thread[reg];
+
+	/* Terminate the callback chain. */
+	newcpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
 
 	if (start_secondary_spin_table(table_va, reg, newcpu))
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR, "couldn't spin up CPU%u\n", reg);
@@ -667,4 +676,40 @@ static void core_init(void)
 	      EPCR_EXTGS | EPCR_DTLBGS | EPCR_ITLBGS |
 	      EPCR_DSIGS | EPCR_DUVD | EPCR_DGTMI);
 #endif
+}
+
+void new_thread_inplace(thread_t *thread, uint8_t *kstack,
+                        void (*func)(trapframe_t *regs, void *arg), void *arg)
+{
+	cpu->kstack = &kstack[KSTACK_SIZE - FRAMELEN];
+	trapframe_t *regs = (trapframe_t *)cpu->kstack;
+
+	thread->pc = ret_from_exception;
+	thread->stack = regs;
+
+	regs->gpregs[1] = (register_t)regs;
+	regs->gpregs[2] = (register_t)cpu;
+	regs->gpregs[3] = (register_t)regs;
+	regs->gpregs[4] = (register_t)arg;
+	
+	regs->srr0 = (register_t)func;
+	regs->srr1 = MSR_ME | MSR_CE | MSR_EE;
+
+	regs->lr = (register_t)ret_from_exception;
+}
+
+thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg), void *arg)
+{
+	thread_t *thread = malloc(sizeof(thread_t));
+	if (!thread)
+		return NULL;
+	
+	uint8_t *stack = alloc_type(kstack_t);
+	if (!stack) {
+		free(thread);
+		return NULL;
+	}
+
+	new_thread_inplace(thread, stack, func, arg);
+	return thread;
 }

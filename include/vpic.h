@@ -59,7 +59,7 @@ void vpic_assert_vint_txq(queue_t *q);
 void vpic_assert_vint(vpic_interrupt_t *irq);
 void vpic_deassert_vint(vpic_interrupt_t *irq);
 
-void critdbell_to_gdbell_glue(trapframe_t *regs);
+void dbell_to_gdbell_glue(trapframe_t *regs);
 interrupt_t *vpic_iack(void);
 
 extern int_ops_t vpic_ops;
