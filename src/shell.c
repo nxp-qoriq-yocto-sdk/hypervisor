@@ -256,7 +256,7 @@ static void pi_fn(shell_t *shell, char *args)
 	print_stat(shell, guest, stat_emu_tlbre,
 	           "Emulated TLB reads:                   ");
 	print_stat(shell, guest, stat_emu_tlbsx,
-	           "Emulated TLB serch:                   ");
+	           "Emulated TLB searches:                ");
 	print_stat(shell, guest, stat_emu_tlbsync,
 	           "Emulated TLB syncs:                   ");
 	print_stat(shell, guest, stat_emu_tlbivax_tlb0_all,
