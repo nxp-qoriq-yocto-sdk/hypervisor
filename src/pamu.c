@@ -214,7 +214,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
 	if (!prop || prop->len != 4) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-		         "%s: warning: missing dma-window\n", __func__);
+		         "%s: warning: missing dma-window at %s\n", __func__, cfgnode->name);
 		return -1;
 	}
 

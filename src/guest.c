@@ -607,7 +607,7 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		goto fail;
 	}
 
-	configure_dma(hwnode, owner);
+	configure_dma(node, owner);
 	return 0;
 
 fail:
