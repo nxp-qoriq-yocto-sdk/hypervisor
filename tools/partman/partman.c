@@ -48,6 +48,8 @@
 #include <arpa/inet.h>
 #include <byteswap.h>
 
+#include "../../output/include/config/autoconf.h"
+
 /*
  * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
  * tree.  So every time that file is updated, you need to copy it here.
@@ -967,6 +969,8 @@ int main(int argc, char *argv[])
 	struct parameters p;
 	int c;
 	int ret = 0;
+
+	printf("Freescale Hypervisor Partition Manager %s\n\n", CONFIG_HV_VERSION);
 
 	if (!verify_dev())
 		return 1;
