@@ -142,7 +142,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
 	dt_prop_t *prop;
-	dt_node_t *gnode, *mixin, *pma_node;
+	dt_node_t *gnode, *pma_node;
 	pma_t *pma;
 	phys_addr_t gaddr;
 	uint32_t reg[4];
@@ -192,8 +192,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	if (dt_set_prop(gnode, "reg", reg, (rootnaddr + rootnsize) * 4))
 		goto nomem;
 
-	mixin = dt_get_subnode(node, "node-update", 0);
-	if (mixin && dt_merge_tree(gnode, mixin, 1))
+	if (dt_process_node_update(gnode, node))
 		goto nomem;
 	
 	return 0;
@@ -326,7 +325,7 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 			         __func__, s, config_child->name);
 			continue;
 		}
-		uint32_t hw_phandle_cfg = dt_get_phandle(devnode);
+		uint32_t hw_phandle_cfg = dt_get_phandle(hw_devtree, devnode, 0);
 
 		prop = dt_get_prop(hwnode, "dev-handle", 0);
 		if (prop) {
@@ -2000,12 +1999,8 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 	if (ret < 0) 
 		goto out_gnode;
 
-	dt_node_t *mixin = dt_get_subnode(owner->cfgnode, "node-update", 0);
-	if (mixin) {
-		ret = dt_merge_tree(owner->gnode, mixin, 1);
-		if (ret < 0)
-			goto out_gnode;
-	}
+	if (dt_process_node_update(owner->gnode, owner->cfgnode))
+		goto out_gnode;
 
 	ret = dt_for_each_node(owner->gnode, guest, assign_child, NULL);
 	if (ret < 0)
@@ -2186,14 +2181,11 @@ static int init_guest_primary(guest_t *guest)
 	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
 
-	node = dt_get_subnode(guest->partition, "node-update", 0);
-	if (node) {
-		ret = dt_merge_tree(guest->devtree, node, 1);
-		if (ret < 0)
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: error %d merging partition node-update\n",
-			         __func__, ret);
-	}
+	ret = dt_process_node_update(guest->devtree, guest->partition);
+	if (ret < 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: error %d merging partition node-update\n",
+			 __func__, ret);
 
 	start_guest_primary();
 	return 0;

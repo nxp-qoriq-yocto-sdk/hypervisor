@@ -209,7 +209,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 {
 	byte_chan_handle_t *handle = node->bch;
 	vpic_interrupt_t *rxirq, *txirq;
-	dt_node_t *gnode, *handles, *mixin;
+	dt_node_t *gnode, *handles;
 	uint32_t intspec[4];
 	int ghandle;
 
@@ -266,15 +266,12 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 	if (dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec)) < 0)
 		goto nomem;
 
-	mixin = dt_get_subnode(node, "node-update", 0);
-	if (mixin) {
-		int ret = dt_merge_tree(gnode, mixin, 1);
-		if (ret < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-			         "%s: error %d merging node-update on %s\n",
-			         __func__, ret, node->name);
-			return ret;
-		}
+	int ret = dt_process_node_update(gnode, node);
+	if (ret < 0) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			 "%s: error %d merging node-update on %s\n",
+			 __func__, ret, node->name);
+		return ret;
 	}
 
 	create_aliases(node, gnode, guest->devtree);

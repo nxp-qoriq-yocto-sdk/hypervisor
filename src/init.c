@@ -73,6 +73,7 @@ void init_guest(void);
 #define UART_OFFSET		0x11c500
 
 dt_node_t *hw_devtree, *config_tree;
+uint32_t hw_devtree_lock;
 void *temp_mapping[2];
 extern char _end;
 uint64_t text_phys, bigmap_phys;

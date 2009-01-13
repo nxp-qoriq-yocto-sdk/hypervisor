@@ -105,6 +105,7 @@ int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len)
 int dt_set_prop_string(dt_node_t *node, const char *name, const char *str);
 
 int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special);
+int dt_process_node_update(dt_node_t *target, dt_node_t *config);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
 int dt_node_is_compatible(dt_node_t *node, const char *compat);
@@ -124,13 +125,18 @@ dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name);
 dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);
 dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 
-uint32_t dt_get_phandle(dt_node_t *node);
+uint32_t dt_get_phandle(dt_node_t *tree, dt_node_t *node, int create);
 
 dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest);
 void dt_read_aliases(void);
 
 /** Hardware device tree passed by firmware */
 extern dt_node_t *hw_devtree;
+
+/** Spinlock for hardware device tree.  Grab this before modifying the
+ *  hardware tree (e.g. adding properties).
+ */
+extern uint32_t hw_devtree_lock;
 
 /** Hypervisor config tree passed in bootargs */
 extern dt_node_t *config_tree;

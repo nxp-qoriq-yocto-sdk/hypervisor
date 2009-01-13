@@ -209,7 +209,6 @@ int send_dbell_init_one(dt_node_t *node, void *arg)
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;
 	dt_node_t *hnode;	// handle node
-	dt_node_t *mixin;
 	int32_t ghandle;
 	int ret;
 
@@ -242,15 +241,12 @@ int send_dbell_init_one(dt_node_t *node, void *arg)
 		// Out of memory
 		return ret;
 
-	mixin = dt_get_subnode(node, "node-update", 0);
-	if (mixin) {
-		int ret = dt_merge_tree(hnode, mixin, 1);
-		if (ret < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-				 "%s: error %d merging node-update on %s\n",
-				 __func__, ret, node->name);
-			return ret;
-		}
+	ret = dt_process_node_update(hnode, node);
+	if (ret < 0) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			 "%s: error %d merging node-update on %s\n",
+			 __func__, ret, node->name);
+		return ret;
 	}
 
 	create_aliases(node, hnode, guest->devtree);
@@ -263,7 +259,6 @@ int recv_dbell_init_one(dt_node_t *node, void *arg)
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;
 	dt_node_t *hnode;	// handle node
-	dt_node_t *mixin;
 	int ret;
 
 	dbell = dbell_from_handle_node(node);
@@ -294,15 +289,12 @@ int recv_dbell_init_one(dt_node_t *node, void *arg)
 		return ret;
 	}
 
-	mixin = dt_get_subnode(node, "node-update", 0);
-	if (mixin) {
-		int ret = dt_merge_tree(hnode, mixin, 1);
-		if (ret < 0) {
-			printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-				 "%s: error %d merging node-update on %s\n",
-				 __func__, ret, node->name);
-			return ret;
-		}
+	ret = dt_process_node_update(hnode, node);
+	if (ret < 0) {
+		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
+			 "%s: error %d merging node-update on %s\n",
+			 __func__, ret, node->name);
+		return ret;
 	}
 
 	create_aliases(node, hnode, guest->devtree);

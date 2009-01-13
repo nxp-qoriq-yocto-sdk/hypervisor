@@ -29,6 +29,7 @@
 
 #include <errors.h>
 #include <devtree.h>
+#include <percpu.h>
 
 dt_node_t *create_dev_tree(void)
 {
@@ -638,16 +639,16 @@ static int merge_pre(dt_node_t *src, void *arg)
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
 
-      if (ctx->special) {
-	      if (!strcmp(prop->name, "delete-node"))
-		      continue;
-	      if (!strcmp(prop->name, "delete-subnodes"))
-		      continue;
-	      if (!strcmp(prop->name, "delete-prop"))
-		     continue;
-	      if (!strcmp(prop->name, "prepend-stringlist"))
-		      continue;
-      }
+		if (ctx->special) {
+			if (!strcmp(prop->name, "delete-node"))
+				continue;
+			if (!strcmp(prop->name, "delete-subnodes"))
+				continue;
+			if (!strcmp(prop->name, "delete-prop"))
+				continue;
+			if (!strcmp(prop->name, "prepend-stringlist"))
+				continue;
+		}
 
 		int ret = dt_set_prop(ctx->dest, prop->name, prop->data, prop->len);
 		if (ret)
@@ -694,6 +695,174 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
 	};
 
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
+}
+
+typedef struct phandle_ctx {
+	dt_prop_t *prop;
+	dt_node_t *target;
+} phandle_ctx_t;
+
+/**
+ * dt_merge_phandle - process a node-update-handle configuration property
+ * @param[in] config pointer to the node-update-handle node
+ * @param[in] prop the specific property to process
+ * @param[in] target the node in the guest device tree to update
+ *
+ * The node-update-phandle configuration subnode is intended to handle this
+ * situation:
+ *
+ * Configuration tree:
+ *
+ * // Create node Ga in the guest device tree
+ * Ca {
+ * 	device = "/path-to/Ha";
+ * 	node-update-phandle = {
+ * 		foo = <&Cb>;
+ * 	};
+ * };
+ *
+ * // Create node Gb in the guest device tree
+ * Cb {
+ * 	device = "/path-to/Hb";
+ * };
+ *
+ * Hardware tree:
+ *
+ * Ha {
+ * 	...
+ * };
+ *
+ * Hb {
+ *      ...
+ * };
+ *
+ * Resulting guest tree:
+ *
+ * Ga {
+ * 	...
+ *      foo = <&Gb>;
+ * };
+ *
+ * Gb {
+ * 	...
+ * };
+ *
+ * This function creates the "foo = <&Gb>" property.  If necessary, it also
+ * creates a phandle property in both hardware node Hb and guest node Gb.
+ */
+static int do_merge_phandle(dt_node_t *config, void *arg)
+{
+	dt_node_t *target = arg;
+	guest_t *guest = get_gcpu()->guest;
+	uint32_t phandle;
+	dev_owner_t *owner;
+	dt_node_t *node;
+	int i, ret;
+
+	list_for_each(&config->props, l) {
+		/* Get the phandle from the config node */
+		dt_prop_t *prop = to_container(l, dt_prop_t, prop_node);
+
+		// Validate the property
+		if (!prop->len || (prop->len % sizeof(uint32_t)))
+			return ERR_BADTREE;
+
+		// Iterate over all the phandles in this property
+		for (i = 0; i < prop->len / sizeof(uint32_t); i++) {
+			// Get the phandle from the config node
+			phandle = ((uint32_t *) prop->data)[i];
+
+			// Find the other config node the phandle points to
+			node = dt_lookup_phandle(config_tree, phandle);
+			if (!node) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					 "%s: node %s: prop %s: invalid phandle 0x%x\n",
+					 __func__, config->name, prop->name, phandle);
+				return ERR_BADTREE;
+			}
+
+			/* Find the hardware node that the other config node
+			 * references.
+			 */
+			owner = dt_owned_by(node->endpoint, guest);
+			node = owner->hwnode;
+
+			// Get the phandle stored in the hardware node, or
+			// allocate a new one Since we might be modifying the
+			// hardware device tree, we need to grab the lock for
+			// it.
+			spin_lock(&hw_devtree_lock);
+			phandle = dt_get_phandle(hw_devtree, node, 1);
+			if (!phandle) {
+				spin_unlock(&hw_devtree_lock);
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					 "%s: could not get/set phandle for hardware node %s\n",
+					 __func__, node->name);
+				return ERR_BADTREE;
+			}
+			spin_unlock(&hw_devtree_lock);
+
+			// If there is a node in the guest device tree that was
+			// already created from the node in the hardware tree
+			// referenced by the other config node, then we need to
+			// create phandle and linux,phandle properties in *that*
+			// node as well.
+			node = owner->gnode;
+			if (node) {
+				ret = dt_set_prop(node, "phandle", &phandle, 4);
+				if (!ret)
+					ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
+				if (ret)
+					return ret;
+			}
+
+			// Finally, put the phandle property into the target node
+			ret = dt_set_prop(target, prop->name, &phandle, 4);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * dt_process_node_update - process the node-update subnodes
+ * @target: the target node to update
+ * @config: the node that contains the "node-update" subnodes
+ *
+ * This function scans a given configuration node for the node-update and
+ * node-update-phandle subnodes, and then it updates the target node
+ * accordingly.
+ */
+int dt_process_node_update(dt_node_t *target, dt_node_t *config)
+{
+	dt_node_t *mixin;
+	int ret;
+
+	mixin = dt_get_subnode(config, "node-update", 0);
+	if (mixin) {
+		ret = dt_merge_tree(target, mixin, 1);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				 "%s: error %d merging node-update on %s\n",
+				 __func__, ret, config->name);
+			return ret;
+		}
+	}
+
+	/* The node has been merged and updated with node-update.  Now check
+	 * for any phandle updates.
+	 */
+	mixin = dt_get_subnode(config, "node-update-phandle", 0);
+	if (mixin) {
+		/* Merge the phandles into the target  */
+		ret = dt_for_each_node(mixin, target, do_merge_phandle, NULL);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 typedef struct print_ctx {
@@ -1028,19 +1197,107 @@ dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle)
 	return node;
 }
 
+static int find_free_phandle_callback(dt_node_t *node, void *arg)
+{
+	uint32_t phandle;
+	uint32_t *free_phandle = (uint32_t *) arg;
+
+	phandle = dt_get_phandle(NULL, node, 0);
+
+	// Check for wrap-around
+	if (phandle == ~0U) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			 "%s: no free phandles\n", __func__);
+		return ERR_BADTREE;
+	}
+
+	if (phandle && (phandle >= *free_phandle))
+		*free_phandle = phandle + 1;
+
+	return 0;
+}
+
+/**
+ * find_free_phandle - return the smallest unusued phandle
+ * @param[in] tree device tree to scan
+ *
+ * Every time this function is called, it returns a new number.
+ *
+ * returns 0 if error, or >0 phandle to use
+ */
+static uint32_t find_free_phandle(dt_node_t *tree)
+{
+	static uint32_t free_phandle;	// The next free phandle to use
+	static uint32_t lock;
+	uint32_t phandle;
+	int ret;
+
+	/* The first time we're called, find the lowest phandle in the
+	 * hardware tree.
+	 */
+	spin_lock(&lock);
+	if (!free_phandle) {
+		ret = dt_for_each_node(tree, &free_phandle,
+				       find_free_phandle_callback, NULL);
+		if (ret) {
+			spin_unlock(&lock);
+			return 0;
+		}
+
+		// What if there are no phandles in the device tree at all?
+		if (!free_phandle)
+			free_phandle = 1;
+	}
+
+	if (free_phandle == ~0U) {
+		spin_unlock(&lock);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			 "%s: no more phandles\n", __func__);
+		return ERR_BADTREE;
+	}
+
+	phandle = free_phandle++;
+	spin_unlock(&lock);
+
+	return phandle;
+}
+
 /** Return the phandle of a node.
  *
+ * @param[in] tree root of tree to which 'node' belongs
  * @param[in] node node of which to retrieve phandle
+ * @param[in] create if non-zero, create a new phandle
  * @return if non-zero, the node's phandle
  *
  * The ePAPR "phandle" value is searched for first, followed
  * by the legacy "linux,phandle" value.
+ *
+ * If 'create' is zero, then 'tree' is ignored.
  */
-uint32_t dt_get_phandle(dt_node_t *node)
+uint32_t dt_get_phandle(dt_node_t *tree, dt_node_t *node, int create)
 {
 	dt_prop_t *prop = dt_get_prop(node, "phandle", 0);
 	if (!prop)
 		prop = dt_get_prop(node, "linux,phandle", 0);
+	if (!prop && create) {
+		// Create the phandle
+		uint32_t phandle;
+		int ret;
+
+		phandle = find_free_phandle(tree);
+		if (!phandle)
+			return 0;
+		ret = dt_set_prop(node, "phandle", &phandle, 4);
+		if (ret)
+			return 0;
+		// Linux expects linux,phandle
+		ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
+		if (ret)
+			return 0;
+
+		return phandle;
+
+	}
 	if (!prop || prop->len != 4)
 		return 0;
 
