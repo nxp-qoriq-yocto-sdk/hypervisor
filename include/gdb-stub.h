@@ -89,6 +89,7 @@ typedef struct breakpoint
 typedef struct gdb_stub_core_context {
 
 	dt_node_t *node;  /* the config node in the dev tree for this stub */
+	int gev_gdb;  /* gevent handle */
 
 	/* These two packets contain the command received from GDB and the
 	 * response to be sent to GDB. cmd must always contain a command whose

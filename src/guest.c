@@ -1247,7 +1247,7 @@ int restart_guest(guest_t *guest)
 
 	if (!ret)
 		for (i = 0; i < guest->cpucnt; i++)
-			setgevent(guest->gcpus[i], GEV_RESTART);
+			setgevent(guest->gcpus[i], gev_restart);
 
 	return ret;
 }
@@ -1520,7 +1520,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 				barrier();
 		}
 
-		setgevent(guest->gcpus[i], GEV_START);
+		setgevent(guest->gcpus[i], gev_start);
 	}
 
 	atomic_add(&guest->active_cpus, 1);
@@ -1600,12 +1600,12 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 		smp_mbar();
 
 		/* If we get a stop or a restart, take the gevent from idle state */
-		if (gcpu->gevent_pending & ((1 << GEV_STOP) |
-		                            (1 << GEV_RESTART)))
+		if (gcpu->gevent_pending & ((1 << gev_stop) |
+		                            (1 << gev_restart)))
 			yield();
 
-		if (gcpu->gevent_pending & (1 << GEV_PAUSE)) {
-			atomic_and(&gcpu->gevent_pending, ~(1 << GEV_PAUSE));
+		if (gcpu->gevent_pending & (1 << gev_pause)) {
+			atomic_and(&gcpu->gevent_pending, ~(1 << gev_pause));
 			pause_core(regs);
 		}
 	}
@@ -1711,7 +1711,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 		if (restart) {
 			guest->state = guest_starting;
-			setgevent(guest->gcpus[0], GEV_START_WAIT);
+			setgevent(guest->gcpus[0], gev_start_wait);
 		} else {
 			guest->state = guest_stopped;
 			send_doorbells(guest->dbell_state_change);
@@ -1786,7 +1786,7 @@ int stop_guest(guest_t *guest)
 		return ret;
 
 	for (i = 0; i < guest->cpucnt; i++)
-		setgevent(guest->gcpus[i], GEV_STOP);
+		setgevent(guest->gcpus[i], gev_stop);
 
 	return ret;
 }
@@ -1806,7 +1806,7 @@ int start_guest(guest_t *guest)
 	if (ret)
 		return ret;
 
-	setgevent(guest->gcpus[0], GEV_START);
+	setgevent(guest->gcpus[0], gev_start);
 	return ret;
 }
 
@@ -1826,7 +1826,7 @@ int pause_guest(guest_t *guest)
 		return ret;
 
 	for (i = 0; i < guest->cpucnt; i++)
-		setgevent(guest->gcpus[i], GEV_PAUSE);
+		setgevent(guest->gcpus[i], gev_pause);
 
 	return ret;
 }
@@ -1850,7 +1850,7 @@ int resume_guest(guest_t *guest)
 		return ret;
 
 	for (i = 0; i < guest->cpucnt; i++)
-		setgevent(guest->gcpus[i], GEV_RESUME);
+		setgevent(guest->gcpus[i], gev_resume);
 
 	return ret;
 }
@@ -2285,7 +2285,7 @@ __attribute__((noreturn)) void init_guest(void)
 			/* Boot CPU */
 			if (init_guest_primary(guest) == 0) {
 				guest->state = guest_starting;
-				setgevent(gcpu, GEV_START_WAIT);
+				setgevent(gcpu, gev_start_wait);
 			}
 		} else {
 			register_gcpu_with_guest(guest);

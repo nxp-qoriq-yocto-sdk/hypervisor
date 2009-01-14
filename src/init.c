@@ -47,6 +47,7 @@
 #include <shell.h>
 #include <ccm.h>
 #include <doorbell.h>
+#include <events.h>
 
 #include <limits.h>
 
@@ -518,6 +519,8 @@ void start(unsigned long devtree_ptr)
 
 	assign_hv_devs(); 
 	enable_int();
+
+	init_gevents();
 
 	ccm_init();
 

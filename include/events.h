@@ -40,6 +40,8 @@ void start_core(trapframe_t *regs);
 void restart_core(trapframe_t *regs);
 void start_wait_core(trapframe_t *regs);
 void wait_for_gevent(trapframe_t *regs);
+int register_gevent(eventfp_t handler);
+void init_gevents(void);
 void idle_loop(void);
 void pause_core(trapframe_t *regs);
 void resume_core(trapframe_t *regs);
@@ -47,14 +49,13 @@ void resume_core(trapframe_t *regs);
 #define EV_ASSERT_VINT 0
 #define EV_TLBIVAX     1
 
-#define GEV_STOP       0 /**< Stop guest on this core */
-#define GEV_START      1 /**< Start guest on this core */
+extern int gev_stop; /**< Stop guest on this core */
+extern int gev_start; /**< Start guest on this core */
 /**< GEV_STOP, plus send GEV_START_WAIT to primary. */
-#define GEV_RESTART    2 
+extern int gev_restart;
 /**< GEV_START, but wait if no image; primary core only. */
-#define GEV_START_WAIT 3
-#define GEV_GDB        4
-#define GEV_PAUSE      5
-#define GEV_RESUME     6
+extern int gev_start_wait;
+extern int gev_pause;
+extern int gev_resume;
 
 #endif 

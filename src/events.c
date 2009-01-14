@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *
@@ -26,6 +25,11 @@
 #include <libos/libos.h>
 #include <libos/bitops.h>
 #include <libos/interrupts.h>
+#include <libos/libos.h>
+#include <libos/console.h>
+#include <libos/printlog.h>
+#include <libos/errors.h>
+
 #include <events.h>
 #include <vpic.h>
 #include <doorbell.h>
@@ -40,19 +44,43 @@ static eventfp_t event_table[] = {
 /* Guest events are processed when returning to the guest, but
  * without regard for the MSR[EE/CE/ME] bits of the guest.
  */
-static eventfp_t gevent_table[] = {
-	&stop_core,                   /* GEV_STOP */
-	&start_core,                  /* GEV_START */
-	&restart_core,                /* GEV_RESTART */
-	&start_wait_core,             /* GEV_START_WAIT */
-#ifdef CONFIG_GDB_STUB
-	&gdb_stub_gevent_handler,     /* GEV_GDB */
-#else
-	NULL,                         /* GEV_GDB */
-#endif
-	&pause_core,                  /* GEV_PAUSE */
-	&resume_core,                 /* GEV_RESUME */
-};
+
+int gev_stop;
+int gev_start;
+int gev_restart;
+int gev_start_wait;
+int gev_pause;
+int gev_resume;
+
+/* Guest events are processed when returning to the guest, but
+ * without regard for the MSR[EE/CE/ME] bits of the guest.
+ */
+#define MAX_GEVENTS 32
+static eventfp_t gevent_table[MAX_GEVENTS];
+static uint32_t gevent_lock;
+
+int register_gevent(eventfp_t handler)
+{
+	int i;
+	spin_lock(&gevent_lock);
+
+	/* find an open event slot */
+	for (i = 0; i < MAX_GEVENTS; i++) {
+		if (!gevent_table[i])
+			break;
+	}
+
+	if (i == MAX_GEVENTS) {
+		spin_unlock(&gevent_lock);
+		return ERR_BUSY;  /* no events available */
+	}
+
+	gevent_table[i] = handler;
+
+	spin_unlock(&gevent_lock);
+
+	return i;
+}
 
 void setevent(gcpu_t *gcpu, int event)
 {
@@ -136,4 +164,21 @@ void doorbell_int(trapframe_t *regs)
 		/* invoke the function */
 		event_table[bit](regs);
 	}
+}
+
+/* Initialize the global gevents
+ */
+void init_gevents(void)
+{
+	gev_stop = register_gevent(&stop_core);
+	gev_start = register_gevent(&start_core);
+	gev_restart = register_gevent(&restart_core);
+	gev_start_wait = register_gevent(&start_wait_core);
+	gev_pause = register_gevent(&pause_core);
+	gev_resume = register_gevent(&resume_core);
+
+	if (gev_stop < 0 || gev_start < 0 ||
+	    gev_restart < 0 || gev_start_wait < 0 ||
+	    gev_pause < 0 || gev_resume < 0)
+		BUG();
 }

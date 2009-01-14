@@ -97,6 +97,14 @@ void gdb_stub_init(void)
 
 	stub->node = gcpu->dbgstub_cfg;
 
+	stub->gev_gdb = register_gevent(&gdb_stub_gevent_handler);
+	if (stub->gev_gdb < 0) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
+		         "%s: gevent registration failed\n",
+		         __func__);
+		return;
+	}
+
 	init_byte_channel(stub->node);
 	/* note: the byte-channel handle is returned in node->bch */
 	if (!stub->node->bch) {
@@ -188,10 +196,14 @@ enum event_type event_type;
  */
 static void rx(queue_t *q)
 {
+ 	gcpu_t *gcpu = (gcpu_t*)q->consumer;
+ 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	DEBUG();
+
 	/* Record the event type and setgevent GEV_GDB on the current CPU. */
 	event_type = received_data;
-	setgevent((gcpu_t*)q->consumer, GEV_GDB);
+ 	setgevent(gcpu, stub->gev_gdb);
+
 	/* TODO: What if there were some other event in progress?  It'll be
 	 * lost. The GDB event handler should check whether the input queue
 	 * is empty, rather than rely on a "received data" flag.
