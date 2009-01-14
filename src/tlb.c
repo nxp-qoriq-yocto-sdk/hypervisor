@@ -958,11 +958,13 @@ out:
  * @param[in]  vpage Virtual base of window to hold mapping
  * @param[out] len Length of the actual mapping
  * @param[in]  maxtsize tsize of the virtual window
+ * @param[in]  mas2flags flags for the mapping (mem or i/o)
  * @param[in]  write if non-zero, fail if write access is not allowed
  * @return virtual address that corresponds to addr
  */
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
-                void *vpage, size_t *len, int maxtsize, int write)
+                void *vpage, size_t *len, int maxtsize, register_t mas2flags,
+                int write)
 {
 	size_t offset, bytesize;
 	unsigned long attr;
@@ -1011,7 +1013,7 @@ size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
 		void *vdest;
 		
 		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
-		                  &chunk, TLB_TSIZE_16M, 1);
+		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 		if (!vdest)
 			break;
 
@@ -1045,7 +1047,7 @@ size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
 		void *vdest;
 
 		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
-		                  &chunk, TLB_TSIZE_16M, 1);
+		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 		if (!vdest)
 			break;
 
@@ -1080,7 +1082,7 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len)
 		void *vsrc;
 		
 		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping[0],
-		                 &chunk, TLB_TSIZE_16M, 0);
+		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 		if (!vsrc)
 			break;
 
@@ -1118,14 +1120,14 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 	while (len > 0) {
 		if (!schunk) {
 			vsrc = map_gphys(TEMPTLB1, stbl, src, temp_mapping[0],
-			                 &schunk, TLB_TSIZE_16M, 0);
+			                 &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 			if (!vsrc)
 				break;
 		}
 
 		if (!dchunk) {
 			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
-			                  &dchunk, TLB_TSIZE_16M, 1);
+			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest)
 				break;
 		}
@@ -1239,7 +1241,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 
 		if (!dchunk) {
 			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
-			                  &dchunk, TLB_TSIZE_16M, 1);
+			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest) {
 				printf("%s: cannot map dest %llx, %d bytes\n",
 				       __func__, dest, dchunk);

@@ -147,7 +147,8 @@ void tlbsync(void);
 extern void *temp_mapping[2];
 
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
-                void *vpage, size_t *len, int maxtsize, int write);
+                void *vpage, size_t *len, int maxtsize, register_t mas2flags,
+                int write);
 void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
                size_t *len, register_t mas2flags);
 
