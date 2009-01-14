@@ -304,7 +304,7 @@ int recv_dbell_init_one(dt_node_t *node, void *arg)
 
 void send_dbell_partition_init(guest_t *guest)
 {
-	int ret = dt_for_each_compatible(config_tree, "send-doorbell",
+	int ret = dt_for_each_compatible(guest->partition, "send-doorbell",
 	                                 send_dbell_init_one, guest);
 	if (ret < 0)
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
@@ -313,7 +313,7 @@ void send_dbell_partition_init(guest_t *guest)
 
 void recv_dbell_partition_init(guest_t *guest)
 {
-	int ret = dt_for_each_compatible(config_tree, "receive-doorbell",
+	int ret = dt_for_each_compatible(guest->partition, "receive-doorbell",
 	                                 recv_dbell_init_one, guest);
 	if (ret < 0)
 		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
