@@ -43,13 +43,13 @@ else
 SUBMAKES = $(wildcard $(testdir)*/Makefile)
 SUBDIRS = $(SUBMAKES:$(testdir)%/Makefile=%)
 
+.PHONY: all $(SUBDIRS)
+all: $(SUBDIRS)
+
 include include/config/auto.conf
 
 include $(LIBFDT_DIR)/Makefile.libfdt
 include $(libos)lib/Makefile.libos
-
-.PHONY: all $(SUBDIRS)
-all: $(SUBDIRS)
 
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := $(testdir)common/libos-client.h
