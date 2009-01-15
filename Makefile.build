@@ -107,6 +107,9 @@ OBJS := $(basename $(libos-src-first-y:%=libos/%) \
                    $(libos-src-y:%=libos/%) $(hv-src-y) \
                    $(LIBFDT_SRCS:%=libfdt/%))
 OBJS := $(OBJS:%=bin/%.o)
+
+PLUGIN_OBJS := $(shell mkdir -p $(src)/plugin; find $(src)/plugin -name '*.[oa]')
+
 HDRS := $(shell cd $(src); find include -name '*.h' -print)
 
 bin/hv.uImage: bin/hv.bin
@@ -118,9 +121,9 @@ bin/hv.bin.gz: bin/hv.bin
 bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/hv: include/config/auto.conf $(OBJS) $(src)hv.lds
+bin/hv: include/config/auto.conf $(OBJS) $(src)hv.lds $(PLUGIN_OBJS)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ $(OBJS) -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ $(OBJS) $(PLUGIN_OBJS) -lgcc
 
 bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/e500mc-data.h
 
