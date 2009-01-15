@@ -61,4 +61,6 @@ thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg), void *arg);
 void new_thread_inplace(thread_t *thread, uint8_t *stack,
                         void (*func)(trapframe_t *regs, void *arg), void *arg);
 
+void yield(void);
+
 #endif

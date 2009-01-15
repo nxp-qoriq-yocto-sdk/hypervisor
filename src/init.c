@@ -46,6 +46,7 @@
 #include <ipi_doorbell.h>
 #include <shell.h>
 #include <ccm.h>
+#include <doorbell.h>
 
 #include <limits.h>
 
@@ -712,4 +713,16 @@ thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg), void *arg)
 
 	new_thread_inplace(thread, stack, func, arg);
 	return thread;
+}
+
+void yield(void)
+{
+	register_t saved = disable_int_save();
+
+	if (cpu->ret_hook)
+		send_doorbell(cpu->coreid);
+
+	switch_thread(&idle_thread[cpu->coreid]);
+
+	restore_int(saved);
 }
