@@ -767,8 +767,13 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 		if (!prop->len || (prop->len % sizeof(uint32_t)))
 			return ERR_BADTREE;
 
+		const unsigned int count = prop->len / sizeof(uint32_t);
+		uint32_t *phandles = malloc(count * sizeof(uint32_t));
+		if (!phandles)
+			return ERR_NOMEM;
+
 		// Iterate over all the phandles in this property
-		for (i = 0; i < prop->len / sizeof(uint32_t); i++) {
+		for (i = 0; i < count; i++) {
 			// Get the phandle from the config node
 			phandle = ((uint32_t *) prop->data)[i];
 
@@ -778,13 +783,22 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 					 "%s: node %s: prop %s: invalid phandle 0x%x\n",
 					 __func__, config->name, prop->name, phandle);
-				return ERR_BADTREE;
+				ret = ERR_BADTREE;
+				break;
 			}
 
 			/* Find the hardware node that the other config node
 			 * references.
 			 */
 			owner = dt_owned_by(node->endpoint, guest);
+			if (!owner) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					 "%s: config node %s: property %s: phandle to %s is invalid \n",
+					 __func__, config->parent->name, prop->name, node->name);
+				ret = ERR_BADTREE;
+				break;
+			}
+
 			node = owner->hwnode;
 
 			// Get the phandle stored in the hardware node, or
@@ -798,7 +812,8 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 					 "%s: could not get/set phandle for hardware node %s\n",
 					 __func__, node->name);
-				return ERR_BADTREE;
+				ret = ERR_BADTREE;
+				break;
 			}
 			spin_unlock(&hw_devtree_lock);
 
@@ -813,14 +828,21 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 				if (!ret)
 					ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
 				if (ret)
-					return ret;
+					break;
 			}
 
-			// Finally, put the phandle property into the target node
-			ret = dt_set_prop(target, prop->name, &phandle, 4);
-			if (ret)
-				return ret;
+			// Save the phandle
+			phandles[i] = phandle;
 		}
+
+		if (!ret)
+			// Finally, put the phandle property into the target node
+			ret = dt_set_prop(target, prop->name, phandles,
+					  count * sizeof(uint32_t));
+
+		free(phandles);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
