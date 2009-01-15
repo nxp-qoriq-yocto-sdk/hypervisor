@@ -169,6 +169,9 @@ typedef struct guest {
 
 	/** phandle of the guest vmpic node */
 	uint32_t vmpic_phandle;
+
+	/** If !0, then don't load images from image-table on start */
+	int no_auto_load;
 } guest_t;
 
 #define MAX_PARTITIONS 8

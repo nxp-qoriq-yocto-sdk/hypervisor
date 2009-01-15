@@ -1557,11 +1557,13 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 static void start_guest_primary(trapframe_t *regs, void *arg)
 {
 	guest_t *guest = get_gcpu()->guest; 
-	int ret;
+	int ret = 1;
 
 	assert(guest->state == guest_starting);
 
-	ret = load_images(guest);
+	if (!guest->no_auto_load)
+		ret = load_images(guest);
+
 	if (ret <= 0) {
 		guest->state = guest_stopped;
 
