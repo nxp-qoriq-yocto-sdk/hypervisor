@@ -1572,7 +1572,8 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 		// Notify the manager(s) that it needs to load images and
 		// start this guest.
 		send_doorbells(guest->dbell_restart_request);
-		return;
+		yield();
+		BUG();
 	}
 
 	start_guest_primary_nowait(regs, arg);
@@ -1600,10 +1601,8 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 
 		/* If we get a stop or a restart, take the gevent from idle state */
 		if (gcpu->gevent_pending & ((1 << GEV_STOP) |
-		                            (1 << GEV_RESTART))) {
-			send_doorbell(cpu->coreid);
-			switch_thread(&idle_thread[cpu->coreid]);
-		}
+		                            (1 << GEV_RESTART)))
+			yield();
 
 		if (gcpu->gevent_pending & (1 << GEV_PAUSE)) {
 			atomic_and(&gcpu->gevent_pending, ~(1 << GEV_PAUSE));
@@ -1724,10 +1723,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 	memset(&gcpu->gdbell_pending, 0,
 	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
-	if (cpu->ret_hook)
-		send_doorbell(cpu->coreid);
-
-	switch_thread(&idle_thread[cpu->coreid]);
+	yield();
 }
 
 void stop_core(trapframe_t *regs)
@@ -1755,10 +1751,7 @@ void pause_core(trapframe_t *regs)
 		send_doorbells(guest->dbell_state_change);
 	}
 
-	if (cpu->ret_hook)
-		send_doorbell(cpu->coreid);
-
-	switch_thread(&idle_thread[cpu->coreid]);
+	yield();
 }
 
 void resume_core(trapframe_t *regs)
