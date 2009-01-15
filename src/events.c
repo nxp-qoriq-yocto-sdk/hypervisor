@@ -46,7 +46,7 @@ static eventfp_t gevent_table[] = {
 	&restart_core,                /* GEV_RESTART */
 	&start_wait_core,             /* GEV_START_WAIT */
 #ifdef CONFIG_GDB_STUB
-	&gdb_stub_event_handler,      /* GEV_GDB */
+	&gdb_stub_gevent_handler,     /* GEV_GDB */
 #else
 	NULL,                         /* GEV_GDB */
 #endif
