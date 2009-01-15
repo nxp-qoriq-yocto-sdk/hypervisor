@@ -62,6 +62,8 @@ typedef struct dt_node {
 
 	struct csd_info *csd;
 
+	struct cpc_part_reg *cpc_reg[2];
+
 	device_t dev; /** libos device */
 	list_t owners;
 	struct guest *irq_owner;

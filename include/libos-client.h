@@ -107,5 +107,6 @@ extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
 #define LOGTYPE_DEVTREE      (CLIENT_BASE_LOGTYPE + 7)
 #define LOGTYPE_PAMU         (CLIENT_BASE_LOGTYPE + 8)
 #define LOGTYPE_CCM          (CLIENT_BASE_LOGTYPE + 9)
+#define LOGTYPE_CPC          (CLIENT_BASE_LOGTYPE + 10)
 
 #endif

@@ -30,6 +30,7 @@
 
 #include <p4080.h>
 #include <ccm.h>
+#include <cpc.h>
 #include <devtree.h>
 #include <percpu.h>
 #include <errors.h>
@@ -56,6 +57,19 @@ static void enable_law(unsigned int lawidx)
 	val = in32(&laws[lawidx].attr);
 	val |= LAW_ENABLE;
 	out32(&laws[lawidx].attr, val);
+}
+
+/* allocate CPC ways for PMA here */
+static void pma_setup_cpc(dt_node_t *node)
+{
+	dt_prop_t *prop = dt_get_prop(node, "allocate-cpc-ways", 0);
+	if (prop) {
+		uint32_t val, tgt;
+
+		val = in32(&laws[node->csd->law_id].attr);
+		tgt = (val & LAW_TARGETID_MASK) >> LAWAR_TARGETID_SHIFT;
+		allocate_cpc_ways(prop, tgt, node->csd->csd_id, node);
+	}
 }
 
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
@@ -309,6 +323,9 @@ static int setup_csd(dt_node_t *node, void *arg)
 	node->csd->csd_id = csdid;
 
 	spin_unlock(&ccm_lock);
+
+	pma_setup_cpc(node);
+
 	return 0;
 
 fail_law:

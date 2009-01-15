@@ -87,7 +87,7 @@ partman: bin/linux/partman
 
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
-            gspr.c misc.S livetree.c ipi_doorbell.c util.c ccm.c
+            gspr.c misc.S livetree.c ipi_doorbell.c util.c ccm.c cpc.c
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
@@ -108,7 +108,7 @@ OBJS := $(basename $(libos-src-first-y:%=libos/%) \
                    $(LIBFDT_SRCS:%=libfdt/%))
 OBJS := $(OBJS:%=bin/%.o)
 
-PLUGIN_OBJS := $(shell mkdir -p $(src)/plugin; find $(src)/plugin -name '*.[oa]')
+PLUGIN_OBJS := $(shell mkdir -p $(src)plugin; find $(src)plugin -name '*.[oa]')
 
 HDRS := $(shell cd $(src); find include -name '*.h' -print)
 

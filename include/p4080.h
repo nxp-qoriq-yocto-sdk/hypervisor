@@ -40,11 +40,39 @@
 /* Define LAW targets here */
 #define LAW_TRGT_DDR1	0x10
 #define LAW_TRGT_DDR2	0x11
+#define LAW_TRGT_INTLV	0x14
 
 typedef struct {
 	uint32_t high, low, attr, reserved;
 } law_t;
 
 #define NUMCSDS 32
+
+#define NUMCPCS 2
+#define NUMCPCWAYS 32
+
+#define CPCADDR0 0x10000
+#define CPCADDR1 0x11000
+
+#define CPCPIR0 0x200
+#define CPCPIR0_RESET_MASK 0xFFFFFFFF
+#define CPCPAR0 0x208
+#define CPCPWR0 0x20C
+
+/*IRDALLOC, DRDALLOC, WCOALLOC, READUALLOC, WRITEUALLOC, ADSTASHEN, CNSTASHEN */
+#define CPCPAR_MASK 0xFB
+
+typedef struct cpc_part_reg {
+	uint32_t cpcpir, reserved, cpcpar, cpcpwr;
+} cpc_part_reg_t;
+
+#define NUM_PART_REGS 16
+
+typedef struct cpc_dev {
+	uint32_t cpc_way_map, cpc_dev_lock;
+	unsigned long cpc_reg_map;
+	struct cpc_part_reg *cpc_part_base;
+} cpc_dev_t;
+
 
 #endif
