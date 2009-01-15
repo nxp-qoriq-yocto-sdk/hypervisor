@@ -26,7 +26,21 @@
 #ifndef DEBUG_STUB_H
 #define DEBUG_STUB_H
 
+#include <libos/trapframe.h>
 #include <percpu.h>
+
+/** operations for debug stubs
+ */
+typedef struct stub_ops {
+	const char *compatible;
+	void (*vcpu_init)(void);
+	void (*vcpu_start)( trapframe_t *trapframe);
+	void (*vcpu_stop)(void);
+	int (*debug_interrupt)(trapframe_t *trap_frame);
+} stub_ops_t;
+
+#define attr_debug_stub __attribute__((section(".hvdbgstub"))) \
+	__attribute__((used))
 
 dt_node_t *find_stub_config_node(const char *compatible);
 void init_stubops(guest_t *guest);

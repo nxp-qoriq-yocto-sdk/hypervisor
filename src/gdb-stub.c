@@ -44,7 +44,6 @@
 #include <greg.h>
 #include <e500mc-data.h>
 #include <debug-stub.h>
-#include <stubops.h>
 
 #define TRACE(fmt, info...) \
 	printlog(LOGTYPE_DEBUG_STUB, \

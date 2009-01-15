@@ -42,6 +42,7 @@
 #include <greg.h>
 #include <paging.h>
 #include <doorbell.h>
+#include <debug-stub.h>
 
 void program_trap(trapframe_t *regs)
 {

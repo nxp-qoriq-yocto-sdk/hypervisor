@@ -25,7 +25,6 @@
  */
 
 #include <debug-stub.h>
-#include <stubops.h>
 #include <devtree.h>
 #include <percpu.h>
 

@@ -37,7 +37,6 @@
 #include <hv.h>
 #include <vpic.h>
 #include <tlbcache.h>
-#include <stubops.h>
 #include <devtree.h>
 #endif
 
@@ -51,6 +50,7 @@ struct guest;
 
 struct handle;
 struct ipi_doorbell;
+struct stub_ops;
 
 /** General handle operations that many types of handle will implement.
  * Any member may be NULL.
@@ -124,7 +124,7 @@ typedef struct guest {
 	int guest_debug_mode;
 	
 #ifdef CONFIG_DEBUG_STUB
-	stub_ops_t *stub_ops;
+	struct stub_ops *stub_ops;
 #endif
 	uint32_t state_lock, inv_lock;
 	gstate_t state;
