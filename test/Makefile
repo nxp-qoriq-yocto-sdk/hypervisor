@@ -89,3 +89,5 @@ bin/%.dtb : $(testdir)%.dts
 -include $(OBJS:%.o=%.d)
 
 endif
+
+.SECONDARY:

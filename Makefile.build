@@ -181,3 +181,5 @@ lib:
 
 docs:
 	doxygen doc/Doxyfile
+
+.SECONDARY:
