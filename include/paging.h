@@ -29,6 +29,7 @@
 #include <hv.h>
 #include <libos/interrupts.h>
 #include <libos/list.h>
+#include <libos/fsl-booke-tlb.h>
 
 #define GUEST_TLB_END 47
 
@@ -211,5 +212,11 @@ int virtualize_device_interrupt(struct guest *guest, struct dt_node *node,
 
 int virtualize_i2c_node(struct guest *guest, struct dt_node *node,
 			phys_addr_t paddr, phys_addr_t size);
+
+void fixup_tlb_sx_re(void);
+
+int guest_tlb_search_mas(uintptr_t va);
+
+int guest_tlb_search(uintptr_t va, int as, int pid, tlb_entry_t *mas);
 
 #endif

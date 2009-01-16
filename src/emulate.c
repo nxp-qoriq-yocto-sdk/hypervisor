@@ -306,85 +306,15 @@ static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
-static void fixup_tlb_sx_re(void)
-{
-	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
-		return;
-
-#ifdef CONFIG_TLB_CACHE
-	BUG();
-#else
-	gcpu_t *gcpu = get_gcpu();
-	unsigned long mas3 = mfspr(SPR_MAS3);
-	unsigned long mas7 = mfspr(SPR_MAS7);
-
-	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
-	                     (mas3 >> MAS3_RPN_SHIFT);
-
-	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
-	         "sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
-	         mfspr(SPR_MAS0), mfspr(SPR_MAS1), mas3, mas7, grpn);
-
-	/* Currently, we only use virtualization faults for bad mappings. */
-	if (likely(!(mfspr(SPR_MAS8) & MAS8_VF))) {
-		unsigned long attr;
-		unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
-		                                grpn, &attr, PTE_PHYS_LEVELS);
-
-		assert(attr & PTE_VALID);
-
-		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
-		                (mas3 & (MAS3_FLAGS | MAS3_USER)));
-		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-	}
-
-	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
-#endif
-}
-
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
-	gcpu_t *gcpu = get_gcpu();
 	uint32_t va = get_ea_indexed(regs, insn);
-	register_t mas1, mas6;
 
 	inc_stat(stat_emu_tlbsx);
 	disable_int();
-	
-	mas6 = mfspr(SPR_MAS6);
-	mas1 = (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT) |
-	       ((mas6 & MAS6_SAS) << MAS1_TS_SHIFT) |
-	       (mas6 & MAS6_SPID_MASK);
-
-	int tlb1 = guest_find_tlb1(-1, mas1, va >> PAGE_SHIFT);
-	if (tlb1 >= 0) {
-		mtspr(SPR_MAS0, MAS0_TLBSEL(1) | MAS0_ESEL(tlb1));
-		mtspr(SPR_MAS1, gcpu->gtlb1[tlb1].mas1);
-		mtspr(SPR_MAS2, gcpu->gtlb1[tlb1].mas2);
-		mtspr(SPR_MAS3, gcpu->gtlb1[tlb1].mas3);
-		mtspr(SPR_MAS7, gcpu->gtlb1[tlb1].mas7);
-
-		enable_int();
-		return 0;
-	}
-
-#ifdef CONFIG_TLB_CACHE
-	tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
-	                         mas6 & MAS6_SAS);
-	tlbcset_t *set;
-	int way;
-
-	if (find_gtlb_entry(va, tag, &set, &way)) {
-		gtlb0_to_mas(set - cpu->client.tlbcache, way);
-		enable_int();
-		return 0;
-	}
-#endif
-
-	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
-	fixup_tlb_sx_re();
-
+	guest_tlb_search_mas(va);
 	enable_int();
+
 	return 0;
 }
 
