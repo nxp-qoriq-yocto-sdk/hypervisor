@@ -52,14 +52,14 @@ void dump_dev_tree(void)
 	printf("------\n");
 }
 
-int test_dma_memcpy(void)
+int test_dma_memcpy(unsigned int gpa_src, unsigned int gpa_dst, int do_memset)
 {
 	int count = 0x100;
-	unsigned int gpa_src = 0x0;
-	unsigned int gpa_dst = 0x100;
 	unsigned char *gva_src, *gva_dst;
 
-	printf("DMA memcpy test begins : ");
+	gva_src = (unsigned char *)(gpa_src + PHYSBASE);
+	if (do_memset)
+		memset(gva_src, 0x5A, count);
 
 	/* basic DMA direct mode test */
 	out32((uint32_t *)(CCSRBAR_VA+0x100100), 0x00000404);
@@ -71,15 +71,9 @@ int test_dma_memcpy(void)
 
 	while (in32((uint32_t *)(CCSRBAR_VA+0x100104)) & DMA_CHAN_BSY);
 
-	gva_src = (unsigned char *)(gpa_src + PHYSBASE);
 	gva_dst = (unsigned char *)(gpa_dst + PHYSBASE);
 
-	if (!memcmp(gva_src, gva_dst, count))
-		printf("passed\n");
-	else
-		printf("failed\n");
-
-	return 0;
+	return (!memcmp(gva_src, gva_dst, count));
 }
 
 
@@ -124,7 +118,22 @@ void start(unsigned long devtree_ptr)
 	printf("actual liodn = %ld\n", *liodnp);
 #endif
 
-	test_dma_memcpy();
+	/* test access violation failure and pass cases */
+	if (!test_dma_memcpy(0, 0x0e000000, 0))
+		printf("DMA access violation test#1 : PASSED\n");
+	else
+		printf("DMA access violation test#1 : FAILED\n");
+
+	if (!test_dma_memcpy(0x00000100, 0x0c000000, 0))
+		printf("DMA access violation test#2 : PASSED\n");
+	else
+		printf("DMA access violation test#2 : FAILED\n");
+
+	if (test_dma_memcpy(0x04000100, 0x0c000100, 1) ||
+		test_dma_memcpy(0x04000100, 0x05000100, 1))
+		printf("DMA access test : PASSED\n");
+	else
+		printf("DMA access test : FAILED\n");
 
 	printf("Test Complete\n");
 }

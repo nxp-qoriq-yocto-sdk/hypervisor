@@ -54,6 +54,21 @@ static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
 	return count_lsb_zeroes(addrspace_size >> PAGE_SHIFT) + 11;
 }
 
+static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
+{
+	/* window count is 2^(WCE+1) bytes */
+	return count_lsb_zeroes(subwindow_cnt) - 1;
+}
+
+static int is_subwindow_count_valid(int subwindow_cnt)
+{
+	if (subwindow_cnt <= 1 || subwindow_cnt > 16)
+		return 0;
+	if (subwindow_cnt & (subwindow_cnt - 1))
+		return 0;
+	return 1;
+}
+
 /*
  * Given a guest physical page number and size, return
  * the real (true physical) page number
@@ -189,6 +204,106 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 	return ULONG_MAX;
 }
 
+#define MAX_SUBWIN_CNT 16
+
+int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
+	uint32_t liodn, uint64_t primary_window_base_addr,
+	uint32_t subwindow_cnt, phys_addr_t subwindow_size,
+	uint32_t omi, uint32_t stash_dest,
+	unsigned int *first_subwin_swse, unsigned long *fspi)
+{
+	dt_node_t *dma_subwindow = NULL;
+	struct spaace_t *spaace = NULL;
+	int def_subwindow_cnt = -1, def_window;
+	unsigned long current_fspi;
+	int unit_address;
+	unsigned long rpn;
+	uint64_t window_addr[MAX_SUBWIN_CNT], window_size[MAX_SUBWIN_CNT];
+	uint64_t next_window_addr;
+	int i;
+
+	for (i=0; i < MAX_SUBWIN_CNT; i++) {
+		window_addr[i] = ULLONG_MAX;
+		window_size[i] = ULLONG_MAX;
+	}
+
+	list_for_each(&dma_window->children, i) {
+		dt_node_t *dma_subwindow = to_container(i, dt_node_t,
+				child_node);
+		dt_prop_t *gaddr;
+		dt_prop_t *size;
+
+		gaddr = dt_get_prop(dma_subwindow, "guest-addr", 0);
+		if (!gaddr || gaddr->len != 8) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: warning: missing/bad guest-addr at %s\n",
+				  __func__, dma_subwindow->name);
+			return ERR_BADTREE;
+		}
+		window_addr[++def_subwindow_cnt] = *(uint64_t *)gaddr->data;
+
+		size = dt_get_prop(dma_subwindow, "size", 0);
+		if (!size || size->len != 8) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				 "%s: warning: missing/bad size prop at %s\n",
+				__func__, dma_subwindow->name);
+			return ERR_BADTREE;
+		}
+		window_size[def_subwindow_cnt] = *(uint64_t *)size->data;
+	}
+
+	*fspi = current_fspi = get_fspi_and_increment(subwindow_cnt);
+
+	if (current_fspi == ULONG_MAX) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			 "%s: spaace indexes exhausted %s\n",
+			 __func__, dma_subwindow->name);
+		return 0;
+	}
+
+	next_window_addr = primary_window_base_addr + subwindow_size;
+	def_window = 0;
+	*first_subwin_swse = 0;
+
+	if (primary_window_base_addr == window_addr[0]) {
+		*first_subwin_swse = map_addrspace_size_to_wse(window_size[0]);
+		++def_window;
+	}
+
+	for (unit_address = 0; unit_address < subwindow_cnt;
+		next_window_addr += subwindow_size, unit_address++) {
+
+		if (window_addr[def_window] == next_window_addr) {
+			spaace = pamu_get_spaace(current_fspi, unit_address);
+			setup_default_xfer_to_host_spaace(spaace);
+			spaace->liodn = liodn;
+
+			rpn = get_rpn(guest,
+				window_addr[def_window] >> PAGE_SHIFT,
+				window_size[def_window]);
+
+			if (rpn == ULONG_MAX)
+				return 0;
+
+			spaace->atm = PAACE_ATM_WINDOW_XLATE;
+
+			spaace->twbah = rpn >> 20;
+			spaace->twbal = rpn;
+
+			spaace->swse = map_addrspace_size_to_wse(
+				window_size[def_window]);
+			def_window++;
+
+			if (omi != -1) {
+				spaace->otm = PAACE_OTM_INDEXED;
+				spaace->op_encode.index_ot.omi = omi;
+				spaace->impl_attr.cid = stash_dest;
+			}
+		}
+	}
+	return subwindow_cnt;
+}
+
 /*
  * Given a device liodn and a device config node setup
  * the paace entry for this device.
@@ -208,8 +323,11 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	phys_addr_t window_addr = -1;
 	phys_addr_t window_size = 0;
 	uint32_t stash_dest = -1;
-
-// TODO implement subwindows
+	uint32_t omi = -1;
+	unsigned long fspi;
+	phys_addr_t subwindow_size;
+	unsigned int first_subwin_swse;
+	uint32_t subwindow_cnt = 0;
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
 	if (!prop || prop->len != 4) {
@@ -273,7 +391,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
 	if (prop) {
 		if (prop->len == 4) {
-			uint32_t omi = *(const uint32_t *)prop->data;
+			omi = *(const uint32_t *)prop->data;
 			if (omi <= OMI_MAX) {
 				ppaace->otm = PAACE_OTM_INDEXED;
 				ppaace->op_encode.index_ot.omi = omi;
@@ -295,6 +413,29 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		stash_dest = get_stash_dest(*(const uint32_t *)prop->data, hwnode);
 		if (stash_dest != -1)
 			ppaace->impl_attr.cid = stash_dest;
+	}
+
+	prop = dt_get_prop(dma_window, "subwindow-count", 0);
+	if (prop)
+		subwindow_cnt = *(const uint32_t *)prop->data;
+
+	if (is_subwindow_count_valid(subwindow_cnt)) {
+		subwindow_size = window_size / subwindow_cnt;
+
+		if (configure_dma_sub_windows(guest, dma_window, liodn,
+					      window_addr, subwindow_cnt - 1,
+					      subwindow_size, omi, stash_dest,
+					      &first_subwin_swse, &fspi)) {
+			ppaace->mw = 1;
+			/*
+			 * NOTE: The first sub-window exists in the primary
+			 * paace itself and fspi is the index location of
+			 * the spaace that describes the second sub-window
+			 */
+			ppaace->swse = first_subwin_swse;
+			ppaace->fspi = fspi;
+			ppaace->wce = map_subwindow_cnt_to_wce(subwindow_cnt);
+		}
 	}
 
 	lwsync();

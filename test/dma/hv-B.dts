@@ -1,0 +1,95 @@
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&uart0>;
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma1>;
+		};
+
+		uart0: uart0 {
+			device = "serial0";
+		};
+
+		uart1: uart1 {
+			device = "serial1";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+	};
+
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0x0 0x40000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0x0 0x40000000>;
+			size = <0 0x2000000>;
+		};
+	};
+
+	dma-windows {
+		window0: window0 {
+			compatible = "dma-window";
+			guest-addr = <0 0x0>;
+			size = <0x0 0x40000000>; // 1G
+			subwindow-count = <16>;
+			sub-window@1 {
+				compatible = "dma-subwindow";
+				guest-addr = <0x0 0x04000000>;
+				size = <0x0 0x01000000>; // 16M
+			};
+			sub-window@3 {
+				compatible = "dma-subwindow";
+				guest-addr = <0x0 0x0c000000>;
+				size = <0x0 0x01000000>; // 16M
+			};
+		};
+	};
+
+	partitions {
+		part1 {
+			compatible = "partition";
+			cpus = <2 3>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
+
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma0>;
+				guest-addr = <0 0>;
+			};
+
+			uart2: uart2 {
+				device = "serial2";
+			};
+
+			dma0: dma0 {
+				device = "dma0";
+				dma-window = <&window0>;
+			};
+
+			aliases {
+				stdout = <&uart2>;
+			};
+		};
+	};
+
+	chosen {
+	};
+};

@@ -22,16 +22,25 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := dma
-dir := $(testdir)$(test)/
+# UART0 is the hypervisor
+# UART1 is Linux byte channel console
+# UART2 is Linux serial console
+$use_uart2 = 1
 
-include $(testdir)common/Makefile.inc
+$guest_image[0] = "dma"
+$guest_addr[0]  = 0x00200000
 
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+$kernel_image  = "hv.uImage"
 
-$(test)-check-B: $(test)-run-B-batch
-	$(testdir)common/check-results 2
+$guest_image[1] = "hv-A.dtb"
+$guest_addr[1]  = 0x00100000
 
-$(test)-check-A: $(test)-run-A-batch
-	$(testdir)common/check-results 2
+$kernel_cmdline = "config-addr=0xe8100000"
+
+add-directory "%script%/../sim" -prepend
+add-directory "%script%/../sim/images" -prepend
+add-directory "../bin" -prepend
+add-directory "bin" -prepend
+add-directory "bin/dma" -prepend
+
+run-command-file "boot.simics"
