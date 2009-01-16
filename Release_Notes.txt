@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc9
-Date: 1/10/2009
+Revsion: 0.3-rc10
+Date: 1/16/2009
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc9 is compatible with Simics 4.0.29 / pre14 and
+   -Topaz 0.3-rc10 is compatible with Simics 4.0.29 / pre14 and
     later
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -31,6 +31,20 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc10 bug fixes and changes
+      -PAMU subwindows
+      -CPC partitioning
+      -bug fix for setting DEAR correctly on alignment exceptions
+      -threading infrastucture
+      -support for node-update-phandle
+      -debug stub API updates
+         -guest TLB search API
+         -build plugin support
+         -spr accessor updates
+         -mas2 flags supported on map_gphys()
+      -bug 2584 fixed-- doorbells don't work correctly in multiple
+       partition configuration
 
    -Topaz 0.3-rc9 bug fixes and changes
       -support guest debug mode (2490)
