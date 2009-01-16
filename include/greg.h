@@ -48,6 +48,8 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val);
 int write_gspr(trapframe_t *regs, int spr, register_t val);
 int read_pmr(trapframe_t *regs, int pmr, register_t *val);
 int write_pmr(trapframe_t *regs, int pmr, register_t val);
+int read_fpscr(uint64_t *val);
+int write_fpscr(uint64_t val);
 
 static inline int read_ggpr(trapframe_t *regs, int gpr, register_t *val)
 {

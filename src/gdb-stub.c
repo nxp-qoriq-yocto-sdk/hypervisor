@@ -685,14 +685,18 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg
 	case reg_cat_cr:
 		c = read_gcr(trap_frame, &reg_value);
 		break;
-	case reg_cat_unk:
 	case reg_cat_pmr:
-		c = 1;
+		c = read_pmr(trap_frame, e500mc_reg_num, &reg_value);
 		break;
 	case reg_cat_fpr:
 		c = read_gfpr(trap_frame, e500mc_reg_num, &fp_reg_value);
 		stringize_reg_value(value, fp_reg_value, byte_length);
 		return c;
+	case reg_cat_fpscr:
+		c = read_fpscr(&fp_reg_value);
+		stringize_reg_value(value, fp_reg_value, byte_length);
+		break;
+	case reg_cat_unk:
 	default: DEBUG("Illegal register category.");
 		c = 1;
 		break;
@@ -724,10 +728,13 @@ static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t re
 	case reg_cat_cr:
 		c = write_gcr(trap_frame, reg_value);
 		break;
-	case reg_cat_unk:
 	case reg_cat_pmr:
-		c = 1;
+		c = write_pmr(trap_frame, e500mc_reg_num, reg_value);
 		break;
+	case reg_cat_fpscr:
+		c = write_fpscr(reg_value);
+		break;
+	case reg_cat_unk:
 	default: DEBUG("Illegal register category.");
 		c = 1;
 		break;

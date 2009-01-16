@@ -141,8 +141,36 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_PVR);
 		break;
 
+	/* no-op on 32-bit (Removed Registers) */
+	case SPR_MSRP:
+	case SPR_MAS5:
+	case SPR_MAS8:
+	case SPR_DBSRWR:
 	case SPR_EPCR:
-		/* no-op on 32-bit */
+	case SPR_LPIDR:
+	case SPR_IVOR0:
+	case SPR_IVOR38:
+	case SPR_IVOR39:
+	case SPR_IVOR40:
+	case SPR_IVOR41:
+	case SPR_GIVPR:
+	case SPR_GPIR:
+	case SPR_GIVOR2:
+	case SPR_GIVOR3:
+	case SPR_GIVOR4:
+	case SPR_GIVOR8:
+	case SPR_GIVOR13:
+	case SPR_GIVOR14:
+	case SPR_GESR:
+	case SPR_GSRR0:
+	case SPR_GSRR1:
+	case SPR_GSPRG0:
+	case SPR_GSPRG1:
+	case SPR_GSPRG2:
+	case SPR_GSPRG3:
+	case SPR_GDEAR:
+	case SPR_GEPR:
+
 		*val = 0;
 		break;
 
@@ -162,7 +190,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_ATBU);
 		break;
 
-	case SPR_IVOR0...SPR_IVOR15:
+	case SPR_IVOR1...SPR_IVOR15:
 		*val = gcpu->ivor[spr - SPR_IVOR0];
 		break;
 
@@ -381,6 +409,34 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	case SPR_DAC2:
 		*val = mfspr(SPR_DAC2);
+		break;
+
+	case SPR_NPIDR:
+		*val = mfspr(SPR_NPIDR);
+		break;
+
+	case SPR_NSPC:
+		*val = mfspr(SPR_NSPC);
+		break;
+
+	case SPR_NSPD:
+		*val = mfspr(SPR_NSPD);
+		break;
+
+	case SPR_L1CFG0:
+		*val = mfspr(SPR_L1CFG0);
+		break;
+
+	case SPR_L1CFG1:
+		*val = mfspr(SPR_L1CFG1);
+		break;
+
+	case SPR_L2CFG0:
+		*val = mfspr(SPR_L2CFG0);
+		break;
+
+	case SPR_DEVENT:
+		*val = mfspr(SPR_DEVENT);
 		break;
 
 	default:
@@ -914,3 +970,14 @@ int write_pmr(trapframe_t *regs, int pmr, register_t val)
 	return 0;
 }
 
+int read_fpscr(uint64_t *val)
+{
+	*val = mffs();
+	return 0;
+}
+
+int write_fpscr(uint64_t val)
+{
+	mtfsf(val);
+	return 0;
+}
