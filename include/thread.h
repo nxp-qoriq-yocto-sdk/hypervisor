@@ -1,6 +1,8 @@
-
+/** @file
+ * Threads and scheduling
+ */
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,36 +25,63 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HV_H
-#define HV_H
+#ifndef THREAD_H
+#define THREAD_H
 
-#include <libos/libos.h>
+#include <libos/percpu.h>
 #include <libos/thread.h>
-#include <libos/trapframe.h>
+#include <libos/list.h>
+#include <libos/io.h>
 
-#define FH_API_VERSION 1
-#define FH_API_COMPAT_VERSION 1
+#define NUM_PRIOS 2
 
-#define MAX_CORES 8
+struct sched;
 
-struct guest;
+enum {
+	sched_running,
+	sched_prep_block,
+	sched_blocked,
+};
 
-int start_guest(struct guest *guest);
-int stop_guest(struct guest *guest);
-int restart_guest(struct guest *guest);
-int pause_guest(struct guest *guest);
-int resume_guest(struct guest *guest);
-phys_addr_t find_lowest_guest_phys(void *fdt);
+typedef struct thread {	
+	libos_thread_t libos_thread; 
+	list_t rq_node;
+	struct sched *sched;
+	int prio, state;
+} thread_t;
 
-char *stripspace(const char *str);
-char *nextword(char **str);
-uint64_t get_number64(queue_t *out, const char *numstr);
-int64_t get_snumber64(queue_t *out, const char *numstr);
-uint32_t get_number32(queue_t *out, const char *numstr);
-int32_t get_snumber32(queue_t *out, const char *numstr);
-int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu);
+typedef struct sched {
+	cpu_t *sched_cpu;
+	list_t rq[NUM_PRIOS];
+	thread_t idle;
+	uint32_t lock;
+} sched_t;
 
-void branch_to_reloc(void *bigmap_text_base,
-                     register_t mas3, register_t mas7);
+static inline int is_idle(void)
+{
+	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
+	return thread == &thread->sched->idle;
+}
+
+static inline void prepare_to_block(void)
+{
+	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
+	
+	assert(!is_idle());
+	thread->state = sched_prep_block;
+	smp_sync();
+}
+
+void block(void);
+void unblock(thread_t *thread);
+
+thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg),
+                     void *arg, int prio);
+void new_thread_inplace(thread_t *thread, uint8_t *stack,
+                        void (*func)(trapframe_t *regs, void *arg),
+                        void *arg, int prio);
+ 
+void sched_core_init(cpu_t *sched_cpu);
+void sched_init(void);
 
 #endif
