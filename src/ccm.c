@@ -35,9 +35,11 @@
 #include <percpu.h>
 #include <errors.h>
 
+#define HV_CPUS ((1 << MAX_CORES) - 1) << (32 - MAX_CORES)
+
 static law_t *laws;
 static uint32_t *csdids;
-static uint32_t csdid_map, ccm_lock;
+static uint32_t csdid_map;
 
 static void disable_law(unsigned int lawidx)
 {
@@ -72,45 +74,39 @@ static void pma_setup_cpc(dt_node_t *node)
 	}
 }
 
+static inline void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
+{
+	uint32_t val;
+
+	disable_law(csd->law_id);
+
+	val = in32(&csdids[csd->csd_id]);
+	val |= cpus;
+	out32(&csdids[csd->csd_id], val);
+
+	enable_law(csd->law_id);
+}
+
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 {
-	uint32_t val, i, core, base, num;
+	uint32_t i, core, base, num;
 	uint32_t cpus = 0;
 
-	if (guest == NULL) {
-		cpus = ((1 << MAX_CORES) - 1) << (32 - MAX_CORES);
-		goto hv;
-	}
+	if (!node->csd)
+		return;
 
 	for (i = 0; i < guest->cpulist_len / 4; i += 2) {
 		base = guest->cpulist[i];
 		num = guest->cpulist[i + 1];
 
 		for (core = base; core < base + num; core++) {
-			if (core >= MAX_CORES) {
-				printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
-				         "%s: core %d doesn't match any valid ccm port\n",
-				         __func__, core);
-
-				/* Leave the LAW disabled so the PMA is global. */
-				return;
-			}
-
+			assert(core < MAX_CORES);
 			cpus |= 1 << (31 - core);
 		}
 	}
-
-hv:
-	spin_lock(&ccm_lock);
-	disable_law(node->csd->law_id);
-
-	val = in32(&csdids[node->csd->csd_id]);
-	val |= cpus;
-
-	out32(&csdids[node->csd->csd_id], val);
-	enable_law(node->csd->law_id);
-
-	spin_unlock(&ccm_lock);
+	spin_lock(&node->csd->csd_lock);
+	set_csd_cpus(node->csd, cpus);
+	spin_unlock(&node->csd->csd_lock);
 }
 
 static int get_sizebit(phys_addr_t size)
@@ -233,12 +229,6 @@ static pma_t *read_pma(dt_node_t *node)
 	pma_t *pma;
 	dt_prop_t *prop;
 	
-	spin_lock(&ccm_lock);
-
-	pma = node->pma;
-	if (pma)
-		goto out;
-
 	pma = alloc_type(pma_t);
 	if (!pma) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -284,11 +274,9 @@ static pma_t *read_pma(dt_node_t *node)
 
 out:
 	node->pma = pma;
-	spin_unlock(&ccm_lock);
 	return pma;
 
 out_free:
-	spin_unlock(&ccm_lock);
 	free(pma);
 	return NULL;
 }
@@ -301,9 +289,7 @@ static int setup_csd(dt_node_t *node, void *arg)
 
 	pma = read_pma(node);
 	if (!pma)
-		return 0;
-
-	spin_lock(&ccm_lock);
+		goto fail;
 
 	ret = csdid = get_free_csd();
 	if (ret < 0)
@@ -322,8 +308,6 @@ static int setup_csd(dt_node_t *node, void *arg)
 	node->csd->law_id = lawid;
 	node->csd->csd_id = csdid;
 
-	spin_unlock(&ccm_lock);
-
 	pma_setup_cpc(node);
 
 	return 0;
@@ -333,7 +317,6 @@ fail_law:
 fail_csd:
 	release_csd(csdid);
 fail:
-	spin_unlock(&ccm_lock);
 	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 	         "%s: error %d for %s\n", __func__, ret, node->name);
 	return ret;
@@ -363,7 +346,8 @@ void ccm_init(void)
 
 	node = dt_get_first_compatible(config_tree, "hv-memory");
 	node = get_pma_node(node);
-	add_cpus_to_csd(NULL, node);
+	if (node->csd)
+		set_csd_cpus(node->csd, HV_CPUS);
 }
 
 dt_node_t *get_pma_node(dt_node_t *node)
@@ -390,6 +374,5 @@ dt_node_t *get_pma_node(dt_node_t *node)
 		return NULL;
 	}
 
-	read_pma(pma_node);
 	return pma_node;
 }

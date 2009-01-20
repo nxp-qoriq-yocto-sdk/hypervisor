@@ -5,7 +5,7 @@ struct guest;
 struct dt_node;
 
 typedef struct csd_info {
-	uint32_t law_id, csd_id;
+	uint32_t law_id, csd_id, csd_lock;
 } csd_info_t;
 
 void ccm_init(void);

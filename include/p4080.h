@@ -69,7 +69,7 @@ typedef struct cpc_part_reg {
 #define NUM_PART_REGS 16
 
 typedef struct cpc_dev {
-	uint32_t cpc_way_map, cpc_dev_lock;
+	uint32_t cpc_way_map;
 	unsigned long cpc_reg_map;
 	struct cpc_part_reg *cpc_part_base;
 } cpc_dev_t;

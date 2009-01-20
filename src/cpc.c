@@ -112,13 +112,9 @@ static cpc_part_reg_t *allocate_ways(int num, dt_prop_t *prop, uint32_t csdid)
 	uint32_t val = 0;
 	int numways, index, i;
 
-	spin_lock(&cpcs[num].cpc_dev_lock);
-
 	index = get_free_cpcpir(num);
-	if (index == -1) {
-		spin_unlock(&cpcs[num].cpc_dev_lock);
+	if (index == -1)
 		return NULL;
-	}
 
 	numways = prop->len / sizeof(uint32_t);
 	ways = (const uint32_t *)prop->data;
@@ -136,10 +132,8 @@ static cpc_part_reg_t *allocate_ways(int num, dt_prop_t *prop, uint32_t csdid)
 					"CPC way %d already allocated\n", ways[i]);
 	}
 
-	if (val == 0) {
-		spin_unlock(&cpcs[num].cpc_dev_lock);
+	if (val == 0)
 		return NULL;
-	}
 
 	/* CPCPIRn is a bitmap of CSDIDs */
 	out32(&cpcs[num].cpc_part_base[index].cpcpir, 1 << (31 - csdid));
@@ -148,8 +142,6 @@ static cpc_part_reg_t *allocate_ways(int num, dt_prop_t *prop, uint32_t csdid)
 	out32(&cpcs[num].cpc_part_base[index].cpcpar, CPCPAR_MASK);
 	out32(&cpcs[num].cpc_part_base[index].cpcpwr, val);
 	set_cpc_way_map(num, val);
-
-	spin_unlock(&cpcs[num].cpc_dev_lock);
 
 	return &cpcs[num].cpc_part_base[index];
 }
