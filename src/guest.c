@@ -1290,54 +1290,9 @@ static void get_cpulist(guest_t *guest)
 {
 	dt_node_t *node = guest->partition;
 	dt_prop_t *prop;
-	static int next_cpu;
-	static int fixed_cpus;
-
-	prop = dt_get_prop(node, "cpu-count", 0);
-	if (prop) {
-		if (fixed_cpus) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: cpu-count in %s, but fixed cpus already assigned\n",
-			         __func__, node->name);
-			return;
-		}
-
-		if (prop->len != 4) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: bad cpu-count property in %s\n",
-			         __func__, node->name);
-			return;
-		}
-
-		uint32_t count = *(const uint32_t *)prop->data;
-		if (next_cpu + count <= next_cpu) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: bad cpu-count property in %s\n",
-			         __func__, node->name);
-			return;
-		}
-
-		guest->cpulist = malloc(8);
-		if (!guest->cpulist)
-			goto nomem;
-
-		guest->cpulist_len = 8;
-
-		guest->cpulist[0] = next_cpu;
-		guest->cpulist[1] = count;
-
-		next_cpu += count;
-	}
 
 	prop = dt_get_prop(node, "cpus", 0);
 	if (prop) {
-		if (next_cpu != 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: cpus in %s, but dynamic cpus already assigned\n",
-			         __func__, node->name);
-			return;
-		}
-
 		if (prop->len == 0 || (prop->len % 8) != 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "%s: bad cpus property in %s\n",
@@ -1352,12 +1307,11 @@ static void get_cpulist(guest_t *guest)
 
 		memcpy(guest->cpulist, prop->data, prop->len);
 		guest->cpulist_len = prop->len;
-		fixed_cpus = 1;
 	}
 
 	if (!guest->cpulist)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: No cpus or cpu-count in guest %s\n",
+		         "%s: No cpus property in guest %s\n",
 		         __func__, node->name);
 
 	return;
