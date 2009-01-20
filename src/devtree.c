@@ -864,76 +864,6 @@ typedef struct assignportal_ctx {
 	uint32_t pcpu_num;
 } assignportal_ctx_t;
 
-static int assign_portal_callback(dt_node_t *node, void *arg)
-{
-	assignportal_ctx_t *ctx = arg;
-	dt_prop_t *cpu_handle;
-	dt_node_t *cpu;
-	dt_prop_t *cpu_reg;
-
-	cpu_handle = dt_get_prop(node, "cpu-handle", 0);
-	if (!cpu_handle || cpu_handle->len != 4)
-		return 0;  /* if no cpu-phandle assume that this is
-			      not a per-cpu portal */
-
-	cpu = dt_lookup_phandle(hw_devtree, *(const uint32_t *)cpu_handle->data);
-	if (!cpu) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: bad cpu phandle reference in %s \n",
-		          __func__, node->name);
-		return 0;
-	}
-
-	cpu_reg = dt_get_prop(cpu, "reg", 0);
-	if (!cpu_reg || cpu_reg->len != 4) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: bad/missing reg property in %s \n",
-		          __func__, cpu->name);
-		return 0;
-	}
-
-	/* looking for match of phys cpu & cpu's reg property */
-	if (ctx->pcpu_num == *(const uint32_t *)cpu_reg->data) {
-		ctx->hwnode = node;
-		return 1;  /* found it, stop search */
-	}
-
-	return 0;
-}
-
-dt_node_t *assign_portal(dt_node_t *cfgnode, guest_t *guest, const char *compat)
-{
-	dt_node_t *hwnode;
-	dt_prop_t *vcpu;
-	uint32_t vcpu_num;
-	assignportal_ctx_t ctx;
-
-	vcpu = dt_get_prop(cfgnode, "vcpu", 0);
-	if (!vcpu || vcpu->len != 4) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: missing/bad vcpu property in %s\n",
-		         __func__, cfgnode->name);
-		return 0;
-	}
-
-	vcpu_num = *(const uint32_t *)vcpu->data;
-
-	if (vcpu_num >= guest->cpucnt) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: invalid vcpu value in %s\n",
-		         __func__, cfgnode->name);
-		return 0;
-	}
-
-	ctx.pcpu_num = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, vcpu_num);
-	ctx.hwnode = NULL;
-
-	dt_for_each_compatible(hw_devtree, compat, assign_portal_callback, &ctx);
-
-	hwnode = ctx.hwnode;
-	return hwnode;
-}
-
 int assign_callback(dt_node_t *node, void *arg)
 {
 	assign_ctx_t *ctx = arg;
@@ -952,16 +882,7 @@ int assign_callback(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	/* A device property value of "qman-portal" is magic.
-	 * Portals are identity mapped to the physical cpu--
-	 * portal 0 goes with phys cpu 0.
-	 */
-	if (strcmp(alias, "qman-portal") == 0)
-		hwnode = assign_portal(node, ctx->guest, "fsl,qman-portal");
-	else if (strcmp(alias, "bman-portal") == 0)
-		hwnode = assign_portal(node, ctx->guest, "fsl,bman-portal");
-	else
-		hwnode = dt_lookup_alias(hw_devtree, alias);
+	hwnode = dt_lookup_alias(hw_devtree, alias);
 
 	if (!hwnode) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,

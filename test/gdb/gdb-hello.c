@@ -105,30 +105,9 @@ void gorp(void)
 }
 void start(unsigned long devtree_ptr)
 {
-	uint32_t status;
-	char *str;
-	uint32_t handle;
 	int j, t;
-	int node = -1;
-	int len;
 
 	init(devtree_ptr);
-
-	node = fdt_path_offset(fdt, "/hypervisor/handles/byte-channel0");
-	if (node < 0) {
-		// printf("0 device tree error %d\n",node);
-		return;
-	}
-	const int *prop = fdt_getprop(fdt, node, "reg", &len);
-	if (prop) {
-		handle = *prop;
-	} else {
-		// printf("device tree error\n");
-		return;
-	}
-
-	str = "hello world\r\n";
-	status = fh_byte_channel_send(handle, strlen(str), str);
 
 	while (1) {
 		X = 0;

@@ -89,6 +89,9 @@ void init_stubops(guest_t *guest)
 	const char *str;
 	size_t pos = 0;
 
+	if (guest->guest_debug_mode)
+		return;  /* no stub if guest debug mode is enabled */
+
 	node = dt_get_first_compatible(guest->partition, "debug-stub");
 	if (!node)
 		return;  /* no stubs for this partition */

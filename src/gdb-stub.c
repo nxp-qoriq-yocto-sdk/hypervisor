@@ -886,17 +886,17 @@ static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table)
 	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++) {
 		if (breakpoint_table[index].taken) {
 			flag = 1;
-			DEBUG("index: %d", index);
-			DEBUG("\taddr: 0x%p", breakpoint_table[index].addr);
-			DEBUG("\torig_insn: %x", breakpoint_table[index].orig_insn);
-			DEBUG("\tcount: %d", breakpoint_table[index].count);
-			DEBUG("\ttaken: %d", breakpoint_table[index].taken);
+			TRACE("index: %d", index);
+			TRACE("\taddr: 0x%p", breakpoint_table[index].addr);
+			TRACE("\torig_insn: %x", breakpoint_table[index].orig_insn);
+			TRACE("\tcount: %d", breakpoint_table[index].count);
+			TRACE("\ttaken: %d", breakpoint_table[index].taken);
 			if (breakpoint_table[index].associated)
-				DEBUG("\tassocated internal breakpoint: 0x%p",
+				TRACE("\tassocated internal breakpoint: 0x%p",
 				         breakpoint_table[index].associated->addr);
 			else
-				DEBUG("\tno assocated internal breakpoint");
-			DEBUG("\ttype: %s", breakpoint_table[index].type == external ?
+				TRACE("\tno assocated internal breakpoint");
+			TRACE("\ttype: %s", breakpoint_table[index].type == external ?
 			      "external" : "internal");
 		}
 	}
@@ -1438,23 +1438,23 @@ return_to_guest:
 			cur_pos = content(stub->cmd);
 			cur_pos += 5;
 			if (strncmp(":features:read:", (char *) cur_pos, 15) == 0) {
-				DEBUG ("Got :features:read:");
-				DEBUG ("Retreiving annex.");
+				TRACE ("Got :features:read:");
+				TRACE ("Retreiving annex.");
 				cur_pos += 15;
 				sav_pos = cur_pos;
 				cur_pos = scan_till(cur_pos, ':');
 				BREAK_IF_END(cur_pos);
 				td = "";
 				if (strncmp("target.xml", (char *) sav_pos, cur_pos - sav_pos) == 0) {
-					DEBUG("Using td: e500mc_description");
+					TRACE("Using td: e500mc_description");
 					td = e500mc_description;
 				}
 				else if (strncmp ("power-core.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					DEBUG("Using td: power_core_description");
+					TRACE("Using td: power_core_description");
 					td = power_core_description;
 				}
 				else if (strncmp ("power-fpu.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					DEBUG("Using td: power_fpu_description");
+					TRACE("Using td: power_fpu_description");
 					td = power_fpu_description;
 				}
 				BREAK_IF_END(td);
