@@ -38,6 +38,7 @@
 #include <vpic.h>
 #include <tlbcache.h>
 #include <devtree.h>
+#include <thread.h>
 #endif
 
 #define TLB1_GSIZE 16 /* As seen by the guest */

@@ -32,8 +32,6 @@
 #include <libos/mpic.h>
 #include <libos/ns16550.h>
 #include <libos/interrupts.h>
-#include <libos/thread.h>
-#include <libos/trap_booke.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -48,6 +46,7 @@
 #include <ccm.h>
 #include <doorbell.h>
 #include <events.h>
+#include <thread.h>
 
 #include <limits.h>
 
@@ -470,7 +469,8 @@ void start(unsigned long devtree_ptr)
 	void *fdt;
 	int ret;
 
-	cpu->thread = &idle_thread[0];
+	sched_init();
+	sched_core_init(cpu);
 
 	printf("=======================================\n");
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
@@ -628,7 +628,9 @@ static int release_secondary(dt_node_t *node, void *arg)
 	newcpu->kstack = secondary_stacks[reg - 1] + KSTACK_SIZE - FRAMELEN;
 	newcpu->client.gcpu = &noguest[reg];
 	newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
-	newcpu->thread = &idle_thread[reg];
+	newcpu->coreid = reg;
+
+	sched_core_init(newcpu);
 
 	/* Terminate the callback chain. */
 	newcpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
@@ -680,52 +682,4 @@ static void core_init(void)
 	      EPCR_EXTGS | EPCR_DTLBGS | EPCR_ITLBGS |
 	      EPCR_DSIGS | EPCR_DUVD | EPCR_DGTMI);
 #endif
-}
-
-void new_thread_inplace(thread_t *thread, uint8_t *kstack,
-                        void (*func)(trapframe_t *regs, void *arg), void *arg)
-{
-	cpu->kstack = &kstack[KSTACK_SIZE - FRAMELEN];
-	trapframe_t *regs = (trapframe_t *)cpu->kstack;
-
-	thread->pc = ret_from_exception;
-	thread->stack = regs;
-
-	regs->gpregs[1] = (register_t)regs;
-	regs->gpregs[2] = (register_t)cpu;
-	regs->gpregs[3] = (register_t)regs;
-	regs->gpregs[4] = (register_t)arg;
-	
-	regs->srr0 = (register_t)func;
-	regs->srr1 = MSR_ME | MSR_CE | MSR_EE;
-
-	regs->lr = (register_t)ret_from_exception;
-}
-
-thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg), void *arg)
-{
-	thread_t *thread = malloc(sizeof(thread_t));
-	if (!thread)
-		return NULL;
-	
-	uint8_t *stack = alloc_type(kstack_t);
-	if (!stack) {
-		free(thread);
-		return NULL;
-	}
-
-	new_thread_inplace(thread, stack, func, arg);
-	return thread;
-}
-
-void yield(void)
-{
-	register_t saved = disable_int_save();
-
-	if (cpu->ret_hook)
-		send_doorbell(cpu->coreid);
-
-	switch_thread(&idle_thread[cpu->coreid]);
-
-	restore_int(saved);
 }

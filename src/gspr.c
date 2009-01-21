@@ -141,39 +141,6 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_PVR);
 		break;
 
-	/* no-op on 32-bit (Removed Registers) */
-	case SPR_MSRP:
-	case SPR_MAS5:
-	case SPR_MAS8:
-	case SPR_DBSRWR:
-	case SPR_EPCR:
-	case SPR_LPIDR:
-	case SPR_IVOR0:
-	case SPR_IVOR38:
-	case SPR_IVOR39:
-	case SPR_IVOR40:
-	case SPR_IVOR41:
-	case SPR_GIVPR:
-	case SPR_GPIR:
-	case SPR_GIVOR2:
-	case SPR_GIVOR3:
-	case SPR_GIVOR4:
-	case SPR_GIVOR8:
-	case SPR_GIVOR13:
-	case SPR_GIVOR14:
-	case SPR_GESR:
-	case SPR_GSRR0:
-	case SPR_GSRR1:
-	case SPR_GSPRG0:
-	case SPR_GSPRG1:
-	case SPR_GSPRG2:
-	case SPR_GSPRG3:
-	case SPR_GDEAR:
-	case SPR_GEPR:
-
-		*val = 0;
-		break;
-
 	case SPR_TSR:
 		*val = get_tsr();
 		break;
@@ -438,6 +405,36 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 	case SPR_DEVENT:
 		*val = mfspr(SPR_DEVENT);
 		break;
+
+	/* Removed Registers are not part of the vcpu and should fail. */
+	case SPR_MSRP:
+	case SPR_MAS5:
+	case SPR_MAS8:
+	case SPR_DBSRWR:
+	case SPR_EPCR:
+	case SPR_LPIDR:
+	case SPR_IVOR0:
+	case SPR_IVOR38:
+	case SPR_IVOR39:
+	case SPR_IVOR40:
+	case SPR_IVOR41:
+	case SPR_GIVPR:
+	case SPR_GPIR:
+	case SPR_GIVOR2:
+	case SPR_GIVOR3:
+	case SPR_GIVOR4:
+	case SPR_GIVOR8:
+	case SPR_GIVOR13:
+	case SPR_GIVOR14:
+	case SPR_GESR:
+	case SPR_GSRR0:
+	case SPR_GSRR1:
+	case SPR_GSPRG0:
+	case SPR_GSPRG1:
+	case SPR_GSPRG2:
+	case SPR_GSPRG3:
+	case SPR_GDEAR:
+	case SPR_GEPR:
 
 	default:
 		return 1;
