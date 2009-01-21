@@ -154,7 +154,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 	dt_prop_t *prop;
 	dt_node_t *node;
 
-	prop = dt_get_prop(hwnode, "cpu-phandle", 0);
+	prop = dt_get_prop(hwnode, "cpu-handle", 0);
 	if (!prop || prop->len != 4)
 		return ULONG_MAX ;  /* if no cpu-phandle assume that this is
 			      not a per-cpu portal */
