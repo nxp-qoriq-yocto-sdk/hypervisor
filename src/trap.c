@@ -46,7 +46,7 @@
 
 void program_trap(trapframe_t *regs)
 {
-#ifdef CONFIG_DEBUG_STUB
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
 	gcpu_t *gcpu = get_gcpu();
 	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
 	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_interrupt

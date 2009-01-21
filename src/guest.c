@@ -1487,7 +1487,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	send_doorbells(guest->dbell_state_change);
 
 	assert(cpu->traplevel == 0);
-	assert(cpu->thread == &gcpu->thread);
+	assert(cpu->thread == &gcpu->thread.libos_thread);
 
 	// We only map 1GiB, so we don't support loading/booting an OS above
 	// that address.  We pass the guest physical address even though
@@ -1528,7 +1528,8 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 		// Notify the manager(s) that it needs to load images and
 		// start this guest.
 		send_doorbells(guest->dbell_restart_request);
-		yield();
+		prepare_to_block();
+		block();
 		BUG();
 	}
 
@@ -1557,8 +1558,10 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 
 		/* If we get a stop or a restart, take the gevent from idle state */
 		if (gcpu->gevent_pending & ((1 << gev_stop) |
-		                            (1 << gev_restart)))
-			yield();
+		                            (1 << gev_restart))) {
+			prepare_to_block();
+			block();
+		}
 
 		if (gcpu->gevent_pending & (1 << gev_pause)) {
 			atomic_and(&gcpu->gevent_pending, ~(1 << gev_pause));
@@ -1586,7 +1589,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
 
 	assert(cpu->traplevel == 0);
-	assert(cpu->thread == &gcpu->thread);
+	assert(cpu->thread == &gcpu->thread.libos_thread);
 
 	regs->gpregs[1] = 0xdeadbeef;
 	regs->gpregs[3] = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
@@ -1616,9 +1619,9 @@ void start_core(trapframe_t *regs)
 	else
 		fn = start_guest_secondary;
 
-	assert(cpu->thread == &idle_thread[cpu->coreid]);
-	new_thread_inplace(&gcpu->thread, gcpu->hvstack, fn, NULL);
-	switch_thread(&gcpu->thread);
+	assert(is_idle());
+	new_thread_inplace(&gcpu->thread, gcpu->hvstack, fn, NULL, 0);
+	unblock(&gcpu->thread);
 }
 
 void start_wait_core(trapframe_t *regs)
@@ -1631,10 +1634,10 @@ void start_wait_core(trapframe_t *regs)
 	assert(gcpu == guest->gcpus[0]);
 	assert(guest->state == guest_starting);
 
-	assert(cpu->thread == &idle_thread[cpu->coreid]);
+	assert(is_idle());
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
-	                   start_guest_primary, NULL);
-	switch_thread(&gcpu->thread);
+	                   start_guest_primary, NULL, 0);
+	unblock(&gcpu->thread);
 }
 
 void do_stop_core(trapframe_t *regs, int restart)
@@ -1679,7 +1682,9 @@ void do_stop_core(trapframe_t *regs, int restart)
 	memset(&gcpu->gdbell_pending, 0,
 	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
-	yield();
+	prepare_to_block();
+	block();
+	BUG();
 }
 
 void stop_core(trapframe_t *regs)
@@ -1707,7 +1712,8 @@ void pause_core(trapframe_t *regs)
 		send_doorbells(guest->dbell_state_change);
 	}
 
-	yield();
+	prepare_to_block();
+	block();
 }
 
 void resume_core(trapframe_t *regs)
@@ -1723,7 +1729,7 @@ void resume_core(trapframe_t *regs)
 		send_doorbells(guest->dbell_state_change);
 	}
 
-	switch_thread(&get_gcpu()->thread);
+	unblock(&get_gcpu()->thread);
 }
 
 int stop_guest(guest_t *guest)
