@@ -57,21 +57,6 @@ config BCMUX
 		other things, sharing a single serial port for the
 		consoles of all guests.
 
-config DEBUG_STUB
-	bool "Debug Stub Support"
-	depends on BYTE_CHAN
-	help
-		Enable debug stub support.  This allows you to debug the guest
-		remotely with a host debugger.
-
-config GDB_STUB
-	bool "GDB Stub Support"
-	depends on DEBUG_STUB
-	help
-		Enable GDB stub support.  This allows you to debug the guest 
-		remotely with GDB.  The stub is located in the hypervisor, 
-		allowing non-intrusive debugging.
-
 config SHELL
 	bool "Command-line shell"
 	select LIBOS_QUEUE
@@ -130,3 +115,25 @@ config STATISTICS
 	help
 		Detailed hypervisor emulated instruction statistics.
 		Gives a count of emulated instructions executed.
+
+config DEBUG_STUB
+	bool "Debug Stub Support"
+	depends on BYTE_CHAN
+	help
+		Enable debug stub support.  This allows you to debug the guest
+		remotely with a host debugger.
+
+config GDB_STUB
+	bool "GDB Stub Support"
+	depends on DEBUG_STUB
+	help
+		Enable GDB stub support.  This allows you to debug the guest 
+		remotely with GDB.  The stub is located in the hypervisor, 
+		allowing non-intrusive debugging.
+
+config GDB_STUB_PROGRAM_INTERRUPT
+	bool "Use program interrupt for debugging"
+	depends on GDB_STUB
+	help
+		Specifies that the gdb debug stub should use program interrupts
+		instead of the debug interrupt for debugging.

@@ -60,7 +60,7 @@ void gdb_stub_start(trapframe_t *trap_frame);
 void gdb_stub_stop(void);
 void gdb_stub_init(void);
 
-static int gdb_stub_process_trap(trapframe_t *trap_frame);
+static int handle_debug_exception(trapframe_t *trap_frame);
 static void rx(queue_t *q);
 static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type);
@@ -80,7 +80,7 @@ static stub_ops_t attr_debug_stub stub_ops = {
         .vcpu_init = gdb_stub_init,
         .vcpu_start = gdb_stub_start,
         .vcpu_stop = gdb_stub_stop,
-        .debug_interrupt =  gdb_stub_process_trap,
+        .debug_interrupt =  handle_debug_exception,
 };
 
 void gdb_stub_init(void)
@@ -160,6 +160,12 @@ void gdb_stub_start(trapframe_t *trap_frame)
 			"setting entry breakpoint failed\n");
 		}
 	}
+
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+	/* enable hardware debug mode */
+	mtspr(SPR_DBCR0, DBCR0_IDM | DBCR0_TRAP);
+	trap_frame->srr1 |= MSR_DE;
+#endif
 
 	return;
 }
@@ -345,7 +351,9 @@ static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t re
 static inline uint8_t *scan_till(uint8_t *q, char c);
 static inline uint32_t scan_num(uint8_t **buffer, char c);
 static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
+#endif
 static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
 static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table);
 static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
@@ -796,6 +804,7 @@ static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
 	return result;
 }
 
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
 {
 	uint32_t insn = 0x0;
@@ -875,6 +884,7 @@ static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
 	DEBUG("nia: 0x%p", nia);
 	return nia;
 }
+#endif
 
 /* tw 12,r2,r2: 0x7d821008 */
 const uint32_t trap_insn = 0x7d821008;
@@ -1046,68 +1056,94 @@ static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_con
 	transmit_response(stub);
 }
 
-int gdb_stub_process_trap(trapframe_t *trap_frame)
+/* Note: this is invoked in debug interrupt context
+ * (i.e. CE=0, EE=0)
+ *
+ */
+int handle_debug_exception(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
 	breakpoint_type_t bptype = breakpoint->type;
+	int trap = 0;
 
 	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
 
-	/* register_t esr_reg_value = 0;
-	 * esr_reg_value = mfspr(SPR_ESR);
-	 * DEBUG("esr_ptr check: %s", esr_reg_value == ESR_PTR ? "success" : "fail");
-	 * DEBUG("esr_reg_value: 0x%08lx", esr_reg_value); */
-	nip_reg_value = trap_frame->srr0;
-	/* DEBUG("nip_reg_value: 0x%08lx", nip_reg_value);
-	 *
-	 * DEBUG("Sanity check registers dump:");
-	 * dump_regs(trap_frame); */
-	/* Check if this is a GDB stub registered breakpoint.
-	 * If so, invoke gdb_stub_main_loop();
-	 * Else return with code 1.
-	 */
-	breakpoint = locate_breakpoint(stub->breakpoint_table, (uint32_t *)nip_reg_value);
-	if (!breakpoint) {
-		DEBUG("Breakpoint not set by stub, returning (1).");
-		return 1;
+	/* enable critical interrupts, so UART keeps working */
+	mtmsr(mfmsr() | MSR_CE);
+
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+	trap = 1;
+#else
+	/* check for a TRAP event */
+	if (mfspr(SPR_DBSR) & DBSR_TRAP) {
+		trap = 1;
+		mtspr(SPR_DBSR, DBSR_TRAP); /* clear event */
 	}
+#endif
 
-	/* need to save this so after bp is cleared we still know */
-	bptype = breakpoint->type;
-
-	if (bptype == internal || bptype == internal_1st_inst) {
-		DEBUG("We've hit an internal (set by stub) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
-		guestmem_set_data(trap_frame);
-		if (breakpoint->associated) {
-			DEBUG("Replace the original instruction back at the associated internal "
-			      "breakpoint: 0x%p", breakpoint->associated->addr);
-			guestmem_out32(breakpoint->associated->addr,
-			               breakpoint->associated->orig_insn);
-			DEBUG("Delete the associated internal breakpoint: 0x%p",
-			       breakpoint->associated->addr);
-			delete_breakpoint(stub->breakpoint_table, breakpoint->associated);
-		}
-		DEBUG("Replace the original instruction back at the internal breakpoint: 0x%p", breakpoint->addr);
-		guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
-		delete_breakpoint(stub->breakpoint_table, breakpoint);
-		breakpoint = NULL;
-	} else {
-		DEBUG("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
-	}
-
-	if (bptype != internal_1st_inst)
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+	/* check for an ICMP event */
+	if (mfspr(SPR_DBSR) & DBSR_ICMP) {
+		mtspr(SPR_DBSR, DBSR_ICMP); /* clear event */
+		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP); /* clear ICMP */
 		transmit_stop_reply_pkt_T(trap_frame, stub);
+	}
+#endif
 
-	if (bptype == internal_1st_inst)
-		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_NORMAL,
-			"gdb: waiting for host debugger...\n");
+	if (trap) {
+		nip_reg_value = trap_frame->srr0;
+
+		/* Check if this is a GDB stub registered breakpoint.
+		 * If so, invoke gdb_stub_main_loop();
+		 * Else return with code 1.
+		 */
+		breakpoint = locate_breakpoint(stub->breakpoint_table,
+		                               (uint32_t *)nip_reg_value);
+		if (!breakpoint) {
+			DEBUG("Breakpoint not set by stub, returning (1).");
+			return 1;
+		}
+
+		/* need to save this so after bp is cleared we still know */
+		bptype = breakpoint->type;
+
+		if (bptype == internal || bptype == internal_1st_inst) {
+			int ret;
+			DEBUG("We've hit an internal (set by stub) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
+			guestmem_set_data(trap_frame);
+			if (breakpoint->associated) {
+				DEBUG("Replace the original instruction back at the associated internal "
+				      "breakpoint: 0x%p", breakpoint->associated->addr);
+				ret = guestmem_out32(breakpoint->associated->addr,
+				               breakpoint->associated->orig_insn);
+				DEBUG("Delete the associated internal breakpoint: 0x%p",
+				       breakpoint->associated->addr);
+				delete_breakpoint(stub->breakpoint_table,
+				                  breakpoint->associated);
+			}
+			DEBUG("Replace the original instruction back at the internal breakpoint: 0x%p", breakpoint->addr);
+			ret = guestmem_out32(breakpoint->addr,
+			                     breakpoint->orig_insn);
+			delete_breakpoint(stub->breakpoint_table, breakpoint);
+			breakpoint = NULL;
+		} else {
+			DEBUG("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
+		}
+
+		if (bptype != internal_1st_inst)
+			transmit_stop_reply_pkt_T(trap_frame, stub);
+
+		if (bptype == internal_1st_inst)
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_NORMAL,
+				"gdb: waiting for host debugger...\n");
+	}
 
 	DEBUG("Calling: gdb_stub_main_loop().");
 	gdb_stub_main_loop(trap_frame, GDB_DEBUG_EXCEPTION);
-	DEBUG("Returning from gdb_stub_process_trap()");
+	DEBUG("Returning from handle_debug_exception()");
 	return 0;
 }
 
@@ -1129,13 +1165,15 @@ void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type)
 	uint32_t offset, length;
 	uint8_t err_flag = 0;
 	uint32_t *addr = NULL;
-	uint32_t *nia = NULL, *pc = NULL;
 	uint8_t aux, value[17];
 	uint32_t reg_num, i;
 	uint8_t breakpoint_type;
 	breakpoint_t *breakpoint = NULL;
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+	uint32_t *nia = NULL, *pc = NULL;
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
+#endif
 	const char *td; /* td: target description */
 	int loop_count = 0;
 
@@ -1375,6 +1413,7 @@ return_to_guest:
 		case single_step:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 's' packet.\n");
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
 			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
 			/* If there is no address to resume at; we resume at pc. */
@@ -1401,6 +1440,10 @@ return_to_guest:
 				breakpoint_incrpc->associated = breakpoint_nia;
 			}
 			DEBUG("Stepping after hitting internal (set by stub) breakpoint.");
+#else
+			/* set ICMP */
+			mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) | DBCR0_ICMP);
+#endif
 			DEBUG("Done with s-packet, will return to guest.");
 			goto return_to_guest;
 			return;
