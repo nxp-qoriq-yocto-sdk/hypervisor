@@ -85,9 +85,9 @@ bin/%.dtb : $(testdir)%.dts
 	$(call show,build: $<)
 	$(V)$(DTC) -p 1024 -O dtb $< -o $@
 
--include bin/libos/libos_assym.d
--include $(OBJS:%.o=%.d)
-
+ifneq ($(wildcard bin),)
+-include $(shell find bin -path bin/libos -prune -o -name '*.d' -print) ''
+endif
 endif
 
 .SECONDARY:
