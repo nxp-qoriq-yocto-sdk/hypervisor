@@ -114,9 +114,8 @@ struct register_description
 	             inums are defined per category. */
 };
 
-struct register_description e500mc_registers[] =
+struct register_description e500mc_power_core_gprs[] =
 {
-#define R0_INDEX 0
 	{ .name="r0", .bitsize="32", .type="uint32", .cat=reg_cat_gpr,
 	  .inum=0, },
 	{ .name="r1", .bitsize="32", .type="uint32", .cat=reg_cat_gpr,
@@ -181,8 +180,10 @@ struct register_description e500mc_registers[] =
 	  .inum=30, },
 	{ .name="r31", .bitsize="32", .type="uint32", .cat=reg_cat_gpr,
 	  .inum=31, },
+};
 
-#define F0_INDEX 32
+struct register_description e500mc_power_fpu_fprs[] =
+{
 	{ .name="f0", .bitsize="64", .type="ieee_double",
 	  .regnum="32",
 	  .cat=reg_cat_fpr, .inum=0, },
@@ -248,24 +249,42 @@ struct register_description e500mc_registers[] =
 	  .cat=reg_cat_fpr, .inum=30, },
 	{ .name="f31", .bitsize="64", .type="ieee_double",
 	  .cat=reg_cat_fpr, .inum=31, },
+};
 
-#define PC_INDEX 64
+struct register_description e500mc_power_core_pc[] =
+{
 	{ .name="pc", .bitsize="32", .type="code_ptr", .regnum="64",
 	  .cat=reg_cat_pc, },
+};
+
+struct register_description e500mc_power_core_msr[] =
+{
 	{ .name="msr", .bitsize="32", .type="uint32", .cat=reg_cat_msr, },
+};
+
+struct register_description e500mc_power_core_cr[] =
+{
 	{ .name="cr", .bitsize="32", .type="uint32", .cat=reg_cat_cr, },
+};
+
+struct register_description e500mc_power_core_sprs[] =
+{
 	{ .name="lr", .bitsize="32", .type="code_ptr", .cat=reg_cat_spr,
 	  .inum=SPR_LR, },
 	{ .name="ctr", .bitsize="32", .type="uint32", .cat=reg_cat_spr,
 	  .inum=SPR_CTR, },
 	{ .name="xer", .bitsize="32", .type="uint32", .cat=reg_cat_spr,
 	  .inum=SPR_XER, },
+};
 
-#define FPSCR_INDEX 70
+struct register_description e500mc_power_fpu_fpscr[] =
+{
 	{ .name="fpscr", .bitsize="64", .group="float", .regnum="70",
 	  .cat=reg_cat_fpscr, /* FPSCR is unique - so no .inum */ },
+};
 
-#define E500MC_SPRS_START 71
+struct register_description e500mc_sprs[] =
+{
 	{ .description = "Alternate Time Base Register Lower",
 	  .name="atbl", .bitsize="32", .regnum="71", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_ATBL, },
@@ -779,6 +798,10 @@ struct register_description e500mc_registers[] =
 	{ .description = "User Time Base Upper",
 	  .name="utbu", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_UTBU, },
+};
+
+struct register_description e500mc_pmrs[] =
+{
 	{ .description = "Performance Monitor Counter Register 0",
 	  .name="pmc0", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_pmr, .inum=PMR_PMC0, },
@@ -859,4 +882,22 @@ struct register_description e500mc_registers[] =
 	  .group="general", .cat=reg_cat_pmr, .inum=PMR_UPMLCB3, },
 };
 
-#define REG_COUNT sizeof(e500mc_registers)/sizeof(e500mc_registers[0])
+#define ECOUNT(a) sizeof((a))/sizeof((a)[0])
+#define E500MC_POWER_CORE_GPRS_COUNT ECOUNT(e500mc_power_core_gprs)
+#define E500MC_POWER_FPU_FPRS_COUNT ECOUNT(e500mc_power_fpu_fprs)
+#define E500MC_POWER_CORE_PC_COUNT ECOUNT(e500mc_power_core_pc)
+#define E500MC_POWER_CORE_MSR_COUNT ECOUNT(e500mc_power_core_msr)
+#define E500MC_POWER_CORE_CR_COUNT ECOUNT(e500mc_power_core_cr)
+#define E500MC_POWER_CORE_SPRS_COUNT ECOUNT(e500mc_power_core_sprs)
+#define E500MC_POWER_FPU_FPSCR_COUNT ECOUNT(e500mc_power_fpu_fpscr)
+#define E500MC_SPRS_COUNT ECOUNT(e500mc_sprs)
+#define E500MC_PMRS_COUNT ECOUNT(e500mc_pmrs)
+#define E500MC_REG_COUNT E500MC_POWER_CORE_GPRS_COUNT + \
+                         E500MC_POWER_FPU_FPRS_COUNT + \
+                         E500MC_POWER_CORE_PC_COUNT + \
+                         E500MC_POWER_CORE_MSR_COUNT + \
+                         E500MC_POWER_CORE_CR_COUNT + \
+                         E500MC_POWER_CORE_SPRS_COUNT + \
+                         E500MC_POWER_FPU_FPSCR_COUNT + \
+                         E500MC_SPRS_COUNT + \
+                         E500MC_PMRS_COUNT

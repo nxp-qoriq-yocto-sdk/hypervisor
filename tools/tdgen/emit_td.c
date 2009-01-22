@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008, 2009 Freescale Semiconductor, Inc.
  * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,37 +32,37 @@
 
 #include "gdb-register-defs.h"
 
-void emit_registers(unsigned int lower, unsigned int upper);
+void emit_registers(struct register_description *registers, unsigned int count);
 void emit_e500mc_description(void);
 void emit_power_core_description(void);
 void emit_power_fpu_description(void);
 void emit_buf_macros(void);
 void emit_e500mc_reg_table(void);
 
-void emit_registers(unsigned int lower, unsigned int upper)
+void emit_registers(struct register_description *registers, unsigned int count)
 {
 	unsigned int i;
 
-	for (i = lower; i < upper; i++) {
+	for (i = 0; i < count; i++) {
 
-		if (e500mc_registers[i].description)
+		if (registers[i].description)
 			printf ("  <!-- %s -->\\n\\\n",
-				e500mc_registers[i].description);
+				registers[i].description);
 		printf("  <reg name=\\\"%s\\\" bitsize=\\\"%s\\\"",
-			e500mc_registers[i].name,
-			e500mc_registers[i].bitsize);
-		if (e500mc_registers[i].regnum)
+			registers[i].name,
+			registers[i].bitsize);
+		if (registers[i].regnum)
 			printf (" regnum=\\\"%s\\\"",
-				e500mc_registers[i].regnum);
-		if (e500mc_registers[i].save_restore)
+				registers[i].regnum);
+		if (registers[i].save_restore)
 			printf (" save_restore=\\\"%s\\\"",
-				e500mc_registers[i].save_restore);
-		if (e500mc_registers[i].type)
+				registers[i].save_restore);
+		if (registers[i].type)
 			printf (" type=\\\"%s\\\"",
-				e500mc_registers[i].type);
-		if (e500mc_registers[i].group)
+				registers[i].type);
+		if (registers[i].group)
 			printf (" group=\\\"%s\\\"",
-				e500mc_registers[i].group);
+				registers[i].group);
 		printf("/>\\n\\\n\\n\\\n");
 	}
 }
@@ -71,7 +71,7 @@ char *xml_version = "<?xml version=\\\"1.0\\\"?>\\n\\\n\\n\\\n";
 char *doc_type_target =
 	"<!DOCTYPE target SYSTEM \\\"gdb-target.dtd\\\">\\n\\\n\\n\\\n";
 char *e500mc_gnu_copyright = "\
-<!-- Copyright (C) 2008 Free Software Foundation, Inc.\\n\\\n\
+<!-- Copyright (C) 2009 Free Software Foundation, Inc.\\n\\\n\
 \\n\\\n\
      Copying and distribution of this file, with or without modification,"
 "\\n\\\n\
@@ -93,9 +93,12 @@ char *includes = "\
  <!-- Include standard PowerPC features. -->\\n\\\n\
  <xi:include href=\\\"power-core.xml\\\"/>\\n\\\n\
  <xi:include href=\\\"power-fpu.xml\\\"/>\\n\\\n\\n\\\n";
-char *e500_feature = "\
+char *e500_sprs_feature = "\
  <!-- Define the e500mc SPR's. -->\\n\\\n\
  <feature name=\\\"freescale.e500mc.sprs\\\">\\n\\\n\\n\\\n";
+char *e500_pmrs_feature = "\
+ <!-- Define the e500mc PMR's. -->\\n\\\n\
+ <feature name=\\\"freescale.e500mc.pmrs\\\">\\n\\\n\\n\\\n";
 char *close_feature = " </feature>\\n\\\n\\n\\\n";
 char *close_target = "</target>\\n\\\n";
 
@@ -110,14 +113,17 @@ void emit_e500mc_description(void)
 	printf("%s", target_version);
 	printf("%s", architecture_declaration);
 	printf("%s", includes);
-	printf("%s", e500_feature);
-	emit_registers(E500MC_SPRS_START, REG_COUNT);
+	printf("%s", e500_sprs_feature);
+	emit_registers(e500mc_sprs, E500MC_SPRS_COUNT);
+	printf("%s", close_feature);
+	printf("%s", e500_pmrs_feature);
+	emit_registers(e500mc_pmrs, E500MC_PMRS_COUNT);
 	printf("%s", close_feature);
 	printf("%s", close_target);
 }
 
 char *power_core_gnu_copyright = "\
-<!-- Copyright (C) 2007, 2008 Free Software Foundation, Inc.\\n\\\n\
+<!-- Copyright (C) 2007, 2008, 2009 Free Software Foundation, Inc.\\n\\\n\
 \\n\\\n\
      Copying and distribution of this file, with or without modification,"
 "\\n\\\n\
@@ -135,8 +141,11 @@ void emit_power_core_description(void)
 	printf("%s", power_core_gnu_copyright);
 	printf("%s", doc_type_feature);
 	printf("%s", power_core_feature);
-	emit_registers(R0_INDEX, R0_INDEX + 32);
-	emit_registers(PC_INDEX, FPSCR_INDEX);
+	emit_registers(e500mc_power_core_gprs, E500MC_POWER_CORE_GPRS_COUNT);
+	emit_registers(e500mc_power_core_pc, E500MC_POWER_CORE_PC_COUNT);
+	emit_registers(e500mc_power_core_msr, E500MC_POWER_CORE_MSR_COUNT);
+	emit_registers(e500mc_power_core_cr, E500MC_POWER_CORE_CR_COUNT);
+	emit_registers(e500mc_power_core_sprs, E500MC_POWER_CORE_SPRS_COUNT);
 	printf("%s", close_feature);
 }
 
@@ -149,14 +158,14 @@ void emit_power_fpu_description(void)
 	printf("%s", power_core_gnu_copyright);
 	printf("%s", doc_type_feature);
 	printf("%s", power_fpu_feature);
-	emit_registers(F0_INDEX, F0_INDEX + 32);
-	emit_registers(FPSCR_INDEX, FPSCR_INDEX + 1);
+	emit_registers(e500mc_power_fpu_fprs, E500MC_POWER_FPU_FPRS_COUNT);
+	emit_registers(e500mc_power_fpu_fpscr, E500MC_POWER_FPU_FPSCR_COUNT);
 	printf("%s", close_feature);
 }
 
 char *freescale_copyright = "\
 /*\n\
- * Copyright (C) 2008 Freescale Semiconductor, Inc.\n\
+ * Copyright (C) 2008, 2009 Freescale Semiconductor, Inc.\n\
  *\n\
  * Redistribution and use in source and binary forms, with or without\n\
  * modification, are permitted provided that the following conditions\n\
@@ -179,13 +188,21 @@ char *freescale_copyright = "\
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\
  */\n";
 
+static inline int reg_byte_count(struct register_description *registers, unsigned int count)
+{
+	int num_reg_bytes = 0, i;
+	for (i = 0; i < count; i++) {
+		num_reg_bytes += atoi(registers[i].bitsize)/8;
+	}
+	return num_reg_bytes;
+}
+
 void emit_buf_macros(void)
 {
 	/* BUFMAX defines the maximum number of characters in inbound/outbound
 	 * buffers; at least NUMREGBYTES*2 are needed for register packets.
 	 */
 	int num_reg_bytes = 0;
-	int num_regs = REG_COUNT;
 	/* buffer_ammount: Add a little extra padding, as the G packet utilizes
 	 * 2 * num_reg_bytes bytes and the G prefixed to that means that we drop
 	 * a byte if we define BUFMAX to be exactly 2 * num_reg_bytes.
@@ -198,17 +215,42 @@ void emit_buf_macros(void)
 	 * transmitted over the serial line using the RSP.
 	 */
 	const int buffer_ammount = 8;
-	int bufmax;
-	int i;
+	int bufmax, num_regs = E500MC_REG_COUNT;
 
-	for (i = 0; i < num_regs; i++) {
-		num_reg_bytes += atoi(e500mc_registers[i].bitsize)/8;
-	}
+	num_reg_bytes += reg_byte_count(e500mc_power_core_gprs,
+	                                E500MC_POWER_CORE_GPRS_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_fpu_fprs,
+	                                E500MC_POWER_FPU_FPRS_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_core_pc,
+	                                E500MC_POWER_CORE_PC_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_core_msr,
+	                                E500MC_POWER_CORE_MSR_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_core_cr,
+	                                E500MC_POWER_CORE_CR_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_core_sprs,
+	                                E500MC_POWER_CORE_SPRS_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_power_fpu_fpscr,
+	                                E500MC_POWER_FPU_FPSCR_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_sprs,
+	                                E500MC_SPRS_COUNT);
+	num_reg_bytes += reg_byte_count(e500mc_pmrs,
+	                                E500MC_PMRS_COUNT);
+
 	printf("#define NUMREGS %d\n", num_regs);
 	printf("#define NUMREGBYTES %d\n", num_reg_bytes);
 	bufmax = 2 * num_reg_bytes + buffer_ammount;
 	printf("#define BUFMAX %d\n", bufmax);
 	printf("#define BUFMAX_HEX \"%x\"\n", bufmax);
+}
+
+static inline void emit_reg_details(struct register_description *registers, unsigned int count)
+{
+	int i;
+	for (i = 0; i < count; i++) {
+		printf("\t{ .e500mc_num=%d, .bitsize=%s, .cat=%s, },\n",
+		       registers[i].inum, registers[i].bitsize,
+		       reg_cat_names[registers[i].cat]);
+	}
 }
 
 void emit_e500mc_reg_table(void)
@@ -224,12 +266,15 @@ void emit_e500mc_reg_table(void)
 					"\tint bitsize;\n"
 					"\treg_cat_t cat;\n};\n");
 	printf("\nstruct reg_info e500mc_reg_table[] =\n{\n");
-	for (i = 0; i < REG_COUNT; i++) {
-		printf("\t{ .e500mc_num=%d, .bitsize=%s, .cat=%s, },\n",
-				e500mc_registers[i].inum,
-				e500mc_registers[i].bitsize,
-				reg_cat_names[e500mc_registers[i].cat]);
-	}
+	emit_reg_details(e500mc_power_core_gprs, E500MC_POWER_CORE_GPRS_COUNT);
+	emit_reg_details(e500mc_power_fpu_fprs, E500MC_POWER_FPU_FPRS_COUNT);
+	emit_reg_details(e500mc_power_core_pc, E500MC_POWER_CORE_PC_COUNT);
+	emit_reg_details(e500mc_power_core_msr, E500MC_POWER_CORE_MSR_COUNT);
+	emit_reg_details(e500mc_power_core_cr, E500MC_POWER_CORE_CR_COUNT);
+	emit_reg_details(e500mc_power_core_sprs, E500MC_POWER_CORE_SPRS_COUNT);
+	emit_reg_details(e500mc_power_fpu_fpscr, E500MC_POWER_FPU_FPSCR_COUNT);
+	emit_reg_details(e500mc_sprs, E500MC_SPRS_COUNT);
+	emit_reg_details(e500mc_pmrs, E500MC_PMRS_COUNT);
 	printf("};\n");
 }
 
