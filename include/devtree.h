@@ -101,6 +101,7 @@ dt_node_t *dt_get_subnode_namelen(dt_node_t *node, const char *name,
                                   size_t namelen, int create);
 dt_node_t *dt_get_subnode(dt_node_t *node, const char *name, int create);
 dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create);
+dt_prop_t *dt_get_prop_len(dt_node_t *node, const char *name, size_t length);
 char *dt_get_prop_string(dt_node_t *node, const char *name);
 
 int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len);

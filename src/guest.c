@@ -569,6 +569,104 @@ static int map_guest_irqs(dev_owner_t *owner)
 	return 0;
 }
 
+typedef struct {
+	unsigned int cpu;
+	dt_node_t *node;
+} cpu_to_node_t;
+
+static int do_cpu_to_node(dt_node_t *node, void *arg)
+{
+	cpu_to_node_t *ctx = arg;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop_len(node, "reg", sizeof(uint32_t));
+	if (prop)
+		if ((* ((uint32_t *) (prop->data))) == ctx->cpu) {
+			ctx->node = node;
+			return 1;
+		}
+
+	return 0;
+}
+
+/**
+ * cpu_to_node - return the HW node that corresponds to the given cpu number
+ * @param[in] cpu the physical CPU number
+ */
+static dt_node_t *cpu_to_node(unsigned int cpu)
+{
+	cpu_to_node_t ctx = { .cpu = cpu };
+	dt_node_t *node = dt_get_subnode(hw_devtree, "cpus", 0);
+
+	dt_for_each_prop_value(node, "device_type", "cpu", sizeof("cpu"),
+			       do_cpu_to_node, &ctx);
+
+	return ctx.node;
+}
+
+/**
+ * configure_qman_portal - configure the vcpu property of a QMAN portal node
+ * @param[in] guest the guest
+ * @param[in] cfgnode the configuration node
+ * @param[in] hwnode the corresponding hardware node
+ * @param[in] gnode the corresponding guest node
+ *
+ * Check if the configuration node has a 'vcpu' property and the hardware
+ * node it represents is a QMAN portal node.  If so, create the
+ * corresponding cpu-handle property in the target guest node.
+ *
+ * Returns 0 if success or not a QMAN portal node, or negative error code
+ */
+static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
+				 dt_node_t *hwnode, dt_node_t *gnode)
+{
+	if (!dt_node_is_compatible(hwnode, "fsl,qman-portal"))
+		return 0;
+
+	dt_prop_t *prop = dt_get_prop_len(cfgnode, "vcpu", sizeof(uint32_t));
+	if (!prop)
+		return 0;
+
+	// Get the VCPU number
+	uint32_t vcpu = * ((uint32_t *) (prop->data));
+
+	// Get the physical CPU number
+	int cpu = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, vcpu);
+	if (cpu < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: 'vcpu' property in cfg node %s has invalid value %u\n",
+			 __func__, cfgnode->name, vcpu);
+		return ERR_BADTREE;
+	}
+
+	// Get the corresponding CPU node in the HW tree
+	dt_node_t *cpunode = cpu_to_node(cpu);
+	if (!cpunode) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: cpu %u does not exist\n", __func__, cpu);
+		return ERR_BADTREE;
+	}
+
+	// Get the phandle from the CPU node
+	uint32_t phandle = dt_get_phandle(hw_devtree, cpunode, 0);
+	if (!phandle) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: cpu node %s does not have a phandle\n",
+			 __func__, cpunode->name);
+		return ERR_BADTREE;
+	}
+
+	// Put the phandle in the guest node
+	int ret = dt_set_prop(gnode, "cpu-handle", &phandle, sizeof(phandle));
+	if (ret)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: could not set cpu-handle property in node %s\n",
+			 __func__, gnode->name);
+
+	return ret;
+}
+
+
 static int map_device_to_guest(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
@@ -609,6 +707,8 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 	}
 
 	configure_dma(node, owner);
+	configure_qman_portal(guest, owner->cfgnode, hwnode, node);
+
 	return 0;
 
 fail:

@@ -428,6 +428,27 @@ dt_prop_t *dt_get_prop(dt_node_t *node, const char *name, int create)
 }
 
 /**
+ * dt_get_prop_len - get a property of a node and verify the length
+ *
+ * @param[in] node node in which to find/create the property
+ * @param[in] name name of the property to get
+ * @param[in] length the length to check, must not be zero
+ *
+ * This function acts like dt_get_prop(node, name, 0), except that it also
+ * returns NULL if 'length' is not equal to the length of the property.
+ */
+dt_prop_t *dt_get_prop_len(dt_node_t *node, const char *name, size_t length)
+{
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, name, 0);
+	if (prop && (prop->len != length))
+		return NULL;
+
+	return prop;
+}
+
+/**
  * Get a the value of a property as a null-terminated string
  *
  * @param[in] node node in which to look for the property

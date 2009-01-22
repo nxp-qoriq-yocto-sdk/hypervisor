@@ -75,17 +75,17 @@
 		};
 
 		bman-portalA {
-			device = "bman-portal";
+			device = "/bman-portals@f4000000/bman-portal@0";
 			vcpu = <0>;
 		};
 
 		bman-portalB {
-			device = "bman-portal";
+			device = "/bman-portals@f4000000/bman-portal@4000";
 			vcpu = <1>;
 		};
 
 		qman-portalA {
-			device = "qman-portal";
+			device = "/qman-portals@f4200000/qman-portal@0";
 			vcpu = <0>;
 			fman0 {
 				device = "fman0";
@@ -120,7 +120,7 @@
 		};
 
 		qman-portalB {
-			device = "qman-portal";
+			device = "/qman-portals@f4200000/qman-portal@4000";
 			vcpu = <1>;
 			fman0 {
 				device = "fman0";
