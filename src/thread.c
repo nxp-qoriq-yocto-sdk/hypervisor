@@ -33,7 +33,6 @@
 #include <events.h>
 
 static sched_t scheds[MAX_CORES];
-static int gev_sched;
 
 static void do_schedule(sched_t *sched)
 {
@@ -56,6 +55,15 @@ void schedule(trapframe_t *regs)
 	register_t saved = spin_lock_intsave(&sched->lock);
 	do_schedule(sched);
 	restore_int(saved);
+}
+
+void prepare_to_block(void)
+{
+	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
+	
+	assert(!is_idle());
+	thread->state = sched_prep_block;
+	smp_sync();
 }
 
 void block(void)
@@ -86,12 +94,18 @@ void unblock(thread_t *thread)
 
 	if (thread->state == sched_blocked) {
 		list_add(&sched->rq[thread->prio], &thread->rq_node);
-		setgevent(sched->sched_cpu->client.gcpu, gev_sched);
+		setevent(sched->sched_cpu->client.gcpu, EV_RESCHED);
 	}
 
 	thread->state = sched_running;
 
 	spin_unlock_intsave(&sched->lock, saved);
+}
+
+void libos_unblock(libos_thread_t *lthread)
+{
+	thread_t *thread = to_container(lthread, thread_t, libos_thread);
+	unblock(thread);
 }
 
 void new_thread_inplace(thread_t *thread, uint8_t *kstack,
@@ -106,6 +120,7 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 
 	thread->sched = &scheds[cpu->coreid];
 	thread->state = sched_blocked;
+	thread->prio = prio;
 
 	regs->gpregs[1] = (register_t)regs;
 	regs->gpregs[2] = (register_t)cpu;
@@ -150,6 +165,4 @@ void sched_core_init(cpu_t *sched_cpu)
 
 void sched_init(void)
 {
-	gev_sched = register_gevent(schedule);
-	assert(gev_sched >= 0);
 }

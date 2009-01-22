@@ -467,7 +467,7 @@ ssize_t byte_chan_send(byte_chan_handle_t *bc, const uint8_t *buf, size_t len)
  */
 ssize_t byte_chan_receive(byte_chan_handle_t *bc, uint8_t *buf, size_t len)
 {
-	int ret = queue_read(bc->rx, buf, len);
+	int ret = queue_read(bc->rx, buf, len, 0);
 
 	if (ret > 0)
 		queue_notify_producer(bc->rx);

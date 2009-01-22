@@ -85,7 +85,7 @@ static void mux_get_data(queue_t *q)
 	register_t saved = spin_lock_intsave(&mux->byte_chan->rx_lock);
 	
 	/* Add a string to byte channel */
-	while ((ch = queue_readchar(mux->byte_chan->rx)) >= 0) {
+	while ((ch = queue_readchar(mux->byte_chan->rx, 0)) >= 0) {
 		mux->rx_count++;
 
 		if (mux->rx_flag_state == 1) {
@@ -163,7 +163,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 		return -1;
 
 	while (queue_get_space(mux->byte_chan->tx) >= 2) {
-		c = queue_readchar(cbc->byte_chan->rx);
+		c = queue_readchar(cbc->byte_chan->rx, 0);
 		if (c < 0)
 			break;
 

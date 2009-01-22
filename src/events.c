@@ -35,10 +35,12 @@
 #include <doorbell.h>
 #include <gdb-stub.h>
 #include <percpu.h>
+#include <thread.h>
 
 static eventfp_t event_table[] = {
 	&dbell_to_gdbell_glue,  /* EV_ASSERT_VINT */
 	&tlbivax_ipi,           /* EV_TLBIVAX */
+	&schedule,              /* EV_RESCHED */
 };
 
 /* Guest events are processed when returning to the guest, but

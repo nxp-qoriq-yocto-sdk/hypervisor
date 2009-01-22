@@ -29,7 +29,6 @@
 #include <libos/readline.h>
 
 typedef struct {
-	readline_t *rl;
 	queue_t *out;
 } shell_t;
 

@@ -74,6 +74,16 @@ typedef struct {
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
+
+#define libos_prepare_to_block prepare_to_block
+#define libos_block block
+
+struct libos_thread;
+
+void prepare_to_block(void);
+void block(void);
+void libos_unblock(struct libos_thread *thread);
+
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt

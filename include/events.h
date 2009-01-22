@@ -48,6 +48,7 @@ void resume_core(trapframe_t *regs);
 
 #define EV_ASSERT_VINT 0
 #define EV_TLBIVAX     1
+#define EV_RESCHED     2
 
 extern int gev_stop; /**< Stop guest on this core */
 extern int gev_start; /**< Start guest on this core */

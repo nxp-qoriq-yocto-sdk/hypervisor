@@ -425,7 +425,7 @@ int open_stdout_chardev(dt_node_t *node)
 		if (!q)
 			return ERR_NOMEM;
 
-		ret = queue_init(q, 16384);
+		ret = queue_init(q, 2048);
 		if (ret < 0)
 			return ret;
 

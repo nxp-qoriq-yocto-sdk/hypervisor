@@ -94,19 +94,41 @@ static int shell_action(void *user_ctx, char *buf)
 	return 0;
 }
 
+void shell_thread(trapframe_t *regs, void *arg)
+{
+	shell_t *shell = arg;
+	int ret;
+
+	ret = readline_init(stdin, stdout, "HV> ",
+	                    shell_action, shell, 1);
+	if (ret < 0)
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		         "%s: readline_init returned %d\n", __func__, ret);
+
+	while (1) {
+		prepare_to_block();
+		block();
+	}
+}
+
 void shell_init(void)
 {
 	open_stdin();
 	
 	if (stdin && stdout) {
+		thread_t *thread;
 		shell_t *shell = alloc_type(shell_t);
 		if (!shell)
 			return;
 		
-		shell->rl = readline_init(stdin, stdout, "HV> ", shell_action, shell);
 		shell->out = stdout;
-		rl_console = shell->rl;
-		readline_resume(shell->rl);
+
+		thread = new_thread(shell_thread, shell, 1);
+		if (thread)
+			unblock(thread);
+		else
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			         "%s: failed to create shell thread\n", __func__);
 	}
 }
 

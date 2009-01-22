@@ -63,18 +63,6 @@ static inline int is_idle(void)
 	return thread == &thread->sched->idle;
 }
 
-static inline void prepare_to_block(void)
-{
-	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
-	
-	assert(!is_idle());
-	thread->state = sched_prep_block;
-	smp_sync();
-}
-
-void block(void);
-void unblock(thread_t *thread);
-
 thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg),
                      void *arg, int prio);
 void new_thread_inplace(thread_t *thread, uint8_t *stack,
@@ -83,5 +71,8 @@ void new_thread_inplace(thread_t *thread, uint8_t *stack,
  
 void sched_core_init(cpu_t *sched_cpu);
 void sched_init(void);
+
+void unblock(thread_t *thread);
+void schedule(trapframe_t *regs);
 
 #endif

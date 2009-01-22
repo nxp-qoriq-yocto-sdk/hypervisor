@@ -239,7 +239,7 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 
 	str += strlen("config-addr=");
 
-	*cfg_addr = get_number64(&early_console, str);
+	*cfg_addr = get_number64(&consolebuf, str);
 	if (cpu->errno) 
 		return cpu->errno;
 
