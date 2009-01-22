@@ -676,7 +676,6 @@ static int emu_dcbtls(trapframe_t *regs, uint32_t insn)
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 			"emulating dcbtls ct =%x, addr = %x\n", ct, addr);
 
-	/*FIXME : Add dcbtls emulation code here, right now we emulate failure*/
 	if (ct == 0)
 		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR0) |  L1CSR0_DCUL);
 
@@ -692,7 +691,6 @@ static int emu_icbtls(trapframe_t *regs, uint32_t insn)
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 			"emulating icbtls ct =%x, addr = %x\n", ct, addr);
 
-	/*FIXME : Add icbtls emulation code here, right now we emulate failure*/
 	if (ct == 0)
 		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR1) | L1CSR1_ICUL);
 
@@ -708,8 +706,6 @@ static int emu_dcblc(trapframe_t *regs, uint32_t insn)
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 			"emulating dcblc ct =%x, addr = %x\n", ct, addr);
 
-	/*FIXME : Add dcblc emulation code here*/
-
 	return 0;
 }
 
@@ -721,8 +717,6 @@ static int emu_icblc(trapframe_t *regs, uint32_t insn)
 	ct = (insn >> 21) & 0x1f;
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 			"emulating icblc ct =%x, addr = %x\n", ct, addr);
-
-	/*FIXME : Add icblc emulation code here*/
 
 	return 0;
 }
@@ -944,7 +938,6 @@ void hvpriv(trapframe_t *regs)
 			break;
 
 		case 0x86:
-			/* FIXME: would require actual dcbtstls emulation */
 			fault = emu_dcbtls(regs, insn);
 			break;
 
