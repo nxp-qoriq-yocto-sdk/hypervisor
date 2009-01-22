@@ -36,6 +36,8 @@
 
 #include <stdint.h>
 #include <libos/trapframe.h>
+#include <libos/core-regs.h>
+#include <libos/trap_booke.h>
 #include <events.h>
 #include <byte_chan.h>
 #include <guestmemio.h>
@@ -1071,8 +1073,8 @@ int handle_debug_exception(trapframe_t *trap_frame)
 
 	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
 
-	/* enable critical interrupts, so UART keeps working */
-	mtmsr(mfmsr() | MSR_CE);
+	/* enable interrupts, so UART keeps working */
+	enable_int();
 
 #ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
 	trap = 1;
@@ -1104,7 +1106,15 @@ int handle_debug_exception(trapframe_t *trap_frame)
 		                               (uint32_t *)nip_reg_value);
 		if (!breakpoint) {
 			DEBUG("Breakpoint not set by stub, returning (1).");
-			return 1;
+#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+			return 1;   /* reflect the trap to the guest */
+#else
+			/* need to reflect program interrupt, not debug interrupt */
+			trap_frame->exc = EXC_PROGRAM;
+			mtspr(SPR_ESR, ESR_PTR);
+			reflect_trap(trap_frame);
+			return 0;   /* don't want debug_trap() doing any fixup */
+#endif
 		}
 
 		/* need to save this so after bp is cleared we still know */
@@ -1133,12 +1143,11 @@ int handle_debug_exception(trapframe_t *trap_frame)
 			DEBUG("We've hit an external (user set) breakpoint at addr: 0x%p", (uint32_t *)nip_reg_value);
 		}
 
-		if (bptype != internal_1st_inst)
-			transmit_stop_reply_pkt_T(trap_frame, stub);
-
 		if (bptype == internal_1st_inst)
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_NORMAL,
 				"gdb: waiting for host debugger...\n");
+		else
+			transmit_stop_reply_pkt_T(trap_frame, stub);
 	}
 
 	DEBUG("Calling: gdb_stub_main_loop().");
