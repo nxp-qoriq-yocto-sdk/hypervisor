@@ -89,15 +89,15 @@ void debug_trap(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	if (!gcpu->guest->guest_debug_mode) {
 #ifdef CONFIG_DEBUG_STUB
-	if (mfspr(SPR_DBSR) && (regs->srr1 & MSR_GS)
- 	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_interrupt
- 	    && !gcpu->guest->stub_ops->debug_interrupt(regs))
-		return;
+		if (mfspr(SPR_DBSR) && (regs->srr1 & MSR_GS)
+	 	    && gcpu->guest->stub_ops && gcpu->guest->stub_ops->debug_interrupt
+	 	    && !gcpu->guest->stub_ops->debug_interrupt(regs))
+			return;
 #endif
-		set_crashing();
-		printf("unexpected debug exception\n");
-		dump_regs(regs);
-		stopsim();
+			set_crashing();
+			printf("unexpected debug exception\n");
+			dump_regs(regs);
+			stopsim();
 	}
  
 	gcpu->dsrr0 = regs->srr0;
