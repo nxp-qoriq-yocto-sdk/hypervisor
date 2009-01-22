@@ -141,8 +141,8 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 void guest_reset_tlb(void);
 void tlbsync(void);
 
-#define CCSRBAR_PA              0xfe000000
-#define CCSRBAR_SIZE            TLB_TSIZE_16M
+/** Real physical address of start of CCSR */
+extern phys_addr_t CCSRBAR_PA;
 
 /** Permanent 16MiB chunk of valloc space for temporary local mappings */
 extern void *temp_mapping[2];

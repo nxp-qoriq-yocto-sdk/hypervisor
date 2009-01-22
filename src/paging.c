@@ -30,6 +30,8 @@
 #include <percpu.h>
 #include <errors.h>
 
+phys_addr_t CCSRBAR_PA;
+
 /* epn is already shifted by levels that the caller deals with. */
 static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
                              int insert)

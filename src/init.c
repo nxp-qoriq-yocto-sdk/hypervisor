@@ -463,9 +463,85 @@ static void assign_hv_devs(void)
 	}
 }
 
+/**
+ * get_ccsr_phys_addr - get the CCSR physical address from the device tree
+ * @param[out] size returned size of CCSR, in bytes
+ *
+ * This function looks up the CCSR base physical address from the device
+ * tree.  If 'ccsr_size' is not NULL, then the size of CCSR space is
+ * returned through it, if this function does not return 0.
+ *
+ * Returns the CCSR base physical address, or 0 if error.
+ */
+static phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size)
+{
+	unsigned int parent_addr_cells, parent_size_cells;
+	unsigned int child_addr_cells, child_size_cells;
+	dt_node_t *node;
+	const dt_prop_t *prop;
+	uint32_t addrbuf[MAX_ADDR_CELLS] = { 0 };
+	phys_addr_t addr, size;
+	int ret;
+
+	// Find the CCSR node
+	node = dt_lookup_alias(hw_devtree, "ccsr");
+	if (!node)
+		node = dt_get_subnode(hw_devtree, "soc", 0);
+
+	if (!node) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "%s: no ccsr alias or /soc node\n", __func__);
+		return 0;
+	}
+
+	// Get the address format info for the CCSR node
+	ret = get_addr_format(node, &child_addr_cells, &child_size_cells);
+	if (ret) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "%s: could not get address format info from CCSR node\n", __func__);
+		return 0;
+	}
+
+	// Get the address format info for the parent of the CCSR node
+	ret = get_addr_format(node->parent, &parent_addr_cells, &parent_size_cells);
+	if (ret) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "%s: could not get address format info from parent of CCSR node\n",
+			 __func__);
+		return 0;
+	}
+
+	// Get the 'ranges' property
+	prop = dt_get_prop(node, "ranges", 0);
+	if (!prop) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "%s: no 'ranges' property in the CCSR node\n", __func__);
+		return 0;
+	}
+
+	ret = xlate_one(addrbuf, prop->data, prop->len,
+			parent_addr_cells, parent_size_cells,
+			child_addr_cells, child_size_cells, &size);
+	if (ret < 0) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "%s: could not obtain physical address from CCSR node\n",
+			 __func__);
+		return 0;
+	}
+
+	addr = ((phys_addr_t)addrbuf[2] << 32) | addrbuf[3];
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_VERBOSE,
+		 "%s: CCSR found at physical address %llx, size %llu\n", __func__, addr, size);
+
+	*ccsr_size = size;
+	return addr;
+}
+
 void start(unsigned long devtree_ptr)
 {
 	phys_addr_t cfg_addr = 0;
+	size_t ccsr_size;
 	void *fdt;
 	int ret;
 
@@ -489,9 +565,6 @@ void start(unsigned long devtree_ptr)
 	if (ret < 0)
 		return;
 
-	CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, 16 * 1024 * 1024,
-	                                TLB_MAS2_IO, TLB_MAS3_KERN);
-	
 	cpu->console_ok = 1;
 	core_init();
 
@@ -514,6 +587,12 @@ void start(unsigned long devtree_ptr)
 	}
 
 	unmap_fdt();
+
+	CCSRBAR_PA = get_ccsr_phys_addr(&ccsr_size);
+	if (CCSRBAR_PA)
+		CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, ccsr_size,
+                                                TLB_MAS2_IO, TLB_MAS3_KERN);
+
 
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
