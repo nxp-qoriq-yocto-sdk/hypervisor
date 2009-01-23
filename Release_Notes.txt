@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc10
-Date: 1/16/2009
+Revsion: 0.3-rc11
+Date: 1/23/2009
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,28 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc10 is compatible with Simics 4.0.29 / pre14 and
+   -Topaz 0.3-rc11 is compatible with Simics 4.0.29 / pre14 and
     later
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.85
+    0.86
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc11 bug fixes and changes
+      -bug 2580-- hypervisor hang during boot if mux server attached
+      -base address of CCSR space comes from device tree
+      -bug 2346-- truncated guest device tree dumps from shell
+      -bug 2644-- hypervisor hangs if default logging level set to 10
+      -gdb stub-- support for running off of debug interrupt, enables
+       single step on smp
+      -support for cpu-count property is removed
+      -implicit handling of qman and bman portals is no longer
+       supported, device= assignment must be explity to the hardware
+       node
+      -support vcpu property on qman portal device assignment nodes
+       so hypevisor will update cpu-handle property on portal nodes
 
    -Topaz 0.3-rc10 bug fixes and changes
       -PAMU subwindows
