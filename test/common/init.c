@@ -132,6 +132,8 @@ static void tlb1_init(void)
 {
 	tlb1_set_entry(0, CCSRBAR_VA, CCSRBAR_PA, CCSRBAR_SIZE, TLB_MAS2_IO,
 		TLB_MAS3_KERN, 0, 0, 0);
+
+	cpu->console_ok = 1;
 }
 
 __attribute__((weak)) void dec_handler(trapframe_t *frameptr)
