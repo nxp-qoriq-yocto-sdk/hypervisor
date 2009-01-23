@@ -71,10 +71,6 @@
 				guest-addr = <0 0>;
 			};
 
-			uart2: uart2 {
-				device = "serial2";
-			};
-
 			bc0: byte-channel0 {
 				compatible = "byte-channel";
 				endpoint = <&uartmux>;
@@ -82,7 +78,6 @@
 			};
 
 			aliases {
-				stdout = <&uart2>;
 			};
 		};
 	};

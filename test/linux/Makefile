@@ -33,7 +33,7 @@
 test := linux
 dir := $(testdir)$(test)/
 
-$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts $(dir)hv-partman.dts $(dir)hv-demo.dts $(dir)hv-1core.dts
+$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts $(dir)hv-partman.dts $(dir)hv-demo.dts $(dir)hv-1core.dts $(dir)hv-hello.dts
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
 include $(src)tools/partman/Makefile
@@ -75,19 +75,17 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.
 bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(dir)rootfs-hello.ext2.gz
 	$(call mount,rootfs-hello)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-hello/bin/
-	sudo cp -af $(testdir)linux/hello bin/linux/rootfs-hello/
+	sudo cp -af bin/hello/hello bin/linux/rootfs-hello/
 	$(call unmount,bin/linux/rootfs-hello)
 
 $(test)-run-partman: bin/$(test)/rootfs-partman.ext2.gz
 
-$(test)-run-hello: bin/$(test)/rootfs-hello.ext2.gz
+$(test)-run-hello: $(test) bin/$(test)/rootfs-hello.ext2.gz
 	../../tools/mux_server/mux_server localhost:9124 9000 &
 	xterm -e "telnet localhost 9000" &
 	$(SIMICS) $(testdir)linux/run-hello.simics
 
 $(test)-run-demo: $(test) bin/$(test)/rootfs-partman.ext2.gz
-	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
-	xterm -geometry 80x25+870+0 -title "telnet : manager partition" -e "telnet localhost 9000"  &
-	xterm -geometry 80x25+150+0 -title "telnet : partition 2" -e "telnet localhost 9001"  &
+	../../test/sim/xtel.sh 9000 2
 	$(SIMICS) $(testdir)linux/run-demo.simics
 

@@ -27,6 +27,8 @@
 # UART2 is Linux serial console
 $use_uart2 = 1
 
+$create_fman = TRUE
+
 $guest_image[0]  = "vmlinux"
 $guest_addr[0]   = 0x00100000
 $guest_image[1]  = "hv-1p.dtb"
@@ -46,23 +48,3 @@ add-directory "bin/linux" -prepend
 
 run-command-file "boot.simics"
 
-run-python-file "exc.py"
-
-$branch_count=1
-
-script-branch {
-	while $branch_count > 0 {
-        	$con3:con.wait-for-string "BENCH START"
-		@clear_mode_stats()
-		@print_stat()
-        	cpu0.print-time
-	}
-}
-
-script-branch {
-	while $branch_count > 0 {
-        	$con3:con.wait-for-string "BENCH STOP"
-		@print_stat()
-        	cpu0.print-time
-	}
-}
