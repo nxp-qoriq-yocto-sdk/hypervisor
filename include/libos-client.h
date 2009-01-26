@@ -34,6 +34,10 @@
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
+#define KSTACK_SIZE 4096
+/* This stack size applies to all exception levels. It
+   changed from 2KB to 4KB due to stack pressure with the
+   TRK debug stub. */
 
 #ifndef _ASM
 
