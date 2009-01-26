@@ -411,8 +411,7 @@ void vmpic_partition_init(guest_t *guest)
 	if (!vmpic)
 		goto nomem;
 
-	if (dt_set_prop(vmpic, "compatible",
-	                "fsl,hv-vmpic", strlen("fsl,hv-vmpic") + 1) < 0)
+	if (dt_set_prop_string(vmpic, "compatible", "fsl,hv-vmpic") < 0)
 		goto nomem;
 
 	propdata = 2;

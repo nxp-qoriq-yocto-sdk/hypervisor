@@ -187,7 +187,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	if (!gnode)
 		goto nomem;
 
-	if (dt_set_prop(gnode, "device_type", "memory", 7))
+	if (dt_set_prop_string(gnode, "device_type", "memory"))
 		goto nomem;
 
 	write_reg(reg, gaddr, pma->size);
@@ -715,7 +715,7 @@ fail:
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 	         "%s: error %d in %s\n", failstr, ret, hwnode->name);
 
-	if (dt_set_prop(owner->gnode, "status", "fail", 5) < 0)
+	if (dt_set_prop_string(owner->gnode, "status", "fail") < 0)
 		return ERR_NOMEM;
 
 	return 0;
@@ -2164,8 +2164,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	}
 
 	guest->devtree = create_dev_tree();
-	ret = dt_set_prop(guest->devtree, "label",
-	                  guest->name, strlen(guest->name) + 1);
+	ret = dt_set_prop_string(guest->devtree, "label", guest->name);
 	if (ret < 0)
 		goto fail;
 
@@ -2204,7 +2203,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	}
 
 	// FIXME: not in spec
-	ret = dt_set_prop(node, "fsl,hv-version", hv_version, 16);
+	ret = dt_set_prop(node, "fsl,hv-version", hv_version, sizeof(hv_version));
 	if (ret < 0)
 		goto fail;
 

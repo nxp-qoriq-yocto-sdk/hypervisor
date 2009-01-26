@@ -258,8 +258,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 	if (!gnode)
 		goto nomem;
 
-	if (dt_set_prop(gnode, "compatible", "fsl,hv-byte-channel-handle",
-	                strlen("fsl,hv-byte-channel-handle") + 1) < 0)
+	if (dt_set_prop_string(gnode, "compatible", "fsl,hv-byte-channel-handle") < 0)
 		goto nomem;
 	if (dt_set_prop(gnode, "reg", &ghandle, 4) < 0)
 		goto nomem;
