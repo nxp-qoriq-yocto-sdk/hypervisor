@@ -742,7 +742,7 @@ static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t re
 		c = write_gfpr(trap_frame, e500mc_reg_num, &reg_value);
 		break;
 	case reg_cat_msr:
-		c = write_gmsr(trap_frame, reg_value);
+		c = write_gmsr(trap_frame, reg_value, 1);
 		break;
 	case reg_cat_cr:
 		c = write_gcr(trap_frame, reg_value);

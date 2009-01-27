@@ -652,7 +652,7 @@ static int emu_rfci(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 
 	regs->srr0 = gcpu->csrr0;
-	write_gmsr(regs, gcpu->csrr1);
+	write_gmsr(regs, gcpu->csrr1, 1);
 
 	return 0;
 }
@@ -662,7 +662,7 @@ static int emu_rfmci(trapframe_t *regs, uint32_t insn)
 	gcpu_t *gcpu = get_gcpu();
 
 	regs->srr0 = gcpu->mcsrr0;
-	write_gmsr(regs, gcpu->mcsrr1);
+	write_gmsr(regs, gcpu->mcsrr1, 1);
 
 	return 0;
 }
