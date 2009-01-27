@@ -313,6 +313,15 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "D", detach },
 };
 
+typedef enum brkpt
+{
+	memory_breakpoint,
+	hardware_breakpoint,
+	write_watchpoint,
+	read_watchpoint,
+	access_watchpoint,
+} brkpt_t;
+
 /* Aux */
 static inline uint8_t checksum(uint8_t *p);
 static inline uint8_t hdtoi(uint8_t hexit);
@@ -1092,6 +1101,12 @@ int handle_debug_exception(trapframe_t *trap_frame)
 		mtspr(SPR_DBSR, DBSR_ICMP); /* clear event */
 		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP); /* clear ICMP */
 		transmit_stop_reply_pkt_T(trap_frame, stub);
+	} else if (mfspr(SPR_DBSR) & DBSR_IAC1) {
+		mtspr(SPR_DBSR, DBSR_IAC1); /* clear event */
+		transmit_stop_reply_pkt_T(trap_frame, stub);
+	} else if (mfspr(SPR_DBSR) & DBSR_IAC2) {
+		mtspr(SPR_DBSR, DBSR_IAC2); /* clear event */
+		transmit_stop_reply_pkt_T(trap_frame, stub);
 	}
 #endif
 
@@ -1185,6 +1200,9 @@ void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type)
 #endif
 	const char *td; /* td: target description */
 	int loop_count = 0;
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+	register_t dbcr0 = 0;
+#endif
 
 	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 		"gdb: in RSP Engine, main loop.\n");
@@ -1375,16 +1393,36 @@ return_to_guest:
 				"Got '%c' packet.\n", *cur_pos);
 			err_flag = 0;
 			breakpoint_type = scan_num(&cur_pos, ',');
-			if (breakpoint_type != 0) {
+			if (breakpoint_type != memory_breakpoint
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+			    && breakpoint_type != hardware_breakpoint
+/* FIXME: Add this when watchpoints work. */
+#if 0
+			    && breakpoint_type != write_watchpoint
+			    && breakpoint_type != read_watchpoint
+			    && breakpoint_type != access_watchpoint
+#endif
+#endif
+			) {
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+				DEBUG("We only support memory and hardware breakpoints.");
+/* FIXME: Add this when watchpoints work. */
+#if 0
+				      "and read, write or access watchpoints.");
+#endif
+#else
 				DEBUG("We only support memory breakpoints.");
-				pkt_cat_string(stub->rsp, "E");
-				pkt_write_hex_byte_update_cur(stub->rsp, 0);
+#endif
+				/* Send back an empty response to indicate
+				 * that this kind of a breakpoint is not
+				 * supported.
+				 */
 				break;
 			}
 			BREAK_IF_END(cur_pos);
-			addr = (uint32_t *) scan_num(&cur_pos, ',');
+			addr = (uint32_t *)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
-			length = scan_num(&cur_pos, ':');
+			length = scan_num(&cur_pos, '\0');
 			if (length != 4) {
 				DEBUG("Breakpoint must be of length: 4.");
 				pkt_cat_string(stub->rsp, "E");
@@ -1394,21 +1432,119 @@ return_to_guest:
 			DEBUG("Breakpoint type: %d, addr: 0x%p, length: %d",
 			       breakpoint_type, addr, length);
 			DEBUG("aux: %c", aux);
-			if (aux == 'Z') {
-				DEBUG ("Invoking set_breakpoint.");
-				breakpoint = set_breakpoint(stub->breakpoint_table, trap_frame, addr, external);
-				if (breakpoint)
-					breakpoint->associated = NULL;
-				err_flag = breakpoint ? 0 : 1;
-			} else { /* 'z' */
-				DEBUG("Invoking locate_breakpoint.");
-				breakpoint = locate_breakpoint(stub->breakpoint_table, addr);
-				if (breakpoint) {
-					DEBUG("Located breakpoint placed at: 0x%p", addr);
-					delete_breakpoint(stub->breakpoint_table, breakpoint);
-				} else /* Vow! Spurious address! */ {
-					DEBUG("No breakpoint placed at: 0x%p", addr);
-					err_flag = 1;
+			if (aux == 'Z') { /* 'Z':Breakpoint insertion. */
+				switch (breakpoint_type) {
+				case memory_breakpoint:
+					DEBUG ("Invoking set_breakpoint.");
+					breakpoint = set_breakpoint(stub->breakpoint_table,
+					                            trap_frame, addr, external);
+					if (breakpoint)
+						breakpoint->associated = NULL;
+					err_flag = breakpoint ? 0 : 1;
+					break;
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+				case hardware_breakpoint:
+					err_flag = 0;
+					dbcr0 = mfspr(SPR_DBCR0);
+					if (!(dbcr0 & DBCR0_IAC1)) {
+						mtspr(SPR_IAC1, (register_t)addr);
+						mtspr(SPR_DBCR0, dbcr0 | DBCR0_IAC1);
+					} else if (!(dbcr0 & DBCR0_IAC2)) {
+						mtspr(SPR_IAC2, (register_t)addr);
+						mtspr(SPR_DBCR0, dbcr0 | DBCR0_IAC2);
+					}
+					else {
+						DEBUG("Failed to set hardware breakpoint at address: 0x%p.", addr);
+						err_flag = 1;
+					}
+					DEBUG("HW breakpoint dbcr0: 0x%lx", mfspr(SPR_DBCR0));
+					break;
+/* FIXME: Watchpoints do not work yet. */
+#if 0
+				case write_watchpoint:
+				case read_watchpoint:
+				case access_watchpoint:
+					err_flag = 0;
+					dbcr0 = mfspr(SPR_DBCR0);
+					if (!(dbcr0 & (DBCR0_DAC1R | DBCR0_DAC1W))) {
+						mtspr(SPR_DAC1, (register_t)addr);
+						if (breakpoint_type == write_watchpoint)
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC1W);
+						else if (breakpoint_type == read_watchpoint)
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC1R);
+						else /* access_watchpoint */
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC1R | DBCR0_DAC1W);
+					} else if (!(dbcr0 & (DBCR0_DAC2R | DBCR0_DAC2W))) {
+						mtspr(SPR_DAC2, (register_t)addr);
+						if (breakpoint_type == write_watchpoint)
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC2W);
+						else if (breakpoint_type == read_watchpoint)
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC2R);
+						else /* access_watchpoint */
+							mtspr(SPR_DBCR0, dbcr0 | DBCR0_DAC2R | DBCR0_DAC2W);
+					}
+					else {
+						DEBUG("Failed to set hardware watchpoint at address: 0x%p.", addr);
+						err_flag = 1;
+					}
+					DEBUG("Watchpoint dbcr0: 0x%lx", mfspr(SPR_DBCR0));
+					break;
+#endif
+#endif
+				default:
+					/* If this is not a known breakpoint type;
+					 * we would not be here in the first place.
+					 */
+					break;
+				}
+			} else { /* 'z':Breakpoint removal. */
+				switch (breakpoint_type) {
+				case memory_breakpoint:
+					DEBUG("Invoking locate_breakpoint.");
+					breakpoint = locate_breakpoint(stub->breakpoint_table, addr);
+					if (breakpoint) {
+						DEBUG("Located breakpoint placed at: 0x%p", addr);
+						delete_breakpoint(stub->breakpoint_table, breakpoint);
+						err_flag = 0;
+					} else /* Vow! Spurious address! */ {
+						DEBUG("No breakpoint placed at: 0x%p", addr);
+						err_flag = 1;
+					}
+					break;
+#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+				case hardware_breakpoint:
+					err_flag = 0;
+					if (mfspr(SPR_IAC1) == (register_t)addr)
+						mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_IAC1);
+					else if (mfspr(SPR_IAC2) == (register_t)addr)
+						mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_IAC2);
+					else {
+						DEBUG("No HW breakpoint at address: 0x%p.", addr);
+						err_flag = 1;
+					}
+					break;
+/* FIXME: Watchpoints do not work yet. */
+#if 0
+				case write_watchpoint:
+				case read_watchpoint:
+				case access_watchpoint:
+					err_flag = 0;
+					if (mfspr(SPR_DAC1) == (register_t)addr)
+						mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~(DBCR0_DAC1R | DBCR0_DAC1W));
+					else if (mfspr(SPR_DAC2) == (register_t)addr)
+						mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~(DBCR0_DAC2R | DBCR0_DAC2W));
+					else {
+						DEBUG("No HW breakpoint at address: 0x%p.", addr);
+						err_flag = 1;
+					}
+					break;
+#endif
+#endif
+				default:
+					/* If this is not a known breakpoint type;
+					 * we would not be here in the first place.
+					 */
+					break;
 				}
 			}
 			if (err_flag == 0) {
