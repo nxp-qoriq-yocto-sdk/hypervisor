@@ -369,6 +369,15 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	get_gcpu()->clean_tlb = 0;
 
 	set->tag[way] = tag;
+
+	mtspr(SPR_MAS0, mas0);
+	mtspr(SPR_MAS1, mas1);
+	mtspr(SPR_MAS2, mas2);
+	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3flags);
+	mtspr(SPR_MAS8, mas8);
+	asm volatile("tlbwe" : : : "memory");
+
 	return 0;
 }
 
