@@ -1628,6 +1628,7 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 		// Notify the manager(s) that it needs to load images and
 		// start this guest.
 		send_doorbells(guest->dbell_restart_request);
+		send_doorbells(guest->dbell_state_change);
 		prepare_to_block();
 		block();
 		BUG();
