@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc11
-Date: 1/23/2009
+Revsion: 0.3-rc12
+Date: 1/28/2009
 
 -------------------------------------------------------
 Contents
@@ -23,14 +23,31 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc11 is compatible with Simics 4.0.29 / pre14 and
+   -Topaz 0.3-rc12 is compatible with Simics 4.0.29 / pre14 and
     later
+      -note: the pre18 Simics model has some DMA address 
+       translation bugs and the dma-B unit test fails
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.86
+    0.87
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc12 bug fixes and changes
+      -bug 2601-- State change interrupt not receieved when
+       FH_PARTITION_RESTART hypercall issued
+      -hypervisor stack is 4KB
+      -performance optimizations
+         -on tlbwe emulation, write to hardware TLB immediately
+         -use dcbz to zero memory
+      -debug stub api: added 'as_guest' argument to write_gmsr()
+      -gdb stub: support hardware breakpoints
+      -cpc cache: PMAs default to allocation defined in partition reg 0
+      -added size alignment error checking for DMA windows
+      -updates to unit tests to work with swift
+      -P4080 law register and ccf register addresses now come from
+       device tree
 
    -Topaz 0.3-rc11 bug fixes and changes
       -bug 2580-- hypervisor hang during boot if mux server attached
@@ -199,11 +216,6 @@ Contents
       -In the platform MPIC multiple error interrupts are multiplexed
        to interrupt 0.  De-multiplexing and routing of platform
        error interrupts to partitions is not implemented.
-
-   -PAMU related
-      -support for PAMU operation mapping table is implemented but
-       not tested
-      -dma subwindows are not supported
 
  D. Configuration
 
