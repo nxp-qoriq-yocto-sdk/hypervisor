@@ -35,6 +35,14 @@
 		L3_1:L3_1 {
 			device ="/soc/l3-cache-controller@11000";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
 	phys-mem {

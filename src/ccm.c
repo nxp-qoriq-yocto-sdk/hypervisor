@@ -35,16 +35,86 @@
 #include <percpu.h>
 #include <errors.h>
 
-#define HV_CPUS ((1 << MAX_CORES) - 1) << (32 - MAX_CORES)
+#define HV_CPUS (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
 
 static law_t *laws;
 static uint32_t *csdids;
-static uint32_t csdid_map;
+static uint32_t csdid_map, pma_lock;
+static uint32_t numcsds, numlaws;
+
+static int ccm_probe(driver_t *drv, device_t *dev);
+static int law_probe(driver_t *drv, device_t *dev);
+
+static driver_t __driver ccm = {
+	.compatible = "fsl,corenet-cf",
+	.probe = ccm_probe
+};
+
+static driver_t __driver law = {
+	.compatible = "fsl,corenet-law",
+	.probe = law_probe
+};
+
+static int ccm_probe(driver_t *drv, device_t *dev)
+{
+	dt_prop_t *prop;
+	dt_node_t *node = to_container(dev, dt_node_t, dev);
+
+	if (dev->num_regs < 1 || !dev->regs[0].virt) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+				"CCM reg initialization failed\n");
+		return ERR_INVALID;
+	}
+
+	prop = dt_get_prop(node, "fsl,ccf-num-csdids", 0);
+	if (prop && prop->len == 4) {
+		numcsds = *(const uint32_t *)prop->data;
+	} else {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+		         "%s: bad/missing property fsl,ccf-num-csdids in %s\n",
+		         __func__, node->name);
+		return ERR_BADTREE;
+	}
+
+	csdids = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x600);
+
+	dev->driver = &ccm;
+
+	return 0;
+}
+
+static int law_probe(driver_t *drv, device_t *dev)
+{
+	dt_prop_t *prop;
+	dt_node_t *node = to_container(dev, dt_node_t, dev);
+
+	if (dev->num_regs < 1 || !dev->regs[0].virt) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+				"LAW reg initialization failed\n");
+		return ERR_INVALID;
+	}
+
+	prop = dt_get_prop(node, "fsl,num-laws", 0);
+	if (prop && prop->len == 4) {
+		numlaws = *(const uint32_t *)prop->data;
+	} else {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+		         "%s: bad/missing property fsl,num-laws in %s\n",
+		         __func__, node->name);
+		return ERR_BADTREE;
+	}
+
+	laws = (law_t *) ((uint32_t)dev->regs[0].virt + 0xc00);
+
+	dev->driver = &law;
+
+	return 0;
+}
 
 static void disable_law(unsigned int lawidx)
 {
 	uint32_t val;
-	assert(lawidx < NUMLAWS);
+	assert(lawidx < numlaws);
 
 	val = in32(&laws[lawidx].attr);
 	val &= ~LAW_ENABLE;
@@ -54,7 +124,7 @@ static void disable_law(unsigned int lawidx)
 static void enable_law(unsigned int lawidx)
 {
 	uint32_t val;
-	assert(lawidx < NUMLAWS);
+	assert(lawidx < numlaws);
 
 	val = in32(&laws[lawidx].attr);
 	val |= LAW_ENABLE;
@@ -124,7 +194,7 @@ static uint32_t get_law_target(pma_t *pma)
 	uint32_t val;
 	int lawidx;
 
-	for (lawidx = 0; lawidx < NUMLAWS; lawidx++) {
+	for (lawidx = 0; lawidx < numlaws; lawidx++) {
 		val = in32(&laws[lawidx].attr);
 		if (val & LAW_ENABLE) {
 			val = in32(&laws[lawidx].high);
@@ -164,7 +234,7 @@ static int set_law(dt_node_t *node, int csdid)
 		return ERR_BADTREE;
 	}
 
-	for (lawidx = 0; lawidx < NUMLAWS; lawidx++) {
+	for (lawidx = 0; lawidx < numlaws; lawidx++) {
 		val = in32(&laws[lawidx].attr);
 
 		if (!(val & LAW_ENABLE)) {
@@ -199,7 +269,7 @@ static int get_free_csd(void)
 {
 	int csdid;
 
-	if ((~csdid_map & ((1ULL << NUMCSDS) - 1)) == 0) {
+	if ((~csdid_map & ((1ULL << numcsds) - 1)) == 0) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 		         "%s: out of CSDs\n", __func__);
 		return ERR_BUSY;
@@ -326,15 +396,14 @@ void ccm_init(void)
 {
 	dt_node_t *node;
 
-	/* FIXME: Appropriate nodes need to be created in the master device tree. */
-	laws = map(CCSRBAR_PA + 0xc00, sizeof(law_t) * NUMLAWS,
-	           TLB_MAS2_IO, TLB_MAS3_KERN);
-
-	csdids = map(CCSRBAR_PA + 0x18600, 4 * NUMCSDS,
-	             TLB_MAS2_IO, TLB_MAS3_KERN);
+	if (!laws || !csdids) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+				"CCM initialization failed\n");
+		return;
+	}
 
 	/* Mark the CSDs that are already in use */
-	for (int i = 0; i < NUMCSDS; i++)
+	for (int i = 0; i < numcsds; i++)
 		if (in32(&csdids[i]))
 			csdid_map |= 1 << i;
 
@@ -373,6 +442,12 @@ dt_node_t *get_pma_node(dt_node_t *node)
 
 		return NULL;
 	}
+
+	/* Don't depend on the ccm initialization to initialize pma */
+	spin_lock(&pma_lock);
+	if (pma_node->pma == NULL)
+		read_pma(pma_node);
+	spin_unlock(&pma_lock);
 
 	return pma_node;
 }

@@ -26,8 +26,6 @@
 #ifndef HV_P4080_H
 #define HV_P4080_H
 
-#define NUMLAWS 32
-
 #define LAW_ENABLE 0x80000000
 #define LAWAR_TARGETID_SHIFT 20
 #define LAWAR_CSDID_SHIFT 12
@@ -45,8 +43,6 @@
 typedef struct {
 	uint32_t high, low, attr, reserved;
 } law_t;
-
-#define NUMCSDS 32
 
 #define NUMCPCS 2
 #define NUMCPCWAYS 32
