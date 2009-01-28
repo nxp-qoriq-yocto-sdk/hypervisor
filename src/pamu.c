@@ -60,6 +60,11 @@ static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
 	return count_lsb_zeroes(subwindow_cnt) - 1;
 }
 
+static inline int is_primary_window_valid(phys_addr_t base, phys_addr_t size)
+{
+	return !(base & (size - 1));
+}
+
 static int is_subwindow_count_valid(int subwindow_cnt)
 {
 	if (subwindow_cnt <= 1 || subwindow_cnt > 16)
@@ -360,6 +365,12 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		return ERR_BADTREE;
 	}
 	window_size = *(const phys_addr_t *)size->data;
+
+	if (!is_primary_window_valid(window_addr, window_size)) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
+		         "%s: warning: %s is not aligned with window size \n",
+		         __func__, dma_window->name);
+	}
 
 	ppaace = pamu_get_ppaace(liodn);
 	if (!ppaace)
