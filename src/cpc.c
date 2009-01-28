@@ -41,11 +41,6 @@ static inline void reserve_partition_reg(int cpc_index, int pir_num)
 	cpcs[cpc_index].cpc_reg_map |= 1 << pir_num;
 }
 
-static inline void reserve_way(int cpc_index, uint32_t way)
-{
-	cpcs[cpc_index].cpc_way_map |= way >> count_lsb_zeroes(way);
-}
-
 static inline void remove_pir0_ways(int cpc_index, uint32_t way_mask)
 {
 	uint32_t val;
@@ -124,11 +119,7 @@ static cpc_part_reg_t *allocate_ways(int cpc_index, dt_prop_t *prop, uint32_t cs
 					"Invalid CPC way number %d\n", ways[i]);
 			continue;
 		}
-		if (!(cpcs[cpc_index].cpc_way_map & (1 << ways[i])))
-			val |= (1 << (31 - ways[i]));
-		else
-			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
-					"CPC way %d already allocated\n", ways[i]);
+		val |= (1 << (31 - ways[i]));
 	}
 
 	if (val == 0)
@@ -142,7 +133,6 @@ static cpc_part_reg_t *allocate_ways(int cpc_index, dt_prop_t *prop, uint32_t cs
 
 	out32(&cpcs[cpc_index].cpc_part_base[pir_num].cpcpar, CPCPAR_MASK);
 	out32(&cpcs[cpc_index].cpc_part_base[pir_num].cpcpwr, val);
-	reserve_way(cpc_index, val);
 
 	return &cpcs[cpc_index].cpc_part_base[pir_num];
 }
