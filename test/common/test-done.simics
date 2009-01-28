@@ -1,6 +1,6 @@
 
 script-branch {
-    con1.wait-for-string "Test Complete"
+    $test_con.wait-for-string "Test Complete"
     stop
     echo "completed"
     exit 0

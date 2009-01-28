@@ -4,8 +4,9 @@ add-directory "%script%/" -prepend
 
 run-command-file "run.simics"
 
+$test_con = ($con3:con) # uart 2
 script-branch {
-    con1.wait-for-string "watchdog"
+    $test_con.wait-for-string "watchdog"
     stop
     echo "passed"
     exit 0

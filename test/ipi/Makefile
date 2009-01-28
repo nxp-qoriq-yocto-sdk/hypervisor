@@ -79,7 +79,7 @@ $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2
 
 $(test)-check-B: $(test)-run-B-batch
-	$(testdir)common/check-results 1 2
+	$(testdir)common/check-results 2 3
 
-$(test)-check-C: $(test)-run-B-batch
-	$(testdir)common/check-results 1 2
+$(test)-check-C: $(test)-run-C-batch
+	$(testdir)common/check-results 2 3

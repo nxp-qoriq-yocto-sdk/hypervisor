@@ -4,4 +4,5 @@ add-directory "%script%/" -prepend
 
 run-command-file "run-A.simics"
 
+$test_con = ($con3:con) # uart 2
 run-command-file "%script%/../common/test-done.simics"
