@@ -3,6 +3,9 @@
 / {
 	compatible = "fsl,hv-config";
 
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&uart0>;
@@ -27,8 +30,19 @@
 		iommu {
 			device = "/soc/iommu";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
 	phys-mem {
 		pma0:pma0 {
 			compatible = "phys-mem-area";
@@ -66,86 +80,95 @@
 		endpoint = <&uart1>;
 	};
 
-	partitions {
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		cpus = <0 1>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-		part1 {
-			compatible = "partition";
-			cpus = <0 1>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
-
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma0>;
-				guest-addr = <0 0>;
-			};
-
-			gdb-stub@0 {
-				compatible = "gdb-stub", "debug-stub";
-				endpoint = <&uartmux>;
-				mux-channel = <0>;
-				debug-cpus = <0 1>; //virtual cpu 0
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
 		};
 
-		part2 {
-			compatible = "partition";
-			cpus = <1 1>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+		gdb-stub@0 {
+			compatible = "gdb-stub", "debug-stub";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+			debug-cpus = <0 1>; //virtual cpu 0
+		};
+	};
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma1>;
-				guest-addr = <0 0>;
-			};
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2 {
+		compatible = "partition";
+		cpus = <1 1>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gdb-stub@1 {
-				compatible = "gdb-stub", "debug-stub";
-				endpoint = <&uartmux>;
-				mux-channel = <1>;
-				debug-cpus = <0 1>; //virtual cpu 0
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
 		};
 
-		part3 {
-			compatible = "partition";
-			cpus = <2 1>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+		gdb-stub@1 {
+			compatible = "gdb-stub", "debug-stub";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+			debug-cpus = <0 1>; //virtual cpu 0
+		};
+	};
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma2>;
-				guest-addr = <0 0>;
-			};
+	// =====================================================
+	// Partition 3
+	// =====================================================
+	part3 {
+		compatible = "partition";
+		cpus = <2 1>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gdb-stub@2 {
-				compatible = "gdb-stub", "debug-stub";
-				endpoint = <&uartmux>;
-				mux-channel = <2>;
-				debug-cpus = <0 1>; //virtual cpu 0
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
 		};
 
-		part4 {
-			compatible = "partition";
-			cpus = <3 1>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+		gdb-stub@2 {
+			compatible = "gdb-stub", "debug-stub";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
+			debug-cpus = <0 1>; //virtual cpu 0
+		};
+	};
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma3>;
-				guest-addr = <0 0>;
-			};
+	// =====================================================
+	// Partition 4
+	// =====================================================
+	part4 {
+		compatible = "partition";
+		cpus = <3 1>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gdb-stub@3 {
-				compatible = "gdb-stub", "debug-stub";
-				endpoint = <&uartmux>;
-				mux-channel = <3>;
-				debug-cpus = <0 1>; //virtual cpu 0
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma3>;
+			guest-addr = <0 0>;
+		};
+
+		gdb-stub@3 {
+			compatible = "gdb-stub", "debug-stub";
+			endpoint = <&uartmux>;
+			mux-channel = <3>;
+			debug-cpus = <0 1>; //virtual cpu 0
 		};
 	};
 

@@ -3,6 +3,9 @@
 / {
 	compatible = "fsl,hv-config";
 
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&uart0>;
@@ -23,8 +26,19 @@
 		iommu {
 			device = "/soc/iommu";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
 	phys-mem {
 		pma0: pma0 {
 			compatible = "phys-mem-area";
@@ -39,6 +53,9 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 1
+	// =====================================================
 	partitions {
 		part1 {
 			compatible = "partition";

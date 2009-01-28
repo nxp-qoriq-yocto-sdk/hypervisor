@@ -3,6 +3,9 @@
 / {
 	compatible = "fsl,hv-config";
 
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
 	phys-mem {
 		pma0: pma0 {
 			compatible = "phys-mem-area";
@@ -23,6 +26,9 @@
 		};
 	};
 
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&serial0>;
@@ -45,6 +51,14 @@
 		iommu {
 			device = "/soc/iommu";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
 	doorbells {
@@ -53,45 +67,46 @@
 		};
 	};
 
-	partitions {
-		part1 {
-			compatible = "partition";
-			cpus = <0 2>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gpma0 {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma0>;
-				guest-addr = <0 0>;
-			};
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
+		};
 
-			gpma1 {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma2>;
-				guest-addr = <0 0x25000000>;
-				node-update {
-					prepend-stringlist = "compatible", "fsl,share-mem-test";
-				};
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0x25000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,share-mem-test";
 			};
+		};
 
-			serial2: serial2 {
-				device = "serial2";
-			};
+		serial2: serial2 {
+			device = "serial2";
+		};
 
-			doorbell0 {
-				compatible = "receive-doorbell";
-				global-doorbell = <&dbell0>;
-			};
+		doorbell0 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
 
-			dbell1: doorbell1 {
-				compatible = "send-doorbell";
-				global-doorbell = <&dbell0>;
-			};
+		dbell1: doorbell1 {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
 
-			aliases {
-				stdout = <&serial2>;
-			};
+		aliases {
+			stdout = <&serial2>;
 		};
 	};
 };

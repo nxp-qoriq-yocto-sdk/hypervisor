@@ -44,6 +44,14 @@
 		mpic {
 			device = "/soc/pic";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
 	// =====================================================

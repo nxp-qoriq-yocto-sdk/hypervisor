@@ -3,6 +3,9 @@
 / {
 	compatible = "fsl,hv-config";
 
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
 	phys-mem {
 		pma0: pma0 {
 			compatible = "phys-mem-area";
@@ -30,6 +33,9 @@
 
 	};
 
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&serial0>;
@@ -57,6 +63,14 @@
 		iommu {
 			device = "/soc/iommu";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
 	uartmux: uartmux {
@@ -70,79 +84,84 @@
 		};
 	};
 
-	partitions {
-		part1 {
-			compatible = "partition";
-			cpus = <0 2>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma0>;
-				guest-addr = <0 0>;
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
+		};
 
-			gpma1 {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma3>;
-				guest-addr = <0 0x25000000>;
-				node-update {
-					prepend-stringlist = "compatible", "fsl,share-mem-test";
-				};
-			};
-
-			serial2: serial2 {
-				device = "serial2";
-			};
-
-			doorbell0 {
-				compatible = "receive-doorbell";
-				global-doorbell = <&dbell0>;
-			};
-
-			doorbell1 {
-				compatible = "send-doorbell";
-				global-doorbell = <&dbell0>;
-			};
-
-			aliases {
-				stdout = <&serial2>;
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma3>;
+			guest-addr = <0 0x25000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,share-mem-test";
 			};
 		};
-		part2 {
-			compatible = "partition";
-			cpus = <2 2>;
-			guest-image = <0 0xe8300000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma1>;
-				guest-addr = <0 0>;
-			};
+		serial2: serial2 {
+			device = "serial2";
+		};
 
-			gpma1 {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma3>;
-				guest-addr = <0 0x25000000>;
-				node-update {
-					prepend-stringlist = "compatible", "fsl,share-mem-test";
-				};
-			};
+		doorbell0 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
 
-			doorbell2 {
-				compatible = "receive-doorbell";
-				global-doorbell = <&dbell0>;
-			};
+		doorbell1 {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
 
-			serial3: serial3 {
-				device = "serial3";
-			};
+		aliases {
+			stdout = <&serial2>;
+		};
+	};
 
-			aliases {
-				stdout = <&serial3>;
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2 {
+		compatible = "partition";
+		cpus = <2 2>;
+		guest-image = <0 0xe8300000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma3>;
+			guest-addr = <0 0x25000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,share-mem-test";
 			};
+		};
+
+		doorbell2 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		serial3: serial3 {
+			device = "serial3";
+		};
+
+		aliases {
+			stdout = <&serial3>;
 		};
 	};
 };

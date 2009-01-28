@@ -3,6 +3,9 @@
 / {
 	compatible = "fsl,hv-config";
 
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&uart0>;
@@ -28,8 +31,19 @@
 		iommu {
 			device = "/soc/iommu";
 		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
 	};
 
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
 	phys-mem {
 		pma0: pma0 {
 			compatible = "phys-mem-area";
@@ -44,26 +58,24 @@
 		};
 	};
 
-	partitions {
-		part1 {
-			compatible = "partition";
-			cpus = <0 2>;
-			guest-image = <0 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+	part1 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma0>;
-				guest-addr = <0 0>;
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
+		};
 
-			uart2: uart2 {
-				device = "serial2";
-			};
+		uart2: uart2 {
+			device = "serial2";
+		};
 
-			aliases {
-				stdout = <&uart2>;
-			};
+		aliases {
+			stdout = <&uart2>;
 		};
 	};
 };
