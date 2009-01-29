@@ -451,22 +451,53 @@ int open_stdout_bytechan(dt_node_t *node)
 	if (!dt_node_is_compatible(node, "byte-channel"))
 		return ERR_UNHANDLED;
 
-	stdout_node = create_dev_tree();
-	if (!stdout_node)
-		return ERR_NOMEM;
-	
-	stdout_node->name = "stdout";
-	
-	bc = other_attach_byte_chan(stdout_node, node);
-	if (!bc)
-		return ERR_INVALID;
+	// We support only two kinds of byte channels: defined either in the
+	// guest partition, or defined in the hypervisor config node directly.
 
-	bc_console = byte_chan_claim(bc);
-	if (!bc_console)
-		return ERR_BUSY;
+	if (!dt_node_is_compatible(node->parent, "partition")) {
+		// This byte channel is defined in the hypervisor configuration,
+		// not in a partition.
+
+		// An "implicit" connection to a byte channel is a pointer to
+		// the byte channel object, and an "explicit" connection is a
+		// pointer from the byte channel object (e.g. the 'endpoint'
+		// field).  Byte channel objects only support one explicit
+		// connection.  For the hypervisor byte channel object, that
+		// connection is used for the serial device. We use bc_console
+		// to act as an implicit connection because the hypervisor does
+		// not manage a list of handles.
+		init_byte_channel(node);
+
+		// init_byte_channel() already claims the handle for us, so we
+		// don't need to call byte_chan_claim().  We just use the handle
+		// we already have.
+
+		// We use bc_console as our implicit connection to the byte
+		// channel object.
+		bc_console = node->bch;
+	} else {
+		// This byte channel is defined in a partition.
+
+		stdout_node = create_dev_tree();
+		if (!stdout_node)
+			return ERR_NOMEM;
+	
+		stdout_node->name = "stdout";
+	
+		bc = other_attach_byte_chan(node, stdout_node);
+		if (!bc)
+			return ERR_INVALID;
+
+		bc_console = byte_chan_claim(bc);
+		if (!bc_console)
+			return ERR_BUSY;
+	}
 
 	qconsole_init(bc_console->tx);
 	stdout = bc_console->tx;
+
+	// stdin is used only if there's a shell, so that variable will
+	// be initialized in shell_init().
 
 	return 0;
 }
