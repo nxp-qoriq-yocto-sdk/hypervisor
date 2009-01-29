@@ -57,7 +57,7 @@ static void init_cpc_dev(int cpc_index, void *vaddr)
 	cpcs[cpc_index].cpc_reg_map = ~0xffffUL;
 
 	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpir, CPCPIR0_RESET_MASK);
-	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpar, CPCPIR0_RESET_MASK);
+	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpar, CPCPAR0_RESET_MASK);
 	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpwr, CPCPIR0_RESET_MASK);
 
 	reserve_partition_reg(cpc_index, 0);

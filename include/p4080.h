@@ -56,7 +56,11 @@ typedef struct {
 #define CPCPWR0 0x20C
 
 /* this mask is specified as the reset value 0.902 block guide */
-#define CPCPAR_MASK 0xFFFFFBFF
+#define CPCPAR0_RESET_MASK 0xFFFFFBFF
+/* DRDPEALLOC, DRDFEALLOC, IRDALLOC, DRDALLOC, WCOALLOC,
+ * READUALLOC, WRITEUALLOC, ADSTASHEN, CNSTASHEN
+ */
+#define CPCPAR_MASK 0x3FB
 
 typedef struct cpc_part_reg {
 	uint32_t cpcpir, reserved, cpcpar, cpcpwr;
