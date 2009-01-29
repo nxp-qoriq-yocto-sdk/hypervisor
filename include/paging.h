@@ -73,6 +73,9 @@
 #define PTE_GS      0x00000080 /* Guest access -- HV only */
 #define PTE_VALID   0x00001000
 #define PTE_GLOBAL  0x00002000 /* If set, PTE has PID zero */
+#define PTE_DMA     0x00004000 /* If set, but PTE_VALID isn't, then
+                                * is a dma-only mapping.
+                                */
 #define PTE_E       0x00010000 /* Little Endian */
 #define PTE_G       0x00020000 /* Guarded */
 #define PTE_M       0x00040000 /* Memory Coherence Required */
@@ -95,7 +98,7 @@
 
 #define PTE_SIZE_SHIFT 28
 
-#define PTE_ALL (PTE_MAS3_MASK | PTE_VALID | PTE_GS)
+#define PTE_ALL (PTE_MAS3_MASK | PTE_VALID | PTE_GS | PTE_DMA)
 
 typedef struct pte {
 	unsigned long page;
@@ -114,7 +117,7 @@ typedef struct pte {
  */
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
-                          unsigned long *attr, int levels);
+                          unsigned long *attr, int levels, int dma);
 
 /* attr->PTE_SIZE should be 0; vptbl_map will use the largest
   page sizes it can. */

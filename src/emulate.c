@@ -566,7 +566,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		unsigned long mas8 = guest->lpid | MAS8_GTS;
 		unsigned long attr, gmas3;
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
-		                                &attr, PTE_PHYS_LEVELS);
+		                                &attr, PTE_PHYS_LEVELS, 0);
 
 		/* If there's no valid mapping, request a virtualization
 		 * fault, so a machine check can be reflected upon use.

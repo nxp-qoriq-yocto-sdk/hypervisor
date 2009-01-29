@@ -97,8 +97,8 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t siz
 		 * mapping upto max. TLB page size on each call.
 		 */
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr,
-						 PTE_PHYS_LEVELS);
-		if (!(attr & PTE_VALID)) {
+		                                PTE_PHYS_LEVELS, 1);
+		if (!(attr & PTE_DMA)) {
 			if (start_rpn == ULONG_MAX) {
 				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 						"%s: invalid rpn\n", __func__);

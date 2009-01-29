@@ -46,6 +46,9 @@ static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
 		         "pte %lx attr %lx epn %lx level %d\n", ptep->page, ptep->attr,
 		         epn, *levels);
 
+		if (ptep->attr & PTE_DMA)
+			return ptep;
+
 		if (!(ptep->attr & PTE_VALID)) {
 			if (!insert)
 				return NULL;
@@ -70,9 +73,10 @@ static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
 }
 
 unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
-                          unsigned long *attr, int level)
+                          unsigned long *attr, int level, int dma)
 {
 	pte_t *ptep = vptbl_get_ptep(tbl, &level, epn, 0);
+	int valid = dma ? PTE_DMA : PTE_VALID;
 
 	if (unlikely(!ptep)) {
 		*attr = 0;
@@ -100,7 +104,7 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 
 	*attr = pte.attr;
 
-	if (unlikely(!(pte.attr & PTE_VALID)))
+	if (unlikely(!(pte.attr & valid)))
 		return (1UL << (PGDIR_SHIFT * level)) - 1;
 	
 	size_pages = tsize_to_pages(size);
@@ -151,7 +155,9 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 				         "a small page at %llx\n",
 				         ((uint64_t)epn) << PAGE_SHIFT);
 
-				/* FIXME: verify that the rpn is the same */
+				/* FIXME: verify that the rpn is the same, and that
+				 * the permissions of the small page are a subset.
+				 */
 				goto next;
 			}
 
@@ -164,7 +170,10 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 				         "a large page at %llx\n",
 				         ((uint64_t)epn) << PAGE_SHIFT);
 
-				/* FIXME: verify that the all rpns are the same */
+				/* FIXME: verify that the all rpns are the same,
+				 * and that permissions of the large page are a
+				 * superset.
+				 */
 				free((void *)ptep->page);
 			} 
 

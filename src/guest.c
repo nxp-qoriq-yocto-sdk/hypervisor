@@ -109,20 +109,22 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 }
 
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
-                                 phys_addr_t addr, phys_addr_t size)
+                                 phys_addr_t addr, phys_addr_t size,
+                                 int dmaonly)
 {
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
 	unsigned long pages = (gaddr + size -
 	                       (grpn << PAGE_SHIFT) +
 	                       (PAGE_SIZE - 1)) >> PAGE_SHIFT;
+	int flags = dmaonly ? PTE_MAS3_MASK | PTE_GS | PTE_DMA : PTE_ALL;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 	         "mapping guest %lx to real %lx, %lx pages\n",
 	         grpn, rpn, pages);
 
-	vptbl_map(guest->gphys, grpn, rpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
-	vptbl_map(guest->gphys_rev, rpn, grpn, pages, PTE_ALL, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys, grpn, rpn, pages, flags, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys_rev, rpn, grpn, pages, flags, PTE_PHYS_LEVELS);
 }
 
 static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
@@ -149,12 +151,16 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	phys_addr_t gaddr;
 	uint32_t reg[4];
 	char buf[32];
+	int dmaonly = 0;
 
 	pma_node = get_pma_node(node);
 	if (!pma_node || !pma_node->pma)
 		return 0;
 
 	pma = pma_node->pma;
+
+	if (dt_get_prop(node, "dma-only", 0))
+		dmaonly = 1;
 
 	prop = dt_get_prop(node, "guest-addr", 0);
 	if (prop) {
@@ -177,25 +183,27 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		gaddr = pma->start;
 	}
 
-	map_guest_addr_range(guest, gaddr, pma->start, pma->size);
+	map_guest_addr_range(guest, gaddr, pma->start, pma->size, dmaonly);
 
-	add_cpus_to_csd(guest, pma_node);
+	if (!dmaonly) {
+		add_cpus_to_csd(guest, pma_node);
 
-	snprintf(buf, sizeof(buf), "memory@%llx", gaddr);
+		snprintf(buf, sizeof(buf), "memory@%llx", gaddr);
 
-	gnode = dt_get_subnode(guest->devtree, buf, 1);
-	if (!gnode)
-		goto nomem;
+		gnode = dt_get_subnode(guest->devtree, buf, 1);
+		if (!gnode)
+			goto nomem;
 
-	if (dt_set_prop_string(gnode, "device_type", "memory"))
-		goto nomem;
+		if (dt_set_prop_string(gnode, "device_type", "memory"))
+			goto nomem;
 
-	write_reg(reg, gaddr, pma->size);
-	if (dt_set_prop(gnode, "reg", reg, (rootnaddr + rootnsize) * 4))
-		goto nomem;
+		write_reg(reg, gaddr, pma->size);
+		if (dt_set_prop(gnode, "reg", reg, (rootnaddr + rootnsize) * 4))
+			goto nomem;
 
-	if (dt_process_node_update(gnode, node))
-		goto nomem;
+		if (dt_process_node_update(gnode, node))
+			goto nomem;
+	}
 	
 	return 0;
 
@@ -281,7 +289,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 		assert(!addrbuf[0] && !addrbuf[1]);
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
-			map_guest_addr_range(owner->guest, addr, addr, size);
+		map_guest_addr_range(owner->guest, addr, addr, size, 0);
 
 		memcpy(newranges, ranges, caddr * 4);
 		newranges += caddr;
@@ -457,7 +465,7 @@ static int map_guest_reg(dev_owner_t *owner)
 
 	for (int i = 0; i < num; i++) {
 		map_guest_addr_range(owner->guest, regs[i].start,
-		                     regs[i].start, regs[i].size);
+		                     regs[i].start, regs[i].size, 0);
 
 		regp = write_reg(regp, regs[i].start, regs[i].size);
 	}

@@ -243,7 +243,7 @@ void gtlb0_to_mas(int index, int way)
 		unsigned long grpn = (set->entry[way].mas7 << (32 - PAGE_SHIFT)) |
 		                     (set->entry[way].mas3 >> MAS3_RPN_SHIFT);
 		unsigned long rpn = vptbl_xlate(get_gcpu()->guest->gphys_rev,
-		                                grpn, &attr, PTE_PHYS_LEVELS);
+		                                grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		assert(attr & PTE_VALID);
 
@@ -419,7 +419,7 @@ int guest_tlb1_miss(register_t vaddr, int space, int pid)
 
 		grpn = (entry->mas3 >> PAGE_SHIFT) | (entry->mas7 << (32 - PAGE_SHIFT));
 		grpn += epn - entryepn;
-		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
+		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		if (unlikely(!(attr & PTE_VALID)))
 			return TLB_MISS_MCHECK;
@@ -538,7 +538,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		int size = max_page_size(epn, end - epn);
 
 		unsigned long attr, rpn; 
-		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS);
+		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		/* If there's no valid mapping, try again at the next page. Note
 		 * that this can be slow.  
@@ -763,7 +763,7 @@ void fixup_tlb_sx_re(void)
 	if (likely(!(mfspr(SPR_MAS8) & MAS8_VF))) {
 		unsigned long attr;
 		unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
-						grpn, &attr, PTE_PHYS_LEVELS);
+		                                grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		assert(attr & PTE_VALID);
 
@@ -1094,7 +1094,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 	phys_addr_t physaddr;
 	int tsize;
 
-	rpn = vptbl_xlate(tbl, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS);
+	rpn = vptbl_xlate(tbl, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS, 0);
 
 	if (!(attr & PTE_VALID) || (attr & PTE_VF))
 		return NULL;
