@@ -279,7 +279,7 @@ struct register_description e500mc_power_core_sprs[] =
 
 struct register_description e500mc_power_fpu_fpscr[] =
 {
-	{ .name="fpscr", .bitsize="64", .group="float", .regnum="70",
+	{ .name="fpscr", .bitsize="32", .group="float", .regnum="70",
 	  .cat=reg_cat_fpscr, /* FPSCR is unique - so no .inum */ },
 };
 

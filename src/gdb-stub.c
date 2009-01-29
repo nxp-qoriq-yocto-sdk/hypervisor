@@ -714,7 +714,7 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg
 	case reg_cat_fpscr:
 		c = read_fpscr(&fp_reg_value);
 		stringize_reg_value(value, fp_reg_value, byte_length);
-		break;
+		return c;
 	case reg_cat_unk:
 	default: DEBUG("Illegal register category.");
 		c = 1;
