@@ -209,6 +209,32 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 	return ULONG_MAX;
 }
 
+static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
+{
+	dt_prop_t *prop;
+	dt_node_t *node;
+
+	prop = dt_get_prop(gnode, "cpu-handle", 0);
+	if (!prop || prop->len != 4)
+		return ULONG_MAX;
+
+	node = dt_lookup_phandle(guest->devtree, *(const uint32_t *)prop->data);
+	if (!node) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: bad cpu phandle reference in %s \n",
+		          __func__, gnode->name);
+		return ULONG_MAX;
+	}
+	prop = dt_get_prop(node, "reg", 0);
+	if (!prop || prop->len != 4) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: bad reg in cpu node %s \n",
+		          __func__, node->name);
+		return ULONG_MAX;
+	}
+	return *(const uint32_t *)prop->data;
+}
+
 #define MAX_SUBWIN_CNT 16
 
 int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
@@ -424,6 +450,13 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		stash_dest = get_stash_dest(*(const uint32_t *)prop->data, hwnode);
 		if (stash_dest != -1)
 			ppaace->impl_attr.cid = stash_dest;
+	}
+
+	/* configure snoop-id if needed */
+	prop = dt_get_prop(cfgnode, "snoop-cpu-only", 0);
+	if (prop) {
+		ppaace->domain_attr.to_host.snpid =
+				get_snoop_id(hwnode, guest) + 1;
 	}
 
 	prop = dt_get_prop(dma_window, "subwindow-count", 0);

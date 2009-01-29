@@ -706,8 +706,8 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		goto fail;
 	}
 
-	configure_dma(node, owner);
 	configure_qman_portal(guest, owner->cfgnode, hwnode, node);
+	configure_dma(node, owner);
 
 	return 0;
 

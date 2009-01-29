@@ -59,6 +59,8 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
+	uint32_t *sidmr; /* Snoop ID Port mapping register */
+	int num_snoopids;
 
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
@@ -77,6 +79,31 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	}
 
 	csdids = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x600);
+
+	/*
+	 * Snoop domains are meant specifically for (PAMU based) stashing
+	 * optimization to restrict snooping traffic to only the targeted
+	 * core/cache during stashing transactions. The logic here is to
+	 * implement snoop domains representing a single physical core.
+	 */
+	prop = dt_get_prop(node, "fsl,ccf-num-snoopids", 0);
+	if (prop && prop->len == 4) {
+		num_snoopids = *(const uint32_t *)prop->data;
+	} else {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+		        "%s: bad/missing property fsl,ccf-num-snoopids in %s\n",
+		         __func__, node->name);
+		return ERR_BADTREE;
+	}
+	
+	sidmr = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x200);
+
+	/*
+	 * NOTE: Looks like SIDMR00 is used for snoop-id 0, i.e, to enable
+	 * snooping on all cores, hence program SIDMR01 onwards
+	 */
+	for (int i = 1; i < num_snoopids; i++)
+		out32(&sidmr[i], (0x80000000 >> (i - 1)));
 
 	dev->driver = &ccm;
 
