@@ -78,7 +78,7 @@ void init_guest(void);
 dt_node_t *hw_devtree, *config_tree;
 uint32_t hw_devtree_lock;
 void *temp_mapping[2];
-extern char _end;
+extern char _end, _start;
 uint64_t text_phys, bigmap_phys;
 thread_t idle_thread[MAX_CORES];
 
@@ -379,7 +379,7 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 
 	fdt = map_fdt(devtree_ptr);
 
-	exclude_phys(0, (uintptr_t)&_end - 1);
+	exclude_phys(0, &_end - &_start - 1);
 	exclude_phys(devtree_ptr, devtree_ptr + fdt_totalsize(fdt) - 1);
 	exclude_memrsv(fdt);
 
