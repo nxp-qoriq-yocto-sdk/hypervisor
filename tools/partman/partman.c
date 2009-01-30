@@ -47,6 +47,7 @@
 #include <sys/mman.h>
 #include <arpa/inet.h>
 #include <byteswap.h>
+#include <asm/ioctl.h>
 
 /*
  * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
@@ -204,7 +205,7 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 		return ret;
 	}
 
-	if (ioctl(f, cmd, p) == -1) {
+	if (ioctl(f, _IOWR(0, cmd, union fsl_hv_ioctl_param), p) == -1) {
 		ret = errno;
 		if (verbose)
 			perror(__func__);
