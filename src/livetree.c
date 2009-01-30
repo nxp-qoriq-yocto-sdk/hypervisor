@@ -718,11 +718,6 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
 }
 
-typedef struct phandle_ctx {
-	dt_prop_t *prop;
-	dt_node_t *target;
-} phandle_ctx_t;
-
 /**
  * dt_merge_phandle - process a node-update-handle configuration property
  * @param[in] config pointer to the node-update-handle node
@@ -773,12 +768,31 @@ typedef struct phandle_ctx {
  */
 static int do_merge_phandle(dt_node_t *config, void *arg)
 {
-	dt_node_t *target = arg;
+	merge_ctx_t *ctx = arg;
 	guest_t *guest = get_gcpu()->guest;
 	uint32_t phandle;
 	dev_owner_t *owner;
 	dt_node_t *node;
 	int i, ret;
+
+	/* This function is called recursively, and the top-level node is the
+	 * "node-update-phandle" configuration node.  So we use notfirst to
+	 * skip the top level, so that we don't create a node called*
+	 * "node-update-phandle" in the guest.  We could have also just done
+	 * a strcmp on config->name.
+	 */
+	if (!ctx->notfirst) {
+		ctx->notfirst = 1;
+	} else {
+		/* Make sure the guest has a node with the same name as the
+		 * configuration node, and traverse into that node as well.
+		 * ctx->dest is the node in the guest device tree that we are
+		 * updating.
+		 */
+		ctx->dest = dt_get_subnode(ctx->dest, config->name, 1);
+		if (!ctx->dest)
+			return ERR_NOMEM;
+	}
 
 	list_for_each(&config->props, l) {
 		/* Get the phandle from the config node */
@@ -858,7 +872,7 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 
 		if (!ret)
 			// Finally, put the phandle property into the target node
-			ret = dt_set_prop(target, prop->name, phandles,
+			ret = dt_set_prop(ctx->dest, prop->name, phandles,
 					  count * sizeof(uint32_t));
 
 		free(phandles);
@@ -900,7 +914,12 @@ int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 	mixin = dt_get_subnode(config, "node-update-phandle", 0);
 	if (mixin) {
 		/* Merge the phandles into the target  */
-		ret = dt_for_each_node(mixin, target, do_merge_phandle, NULL);
+		merge_ctx_t ctx = {
+			.dest = target,
+			.notfirst = 0,
+		};
+
+		ret = dt_for_each_node(mixin, &ctx, do_merge_phandle, NULL);
 		if (ret)
 			return ret;
 	}
