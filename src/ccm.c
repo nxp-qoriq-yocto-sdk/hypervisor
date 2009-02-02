@@ -95,6 +95,13 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 		         __func__, node->name);
 		return ERR_BADTREE;
 	}
+
+	if (num_snoopids > NUM_SNOOP_IDS) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+		        "%s: fsl,ccf-num-snoopids exceeds platform limit %s\n",
+		         __func__, node->name);
+		return ERR_BADTREE;
+	}
 	
 	sidmr = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x200);
 

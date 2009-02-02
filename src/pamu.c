@@ -218,7 +218,7 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 	if (!prop || prop->len != 4)
 		return ULONG_MAX;
 
-	node = dt_lookup_phandle(guest->devtree, *(const uint32_t *)prop->data);
+	node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
 	if (!node) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: bad cpu phandle reference in %s \n",
@@ -347,7 +347,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 {
 	struct ppaace_t *ppaace;
 	unsigned long rpn;
-	dt_prop_t *prop;
+	dt_prop_t *prop, *stash_prop;
 	dt_prop_t *gaddr;
 	dt_prop_t *size;
 	dt_node_t *dma_window;
@@ -453,8 +453,21 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	}
 
 	/* configure snoop-id if needed */
+	stash_prop = prop;
 	prop = dt_get_prop(cfgnode, "snoop-cpu-only", 0);
 	if (prop) {
+		if ((*(const uint32_t *)stash_prop->data) >= L3) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
+				"%s: warning: %s snoop-cpu-only property must have stash-dest as L1 or L2 cache\n",
+				 __func__, dma_window->name);
+		}
+
+		if (guest->cpucnt > 1) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
+				"%s: warning: %s snoop-cpu-only property for device whose owner partition has more than one core assigned to it\n",
+				 __func__, dma_window->name);
+		}
+
 		ppaace->domain_attr.to_host.snpid =
 				get_snoop_id(hwnode, guest) + 1;
 	}

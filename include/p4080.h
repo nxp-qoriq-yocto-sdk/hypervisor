@@ -73,5 +73,6 @@ typedef struct cpc_dev {
 	struct cpc_part_reg *cpc_part_base;
 } cpc_dev_t;
 
+#define NUM_SNOOP_IDS 32
 
 #endif
