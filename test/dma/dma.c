@@ -81,10 +81,8 @@ void start(unsigned long devtree_ptr)
 {
 	int node = -1;
 	int ret;
-#if 0  // FIXME after handle support implemented
 	int len;
 	unsigned long *liodnp;
-#endif
 
 	init(devtree_ptr);
 
@@ -105,10 +103,9 @@ void start(unsigned long devtree_ptr)
 	}
 	node = ret;
 
-#if 0  // FIXME after handle support implemented
-	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-liodn-handle", &len);
+	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-dma-handle", &len);
 	if (!liodnp) {
-		printf("fsl,liodn property not found\n");
+		printf("fsl,hv-dma-handle property not found\n");
 		return;
 	}
 
@@ -116,7 +113,6 @@ void start(unsigned long devtree_ptr)
 
 	liodnp = fdt_getprop_w(fdt, node, "fsl,liodn", &len);
 	printf("actual liodn = %ld\n", *liodnp);
-#endif
 
 	/* test access violation failure and pass cases */
 	if (!test_dma_memcpy(0, 0x0e000000, 0))

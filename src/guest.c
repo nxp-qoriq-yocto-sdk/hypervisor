@@ -392,8 +392,10 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	dt_node_t *cfgnode;
 	dt_prop_t *liodn_prop = NULL;
 	const uint32_t *liodn;
-	int liodn_cnt;
+	int liodn_cnt, i;
 	int ret;
+	uint32_t *dma_handles = NULL;
+	pamu_handle_t *pamu_handle;
 
 	cfgnode = find_cfgnode(hwnode, owner);
 	if (!cfgnode)
@@ -415,7 +417,11 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	/* get a count of liodns */
 	liodn_cnt = liodn_prop->len / 4;
 
-	for (int i = 0; i < liodn_cnt; i++) {
+	dma_handles = malloc(liodn_cnt * sizeof(uint32_t));
+	if (!dma_handles) 
+		goto nomem;
+
+	for (i = 0; i < liodn_cnt; i++) {
 		search_liodn_ctx_t ctx;
 
 		/* search for an liodn-index that matches this liodn */
@@ -423,17 +429,42 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 		ctx.cfgnode = cfgnode;  /* default */
 		dt_for_each_node(cfgnode, &ctx, search_liodn_index, NULL);
 
-		if (!ctx.cfgnode)  /* error */
-			continue;
+		if (!ctx.cfgnode) { /* error */
+			free(dma_handles);
+			return 0;
+		}
 
 		ret = pamu_config_liodn(owner->guest, liodn[i], hwnode, ctx.cfgnode);
-		if (ret < 0)
+		if (ret < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "%s: config of liodn failed (rc=%d)\n",
 			         __func__, ret);
+			free(dma_handles);
+			return 0;
+		}
+
+		pamu_handle = alloc_type(pamu_handle_t);
+		if (!pamu_handle) 
+			goto nomem;
+
+		pamu_handle->assigned_liodn = liodn[i];
+		pamu_handle->user.pamu = pamu_handle;
+		dma_handles[i] = alloc_guest_handle(owner->guest, 
+							&pamu_handle->user);
 	}
 
+	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles, 
+				i * sizeof(uint32_t)) < 0) 
+		goto nomem;
+	
+	free(dma_handles);
 	return 0;
+
+nomem: 
+	free(dma_handles);
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+        	 "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
 }
 
 static int map_guest_reg(dev_owner_t *owner)
