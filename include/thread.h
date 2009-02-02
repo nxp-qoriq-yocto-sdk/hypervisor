@@ -37,6 +37,15 @@
 
 struct sched;
 
+/* To block waiting for a condition, a task enters the sched_prep_block
+ * state (via prepare_to_block()), then tests the condition.  If the
+ * condition is still false, it calls block(), which will remove
+ * the thread from the runqueue and set the state to sched_blocked --
+ * unless unblock() has been called on the thread in the meantime.
+ *
+ * Any code that alters the condition such that the the task should
+ * no longer block must call unblock() *after* setting the condition.
+ */
 enum {
 	sched_running,
 	sched_prep_block,
@@ -45,14 +54,14 @@ enum {
 
 typedef struct thread {	
 	libos_thread_t libos_thread; 
-	list_t rq_node;
-	struct sched *sched;
+	list_t rq_node; /* Run queue node */
+	struct sched *sched; /* Scheduler of CPU to which this thread is bound */
 	int prio, state;
 } thread_t;
 
 typedef struct sched {
-	cpu_t *sched_cpu;
-	list_t rq[NUM_PRIOS];
+	cpu_t *sched_cpu; /* CPU which this scheduler controls */
+	list_t rq[NUM_PRIOS]; /* FIFO run queue per priority */
 	thread_t idle;
 	uint32_t lock;
 } sched_t;

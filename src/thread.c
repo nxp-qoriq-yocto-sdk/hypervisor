@@ -90,7 +90,11 @@ void block(void)
 void unblock(thread_t *thread)
 {
 	sched_t *sched = thread->sched;
-	register_t saved = spin_lock_intsave(&sched->lock);
+	register_t saved;
+
+	smp_sync();
+
+	saved = spin_lock_intsave(&sched->lock);
 
 	if (thread->state == sched_blocked) {
 		list_add(&sched->rq[thread->prio], &thread->rq_node);
@@ -98,7 +102,6 @@ void unblock(thread_t *thread)
 	}
 
 	thread->state = sched_running;
-
 	spin_unlock_intsave(&sched->lock, saved);
 }
 
