@@ -107,8 +107,11 @@ static cpc_part_reg_t *allocate_ways(int cpc_index, dt_prop_t *prop, uint32_t cs
 	int numways, pir_num, i;
 
 	pir_num = get_free_cpcpir(cpc_index);
-	if (pir_num == -1)
+	if (pir_num == -1) {
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+				"Way allocation failed, all CPC partitioning registers taken\n");
 		return NULL;
+	}
 
 	numways = prop->len / sizeof(uint32_t);
 	ways = (const uint32_t *)prop->data;
