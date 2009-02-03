@@ -1377,15 +1377,23 @@ return_to_guest:
 			length = scan_num(&cur_pos, '\0');
 			TRACE("Read memory at addr: 0x%p, length: %d", addr, length);
 			guestmem_set_data(trap_frame);
+			err_flag = 0;
 			for (i = 0; i < length; i++) {
-				if (guestmem_in8((uint8_t *) addr + i, ((uint8_t *) (&value[0]))) != 0)
-					value[0] = 0;
+				if (guestmem_in8((uint8_t *) addr + i, ((uint8_t *) (&value[0]))) != 0) {
+					err_flag = 1;
+					break;
+				}
 				TRACE("value[0]: %c", value[0]);
 				pkt_write_hex_byte_update_cur(stub->rsp, value[0]);
 				TRACE("byte address: 0x%p, upper nibble value: %c",
 				       (uint8_t *)addr + i, hex(upper_nibble(value[0])));
 				TRACE("byte address: 0x%p, lower nibble value: %c",
 				       (uint8_t *)addr + i, hex(lower_nibble(value[0])));
+			}
+			if (err_flag == 1) {
+				pkt_reset(stub->rsp);
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 			}
 			break;
 
