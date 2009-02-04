@@ -8,7 +8,7 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&uart0>;
+		stdout = <&hvbc>;
 		
 		memory {
 			compatible = "hv-memory";
@@ -45,6 +45,11 @@
 
 		corenet-cf {
 			device = "/soc/corenet-cf";
+		};
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uart0>;
 		};
 	};
 
