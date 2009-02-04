@@ -46,6 +46,7 @@ static int find_stub_by_vcpu(dt_node_t *node, void *arg)
 		return 1;
 	}
 
+	*ret = NULL;
 	return 0;
 }
 

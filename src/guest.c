@@ -2301,7 +2301,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (guest->stub_ops && guest->stub_ops->compatible)
 		get_gcpu()->dbgstub_cfg = find_stub_config_node(guest->stub_ops->compatible);
 
-	if (guest->stub_ops && guest->stub_ops->vcpu_init) {
+	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_init) {
 		guest->stub_ops->vcpu_init();
 	}
 #endif
@@ -2397,7 +2397,8 @@ __attribute__((noreturn)) void init_guest(void)
 				gcpu->dbgstub_cfg =
 					find_stub_config_node(guest->stub_ops->compatible);
 
-			if (guest->stub_ops && guest->stub_ops->vcpu_init) {
+			if (get_gcpu()->dbgstub_cfg && guest->stub_ops
+			    && guest->stub_ops->vcpu_init) {
 				guest->stub_ops->vcpu_init();
 			}
 #endif
