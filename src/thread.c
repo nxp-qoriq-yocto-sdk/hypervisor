@@ -115,8 +115,8 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
                         void (*func)(trapframe_t *regs, void *arg),
                         void *arg, int prio)
 {
-	cpu->kstack = &kstack[KSTACK_SIZE - FRAMELEN];
-	trapframe_t *regs = (trapframe_t *)cpu->kstack;
+	thread->libos_thread.kstack = &kstack[KSTACK_SIZE - FRAMELEN];
+	trapframe_t *regs = (trapframe_t *)thread->libos_thread.kstack;
 
 	thread->libos_thread.pc = ret_from_exception;
 	thread->libos_thread.stack = regs;
@@ -159,6 +159,7 @@ void sched_core_init(cpu_t *sched_cpu)
 
 	sched->sched_cpu = sched_cpu;
 	sched->idle.sched = sched;
+	sched->idle.libos_thread.kstack = sched_cpu->kstack;
 
 	for (int i = 0; i < NUM_PRIOS; i++) 
 		list_init(&sched->rq[i]);
