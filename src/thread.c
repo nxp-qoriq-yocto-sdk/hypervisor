@@ -38,6 +38,8 @@ static void do_schedule(sched_t *sched)
 {
 	libos_thread_t *thread = &sched->idle.libos_thread;
 
+	assert(cpu->traplevel == 0);
+
 	for (int i = 0; i < NUM_PRIOS; i++)
 		if (!list_empty(&sched->rq[i]))
 			thread = &to_container(sched->rq[i].next,
