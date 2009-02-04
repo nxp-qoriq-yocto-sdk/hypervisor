@@ -919,7 +919,7 @@ int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 			.notfirst = 0,
 		};
 
-		ret = dt_for_each_node(mixin, &ctx, do_merge_phandle, NULL);
+		ret = dt_for_each_node(mixin, &ctx, do_merge_phandle, merge_post);
 		if (ret)
 			return ret;
 	}
