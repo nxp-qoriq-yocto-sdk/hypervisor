@@ -1657,7 +1657,7 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 	if (!guest->no_auto_load)
 		ret = load_images(guest);
 
-	if (ret <= 0) {
+	if (ret <= 0 || dt_get_prop(guest->partition, "no-auto-start", 0)) {
 		guest->state = guest_stopped;
 
 		/* No hypervisor-loadable image; wait for a manager to start us. */
