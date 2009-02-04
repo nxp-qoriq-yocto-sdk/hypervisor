@@ -560,8 +560,6 @@ static int map_guest_irqs(dev_owner_t *owner)
 	if (!dt_get_prop(owner->gnode, "interrupts", 0))
 		return 0;
 
-	dt_lookup_irqs(hwnode);
-
 	if (hwnode->dev.num_irqs <= 0)
 		return 0;
 
@@ -570,23 +568,24 @@ static int map_guest_irqs(dev_owner_t *owner)
 		return ERR_NOMEM;
 
 	for (int i = 0; i < hwnode->dev.num_irqs; i++) {
-		int handle;
+		interrupt_t *irq = hwnode->dev.irqs[i];
+		int handle;  
+
+		if (!irq)
+			goto bad;
 		
 		/* FIXME: handle more than just mpic */
-		handle = vmpic_alloc_mpic_handle(owner->guest,
-		                                 hwnode->dev.irqs[i]);
+		handle = vmpic_alloc_mpic_handle(owner->guest, irq);
 		if (handle < 0) {
+bad:
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-			         "%s: couldn't grant interrupts for %s\n",
-			         __func__, hwnode->name);
+			         "%s: couldn't grant interrupt %d for %s\n",
+			         __func__, i, hwnode->name);
 
-			dt_prop_t *prop = dt_get_prop(owner->gnode,
-			                              "interrupts", 0);
-			if (prop)
-				dt_delete_prop(prop);
+ 			intspec[i * 2 + 0] = ~0UL;
+ 			intspec[i * 2 + 1] = ~0UL;
 
-			free(intspec);
-			return 0;
+			continue;
 		}
 
 		intspec[i * 2 + 0] = handle;
@@ -606,6 +605,100 @@ static int map_guest_irqs(dev_owner_t *owner)
 		return ERR_NOMEM;
 
 	return 0;
+}
+
+static int calc_new_imaplen(dt_node_t *node, uint32_t naddr, uint32_t nint)
+{
+	int newmaplen = 0;
+
+	for (int i = 0; i < node->intmap_len; i++) {
+		intmap_entry_t *ent = &node->intmap[i];
+		
+		if (!ent->valid)
+			continue;
+
+		newmaplen += nint + naddr + 1;
+		
+		if (ent->irq)
+			newmaplen += 2; /* VMPIC */
+		else
+			newmaplen += ent->parent_naddr + ent->parent_nint;
+	}
+
+	return newmaplen;
+}
+
+static int patch_guest_intmaps(dev_owner_t *owner)
+{
+	dt_node_t *hwnode = owner->hwnode;
+	int ret, newmaplen;
+	uint32_t *newmap, *mapptr;
+	uint32_t naddr, nint;
+	dt_prop_t *gimap;
+
+	gimap = dt_get_prop(owner->gnode, "interrupt-map", 0);
+	if (!gimap)
+		return 0;
+
+	if (!hwnode->intmap)
+		return 0;
+
+	dt_lookup_intmap(hwnode);
+
+	ret = dt_get_int_format(hwnode, &nint, &naddr);
+	if (ret < 0)
+		return ret;
+
+	newmaplen = calc_new_imaplen(hwnode, naddr, nint);
+	if (newmaplen == 0) {
+		dt_delete_prop(gimap);
+		return 0;
+	}
+
+	mapptr = newmap = malloc(newmaplen * 4);
+	if (!newmap)
+		return ERR_NOMEM;
+
+	for (int i = 0; i < hwnode->intmap_len; i++) {
+		intmap_entry_t *ent = &hwnode->intmap[i];
+		int handle = -1;
+		
+		if (!ent->valid)
+			continue;
+
+		if (ent->irq) {
+			/* FIXME: handle more than just mpic */
+			handle = vmpic_alloc_mpic_handle(owner->guest, ent->irq);
+			if (handle < 0) {
+				printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+				         "%s: couldn't grant imap entry %d for %s\n",
+				         __func__, i, hwnode->name);
+				continue;
+			}
+		}
+
+		memcpy(mapptr, ent->intspec, (naddr + nint) * 4);
+		mapptr += naddr + nint;
+
+		if (ent->irq) {
+			*mapptr++ = owner->guest->vmpic_phandle;
+			*mapptr++ = handle;
+			*mapptr++ = vmpic_config_to_intspec[ent->irq->config];
+		} else {
+			int parentlen = ent->parent_naddr + ent->parent_nint;
+
+			*mapptr++ = ent->parent;
+
+			memcpy(mapptr, ent->parent_intspec, parentlen * 4);
+			mapptr += parentlen;
+		}
+
+		assert(mapptr <= newmap + newmaplen);
+	}
+
+	ret = dt_set_prop(owner->gnode, "interrupt-map", newmap, newmaplen * 4);
+	free(newmap);
+	return ret;
 }
 
 typedef struct {
@@ -739,9 +832,17 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 		goto fail;
 	}
 
+	dt_lookup_irqs(hwnode);
+
 	ret = map_guest_irqs(owner);
 	if (ret < 0) {
 		failstr = "map_guest_irqs";
+		goto fail;
+	}
+
+	ret = patch_guest_intmaps(owner);
+	if (ret < 0) {
+		failstr = "patch_guest_intmaps";
 		goto fail;
 	}
 

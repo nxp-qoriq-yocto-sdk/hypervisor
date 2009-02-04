@@ -29,6 +29,7 @@
 #include <paging.h>
 #include <errors.h>
 #include <byte_chan.h>
+#include <limits.h>
 
 #include <libos/queue.h>
 #include <libos/chardev.h>
@@ -699,9 +700,9 @@ int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr)
 
 		*nint = *(const uint32_t *)prop->data;
 
-		if (*nint == 0) {
+		if (*nint == 0 || *nint > MAX_INT_CELLS) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "dt_get_int_format: %s has #interrupt-cells == 0\n",
+			         "dt_get_int_format: %s has invalid #interrupt-cells\n",
 			         domain->name);
 			return ERR_BADTREE;
 		}
@@ -716,6 +717,13 @@ int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr)
 			*naddr = 0;
 		} else {
 			*naddr = *(const uint32_t *)prop->data;
+		}
+
+		if (*naddr > MAX_ADDR_CELLS) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "dt_get_int_format: %s has invalid #address-cells\n",
+			         domain->name);
+			return ERR_BADTREE;
 		}
 	}
 
@@ -862,7 +870,7 @@ dt_node_t *get_cpu_node(dt_node_t *tree, int cpunum)
 uint32_t dt_owner_lock;
 DECLARE_LIST(hv_devs);
 
-static dev_owner_t *__dt_owned_by(dt_node_t *node, struct guest *guest)
+static dev_owner_t *dt_owned_by_nolock(dt_node_t *node, struct guest *guest)
 {
 	list_for_each(&node->owners, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, dev_node);
@@ -879,7 +887,7 @@ dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest)
 	dev_owner_t *ret;
 
 	spin_lock(&dt_owner_lock);
-	ret = __dt_owned_by(node, guest);
+	ret = dt_owned_by_nolock(node, guest);
 	spin_unlock(&dt_owner_lock);
 
 	return ret;
@@ -1090,7 +1098,7 @@ void dt_lookup_regs(dt_node_t *node)
 		node->dev.regs[i].size = size;
 
 		/* Create virtual mappings for HV-owned devices */
-		if (__dt_owned_by(node, NULL))
+		if (dt_owned_by_nolock(node, NULL))
 			node->dev.regs[i].virt = map(addr, size,
 			                             TLB_MAS2_IO, TLB_MAS3_KERN);
 	}
@@ -1106,6 +1114,10 @@ int dt_bind_driver(dt_node_t *node)
 	/* Don't bind twice. */
 	if (node->dev.driver)
 		return 0;
+
+	/* Don't bind if we don't own it. */
+	if (!dt_owned_by_nolock(node, NULL))
+		return ERR_INVALID;
 	
 	compat = dt_get_prop(node, "compatible", 0);
 	if (!compat)
@@ -1119,18 +1131,105 @@ int dt_bind_driver(dt_node_t *node)
  */
 #define MAX_IRQ_DEPTH 5
 
-static void __dt_lookup_irqs(dt_node_t *node, int depth);
+static void dt_lookup_irqs_nolock(dt_node_t *node, int depth);
+
+/* Read raw intmap data into C data structures.  addr/int cells
+ * are looked up, but otherwise domain phandles are not followed
+ * so as to avoid problems with circular maps (e.g. two maps that
+ * refer to each other, without any single interrupt following a
+ * circular path).  interrupt_t lookups happen later.
+ */
+static void read_intmap(dt_node_t *node)
+{
+	dt_prop_t *imap_prop, *mask_prop;
+	uint32_t naddr, nint, nimap;
+	uint32_t *imap, *imap_end;
+	int ret;
+
+	ret = dt_get_int_format(node, &nint, &naddr);
+	if (ret < 0)
+		return;
+
+	nimap = naddr + nint;
+
+	imap_prop = dt_get_prop(node, "interrupt-map", 0);
+	if (!imap_prop)
+		return;
+	
+	mask_prop = dt_get_prop(node, "interrupt-map-mask", 0);
+	if (mask_prop) {
+		if (mask_prop->len != (nint + naddr) * 4) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: %s: Invalid interrupt-map-mask length\n",
+			         __func__, node->name);
+			return;
+		}
+	
+		memcpy(node->intmap_mask, mask_prop->data, mask_prop->len);
+	} else {
+		memset(node->intmap_mask, 0xff, sizeof(node->intmap_mask));
+	}
+
+	/* Estimate an upper bound for number of interrupt-map entries. */
+	node->intmap_len = imap_prop->len / (nint + naddr + 1);
+
+	node->intmap = alloc_type_num(intmap_entry_t, node->intmap_len);
+	if (!node->intmap) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		return;
+	} 
+
+	imap = imap_prop->data;
+	imap_end = imap_prop->data + imap_prop->len;
+
+	for (int i = 0; i < node->intmap_len; i++) {
+		intmap_entry_t *ent = &node->intmap[i];
+		dt_node_t *domain;
+
+		if (imap + naddr + nint + 1 > imap_end)
+			break;
+
+		memcpy(ent->intspec, imap, (naddr + nint) * 4);
+		ent->parent = imap[naddr + nint];
+
+		domain = dt_lookup_phandle(hw_devtree, ent->parent);
+		if (!domain) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: %s: Invalid phandle %x in interrupt-map entry %d\n",
+			         __func__, node->name, ent->parent, i);
+			break;
+		}
+
+		imap += naddr + nint + 1;
+
+		ret = dt_get_int_format(domain, &ent->parent_nint,
+		                        &ent->parent_naddr);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: %s: Bad addr/int cells in %s, entry %d\n",
+			         __func__, node->name, domain->name, i);
+			break;
+		}
+
+		if (imap + ent->parent_naddr + ent->parent_nint > imap_end) {
+			memset(ent, 0, sizeof(ent));
+			break;
+		}
+
+		memcpy(ent->parent_intspec, imap,
+		       (ent->parent_naddr + ent->parent_nint) * 4);
+
+		imap += ent->parent_naddr + ent->parent_nint;
+		ent->valid = 1;
+	}
+}
 
 static interrupt_t *lookup_irq(dt_node_t *domain, const uint32_t *intspec,
-                               uint32_t nint, int depth)
+                               uint32_t nint)
 {
 	interrupt_t *irq;
 	int_ops_t *ctrl;
-
-	if (!domain->dev.driver) {
-		__dt_lookup_irqs(domain, depth + 1);
-		dt_bind_driver(domain);
-	}
 
 	ctrl = domain->dev.irqctrl;
 	if (!ctrl) {
@@ -1154,7 +1253,155 @@ static interrupt_t *lookup_irq(dt_node_t *domain, const uint32_t *intspec,
 	return irq;
 }
 
-static void __dt_lookup_irqs(dt_node_t *node, int depth)
+static intmap_entry_t *lookup_intmap(dt_node_t *domain,
+                                     const uint32_t *intspec,
+                                     uint32_t nispec)
+{
+	if (!domain->intmap)
+		return NULL;
+
+	for (int i = 0; i < domain->intmap_len; i++) {
+		intmap_entry_t *ent = &domain->intmap[i];
+		int j;
+
+		if (!ent->valid)
+			break;
+
+		for (j = 0; j < nispec; j++)
+			if ((ent->intspec[j] & domain->intmap_mask[j]) !=
+			    (intspec[j] & domain->intmap_mask[j]))
+				break;
+
+		if (j == nispec)
+			return ent;
+	}
+
+	return NULL;
+}
+
+static interrupt_t *lookup_intmap_entry(dt_node_t *node,
+                                        intmap_entry_t *ent, int depth)
+{
+	dt_node_t *domain;
+
+	if (depth > MAX_IRQ_DEPTH) {
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		         "%s: IRQ nesting too deep in %s\n",
+		         __func__, node->name);
+		ent->valid = 0;
+		return NULL;
+	}
+
+	if (ent->irq)
+		return ent->irq;
+
+	domain = dt_lookup_phandle(hw_devtree, ent->parent);
+	if (!domain) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: Invalid phandle %x in interrupt-map entry %d\n",
+		         __func__, node->name, ent->parent, ent - node->intmap);
+		ent->valid = 0;
+		return NULL;
+	}
+
+	if (!dt_owned_by_nolock(domain, NULL))
+		return NULL;
+
+	dt_lookup_irqs_nolock(domain, depth + 1);
+	dt_bind_driver(domain);
+
+	if (domain->dev.irqctrl) {
+		ent->irq = lookup_irq(domain,
+		                      ent->parent_intspec + ent->parent_naddr,
+		                      ent->parent_nint);
+		return ent->irq;
+	}
+
+	if (domain->intmap) {
+		intmap_entry_t *next = lookup_intmap(domain, ent->parent_intspec,
+		                                     ent->parent_naddr +
+		                                     ent->parent_nint);
+		if (!next) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: No interrupt-map match in %s for %s, intmap %d\n", 
+			         __func__, domain->name, node->name, ent - node->intmap);
+			ent->valid = 0;
+			return NULL;
+		}
+
+		ent->irq = lookup_intmap_entry(domain, next, depth + 1);
+		return ent->irq;
+	}
+
+	/* HV-owned, no supported IRQ controller, and no interrupt map */
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "%s: %s intmap %d points to invalid domain %s\n",
+	         __func__, node->name, ent - node->intmap, domain->name);
+
+	ent->valid = 0;
+	return NULL;
+}
+
+static void lookup_irqs_in_intmap(dt_node_t *node, dt_node_t *domain,
+                                  const uint32_t *ints,
+                                  uint32_t naddr, uint32_t nint, int depth)
+{
+	uint32_t intspec[MAX_ADDR_CELLS + MAX_INT_CELLS];
+	uint32_t *intspec_afteraddr = intspec;
+	dt_prop_t *reg;
+	uint32_t dtparent_naddr, dtparent_nsize;
+
+	if (!domain->intmap)
+		read_intmap(domain);
+
+	if (naddr > 0) {
+		int ret = get_addr_format(node->parent,
+		                          &dtparent_naddr,
+		                          &dtparent_nsize);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: get_addr_format failed %d for %s\n",
+			         __func__, ret, node->name);
+			return;
+		}
+
+		if (naddr != dtparent_naddr) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: address cell mismatch (%u/%u) for %s\n",
+			         __func__, naddr, dtparent_naddr, node->name);
+			return;
+		}
+
+		reg = dt_get_prop(node, "reg", 0);
+		if (!reg || reg->len < naddr * 4) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: missing/invaid reg in %s\n", 
+			         __func__, node->name);
+			return;
+		}
+		
+		memcpy(intspec, reg->data, naddr * 4);
+		intspec_afteraddr += naddr;
+	}
+
+	for (int i = 0; i < node->dev.num_irqs; i++) {
+		intmap_entry_t *ent;
+	
+		memcpy(intspec_afteraddr, &ints[i * nint], nint * 4);
+
+		ent = lookup_intmap(domain, intspec, naddr + nint);
+		if (!ent) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: No interrupt-map match in %s for %s, int %d\n", 
+			         __func__, domain->name, node->name, i);
+			continue;
+		}
+
+		node->dev.irqs[i] = lookup_intmap_entry(domain, ent, depth);
+	}
+}
+
+static void dt_lookup_irqs_nolock(dt_node_t *node, int depth)
 {
 	dt_prop_t *prop;
 	uint32_t nint, naddr;
@@ -1162,7 +1409,7 @@ static void __dt_lookup_irqs(dt_node_t *node, int depth)
 	dt_node_t *domain;
 	int ret;
 	
-	if (node->dev.irqs)
+	if (node->irqs_looked_up)
 		return; 
 
 	if (depth > MAX_IRQ_DEPTH) {
@@ -1171,6 +1418,11 @@ static void __dt_lookup_irqs(dt_node_t *node, int depth)
 		         __func__, node->name);
 		return;
 	}
+
+	node->irqs_looked_up = 1;
+
+	if (!node->intmap && dt_get_prop(node, "interrupt-map", 0))
+		read_intmap(node);
 	
 	prop = dt_get_prop(node, "interrupts", 0);
 	if (!prop)
@@ -1184,19 +1436,12 @@ static void __dt_lookup_irqs(dt_node_t *node, int depth)
 		return;
 	}
 
-	if (!dt_get_prop(domain, "interrupt-controller", 0)) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: interrupt parent %s of %s is a nexus, FIXME\n",
-		         __func__, domain->name, node->name);
-		return;
-	}
-
-	/* Only process hv-owned IRQ controllers */
-	if (!__dt_owned_by(domain, NULL))
-		return;
-
 	ret = dt_get_int_format(domain, &nint, &naddr);
 	if (ret < 0)
+		return;
+
+	/* Only process hv-owned IRQ controllers and nexuses */
+	if (!dt_owned_by_nolock(domain, NULL))
 		return;
 
 	ints = prop->data;
@@ -1214,14 +1459,35 @@ static void __dt_lookup_irqs(dt_node_t *node, int depth)
 		return;
 	}
 
-	for (int i = 0; i < node->dev.num_irqs; i++)
-		node->dev.irqs[i] = lookup_irq(domain, &ints[i * nint], nint, depth);
+	dt_lookup_irqs_nolock(domain, depth + 1);
+	dt_bind_driver(domain);
+
+	if (dt_get_prop(domain, "interrupt-controller", 0)) {
+		for (int i = 0; i < node->dev.num_irqs; i++)
+			node->dev.irqs[i] = lookup_irq(domain, &ints[i * nint], nint);
+	} else {
+		lookup_irqs_in_intmap(node, domain, ints, naddr, nint, depth);
+	}
 }
 
 void dt_lookup_irqs(dt_node_t *node)
 {
 	spin_lock(&dt_owner_lock);
-	__dt_lookup_irqs(node, 0);
+	dt_lookup_irqs_nolock(node, 0);
 	spin_unlock(&dt_owner_lock);
 }
 
+void dt_lookup_intmap(dt_node_t *node)
+{
+	spin_lock(&dt_owner_lock);
+
+	if (!node->intmap)
+		read_intmap(node);
+
+	if (node->intmap)
+		for (int i = 0; i < node->intmap_len; i++)
+			if (node->intmap[i].valid)
+				lookup_intmap_entry(node, &node->intmap[i], 0);
+
+	spin_unlock(&dt_owner_lock);
+}
