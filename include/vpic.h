@@ -29,7 +29,8 @@
 #include <libos/trapframe.h>
 #include <stdint.h>
 
-#define MAX_VINT_CNT 32
+#define MAX_VINT_CNT 64
+#define MAX_VINT_INDEX ((MAX_VINT_CNT + LONG_BITS - 1) / LONG_BITS)
 
 struct guest;
 
@@ -47,8 +48,8 @@ typedef struct vpic {
 } vpic_t;
 
 typedef struct vpic_cpu {
-	uint32_t active;
-	uint32_t pending;
+	uint64_t active[MAX_VINT_INDEX];
+	uint64_t pending[MAX_VINT_INDEX];
 } vpic_cpu_t;
 
 vpic_interrupt_t *vpic_alloc_irq(struct guest *guest, int config);

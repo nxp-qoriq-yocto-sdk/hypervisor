@@ -82,6 +82,70 @@ static void send_vint(gcpu_t *gcpu)
 	setevent(gcpu, EV_ASSERT_VINT);
 }
 
+static void set_virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
+{
+	gcpu->vpic.pending[virq->irqnum / LONG_BITS] |=
+					1 << (virq->irqnum % LONG_BITS);
+	virq->pending = 1;
+}
+
+static void set_virq_active(vpic_interrupt_t *virq, gcpu_t *gcpu)
+{
+	gcpu->vpic.active[virq->irqnum / LONG_BITS] |=
+					1 << (virq->irqnum % LONG_BITS);
+	virq->active = 1;
+}
+
+static void clear_virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
+{
+
+	gcpu->vpic.pending[virq->irqnum / LONG_BITS] &=
+					~(1 << (virq->irqnum % LONG_BITS));
+	virq->pending = 0;
+}
+
+static void clear_virq_active(vpic_interrupt_t *virq, gcpu_t *gcpu)
+{
+	gcpu->vpic.active[virq->irqnum / LONG_BITS] &=
+					~(1 << (virq->irqnum % LONG_BITS));
+	virq->active = 0;
+}
+
+static int virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
+{
+	return gcpu->vpic.pending[virq->irqnum / LONG_BITS] &
+					(1 << (virq->irqnum % LONG_BITS));
+}
+
+
+static void clear_gcpu_pending_virq(uint8_t irqnum, gcpu_t *gcpu)
+{
+	gcpu->vpic.pending[irqnum / LONG_BITS] &= ~(1 << (irqnum%LONG_BITS));
+}
+
+
+static int gcpu_virq_active(gcpu_t *gcpu)
+{
+	for (int i = 0; i < MAX_VINT_INDEX; i++) {
+		if (gcpu->vpic.active[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+static int gcpu_virq_pending(gcpu_t *gcpu)
+{
+	for (int i = 0; i < MAX_VINT_INDEX; i++) {
+		if (gcpu->vpic.pending[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+
+
 static void __vpic_assert_vint(vpic_interrupt_t *virq)
 {
 	uint32_t cpumask, destcpu;
@@ -95,9 +159,9 @@ static void __vpic_assert_vint(vpic_interrupt_t *virq)
 	gcpu_t *gcpu = guest->gcpus[destcpu];
 	virq->pending = 1;
 
-	if (!(gcpu->vpic.pending & (1 << virq->irqnum))) {
+	if (!virq_pending(virq, gcpu)) {
 		if (virq->enable) {
-			gcpu->vpic.pending |= 1 << virq->irqnum;
+			set_virq_pending(virq, gcpu);
 			send_vint(gcpu);
 		} else {
 			printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
@@ -139,54 +203,78 @@ void vpic_deassert_vint(vpic_interrupt_t *virq)
 	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
-static vpic_interrupt_t *__vpic_iack(void)
+static vpic_interrupt_t *get_pending_virq(void)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	uint32_t pending;
+	unsigned int irq = 0;
 
-	if (gcpu->vpic.active) {
-		int irqnum = count_lsb_zeroes(gcpu->vpic.active);
-		return &guest->vpic.ints[irqnum];
+	for (int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
+		if (gcpu->vpic.pending[i]) {
+			irq += count_lsb_zeroes(gcpu->vpic.pending[i]);
+			return &guest->vpic.ints[irq];
+		}
 	}
 
-	/* if any vint is already active defer */
-	pending = gcpu->vpic.pending;
+	return NULL;
+}
+
+static vpic_interrupt_t *get_active_virq(void)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	unsigned int irq = 0;
+
+	for (int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
+		if (gcpu->vpic.active[i]) {
+			irq += count_lsb_zeroes(gcpu->vpic.active[i]);
+			return &guest->vpic.ints[irq];
+		}
+	}
+
+	return NULL;
+}
+
+
+static vpic_interrupt_t *__vpic_iack(void)
+{
+	vpic_interrupt_t *virq;
+	gcpu_t *gcpu = get_gcpu();
+
+	virq = get_active_virq();
+	if (virq)
+		return virq;
 
 	/* look for a pending interrupt that is not masked */
-	while (pending) {
-		/* get int num */
-		int irqnum = count_lsb_zeroes(pending);
-		vpic_interrupt_t *virq = &guest->vpic.ints[irqnum];
-
+	virq = get_pending_virq();
+	while (virq) {
 		if (!virq->pending || !virq->enable) {
 			/* IRQ was de-asserted, or is masked. */
-			gcpu->vpic.pending &= ~(1 << irqnum);
+			clear_gcpu_pending_virq(virq->irqnum, gcpu);
 		} else {
 			if (virq->destcpu & (1 << gcpu->gcpu_num)) {
 				/* int now moves to active state */
-				gcpu->vpic.active |= 1 << irqnum;
-				virq->active = 1;
+				set_virq_active(virq, gcpu);
 
-				if (!(virq->config & IRQ_LEVEL)) {
-					gcpu->vpic.pending &= ~(1 << irqnum);
-					virq->pending = 0;
-				}
+				if (!(virq->config & IRQ_LEVEL))
+					clear_virq_pending(virq, gcpu);
 
 				return virq;
 			}
 			
-			/* Tsk, tsk.  The guest changed the destcpu mask while the
-			 * interrupt was pending.  Reissue it if it's still active.
+			/* Tsk, tsk.  The guest changed the destcpu mask
+			 * while the interrupt was pending. Reissue it if
+			 * it's still active.
 			 */
 			if (virq->pending) {
 				printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
-				         "vpic_iack: changed destcpu while pending\n");
+					"vpic_iack: changed destcpu while"
+					"pending\n");
 				__vpic_assert_vint(virq);
 			}
-		} 
+		}
 
-		pending &= ~(1 << irqnum);
+		virq = get_pending_virq();
 	}
 
 	return NULL;
@@ -278,11 +366,10 @@ static void vpic_eoi(interrupt_t *irq)
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic eoi: %p\n", virq);
 
-	gcpu->vpic.active &= ~(1 << virq->irqnum);
-	virq->active = 0;
+	clear_virq_active(virq, gcpu);
 
 	/* check if more vints are pending */
-	if (gcpu->vpic.active == 0 && gcpu->vpic.pending)
+	if (!gcpu_virq_active(gcpu) && gcpu_virq_pending(gcpu))
 		send_vint(gcpu);
 
 	spin_unlock_intsave(&guest->vpic.lock, save);
