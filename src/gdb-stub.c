@@ -1428,10 +1428,10 @@ return_to_guest:
 		case remove_breakpoint:
 			cur_pos = content(stub->cmd);
 			aux = *cur_pos;
-			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
-				"Got '%c' packet.\n", *cur_pos);
 			err_flag = 0;
 			breakpoint_type = scan_num(&cur_pos, ',');
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
+				"Got '%c%d' packet.\n", aux, breakpoint_type);
 			if (breakpoint_type != memory_breakpoint
 #ifdef USE_DEBUG_INTERRUPT
 			    && breakpoint_type != hardware_breakpoint
