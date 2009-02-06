@@ -295,14 +295,14 @@ static void fh_byte_channel_receive(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
-	size_t max_receive = regs->gpregs[4];
 	uint8_t *outbuf = (uint8_t *)&regs->gpregs[5];
 	register_t saved;
 
-	if (max_receive > 16) {
-		regs->gpregs[3] = EINVAL;
-		return;
-	}
+	/* We don't care how big the caller's buffer is, but we only have four
+	 * registers to hold the data, so just truncate the length to the max.
+	 * The caller is supposed to be able to handle any count >= 0 anyway.
+	 */
+	size_t max_receive = min(regs->gpregs[4], 4 * sizeof(register_t));
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
