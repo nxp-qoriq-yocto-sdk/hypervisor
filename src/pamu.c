@@ -82,7 +82,8 @@ static int is_subwindow_count_valid(int subwindow_cnt)
  *    ULONG_MAX on failure
  *    rpn value on success
  */
-static unsigned long get_rpn(guest_t *guest, unsigned long grpn, phys_addr_t size)
+static unsigned long get_rpn(guest_t *guest, unsigned long grpn,
+	phys_addr_t size)
 {
 	unsigned long attr;
 	unsigned long mach_phys_contig_size = 0;
@@ -241,7 +242,8 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 	uint32_t liodn, uint64_t primary_window_base_addr,
 	uint32_t subwindow_cnt, phys_addr_t subwindow_size,
 	uint32_t omi, uint32_t stash_dest,
-	unsigned int *first_subwin_swse, unsigned long *fspi)
+	unsigned int *first_subwin_swse, unsigned long *fspi,
+	unsigned long *first_subwin_rpn)
 {
 	dt_node_t *dma_subwindow = NULL;
 	struct spaace_t *spaace = NULL;
@@ -295,9 +297,15 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 	next_window_addr = primary_window_base_addr + subwindow_size;
 	def_window = 0;
 	*first_subwin_swse = 0;
+	*first_subwin_rpn = 0;
 
 	if (primary_window_base_addr == window_addr[0]) {
 		*first_subwin_swse = map_addrspace_size_to_wse(window_size[0]);
+		rpn = get_rpn(guest, window_addr[0] >> PAGE_SHIFT,
+				 window_size[0]);
+		if (rpn == ULONG_MAX)
+			return 0;
+		*first_subwin_rpn = rpn;
 		++def_window;
 	}
 
@@ -359,6 +367,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	phys_addr_t subwindow_size;
 	unsigned int first_subwin_swse;
 	uint32_t subwindow_cnt = 0;
+	unsigned long first_subwin_rpn;
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
 	if (!prop || prop->len != 4) {
@@ -410,19 +419,10 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 
 	ppaace->wse = map_addrspace_size_to_wse(window_size);
 
-	rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
-	if (rpn == ULONG_MAX)
-		return ERR_NOTRANS;
-
 	setup_default_xfer_to_host_ppaace(ppaace);
 
 	ppaace->wbah = 0;   // FIXME: 64-bit
 	ppaace->wbal = window_addr >> PAGE_SHIFT;
-
-	ppaace->atm = PAACE_ATM_WINDOW_XLATE;
-
-	ppaace->twbah = 0;  // FIXME: 64-bit
-	ppaace->twbal = rpn;
 
 	/* set up operation mapping if it's configured */
 	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
@@ -476,13 +476,24 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	if (prop)
 		subwindow_cnt = *(const uint32_t *)prop->data;
 
-	if (is_subwindow_count_valid(subwindow_cnt)) {
+	if (!is_subwindow_count_valid(subwindow_cnt)) {
+		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
+		if (rpn == ULONG_MAX)
+			return ERR_NOTRANS;
+
+		ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+		ppaace->twbah = rpn >> 20;
+		ppaace->twbal = rpn;
+	}
+	else
+	{
 		subwindow_size = window_size / subwindow_cnt;
 
 		if (configure_dma_sub_windows(guest, dma_window, liodn,
 					      window_addr, subwindow_cnt - 1,
 					      subwindow_size, omi, stash_dest,
-					      &first_subwin_swse, &fspi)) {
+					      &first_subwin_swse, &fspi,
+					      &first_subwin_rpn)) {
 			ppaace->mw = 1;
 			/*
 			 * NOTE: The first sub-window exists in the primary
@@ -492,6 +503,9 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 			ppaace->swse = first_subwin_swse;
 			ppaace->fspi = fspi;
 			ppaace->wce = map_subwindow_cnt_to_wce(subwindow_cnt);
+			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+			ppaace->twbah = first_subwin_rpn >> 20;
+			ppaace->twbal = first_subwin_rpn;
 		}
 	}
 
