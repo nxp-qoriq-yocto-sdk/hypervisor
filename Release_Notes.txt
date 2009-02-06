@@ -3,8 +3,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.3
-Revsion: 0.3-rc12
-Date: 1/28/2009
+Revsion: rc13
+Date: 2/06/2009
 
 -------------------------------------------------------
 Contents
@@ -23,7 +23,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc12 is compatible with Simics 4.0.29 / pre14 and
+   -Topaz 0.3-rc13 is compatible with Simics 4.0.29 / pre14 and
     later
       -note: the pre18 Simics model has some DMA address 
        translation bugs and the dma-B unit test fails
@@ -33,6 +33,24 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.3-rc13 bug fixes and changes
+      -support for snoop domains for DMA devices (bug 2606)
+      -gdb stub-- support fpscr register
+      -fix node-update-phandle processing of subnodes
+      -partman-- improve parameter checking
+      -support hypervisor console on a byte-channel
+      -support booting hypervisor from 4MB of memory
+      -support fsl,hv-dma-handle property in guest device
+       trees
+      -implment no-auto-start feature
+      -bug 2595-- crash with debug stub in multi cpu
+       partitions
+      -bug 2700-- gdb stub, give error when reading inaccessible
+       memory
+      -bug 2305-- support up to 64 virtual interrupt sources
+       per partition
+      -bug 2701-- fix PAMU address translations with subwindows
 
    -Topaz 0.3-rc12 bug fixes and changes
       -bug 2601-- State change interrupt not receieved when
