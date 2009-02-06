@@ -4,9 +4,6 @@
 [submodule "dtc"]
 	path = dtc
 	url = ../dtc.git
-[submodule "test/sim"]
-	path = test/sim
-	url = ../e500mc/sim.git
 [submodule "kconfig"]
 	path = kconfig
 	url = ../kconfig.git

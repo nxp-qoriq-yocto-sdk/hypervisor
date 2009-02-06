@@ -22,7 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-add-directory "%script%/../sim/hv-1p-lnx" -prepend
+add-directory "%script%/../../../sim/hv-1p-lnx" -prepend
 
 run-command-file "run.simics"
 

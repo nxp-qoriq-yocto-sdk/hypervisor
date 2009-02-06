@@ -44,8 +44,8 @@ $kernel_image  = "hv.uImage"
 
 $kernel_cmdline = "config-addr=0xe8100000"
 
-add-directory "%script%/../sim" -prepend
-add-directory "%script%/../sim/images" -prepend
+add-directory "%script%/../../../sim" -prepend
+add-directory "%script%/../../../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/ipi" -prepend

@@ -17,8 +17,8 @@ $kernel_image  = "hv.uImage"
 $dev_tree_blob  = "hv-linux-intmap.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../sim" -prepend
-add-directory "%script%/../sim/images" -prepend
+add-directory "%script%/../../../sim" -prepend
+add-directory "%script%/../../../sim/images" -prepend
 add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
