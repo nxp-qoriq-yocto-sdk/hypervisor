@@ -62,7 +62,12 @@ void gdb_stub_start(trapframe_t *trap_frame);
 void gdb_stub_stop(void);
 void gdb_stub_init(void);
 
-static int handle_debug_exception(trapframe_t *trap_frame);
+static void rx_gevent_handler(trapframe_t *trap_frame);
+static int handle_debug_event(trapframe_t *trap_frame);
+#ifdef USE_DEBUG_INTERRUPT
+static int debug_exception(trapframe_t *trap_frame);
+static void debug_gevent_handler(trapframe_t *trap_frame);
+#endif
 static void rx(queue_t *q);
 static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type);
@@ -82,7 +87,11 @@ static stub_ops_t attr_debug_stub stub_ops = {
         .vcpu_init = gdb_stub_init,
         .vcpu_start = gdb_stub_start,
         .vcpu_stop = gdb_stub_stop,
-        .debug_interrupt =  handle_debug_exception,
+#ifdef USE_DEBUG_INTERRUPT
+        .debug_interrupt =  debug_exception,
+#else
+        .debug_interrupt =  handle_debug_event,
+#endif
 };
 
 void gdb_stub_init(void)
@@ -98,13 +107,23 @@ void gdb_stub_init(void)
 
 	stub->node = gcpu->dbgstub_cfg;
 
-	stub->gev_gdb = register_gevent(&gdb_stub_gevent_handler);
-	if (stub->gev_gdb < 0) {
+	stub->gev_rx = register_gevent(&rx_gevent_handler);
+	if (stub->gev_rx < 0) {
 		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
 		         "%s: gevent registration failed\n",
 		         __func__);
 		return;
 	}
+
+#ifdef USE_DEBUG_INTERRUPT
+	stub->gev_dbg = register_gevent(&debug_gevent_handler);
+	if (stub->gev_dbg < 0) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
+		         "%s: gevent registration failed\n",
+		         __func__);
+		return;
+	}
+#endif
 
 	init_byte_channel(stub->node);
 	/* note: the byte-channel handle is returned in node->bch */
@@ -143,6 +162,8 @@ void gdb_stub_start(trapframe_t *trap_frame)
 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	breakpoint_t *breakpoint;
 
+	DEBUG();
+
 	/* register the callbacks */
 	stub->node->bch->rx->consumer = gcpu;
 	smp_lwsync();
@@ -163,7 +184,7 @@ void gdb_stub_start(trapframe_t *trap_frame)
 		}
 	}
 
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 	/* enable hardware debug mode */
 	mtspr(SPR_DBCR0, DBCR0_IDM | DBCR0_TRAP);
 	trap_frame->srr1 |= MSR_DE;
@@ -182,22 +203,6 @@ void gdb_stub_stop(void)
 	return; 
 }
 
-/**
- * Enumerate the various events that we are interested in. The external world in
- * the hypervisor only knows that a "GDB event" occurred. However, within the
- * stub, we need to have a finer view of things, as captured in the following
- * enum 'event_type'. The global variable 'event_type', is used to record the
- * current event.
- */
-
-enum event_type {
-
-	/* RX interrupt. */
-	received_data,
-};
-
-enum event_type event_type;
-
 /** Callback for RX interrupt.
  *
  */
@@ -207,21 +212,13 @@ static void rx(queue_t *q)
  	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	DEBUG();
 
-	/* Record the event type and setgevent GEV_GDB on the current CPU. */
-	event_type = received_data;
- 	setgevent(gcpu, stub->gev_gdb);
-
-	/* TODO: What if there were some other event in progress?  It'll be
-	 * lost. The GDB event handler should check whether the input queue
-	 * is empty, rather than rely on a "received data" flag.
-	 */
+ 	setgevent(gcpu, stub->gev_rx);
 }
 
 /* get_debug_char() and put_debug_char() are our
  * means of communicating with the outside world,
  * one character at a time.
  */
-
 static uint8_t get_debug_char(gdb_stub_core_context_t *stub)
 {
 	ssize_t byte_count = 0;
@@ -362,7 +359,7 @@ static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t re
 static inline uint8_t *scan_till(uint8_t *q, char c);
 static inline uint32_t scan_num(uint8_t **buffer, char c);
 static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifndef USE_DEBUG_INTERRUPT
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
 #endif
 static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
@@ -815,7 +812,7 @@ static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
 	return result;
 }
 
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifndef USE_DEBUG_INTERRUPT
 static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
 {
 	uint32_t insn = 0x0;
@@ -1067,11 +1064,55 @@ static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_con
 	transmit_response(stub);
 }
 
+#ifdef USE_DEBUG_INTERRUPT
 /* Note: this is invoked in debug interrupt context
  * (i.e. CE=0, EE=0)
  *
  */
-int handle_debug_exception(trapframe_t *trap_frame)
+static int debug_exception(trapframe_t *trap_frame)
+{
+	gcpu_t *gcpu = get_gcpu();
+ 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
+	register_t dbsr = mfspr(SPR_DBSR);
+
+	mtspr(SPR_DBSR, dbsr); /* clear all hw events */
+
+	stub->dbsr = 0;
+
+	DEBUG();
+
+	if (dbsr & DBSR_TRAP)
+ 		stub->dbsr |= DBSR_TRAP;
+
+	if (dbsr & DBSR_ICMP) {
+ 		stub->dbsr |= DBSR_ICMP;
+		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP); /* clear ICMP */
+	}
+
+	if (dbsr & DBSR_IAC1)
+ 		stub->dbsr |= DBSR_IAC1;
+
+	if (dbsr & DBSR_IAC2) {
+ 		stub->dbsr |= DBSR_IAC2;
+	}
+
+	if (dbsr & ~(DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 | DBSR_IAC2))
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, "%s: unknown debug event\n",
+		         __func__);
+
+ 	setgevent(gcpu, stub->gev_dbg);
+
+	return 0;   /* handled event */
+}
+
+static void debug_gevent_handler(trapframe_t *trap_frame)
+{
+	handle_debug_event(trap_frame);
+}
+
+#endif
+
+static int handle_debug_event(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
@@ -1080,34 +1121,24 @@ int handle_debug_exception(trapframe_t *trap_frame)
 	breakpoint_type_t bptype = breakpoint->type;
 	int trap = 0;
 
+	DEBUG();
+
 	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
 
 	/* enable interrupts, so UART keeps working */
 	enable_int();
 
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
-	trap = 1;
+#ifdef USE_DEBUG_INTERRUPT
+	if (stub->dbsr) {
+		if (stub->dbsr & DBSR_TRAP) {
+			trap = 1;
+		} else {  /* ICMP and IACx */
+			transmit_stop_reply_pkt_T(trap_frame, stub);
+		}
+		stub->dbsr = 0;  /* clear all pending events */
+	}
 #else
-	/* check for a TRAP event */
-	if (mfspr(SPR_DBSR) & DBSR_TRAP) {
-		trap = 1;
-		mtspr(SPR_DBSR, DBSR_TRAP); /* clear event */
-	}
-#endif
-
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
-	/* check for an ICMP event */
-	if (mfspr(SPR_DBSR) & DBSR_ICMP) {
-		mtspr(SPR_DBSR, DBSR_ICMP); /* clear event */
-		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP); /* clear ICMP */
-		transmit_stop_reply_pkt_T(trap_frame, stub);
-	} else if (mfspr(SPR_DBSR) & DBSR_IAC1) {
-		mtspr(SPR_DBSR, DBSR_IAC1); /* clear event */
-		transmit_stop_reply_pkt_T(trap_frame, stub);
-	} else if (mfspr(SPR_DBSR) & DBSR_IAC2) {
-		mtspr(SPR_DBSR, DBSR_IAC2); /* clear event */
-		transmit_stop_reply_pkt_T(trap_frame, stub);
-	}
+	trap = 1;
 #endif
 
 	if (trap) {
@@ -1120,8 +1151,8 @@ int handle_debug_exception(trapframe_t *trap_frame)
 		breakpoint = locate_breakpoint(stub->breakpoint_table,
 		                               (uint32_t *)nip_reg_value);
 		if (!breakpoint) {
-			DEBUG("Breakpoint not set by stub, returning (1).");
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+			DEBUG("Not our breakpoint/trap, reflecting to guest.");
+#ifndef USE_DEBUG_INTERRUPT
 			return 1;   /* reflect the trap to the guest */
 #else
 			/* need to reflect program interrupt, not debug interrupt */
@@ -1171,7 +1202,7 @@ int handle_debug_exception(trapframe_t *trap_frame)
 	return 0;
 }
 
-void gdb_stub_gevent_handler(trapframe_t *trap_frame)
+void rx_gevent_handler(trapframe_t *trap_frame)
 {
 	DEBUG("Calling: gdb_stub_main_loop().");
 	gdb_stub_main_loop(trap_frame,GDB_GEVENT);
@@ -1193,14 +1224,14 @@ void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type)
 	uint32_t reg_num, i;
 	uint8_t breakpoint_type;
 	breakpoint_t *breakpoint = NULL;
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifndef USE_DEBUG_INTERRUPT
 	uint32_t *nia = NULL, *pc = NULL;
 	breakpoint_t *breakpoint_nia = NULL;
 	breakpoint_t *breakpoint_incrpc = NULL;
 #endif
 	const char *td; /* td: target description */
 	int loop_count = 0;
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 	register_t dbcr0 = 0;
 #endif
 
@@ -1394,7 +1425,7 @@ return_to_guest:
 			err_flag = 0;
 			breakpoint_type = scan_num(&cur_pos, ',');
 			if (breakpoint_type != memory_breakpoint
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 			    && breakpoint_type != hardware_breakpoint
 /* FIXME: Add this when watchpoints work. */
 #if 0
@@ -1404,7 +1435,7 @@ return_to_guest:
 #endif
 #endif
 			) {
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 				DEBUG("We only support memory and hardware breakpoints.");
 /* FIXME: Add this when watchpoints work. */
 #if 0
@@ -1442,7 +1473,7 @@ return_to_guest:
 						breakpoint->associated = NULL;
 					err_flag = breakpoint ? 0 : 1;
 					break;
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 				case hardware_breakpoint:
 					err_flag = 0;
 					dbcr0 = mfspr(SPR_DBCR0);
@@ -1511,7 +1542,7 @@ return_to_guest:
 						err_flag = 1;
 					}
 					break;
-#ifndef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifdef USE_DEBUG_INTERRUPT
 				case hardware_breakpoint:
 					err_flag = 0;
 					if (mfspr(SPR_IAC1) == (register_t)addr)
@@ -1558,7 +1589,7 @@ return_to_guest:
 		case single_step:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 's' packet.\n");
-#ifdef CONFIG_GDB_STUB_PROGRAM_INTERRUPT
+#ifndef USE_DEBUG_INTERRUPT
 			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
 			/* If there is no address to resume at; we resume at pc. */

@@ -82,6 +82,10 @@ typedef struct breakpoint
  */
 #define MAX_BREAKPOINT_COUNT 32*3
 
+#ifndef CONFIG_DEBUG_STUB_PROGRAM_INTERRUPT
+#define USE_DEBUG_INTERRUPT
+#endif
+
 /**
  * The following structure collects together all the parameters pertaining to
  * a GDB stub invocation on a per core basis.
@@ -89,7 +93,11 @@ typedef struct breakpoint
 typedef struct gdb_stub_core_context {
 
 	dt_node_t *node;  /* the config node in the dev tree for this stub */
-	int gev_gdb;  /* gevent handle */
+	int gev_rx;       /* rx gevent handle */
+#ifdef USE_DEBUG_INTERRUPT
+	int gev_dbg;      /* debug exception gevent handle */
+#endif
+	register_t dbsr;  /* shadow copy of dbsr */
 
 	/* These two packets contain the command received from GDB and the
 	 * response to be sent to GDB. cmd must always contain a command whose

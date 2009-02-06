@@ -132,9 +132,13 @@ config GDB_STUB
 		remotely with GDB.  The stub is located in the hypervisor, 
 		allowing non-intrusive debugging.
 
-config GDB_STUB_PROGRAM_INTERRUPT
+config DEBUG_STUB_PROGRAM_INTERRUPT
 	bool "Use program interrupt for debugging"
-	depends on GDB_STUB
+	depends on DEBUG_STUB
 	help
-		Specifies that the gdb debug stub should use program interrupts
-		instead of the debug interrupt for debugging.
+		Specifies that the debug stub should use program interrupts
+		instead of the debug interrupt for debugging.  Use this 
+		option to enable guest debugging with a debug stub at the
+		same time 'guest debug mode' has been granted to a guest.
+		NOTE: program interrupt debugging has limitations in an
+		SMP partition.
