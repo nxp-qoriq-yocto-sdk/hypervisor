@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,25 +27,27 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
-#define CCSRBAR_VA 0xfe000000
+#define CCSRBAR_VA              0xfe000000
 
 #define PHYSBASE 0x20000000
 #define BASE_TLB_ENTRY 15
-#define KSTACK_SIZE 2048
 
 #ifndef _ASM
 typedef int client_cpu_t;
 #endif
 
-#define EXC_DECR_HANDLER dec_handler
-#define EXC_EXT_INT_HANDLER ext_int_handler
-#define EXC_MCHECK_HANDLER mcheck_interrupt
-#define EXC_DEBUG_HANDLER debug_handler
-#define EXC_FIT_HANDLER fit_handler
-#define EXC_DOORBELL_HANDLER ext_doorbell_handler
-#define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
-#define EXC_DTLB_HANDLER dtlb_handler
-#define EXC_WDOG_HANDLER watchdog_handler
-#define EXC_PROGRAM_HANDLER program_handler
+#define CONFIG_LIBOS_MAX_BUILD_LOGLEVEL LOGLEVEL_NORMAL
+#define CONFIG_LIBOS_DEFAULT_LOGLEVEL LOGLEVEL_NORMAL
+#define CONFIG_LIBOS_INIT 1
+#define CONFIG_LIBOS_MP 1
+#define CONFIG_LIBOS_NS16550 1
+#define CONFIG_LIBOS_EXCEPTION 1
+#define CONFIG_LIBOS_SIMPLE_ALLOC 1
+#define CONFIG_LIBOS_PHYS_64BIT 1
+#define CONFIG_LIBOS_FSL_BOOKE_TLB 1
+#define CONFIG_LIBOS_ALLOC_IMPL 1
+#define CONFIG_LIBOS_VIRT_ALLOC 1
+#define CONFIG_LIBOS_CONSOLE 1
+#define CONFIG_LIBOS_LIBC 1
 
 #endif

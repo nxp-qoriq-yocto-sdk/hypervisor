@@ -1,0 +1,83 @@
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&uart0>;
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		uart0: uart0 {
+			device = "serial0";
+		};
+
+		uart1: uart1 {
+			device = "serial1";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+	};
+
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x2000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x2000000>;
+			size = <0 0x2000000>;
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart1>;
+	};
+
+	partitions {
+		part1 {
+			compatible = "partition";
+			cpus = <0 1>;
+			guest-image = <0 0xe8200000 0 0 0 0x200000>;
+			dtb-window = <0 0x01000000 0 0x10000>;
+
+			gpma {
+				compatible = "guest-phys-mem-area";
+				phys-mem = <&pma1>;
+				guest-addr = <0 0>;
+			};
+
+			uart2: uart2 {
+				device = "serial2";
+			};
+
+			gdb-stub@0 {
+				compatible = "gdb-stub", "debug-stub";
+				endpoint = <&uartmux>;  // byte-channel endpoint
+				mux-channel = <0>;
+				debug-cpus = <0 1>; //virtual cpu 0
+			};
+
+			aliases {
+				stdout = <&uart2>;
+			};
+		};
+	};
+
+	chosen {
+	};
+};

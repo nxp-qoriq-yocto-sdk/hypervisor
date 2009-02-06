@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,29 +23,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <libos/libos.h>
+#include <libos/hcalls.h>
+#include <libos/trapframe.h>
+#include <libos/fsl-booke-tlb.h>
+#include <libos/io.h>
+void unknown_exception(trapframe_t *regs);
+void init(unsigned long devtree_ptr);
 
-#ifndef LIBOS_CLIENT_H
-#define LIBOS_CLIENT_H
+int state = 0;
 
-#define CCSRBAR_VA 0xfe000000
+void program_handler(trapframe_t *regs)
+{
+	switch (state) {
+	case 0:
+		if (mfspr(SPR_ESR) & ESR_PTR) {
+			printf("PASSED\n");
+			regs->srr0 += 4;  // advance PC past trap
+		} else {
+			unknown_exception(regs);
+		}
+		break;
+	default:
+		printf("FAILED\n");
+	}
+}
 
-#define PHYSBASE 0x20000000
-#define BASE_TLB_ENTRY 15
-#define KSTACK_SIZE 2048
+static void trap_instruction(void)
+{
+	printf("trap instruction: ");
+	asm volatile ("twge %r2, %r2");
+}
 
-#ifndef _ASM
-typedef int client_cpu_t;
-#endif
+void start(unsigned long devtree_ptr)
+{
+	init(devtree_ptr);
 
-#define EXC_DECR_HANDLER dec_handler
-#define EXC_EXT_INT_HANDLER ext_int_handler
-#define EXC_MCHECK_HANDLER mcheck_interrupt
-#define EXC_DEBUG_HANDLER debug_handler
-#define EXC_FIT_HANDLER fit_handler
-#define EXC_DOORBELL_HANDLER ext_doorbell_handler
-#define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
-#define EXC_DTLB_HANDLER dtlb_handler
-#define EXC_WDOG_HANDLER watchdog_handler
-#define EXC_PROGRAM_HANDLER program_handler
+	printf("Exception Test\n");
 
-#endif
+	trap_instruction();
+
+	printf("Test Complete\n");
+}
