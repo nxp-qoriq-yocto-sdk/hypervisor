@@ -1,0 +1,4 @@
+target remote :9002
+symbol-file ../../output/test/bin/gdb/gdb-whoami
+hbreak debug_code
+c

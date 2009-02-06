@@ -1,0 +1,16 @@
+0. In top-level HV directory, do a: make test-gdb-run-C
+1. At the Simics prompt: simics> c
+2. In test/gdb, invoke: ./run-gdb-C.sh
+   This will bring up four xterms with GDB sessions, with
+   text like:
+
+Hardware assisted breakpoint 1 at 0x20003884: file /proj/.ppc_07/labhome/b07584/hv-test/test/gdb/gdb-whoami.c, line 88.
+
+Breakpoint 1, debug_code (pir=2)
+    at /proj/.ppc_07/labhome/b07584/hv-test/test/gdb/gdb-whoami.c:88
+88              if (!gdb_attached[pir]) /* Set at GDB prompt. */
+(gdb)
+
+3. To step through debug_code(), do a:
+(gdb) set gdb_attached[pir] = 1
+

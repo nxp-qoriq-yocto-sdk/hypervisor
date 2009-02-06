@@ -49,6 +49,18 @@ gdb-hello-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           common/init.o)
 gdb-hello-obj := $(gdb-hello-obj:%=bin/%.o)
 
+# test source
+gdb-whoami-src-y := $(dir)gdb-whoami.c
+
+# define test and libos object files
+gdb-whoami-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(gdb-whoami-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+gdb-whoami-obj := $(gdb-whoami-obj:%=bin/%.o)
+
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
 $(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
@@ -69,8 +81,13 @@ bin/$(test)/gdb-hello: $(gdb-hello-obj)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
+bin/$(test)/gdb-whoami: $(gdb-whoami-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+
 .PHONY: $(test)
-$(test): bin/$(test)/gdb bin/$(test)/gdb-hello $($(test)-hv-dtb)
+$(test): bin/$(test)/gdb bin/$(test)/gdb-hello bin/$(test)/gdb-whoami $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
