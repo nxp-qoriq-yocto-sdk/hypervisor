@@ -29,18 +29,18 @@ dir := $(testdir)$(test)/
 
 tunctl:
 	ls /sys/class/net/fman* > /dev/null 2>&1 || \
-		$(testdir)sim/fm.sh -s -a up
+		$(testdir)../../sim/fm.sh -s -a up
 
 simtst-run-1p: simtst tunctl
-	$(MAKE) -C $(testdir)sim/hv-1p-lnx 
+	$(MAKE) -C $(testdir)../../sim/hv-1p-lnx 
 	$(SIMICS) $(testdir)$</run-1p.simics
 
 simtst-run-7p: simtst tunctl
-	$(MAKE) -C $(testdir)sim/hv-7p-lnx-lnx-lwe
-	$(testdir)sim/xtel.sh 9000 6
+	$(MAKE) -C $(testdir)../../sim/hv-7p-lnx-lnx-lwe
+	$(testdir)../../sim/xtel.sh 9000 6
 	$(SIMICS) $(testdir)$</run-7p.simics
 
 simtst-run-8p: simtst tunctl
-	$(MAKE) -C $(testdir)sim/hv-8p-lnx-lwe
-	$(testdir)sim/xtel.sh 9000 8
+	$(MAKE) -C $(testdir)../../sim/hv-8p-lnx-lwe
+	$(testdir)../../sim/xtel.sh 9000 8
 	$(SIMICS) $(testdir)$</run-8p.simics
