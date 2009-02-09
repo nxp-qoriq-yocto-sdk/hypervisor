@@ -15,7 +15,6 @@ if (defined $options{h} )  {
 
 foreach (@ARGV) {
 	$logfile = "uart".$_."-log.txt";
-	system("mv /tmp/$logfile .") == 0 || die "Missing $logfile file";
 	open(FILE, "$logfile") or die "Can't open $logfile";
 	$output = do { local $/; <FILE> };
 	close($FILE);
