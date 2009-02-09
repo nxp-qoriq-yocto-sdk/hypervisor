@@ -1,0 +1,7 @@
+$console_capture = 1
+
+add-directory "%script%/" -prepend
+
+run-command-file "run.simics"
+
+run-command-file "%script%/../common/test-done.simics"

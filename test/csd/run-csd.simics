@@ -1,0 +1,12 @@
+$ccmode_parameters = [
+  "ccm.logger.filename", "ccm_log.txt",
+  "ccm.logger.start_cycle", "0",
+  "ccm.logger.stop_cycle", "never",
+  "ccm.logger.watch_address", "0x40000000",
+  "ccm.logger.watch_address_mask", "0xC0000000",
+]
+read-configuration-to-ccmode csd.ckpt
+run-python-file "../../test/csd/csd.py"
+cpu0.trace -mark
+cpu4.trace -mark
+c
