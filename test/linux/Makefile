@@ -68,7 +68,7 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.
 	$(call unmount,bin/linux/rootfs)
 	$(call mount,rootfs-partman)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
-	sudo cp -af $(testdir)sim/images/vmlinux bin/linux/rootfs-partman/
+	sudo cp -af $(testdir)../../sim/images/vmlinux bin/linux/rootfs-partman/
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	$(call unmount,bin/linux/rootfs-partman)
 
@@ -86,6 +86,6 @@ $(test)-run-hello: $(test) bin/$(test)/rootfs-hello.ext2.gz
 	$(SIMICS) $(testdir)linux/run-hello.simics
 
 $(test)-run-demo: $(test) bin/$(test)/rootfs-partman.ext2.gz
-	../../test/sim/xtel.sh 9000 2
+	../../../sim/xtel.sh 9000 2
 	$(SIMICS) $(testdir)linux/run-demo.simics
 
