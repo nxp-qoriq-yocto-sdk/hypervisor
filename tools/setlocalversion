@@ -1,5 +1,10 @@
 #!/bin/sh
 # Print additional version information for non-release trees.
+#
+# This script was copied from the Linux kernel
+# (scripts/setlocalversion), which has no explicit copyright
+# or license.
+#
 
 usage() {
 	echo "Usage: $0 [srctree]" >&2

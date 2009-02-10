@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008, 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -165,7 +165,7 @@ void emit_power_fpu_description(void)
 
 char *freescale_copyright = "\
 /*\n\
- * Copyright (C) 2008, 2009 Freescale Semiconductor, Inc.\n\
+ * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.\n\
  *\n\
  * Redistribution and use in source and binary forms, with or without\n\
  * modification, are permitted provided that the following conditions\n\

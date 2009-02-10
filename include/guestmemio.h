@@ -1,7 +1,7 @@
 /* @file
  * Load/store acccesors to guest virtual addresses.
  */
-/* Copyright (C) 2008 Freescale Semiconductor, Inc.
+/* Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  * 
  * Redistribution and use in source and binary forms, with or without

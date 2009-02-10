@@ -10,7 +10,7 @@
  *     Ninth Edition, for gdb version 6.7.50.20080119
  *     Free Software Foundation.
  *
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
