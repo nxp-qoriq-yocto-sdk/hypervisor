@@ -445,32 +445,29 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	}
 
 	/* configure stash id */
-	prop = dt_get_prop(cfgnode, "stash-dest", 0);
-	if (prop && prop->len == 4) {
-		stash_dest = get_stash_dest(*(const uint32_t *)prop->data, hwnode);
+	stash_prop = dt_get_prop(cfgnode, "stash-dest", 0);
+	if (stash_prop && stash_prop->len == 4) {
+		stash_dest = get_stash_dest( *(const uint32_t *)
+				stash_prop->data , hwnode);
+
 		if (stash_dest != -1)
 			ppaace->impl_attr.cid = stash_dest;
 	}
 
 	/* configure snoop-id if needed */
-	stash_prop = prop;
 	prop = dt_get_prop(cfgnode, "snoop-cpu-only", 0);
-	if (prop) {
+	if (prop && stash_dest != -1) {
 		if ((*(const uint32_t *)stash_prop->data) >= L3) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
 				"%s: warning: %s snoop-cpu-only property must have stash-dest as L1 or L2 cache\n",
 				 __func__, dma_window->name);
-		}
-
-		if (guest->cpucnt > 1) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
-				"%s: warning: %s snoop-cpu-only property for device whose owner partition has more than one core assigned to it\n",
-				 __func__, dma_window->name);
+			goto skip_snoop_id;
 		}
 
 		ppaace->domain_attr.to_host.snpid =
 				get_snoop_id(hwnode, guest) + 1;
 	}
+skip_snoop_id:
 
 	prop = dt_get_prop(dma_window, "subwindow-count", 0);
 	if (prop)
