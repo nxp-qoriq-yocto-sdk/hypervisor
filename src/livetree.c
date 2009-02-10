@@ -958,6 +958,44 @@ static int is_strlist(const char *str, size_t len)
 	return 1;
 }
 
+static void print_strlist(print_ctx_t *ctx, dt_prop_t *prop)
+{
+	const char *str = prop->data;
+	size_t pos = 0;
+
+	while (pos < prop->len) {
+		qprintf(ctx->out, "%s\"%s\"",
+		        pos == 0 ? " = " : ", ", &str[pos]);
+		pos += strlen(&str[pos]) + 1;
+	}
+}
+
+static void print_hex_bytes(print_ctx_t *ctx, dt_prop_t *prop)
+{
+	uint8_t *data = prop->data;
+
+	for (int j = 0; j < prop->len; j++) {
+		qprintf(ctx->out, "%s%02x",
+		        j == 0 ? " = [" : " ", data[j]);
+	}
+
+	qprintf(ctx->out, "]");
+}
+
+static void print_cells(print_ctx_t *ctx, dt_prop_t *prop, int always_dec)
+{
+	uint32_t *data = prop->data;
+
+	for (int j = 0; j < prop->len / 4; j++) {
+		int dec = always_dec || data[j] < 256;
+
+		qprintf(ctx->out, dec ? "%s%u" : "%s%#x",
+		        j == 0 ? " = <" : " ", data[j]);
+	}
+
+	qprintf(ctx->out, ">");
+}
+
 static int print_pre(dt_node_t *tree, void *arg)
 {
 	print_ctx_t *ctx = arg;
@@ -980,33 +1018,38 @@ static int print_pre(dt_node_t *tree, void *arg)
 
 		qprintf(ctx->out, "%s", prop->name);
 
-		if (is_strlist(prop->data, prop->len)) {
-			const char *str = prop->data;
-			size_t pos = 0;
+		if (prop->len == 0)
+			goto done;
 
-			while (pos < prop->len) {
-				qprintf(ctx->out, "%s\"%s\"",
-				        pos == 0 ? " = " : ", ", &str[pos]);
-				pos += strlen(&str[pos]) + 1;
-			}
-		} else if (prop->len & 3) {
-			uint8_t *data = prop->data;
-
-			for (int j = 0; j < prop->len; j++) {
-				qprintf(ctx->out, "%s%02x",
-				        j == 0 ? " = [" : " ", data[j]);
+		if ((prop->len & 3) == 0) {
+			if (strstr(prop->name, "frequency") ||
+			    strstr(prop->name, "-size") ||
+			    strstr(prop->name, "-count") ||
+			    strstr(prop->name, "-speed") ||
+			    strstr(prop->name, "-len") ||
+			    strstr(prop->name, "-index") ||
+			    strstr(prop->name, "num-")) {
+				print_cells(ctx, prop, 1);
+				goto done;
 			}
 
-			qprintf(ctx->out, "]");
-		} else if (prop->len != 0) {
-			uint32_t *data = prop->data;
-
-			for (int j = 0; j < prop->len / 4; j++)
-				qprintf(ctx->out, "%s%#x", j == 0 ? " = <" : " ", data[j]);
-
-			qprintf(ctx->out, ">");
+			if (strstr(prop->name, "handle") ||
+			    !strcmp(prop->name, "reg") ||
+			    strstr(prop->name, "ranges") ||
+			    strstr(prop->name, "interrupt")) {
+				print_cells(ctx, prop, 0);
+				goto done;
+			}
 		}
 
+		if (is_strlist(prop->data, prop->len))
+			print_strlist(ctx, prop);
+		else if (prop->len & 3)
+			print_hex_bytes(ctx, prop);
+		else
+			print_cells(ctx, prop, 0);
+
+done:
 		qprintf(ctx->out, ";\n");
 	}
 
