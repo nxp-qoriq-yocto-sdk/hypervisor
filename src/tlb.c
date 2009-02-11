@@ -274,7 +274,7 @@ static void guest_inv_tlb0_pid(int pid)
 
 	for (i = 0; i < num_sets; i++)
 		for (j = 0; j < TLBC_WAYS; j++)
-			if (pid == set[i].tag[j].pid || pid < 0)
+			if (pid == set[i].tag[j].pid)
 				set[i].tag[j].valid = 0;
 }
 
