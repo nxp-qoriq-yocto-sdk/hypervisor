@@ -43,4 +43,12 @@ add-directory "../bin" -prepend
 add-directory "bin" -prepend
 add-directory "bin/cache" -prepend
 
+@os.system('rm cache-lock-A.ckpt*')
+
 run-command-file "boot.simics"
+b 0
+continue
+continue
+write-configuration cache-lock-A.ckpt
+restart-simics ../../test/cache/run-cache-A.simics
+

@@ -55,5 +55,4 @@ break 0
 continue
 continue
 write-configuration csd.ckpt
-#restart-simics /home/kalraa/hv/hype3-dev/test/csd/run-csd.simics
 restart-simics ../../test/csd/run-csd.simics
