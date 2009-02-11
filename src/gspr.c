@@ -699,7 +699,7 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_MMUCSR0:
-		guest_inv_tlb(TLBIVAX_INV_ALL, 0, val & (INV_TLB0 | INV_TLB1));
+		guest_inv_tlb(TLBIVAX_INV_ALL, -1, val & (INV_TLB0 | INV_TLB1));
 		break;
 
 	case SPR_BUCSR:
