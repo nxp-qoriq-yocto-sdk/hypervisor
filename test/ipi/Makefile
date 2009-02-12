@@ -49,6 +49,18 @@ ipi1-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           common/init.o)
 ipi1-obj := $(ipi1-obj:%=bin/%.o)
 
+#test source
+ipi2-src-y := $(dir)ipi2.c
+
+# define test and libos object files
+ipi2-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                           $(libos-src-early-y:%=libos/%) \
+                           $(libos-src-y:%=libos/%) \
+                           $(ipi2-src-y:$(dir)%=$(test)/%) \
+                           $(LIBFDT_SRCS:%=libfdt/%) \
+                           common/init.o)
+ipi2-obj := $(ipi2-obj:%=bin/%.o)
+
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
 $(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
@@ -69,8 +81,13 @@ bin/$(test)/ipi1: $(ipi1-obj)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
+bin/$(test)/ipi2: $(ipi2-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+
 .PHONY: $(test)
-$(test): bin/$(test)/ipi bin/$(test)/ipi1 $($(test)-hv-dtb)
+$(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics

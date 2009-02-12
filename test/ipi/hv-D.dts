@@ -1,0 +1,334 @@
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x20000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x20000000>;
+			size = <0 0x2000000>;
+		};
+
+		pma2: pma2 {
+			compatible = "phys-mem-area";
+			addr = <0 0x30000000>;
+			size = <0 0x1000>;
+		};
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&serial0>;
+		legacy-interrupts;
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma1>;
+		};
+
+		serial0: serial0 {
+			// Hypervisor console
+			device = "serial0";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+	};
+
+	doorbells {
+		dbell0: doorbell0 {
+			compatible = "doorbell";
+		};
+		dbell1: doorbell1 {
+			compatible = "doorbell";
+		};
+		dbell2: doorbell2 {
+			compatible = "doorbell";
+		};
+		dbell3: doorbell3 {
+			compatible = "doorbell";
+		};
+		dbell4: doorbell4 {
+			compatible = "doorbell";
+		};
+		dbell5: doorbell5 {
+			compatible = "doorbell";
+		};
+		dbell6: doorbell6 {
+			compatible = "doorbell";
+		};
+		dbell7: doorbell7 {
+			compatible = "doorbell";
+		};
+		dbell8: doorbell8 {
+			compatible = "doorbell";
+		};
+		dbell9: doorbell9 {
+			compatible = "doorbell";
+		};
+		dbell10: doorbell10 {
+			compatible = "doorbell";
+		};
+		dbell11: doorbell11 {
+			compatible = "doorbell";
+		};
+		dbell12: doorbell12 {
+			compatible = "doorbell";
+		};
+		dbell13: doorbell13 {
+			compatible = "doorbell";
+		};
+		dbell14: doorbell14 {
+			compatible = "doorbell";
+		};
+		dbell15: doorbell15 {
+			compatible = "doorbell";
+		};
+		dbell16: doorbell16 {
+			compatible = "doorbell";
+		};
+		dbell17: doorbell17 {
+			compatible = "doorbell";
+		};
+		dbell18: doorbell18 {
+			compatible = "doorbell";
+		};
+		dbell19: doorbell19 {
+			compatible = "doorbell";
+		};
+		dbell20: doorbell20 {
+			compatible = "doorbell";
+		};
+		dbell21: doorbell21 {
+			compatible = "doorbell";
+		};
+		dbell22: doorbell22 {
+			compatible = "doorbell";
+		};
+		dbell23: doorbell23 {
+			compatible = "doorbell";
+		};
+		dbell24: doorbell24 {
+			compatible = "doorbell";
+		};
+		dbell25: doorbell25 {
+			compatible = "doorbell";
+		};
+		dbell26: doorbell26 {
+			compatible = "doorbell";
+		};
+		dbell27: doorbell27 {
+			compatible = "doorbell";
+		};
+		dbell28: doorbell28 {
+			compatible = "doorbell";
+		};
+		dbell29: doorbell29 {
+			compatible = "doorbell";
+		};
+		dbell30: doorbell30 {
+			compatible = "doorbell";
+		};
+		dbell31: doorbell31 {
+			compatible = "doorbell";
+		};
+		dbell32: doorbell32 {
+			compatible = "doorbell";
+		};
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0x25000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,share-mem-test";
+			};
+		};
+
+		serial2: serial2 {
+			device = "serial2";
+		};
+
+		doorbell0 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+		doorbell1 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell1>;
+		};
+		doorbell2 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell2>;
+		};
+		doorbell3 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell3>;
+		};
+		doorbell4 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell4>;
+		};
+		doorbell5 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell5>;
+		};
+		doorbell6 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell6>;
+		};
+		doorbell7 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell7>;
+		};
+		doorbell8 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell8>;
+		};
+		doorbell9 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell8>;
+		};
+		doorbell10 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell10>;
+		};
+		doorbell11 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell11>;
+		};
+		doorbell12 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell12>;
+		};
+		doorbell13 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell13>;
+		};
+		doorbell14 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell14>;
+		};
+		doorbell15 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell15>;
+		};
+		doorbell16 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell16>;
+		};
+		doorbell17 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell17>;
+		};
+		doorbell18 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell18>;
+		};
+		doorbell19 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell19>;
+		};
+		doorbell20 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell20>;
+		};
+		doorbell21 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell21>;
+		};
+		doorbell22 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell22>;
+		};
+		doorbell23 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell23>;
+		};
+		doorbell24 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell24>;
+		};
+		doorbell25 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell25>;
+		};
+		doorbell26 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell26>;
+		};
+		doorbell27 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell27>;
+		};
+		doorbell28 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell28>;
+		};
+		doorbell29 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell29>;
+		};
+		doorbell30 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell30>;
+		};
+		doorbell31 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell31>;
+		};
+		doorbell32 {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell32>;
+		};
+		doorbell33 {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell32>;
+		};
+		aliases {
+			stdout = <&serial2>;
+		};
+	};
+};
