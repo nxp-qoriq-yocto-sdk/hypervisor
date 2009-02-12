@@ -64,6 +64,12 @@ $(non-config): $(O)include/config/auto.conf FORCE
 	@$(MKDIR) $(O)bin/
 	@$(MAKE) -C $(O) -f $(src)Makefile.build $@
 
+package:
+	git-archive --format=tar --prefix=hv-0.3/ v0.3-rc13 doc libos hv.lds include configs Kconfig Makefile Makefile.build patches README Release_Notes.txt src test tools/partman tools/tdgen tools/genassym.sh | gzip > ../hv-0.3.tgz
+	git-archive --format=tar --prefix=hv-0.3/ v0.3-rc13 tools/mux_server | gzip > ../mux_server-0.3.tgz
+	git-archive --format=tar --prefix=hv-0.3/ v0.3-rc13 tools/setlocalversion | gzip > ../setlocalversion-0.3.tgz
+	git-archive --format=tar --prefix=hv-0.3/ v0.3-rc13 kconfig | gzip > ../kconfig-0.3.tgz
+
 clean:
 	rm -rf $(O)bin/
 	rm -rf $(O)test/
