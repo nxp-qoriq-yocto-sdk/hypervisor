@@ -1,9 +1,6 @@
 [submodule "libos"]
 	path = libos
 	url = ../libos.git
-[submodule "dtc"]
-	path = dtc
-	url = ../dtc.git
 [submodule "kconfig"]
 	path = kconfig
 	url = ../kconfig.git

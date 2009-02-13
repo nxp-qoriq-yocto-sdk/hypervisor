@@ -26,7 +26,7 @@ export SIMICS ?= simics
 export MKDIR=mkdir -p
 export DTC := dtc
 
-export DTC_DIR := $(src)dtc
+export DTC_DIR := $(src)../dtc
 export LIBFDT_DIR := $(DTC_DIR)/libfdt
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := $(src)include/libos-client.h
