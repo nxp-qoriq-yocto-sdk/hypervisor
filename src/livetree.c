@@ -821,6 +821,13 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 				ret = ERR_BADTREE;
 				break;
 			}
+			if (!node->endpoint) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					 "%s: node %s: endpoint %s is not valid\n",
+					 __func__, config->parent->name, node->name);
+				ret = ERR_BADTREE;
+				break;
+			}
 
 			/* Find the hardware node that the other config node
 			 * references.
