@@ -1642,7 +1642,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	regs->srr1 = MSR_GS;
 
 #ifdef CONFIG_DEBUG_STUB
-	if (guest->stub_ops && guest->stub_ops->vcpu_start)
+	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
 		guest->stub_ops->vcpu_start(regs);
 #endif
 }
@@ -1739,7 +1739,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	regs->srr1 = MSR_GS;
 
 #ifdef CONFIG_DEBUG_STUB
-	if (guest->stub_ops && guest->stub_ops->vcpu_start)
+	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
 		guest->stub_ops->vcpu_start(regs);
 #endif
 }
@@ -1791,7 +1791,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 	assert(guest->state == guest_stopping);
 
 #ifdef CONFIG_DEBUG_STUB
-	if (guest->stub_ops && guest->stub_ops->vcpu_stop) {
+	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_stop) {
 		guest->stub_ops->vcpu_stop();
 	}
 #endif
