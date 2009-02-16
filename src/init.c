@@ -44,6 +44,7 @@
 #include <ipi_doorbell.h>
 #include <shell.h>
 #include <ccm.h>
+#include <cpc.h>
 #include <doorbell.h>
 #include <events.h>
 #include <thread.h>
@@ -637,6 +638,8 @@ void start(unsigned long devtree_ptr)
 	ccm_init();
 
 	dt_for_each_compatible(hvconfig, "hv-memory", claim_hv_pma, NULL);
+
+	enable_cpcs();
 
 #ifdef CONFIG_BYTE_CHAN
 #ifdef CONFIG_BCMUX

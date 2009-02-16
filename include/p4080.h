@@ -50,6 +50,11 @@ typedef struct {
 #define CPCADDR0 0x10000
 #define CPCADDR1 0x11000
 
+#define CPCCSR0 0
+#define CPCCSR0_CPCE 0x80000000
+#define CPCCSR0_CPCFL 0x800
+#define CPCCSR0_CPCLFC 0x400
+
 #define CPCPIR0 0x200
 #define CPCPIR0_RESET_MASK 0xFFFFFFFF
 #define CPCPAR0 0x208
@@ -70,6 +75,7 @@ typedef struct cpc_part_reg {
 
 typedef struct cpc_dev {
 	unsigned long cpc_reg_map;
+	uint32_t *cpccsr0;
 	struct cpc_part_reg *cpc_part_base;
 } cpc_dev_t;
 

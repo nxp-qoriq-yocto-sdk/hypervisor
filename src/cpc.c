@@ -36,6 +36,48 @@
 
 static cpc_dev_t cpcs[NUMCPCS];
 
+void enable_cpcs(void)
+{
+	uint32_t val;
+
+	for (int i = 0; i < NUMCPCS; i++){
+		val = in32(cpcs[i].cpccsr0);
+		val |= CPCCSR0_CPCE;
+		out32(cpcs[i].cpccsr0, val);
+	}
+}
+
+static inline void disable_cpc(int cpc_index)
+{
+	uint32_t val;
+
+	val = in32(cpcs[cpc_index].cpccsr0);
+	val &= ~CPCCSR0_CPCE;
+	out32(cpcs[cpc_index].cpccsr0, val);
+}
+
+static inline void poll_reg_bit_clear(void *reg, uint32_t reg_val)
+{
+	out32(reg, in32(reg) | reg_val);
+	while (in32(reg) & reg_val);
+}
+
+static inline void reconfigure_cpc(int cpc_index)
+{
+	int i;
+
+	for (i = 0; i < NUM_PART_REGS; i++)
+		out32(&cpcs[cpc_index].cpc_part_base[i].cpcpar, 0);
+
+	poll_reg_bit_clear(cpcs[cpc_index].cpccsr0, CPCCSR0_CPCFL);
+	poll_reg_bit_clear(cpcs[cpc_index].cpccsr0, CPCCSR0_CPCLFC);
+
+	/* We disable CPC hear for reconfiguration purpose.
+	 * CPCs should be enabled once ccm init is through.
+	 */
+	disable_cpc(cpc_index);
+}
+
 static inline void reserve_partition_reg(int cpc_index, int pir_num)
 {
 	cpcs[cpc_index].cpc_reg_map |= 1 << pir_num;
@@ -52,9 +94,12 @@ static inline void remove_pir0_ways(int cpc_index, uint32_t way_mask)
 
 static void init_cpc_dev(int cpc_index, void *vaddr)
 {
+	cpcs[cpc_index].cpccsr0 = vaddr;
 	cpcs[cpc_index].cpc_part_base = (cpc_part_reg_t *)((uint32_t)vaddr + CPCPIR0);
 	/*cpc_reg_map requires 16 bits*/
 	cpcs[cpc_index].cpc_reg_map = ~0xffffUL;
+
+	reconfigure_cpc(cpc_index);
 
 	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpir, CPCPIR0_RESET_MASK);
 	out32(&cpcs[cpc_index].cpc_part_base[0].cpcpar, CPCPAR0_RESET_MASK);
