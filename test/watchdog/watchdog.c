@@ -49,8 +49,8 @@ void watchdog_handler(trapframe_t *frameptr)
 }
 void delay(void) {
 	// Wait a little extra to give the interrupt handler a chance to run
-	while (!(mfspr(SPR_TBL) & 1));
-	while (mfspr(SPR_TBL) & 1);
+	while (!(mfspr(SPR_TBL) & (1 << 5)));
+	while (mfspr(SPR_TBL) & (1 << 5));
 }
 
 void wait_for_timeout(unsigned int wp)
@@ -179,15 +179,22 @@ int test6(void)
 
 void secondary_entry(void)
 {
-	unsigned int cpu_index;
 
-	fh_cpu_whoami(&cpu_index);
-	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, mfspr(SPR_TSR) >> 28);
+	// If the WRS bits are set, then it means that we just rebooted from
+	// a watchdog timeout.  If we re-run test6(), then we'll just reboot
+	// again.  So instead, we stop.
+	if (!(mfspr(SPR_TSR) & TSR_WRS)) {
+		unsigned int cpu_index;
 
-	test6();
-	printf("\010\010\010\010\010\010FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+		fh_cpu_whoami(&cpu_index);
+		printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
+
+		test6();
+		// If we get here, then we didn't reboot.  That's a failure.
+		printf("\010\010\010\010\010\010FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_WP_SET(0));
+	}
 
 	printf("Test Complete\n");
 }
@@ -201,7 +208,7 @@ void start(void)
 	printf("\n\nWatchdog test\n");
 
 	fh_cpu_whoami(&cpu_index);
-	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, mfspr(SPR_TSR) >> 28);
+	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
 
 	mtspr(SPR_TCR, TCR_WRC_NOP);
 
