@@ -393,9 +393,8 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 	if (ret)
 		return ret;
 
-	assert(node->bch);
-
-	byte_chan_attach_guest(node, guest);
+	if (node->bch)
+		byte_chan_attach_guest(node, guest);
 
 	return 0;
 }
