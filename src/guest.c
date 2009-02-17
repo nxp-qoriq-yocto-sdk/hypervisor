@@ -1759,7 +1759,6 @@ void start_core(trapframe_t *regs)
 	else
 		fn = start_guest_secondary;
 
-	assert(is_idle());
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack, fn, NULL, 0);
 	unblock(&gcpu->thread);
 }
@@ -1774,7 +1773,6 @@ void start_wait_core(trapframe_t *regs)
 	assert(gcpu == guest->gcpus[0]);
 	assert(guest->state == guest_starting);
 
-	assert(is_idle());
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
 	                   start_guest_primary, NULL, 0);
 	unblock(&gcpu->thread);
