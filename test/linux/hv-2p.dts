@@ -112,12 +112,17 @@
 			guest-addr = <0 0>;
 		};
 
-		node-update {
+		node-update@foo {
 			chosen {
 				/* We should probably provide fixup for linux,stdout-path
 				 * similar to aliases.
 				 */
 				linux,stdout-path = "/serial2";
+			};
+		};
+		
+		node-update@bar {
+			chosen {
 				bootargs = "console=ttyS0,115200";
 			};
 		};
