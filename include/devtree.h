@@ -55,6 +55,16 @@ typedef struct dev_owner {
 	struct dev_owner *direct; /**< nearest ancestor which is directly assigned */
 } dev_owner_t;
 
+typedef struct intmap_entry {
+	struct interrupt *irq; /* If the interrupt goes through vmpic, else NULL */
+	uint32_t parent; /* Interrupt-parent phandle */
+	uint32_t intspec[MAX_ADDR_CELLS + MAX_INT_CELLS];
+	uint32_t parent_intspec[MAX_ADDR_CELLS + MAX_INT_CELLS];
+
+	uint32_t parent_naddr, parent_nint;
+	int valid;
+} intmap_entry_t;
+
 typedef struct dt_node {
 	struct dt_node *parent;
 	list_t children, child_node, props;
@@ -76,6 +86,10 @@ typedef struct dt_node {
 	struct mux_complex *bcmux;
 
 	list_t aliases;
+
+	intmap_entry_t *intmap;
+	uint32_t intmap_mask[MAX_ADDR_CELLS + MAX_INT_CELLS];
+	int irqs_looked_up, intmap_len;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -90,7 +104,7 @@ int flatten_dev_tree(dt_node_t *tree, void *fdt_window, size_t fdt_len);
 
 dt_node_t *create_dev_tree(void);
 void dt_delete_node(dt_node_t *tree);
-void dt_delete_prop(dt_prop_t *tree);
+void dt_delete_prop(dt_prop_t *prop);
 
 typedef int (*dt_callback_t)(dt_node_t *node, void *arg);
 
@@ -166,6 +180,7 @@ int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr);
 void dt_assign_devices(dt_node_t *tree, struct guest *guest);
 void dt_lookup_regs(dt_node_t *node);
 void dt_lookup_irqs(dt_node_t *node);
+void dt_lookup_intmap(dt_node_t *node);
 
 int dt_bind_driver(dt_node_t *node);
 

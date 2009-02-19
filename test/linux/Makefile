@@ -33,7 +33,7 @@
 test := linux
 dir := $(testdir)$(test)/
 
-$(test)-dts := $(dir)hv-1p.dts $(dir)hv-2p.dts $(dir)hv-partman.dts $(dir)hv-demo.dts $(dir)hv-1core.dts $(dir)hv-hello.dts
+$(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
 include $(src)tools/partman/Makefile

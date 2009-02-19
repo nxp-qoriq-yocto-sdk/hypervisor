@@ -894,34 +894,35 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
  */
 int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 {
-	dt_node_t *mixin;
 	int ret;
 
-	mixin = dt_get_subnode(config, "node-update", 0);
-	if (mixin) {
-		ret = dt_merge_tree(target, mixin, 1);
-		if (ret < 0) {
-			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-				 "%s: error %d merging node-update on %s\n",
-				 __func__, ret, config->name);
-			return ret;
+	list_for_each(&config->children, i) {
+		dt_node_t *subnode = to_container(i, dt_node_t, child_node);
+
+		if (!strcmp(subnode->name, "node-update") ||
+		    !strncmp(subnode->name, "node-update@", strlen("node-update@"))) {
+			ret = dt_merge_tree(target, subnode, 1);
+			if (ret < 0) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: error %d merging %s on %s\n",
+				         __func__, ret, subnode->name, config->name);
+				return ret;
+			}
 		}
-	}
 
-	/* The node has been merged and updated with node-update.  Now check
-	 * for any phandle updates.
-	 */
-	mixin = dt_get_subnode(config, "node-update-phandle", 0);
-	if (mixin) {
-		/* Merge the phandles into the target  */
-		merge_ctx_t ctx = {
-			.dest = target,
-			.notfirst = 0,
-		};
+		if (!strcmp(subnode->name, "node-update-phandle") ||
+		    !strncmp(subnode->name, "node-update-phandle@",
+		             strlen("node-update-phandle@"))) {
+			/* Merge the phandles into the target  */
+			merge_ctx_t ctx = {
+				.dest = target,
+				.notfirst = 0,
+			};
 
-		ret = dt_for_each_node(mixin, &ctx, do_merge_phandle, merge_post);
-		if (ret)
-			return ret;
+			ret = dt_for_each_node(subnode, &ctx, do_merge_phandle, merge_post);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return 0;
