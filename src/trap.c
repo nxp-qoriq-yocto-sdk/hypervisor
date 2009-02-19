@@ -245,7 +245,11 @@ void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
 	gcpu->mcsrr1 = regs->srr1;
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_MCHECK];
-	regs->srr1 &= MSR_GS | MSR_UCLE;
+
+	if (gcpu->guest->guest_debug_mode)
+		regs->srr1 &= MSR_GS | MSR_UCLE;
+	else
+		regs->srr1 &= MSR_GS | MSR_UCLE | MSR_DE;
 }
 
 typedef struct {
