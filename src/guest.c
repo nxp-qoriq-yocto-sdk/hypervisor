@@ -309,6 +309,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	                   (newranges - newranges_base) * sizeof(newranges[0]));
 }
 
+#ifdef CONFIG_PAMU
 static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_prop_t *prop;
@@ -466,6 +467,7 @@ nomem:
         	 "%s: out of memory\n", __func__);
 	return ERR_NOMEM;
 }
+#endif
 
 static int map_guest_reg(dev_owner_t *owner)
 {
@@ -847,7 +849,9 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 	}
 
 	configure_qman_portal(guest, owner->cfgnode, hwnode, node);
+#ifdef CONFIG_PAMU
 	configure_dma(node, owner);
+#endif
 
 	return 0;
 
