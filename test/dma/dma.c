@@ -30,6 +30,7 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
 #define DMA_CHAN_BSY 0x00000004
@@ -75,7 +76,6 @@ int test_dma_memcpy(unsigned int gpa_src, unsigned int gpa_dst, int do_memset)
 
 	return (!memcmp(gva_src, gva_dst, count));
 }
-
 
 void start(unsigned long devtree_ptr)
 {
@@ -125,8 +125,18 @@ void start(unsigned long devtree_ptr)
 	else
 		printf("DMA access violation test#2 : FAILED\n");
 
-	if (test_dma_memcpy(0x04000100, 0x0c000100, 1) ||
-		test_dma_memcpy(0x04000100, 0x05000100, 1))
+	/*
+	 * create a hard-coded TLB1 entry for PAMU address-translation
+	 * verification test
+	 */
+
+	tlb1_set_entry(3, (unsigned long)(0x20000000 + PHYSBASE),
+		(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
+		TLB_MAS3_KERN, 0, 0, 0);
+
+	if ((test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
+	     test_dma_memcpy(0x04000100, 0x20000100, 1)) ||
+	     test_dma_memcpy(0x04000100, 0x05000100, 1))
 		printf("DMA access test : PASSED\n");
 	else
 		printf("DMA access test : FAILED\n");

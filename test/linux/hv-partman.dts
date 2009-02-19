@@ -48,6 +48,12 @@
 		size = <0x0 0x20000000>;  // 512MB
 	};
 
+	pma3:pma3 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x60000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+
 	dma-windows {
 		window0: window0 {
 			compatible = "dma-window";
@@ -76,6 +82,14 @@
 			device = "serial1";
 		};
 
+		serial2:serial2 {
+			device = "serial2";
+		};
+
+		serial3:serial3 {
+			device = "serial3";
+		};
+
 		mpic {
 			device = "/soc/pic";
 		};
@@ -89,9 +103,10 @@
 		};
 	};
 
-	uartmux: uartmux {
-		compatible = "byte-channel-mux";
-		endpoint = <&serial1>;
+	doorbells {
+		dbell0: doorbell0 {
+			compatible = "doorbell";
+		};
 	};
 
 	part1 {
@@ -102,8 +117,33 @@
 		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 
-		serial2 {
-			device = "serial2";
+		aliases {
+			stdout = <&console1>;
+		};
+
+		console1: console {
+			compatible = "byte-channel";
+			endpoint = <&serial1>;
+		};
+
+		bc1: bc-p2 {
+			compatible = "byte-channel";
+			endpoint = <&bcp2>;
+		};
+
+		bc2: bc-p3 {
+			compatible = "byte-channel";
+			endpoint = <&bcp3>;
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
 		};
 
 		gpma0 {
@@ -117,14 +157,9 @@
 			partition = <&part2>;
 		};
 
-		node-update {
-			chosen {
-				/* We should probably provide fixup for linux,stdout-path
-				 * similar to aliases.
-				 */
-				linux,stdout-path = "/serial2";
-				bootargs = "console=ttyS0,115200";
-			};
+		partition@2 {
+			compatible = "managed-partition";
+			partition = <&part3>;
 		};
 	};
 
@@ -135,18 +170,85 @@
 		dtb-window = <0 0x1000000 0 0x10000>;
 
 		aliases {
-			stdout = <&bc0>;
+			stdout = <&console2>;
 		};
 
-		bc0: byte-channel {
+		console2: console {
 			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <0>;
+			endpoint = <&serial2>;
+		};
+
+		bcp2: bc {
+			compatible = "byte-channel";
+			endpoint = <&bc1>;
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
 		};
 
 		gpma0 {
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
+		};
+
+		/* Currently, the hypervisor does not support updating the
+		 * chosen node based on images loaded via partman.  This is
+		 * because there's no mechanism for partman to tell the
+		 * hypervisor that a particular image is a root file system.
+		 * So we need to hard-code the memory ranges used for the
+		 * rootfs here.  To load the rootfs, use:
+		 * "partman -l -a X ...", where X is the value of
+		 * linux,initrd-start below.
+		 */
+		node-update {
+			chosen {
+				linux,initrd-start = <0x01300000>;
+				linux,initrd-end = <0x02000000>;
+			};
+		};
+	};
+
+	part3:part3 {
+		compatible = "partition";
+		label = "p3-linux";
+		cpus = <4 2>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+
+		aliases {
+			stdout = <&console3>;
+		};
+
+		console3: console {
+			compatible = "byte-channel";
+			endpoint = <&serial3>;
+		};
+
+		bcp3: bc {
+			compatible = "byte-channel";
+			endpoint = <&bc2>;
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma3>;
 			guest-addr = <0 0>;
 		};
 

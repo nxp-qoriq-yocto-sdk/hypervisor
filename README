@@ -1,4 +1,4 @@
-Freescale Embedded Hypervisor README 
+Freescale Embedded Hypervisor README
 Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
 
 ----------------------------------------------------------
@@ -9,7 +9,7 @@ Building the hypervisor
           o git submodule init
           o git submodule update
           o make allyesconfig
-          o make 
+          o make
     * to build the tests
           o make test
     * to build a specific test "foo"
@@ -21,10 +21,9 @@ Building the hypervisor
 Source tree directory structure
 
    The hypervisor uses libos and the libfdt library from the device
-   tree compiler.  Descriptions of the source directories are 
+   tree compiler.  Descriptions of the source directories are
    below:
 
-   dtc/libfdt		The libfdt library for device tree processing
    libos/include        libos library includes
    libos/lib            libos library source
    src                  hypervisor source
@@ -34,7 +33,5 @@ Source tree directory structure
    tools/partman        The Linux user space partition manager tool
    test                 Hypervisor unit tests
    test/common          files shared by the tests
-   test/sim             The sim.git project.  U-boot, kernel images
-                        comem from here.
 
 ----------------------------------------------------------
