@@ -1079,7 +1079,7 @@ static int debug_exception(trapframe_t *trap_frame)
 
 	stub->dbsr = 0;
 
-	DEBUG();
+	DEBUG("DBSR=%08lx, srr0=%08lx, srr1=%08lx\n",dbsr,trap_frame->srr0,trap_frame->srr1);
 
 	if (dbsr & DBSR_TRAP)
  		stub->dbsr |= DBSR_TRAP;
@@ -1123,7 +1123,7 @@ static int handle_debug_event(trapframe_t *trap_frame)
 
 	DEBUG();
 
-	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: debug exception\n");
+	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: -------> debug event <--------- \n");
 
 	/* enable interrupts, so UART keeps working */
 	enable_int();
