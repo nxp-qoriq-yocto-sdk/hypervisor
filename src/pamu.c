@@ -460,7 +460,14 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		if ((*(const uint32_t *)stash_prop->data) >= L3) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
 				"%s: warning: %s snoop-cpu-only property must have stash-dest as L1 or L2 cache\n",
-				 __func__, dma_window->name);
+				 __func__, cfgnode->name);
+			goto skip_snoop_id;
+		}
+
+		if (!dt_get_prop(cfgnode->parent, "vcpu", 0)) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
+				"%s: warning: missing vcpu property in %s node corresponding to snoop-cpu-only property defined in %s node\n",
+				__func__, cfgnode->parent->name, cfgnode->name);
 			goto skip_snoop_id;
 		}
 
