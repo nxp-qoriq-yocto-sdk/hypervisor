@@ -78,22 +78,45 @@ void dump(int *a, int n, int pir, int i)
 	printf("\n");
 }
 
-int gdb_attached[CPUCNT];
-int a[CPUCNT];
+void gorp (void) __attribute__ ((noinline));
+
+void gorp(void)
+{
+	int i;
+	int a[64];
+	for (i = 0; i < 64; i++) {
+		a[i] = i;
+	}
+	return;
+}
+
+volatile int gdb_attached[CPUCNT];
+volatile int a[CPUCNT];
+volatile int X = 9;
+volatile int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
+
 void debug_code (int pir) __attribute__ ((noinline));
+
 void debug_code (int pir)
 {
-	int i = 0;
+	int j, t;
 
-	if (!gdb_attached[pir]) /* Set at GDB prompt. */
-		return;
-
-	while(1) {
-		if (i++ % CPUCNT == pir)
-			a[pir]--;
-		else
-			a[pir]++;
-		dump(a, CPUCNT, pir, i);
+	while (1) {
+		X = 0;
+		Y[0] = 0;
+		Y[1] = 1;
+		Y[2] = 2;
+		Y[3] = 3;
+		Y[4] = 4;
+		Y[5] = 5;
+		Y[6] = 6;
+		Y[7] = 7;
+		for (j = 0; j < 4; j++) {
+			t = Y[2*j];
+			Y[2*j] = Y[2*j+1];
+			Y[2*j+1] = t;
+		}
+		gorp();
 	}
 }
 
@@ -110,8 +133,12 @@ void secondary_entry(void)
 	} else {
 		printf("FAILED\n");
 	}
-	while (!gdb_attached[pir])
-		debug_code(pir);
+
+	/* wait for debugger to set gdb_attached
+	 * and allow code to continue */
+	while (!gdb_attached[pir]);
+
+	debug_code(pir);
 }
 
 extern void (*secondary_startp)(void);
@@ -152,6 +179,10 @@ void start(unsigned long devtree_ptr)
 	}
 
 	printf("Test Complete\n");
-	while (!gdb_attached[pir])
-		debug_code(pir);
+
+	/* wait for debugger to set gdb_attached
+	 * and allow code to continue */
+	while (!gdb_attached[pir]);
+
+	debug_code(pir);
 }
