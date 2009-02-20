@@ -157,6 +157,13 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	if (!pma_node || !pma_node->pma)
 		return 0;
 
+	if (dt_owned_by(pma_node, NULL)) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: phys mem area %s owned by hypervisor and %s\n",
+		         __func__, pma_node->name, guest->name);
+		return 0;
+	}
+
 	pma = pma_node->pma;
 
 	if (dt_get_prop(node, "dma-only", 0))

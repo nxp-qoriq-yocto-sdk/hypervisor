@@ -178,7 +178,7 @@ static void pma_setup_cpc(dt_node_t *node)
 	}
 }
 
-static inline void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
+static void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
 {
 	uint32_t val;
 
@@ -189,6 +189,14 @@ static inline void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
 	out32(&csdids[csd->csd_id], val);
 
 	enable_law(csd->law_id);
+}
+
+void add_all_cpus_to_csd(dt_node_t *node)
+{
+	if (!node->csd)
+		return;
+	
+	set_csd_cpus(node->csd, HV_CPUS);
 }
 
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
@@ -428,8 +436,6 @@ fail:
 
 void ccm_init(void)
 {
-	dt_node_t *node;
-
 	if (!laws || !csdids) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 				"CCM initialization failed\n");
@@ -446,11 +452,6 @@ void ccm_init(void)
 	 */
 	dt_for_each_compatible(config_tree, "phys-mem-area",
 	                       setup_csd, NULL);
-
-	node = dt_get_first_compatible(config_tree, "hv-memory");
-	node = get_pma_node(node);
-	if (node->csd)
-		set_csd_cpus(node->csd, HV_CPUS);
 }
 
 dt_node_t *get_pma_node(dt_node_t *node)

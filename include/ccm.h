@@ -34,6 +34,7 @@ typedef struct csd_info {
 
 void ccm_init(void);
 void add_cpus_to_csd(struct guest *guest, struct dt_node *node);
+void add_all_cpus_to_csd(struct dt_node *node);
 struct dt_node *get_pma_node(struct dt_node *node);
 
 #endif

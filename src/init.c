@@ -436,13 +436,40 @@ static void find_hv_console(dt_node_t *hvconfig)
 		open_stdout_chardev(stdout_node);
 }
 
+static int claim_hv_pma(dt_node_t *node, void *arg)
+{
+	dt_node_t *pma = get_pma_node(node);
+	if (!pma) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: no pma node for %s\n", __func__, node->name);
+		return 0;
+	}
+
+	dev_owner_t *owner = alloc_type(dev_owner_t);
+	if (!owner) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		return ERR_NOMEM;
+	}
+
+	owner->cfgnode = pma;
+
+	spin_lock(&dt_owner_lock);
+	list_add(&hv_devs, &owner->guest_node);
+	list_add(&pma->owners, &owner->dev_node);
+	spin_unlock(&dt_owner_lock);
+
+	add_all_cpus_to_csd(node);
+	return 0;
+}
+
+static dt_node_t *hvconfig;
+
 static void assign_hv_devs(void)
 {
-	dt_node_t *node = dt_get_first_compatible(config_tree, "hv-config");
-
 	dt_read_aliases();
-	dt_assign_devices(node, NULL);
-	find_hv_console(node);
+	dt_assign_devices(hvconfig, NULL);
+	find_hv_console(hvconfig);
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
@@ -588,11 +615,17 @@ void start(unsigned long devtree_ptr)
 
 	unmap_fdt();
 
+	hvconfig = dt_get_first_compatible(config_tree, "hv-config");
+	if (!hvconfig) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+		         "panic: no hv-config node.\n");
+		return;
+	}
+
 	CCSRBAR_PA = get_ccsr_phys_addr(&ccsr_size);
 	if (CCSRBAR_PA)
 		CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, ccsr_size,
                                                 TLB_MAS2_IO, TLB_MAS3_KERN);
-
 
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
@@ -602,6 +635,8 @@ void start(unsigned long devtree_ptr)
 	init_gevents();
 
 	ccm_init();
+
+	dt_for_each_compatible(hvconfig, "hv-memory", claim_hv_pma, NULL);
 
 #ifdef CONFIG_BYTE_CHAN
 #ifdef CONFIG_BCMUX
