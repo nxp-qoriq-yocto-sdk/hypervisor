@@ -193,7 +193,7 @@ shell_cmd(help);
 
 static void version_fn(shell_t *shell, char *args)
 {
-	printf("Topaz Hypervisor version %s\n", CONFIG_HV_VERSION);
+	printf("Freescale Embedded Hypervisor version %s\n", CONFIG_HV_VERSION);
 }
 
 static command_t version = {
