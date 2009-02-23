@@ -522,6 +522,33 @@ fail:
 	return 0;
 }
 
+/**
+ * get_full_node_name - returns the full path name of the given node
+ * @param node: the node
+ * @param name: pointer to a buffer to hold the path
+ * @param lenghth: size of @name
+ *
+ * Traverses the ancestors of the given node and print out a full path name
+ * of the node.
+ *
+ * Returns a pointer to the buffer.
+ */
+static char *get_full_node_name(gdt_node_t *node, char *name, size_t length)
+{
+	char temp[PATH_MAX];
+
+	strncpy(name, node->name, length);
+	node = node->parent;
+
+	while (node && node->name) {
+		snprintf(temp, PATH_MAX, "%s/%s", node->name, name);
+		strncpy(name, temp, length);
+		node = node->parent;
+	}
+
+	return name;
+}
+
 /* Command parsers */
 
 /**
@@ -574,6 +601,75 @@ static int cmd_status(void)
 			default: printf("unknown %i\n", status.status); break;
 			}
 		}
+	}
+
+	printf("\n"
+	       "Byte Channel Name               Handle  RX Int  TX Int\n"
+	       "------------------------------------------------------\n");
+
+	node = NULL;
+	while ((node = gdt_find_next_compatible(node, "fsl,hv-byte-channel-handle")) != NULL) {
+		gdt_prop_t *prop;
+		uint32_t reg;
+		uint32_t *irq;
+
+		prop = gdt_get_property(node, "reg");
+		if (!prop || (prop->len != sizeof(uint32_t))) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "reg", node->name);
+			return -ENOENT;
+		}
+		reg = * ((uint32_t *) prop->data);
+
+		prop = gdt_get_property(node, "interrupts");
+		if (!prop ||(prop->len != 4 * sizeof(uint32_t))) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "interrupts", node->name);
+			return -ENOENT;
+		}
+		irq = prop->data;
+
+		printf("%-31s %-7u %-7u %u\n", node->name, reg, irq[0], irq[2]);
+	}
+
+	printf("\n"
+	       "Doorbell Name                   Handle  Type\n"
+	       "--------------------------------------------\n");
+
+	node = NULL;
+	while ((node = gdt_find_next_compatible(node, "fsl,hv-doorbell-receive-handle")) != NULL) {
+		gdt_prop_t *prop;
+		char name[32];
+		uint32_t *irq;
+
+		prop = gdt_get_property(node, "interrupts");
+		if (!prop ||(prop->len != 2 * sizeof(uint32_t))) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "interrupts", node->name);
+			return -ENOENT;
+		}
+		irq = prop->data;
+
+		printf("%-31s %-7u %s\n", get_full_node_name(node, name, sizeof(name)),
+		       irq[0], "receive");
+	}
+
+	node = NULL;
+	while ((node = gdt_find_next_compatible(node, "fsl,hv-doorbell-send-handle")) != NULL) {
+		gdt_prop_t *prop;
+		uint32_t reg;
+		char name[32];
+
+		prop = gdt_get_property(node, "reg");
+		if (!prop || (prop->len != sizeof(uint32_t))) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "reg", node->name);
+			return -ENOENT;
+		}
+		reg = * ((uint32_t *) prop->data);
+
+		printf("%-31s %-7u %s\n", get_full_node_name(node, name, sizeof(name)),
+		       reg, "send");
 	}
 
 	return 0;
