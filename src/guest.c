@@ -746,22 +746,23 @@ static dt_node_t *cpu_to_node(unsigned int cpu)
 }
 
 /**
- * configure_qman_portal - configure the vcpu property of a QMAN portal node
+ * configure_portal - configure the vcpu property of a Qman or Bman portal node
  * @param[in] guest the guest
  * @param[in] cfgnode the configuration node
  * @param[in] hwnode the corresponding hardware node
  * @param[in] gnode the corresponding guest node
  *
  * Check if the configuration node has a 'vcpu' property and the hardware
- * node it represents is a QMAN portal node.  If so, create the
+ * node it represents is a Qman/Bman portal node.  If so, create the
  * corresponding cpu-handle property in the target guest node.
  *
- * Returns 0 if success or not a QMAN portal node, or negative error code
+ * Returns 0 if success or not a portal node, or negative error code
  */
 static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 				 dt_node_t *hwnode, dt_node_t *gnode)
 {
-	if (!dt_node_is_compatible(hwnode, "fsl,qman-portal"))
+	if (!dt_node_is_compatible(hwnode, "fsl,qman-portal") &&
+	    !dt_node_is_compatible(hwnode, "fsl,bman-portal"))
 		return 0;
 
 	dt_prop_t *prop = dt_get_prop_len(cfgnode, "vcpu", sizeof(uint32_t));
