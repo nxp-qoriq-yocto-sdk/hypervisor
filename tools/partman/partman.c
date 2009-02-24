@@ -1,6 +1,6 @@
-
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Author: Timur Tabi <timur@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +23,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 /**
  * Sample Linux partition management utility
  *
@@ -35,19 +34,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <fcntl.h>
-#include <error.h>
 #include <errno.h>
 #include <stropts.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/mman.h>
 #include <arpa/inet.h>
-#include <byteswap.h>
 #include <asm/ioctl.h>
+
+#include "parse_dt.h"
 
 /*
  * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
@@ -421,63 +417,6 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 }
 
 /**
- * Read a device tree property file into memory
- */
-static void *read_property(const char *filename, size_t *size)
-{
-	off_t off;
-	int f;
-	void *buffer = NULL;
-	struct stat buf;
-
-	f = open(filename, O_RDONLY);
-	if (f == -1) {
-		if (verbose)
-			perror(__func__);
-		return NULL;
-	}
-
-	if (fstat(f, &buf)) {
-		if (verbose)
-			perror(__func__);
-		goto fail;
-	}
-
-	off = buf.st_size;
-	if (!off) {
-		if (verbose)
-			printf("%s: device tree property file %s is zero bytes long\n",
-				__func__, filename);
-		goto fail;
-	}
-
-	buffer = malloc(off);
-	if (!buffer) {
-		if (verbose)
-			perror(__func__);
-		goto fail;
-	}
-
-	if (read(f, buffer, off) != off) {
-		if (verbose)
-			perror(__func__);
-		goto fail;
-	}
-
-	if (size)
-		*size = off;
-
-	close(f);
-	return buffer;
-
-fail:
-	free(buffer);
-	close(f);
-
-	return NULL;
-}
-
-/**
  * Load an image file into memory and parse it if it's an ELF
  *
  * @partition: the partition handle to copy to
@@ -583,120 +522,61 @@ fail:
 	return 0;
 }
 
-/**
- * Returns non-zero if the property is compatible
- *
- * @haystack - pointer to NULL-terminated strings that contain the value of
- *           the 'compatible' property to test
- * @length - length of 'haystack'
- * @needle - compatible string to search for
- */
-static int is_compatible(const char *haystack, size_t length, const char *needle)
-{
-	while (length > 0) {
-		int l;
-
-		if (strcmp(haystack, needle) == 0)
-			return 1;
-		l = strlen(haystack) + 1;
-		haystack += l;
-		length -= l;
-	}
-
-	return 0;
-}
-
 /* Command parsers */
 
-static const char handle_path[] = "/proc/device-tree/hypervisor/handles";
 /**
  * Displays a list of partitions and their status
  */
 static int cmd_status(void)
 {
-	DIR *dir;
-	struct dirent *dp;
-	int ret = 0;
+	gdt_node_t *node = NULL;
 
 	printf("Partition status\n\n");
-
-	if (chdir(handle_path)) {
-		printf("Cannot find %s path\n", handle_path);
-		if (verbose)
-			perror(__func__);
-		return errno;
-	}
-
-	dir = opendir(".");
-	if (!dir) {
-		printf("Cannot open directory %s\n", handle_path);
-		if (verbose)
-			perror(__func__);
-		return errno;
-	}
 
 	printf("Partition Name                  Handle  Status\n"
 	       "----------------------------------------------\n");
 
-	while ((dp = readdir(dir)))
-		if ((dp->d_type == DT_DIR) && (dp->d_name[0] != '.')) {
-			size_t size;
-			char filename[300];
-			char *strprop;
-			uint32_t *reg;
-			struct fsl_hv_ioctl_status status;
+	while ((node = gdt_find_next_compatible(node, "fsl,hv-partition-handle")) != NULL) {
+		gdt_prop_t *prop;
+		uint32_t reg;
+		const char *label;
+		struct fsl_hv_ioctl_status status;
+		int ret;
 
-			snprintf(filename, sizeof(filename) - 1, "%s/compatible", dp->d_name);
-			strprop = read_property(filename, &size);
-			if (!strprop) {
-				printf("Could not read property %s\n", filename);
-				goto exit;
-			}
-			if (!is_compatible(strprop, size, "fsl,hv-partition-handle"))
-				continue;
-			free(strprop);
-
-			sprintf(filename, "%s/reg", dp->d_name);
-			reg = read_property(filename, &size);
-			if (!reg) {
-				printf("%s: 'reg' property missing\n", __func__);
-				goto exit;
-			}
-			if (size != sizeof(uint32_t)) {
-				printf("%s: 'reg' property is wrong size\n", __func__);
-				goto exit;
-			}
-
-			sprintf(filename, "%s/label", dp->d_name);
-			strprop = read_property(filename, &size);
-			if (!strprop)
-				goto exit;
-
-			strprop[size - 1] = 0;
-			printf("%-31s %-7u ", strprop, *reg);
-			free(strprop);
-
-			status.partition = *reg;
-			ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
-			if (ret) {
-				printf("error %i\n", ret);
-				ret = 0;
-			} else {
-				switch (status.status) {
-				case 0: printf("stopped\n"); break;
-				case 1: printf("running\n"); break;
-				case 2: printf("starting\n"); break;
-				case 3: printf("stopping\n"); break;
-				default: printf("unknown %i\n", status.status); break;
-				}
-			}
-			free(reg);
+		prop = gdt_get_property(node, "reg");
+		if (!prop || (prop->len != sizeof(uint32_t))) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "reg", node->name);
+			return -ENOENT;
 		}
+		reg = * ((uint32_t *) prop->data);
 
-exit:
-	closedir(dir);
+		prop = gdt_get_property(node, "label");
+		if (!prop || !prop->len) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "label", node->name);
+			return -ENOENT;
+		}
+		label = prop->data;
 
-	return ret;
+		printf("%-31s %-7u ", label, reg);
+
+		status.partition = reg;
+		ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
+		if (ret) {
+			printf("error %i\n", ret);
+		} else {
+			switch (status.status) {
+			case 0: printf("stopped\n"); break;
+			case 1: printf("running\n"); break;
+			case 2: printf("starting\n"); break;
+			case 3: printf("stopping\n"); break;
+			default: printf("unknown %i\n", status.status); break;
+			}
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -973,6 +853,11 @@ int main(int argc, char *argv[])
 
 	if (!verify_dev())
 		return 1;
+
+	if (!gdt_load_tree("/proc/device-tree/hypervisor/handles")) {
+		printf("Could not load device tree\n");
+		return 1;
+	}
 
 	memset(&p, 0, sizeof(p));
 

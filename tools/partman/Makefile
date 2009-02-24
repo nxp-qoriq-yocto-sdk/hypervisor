@@ -21,8 +21,8 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-bin/linux/partman: $(src)tools/partman/partman.c
+bin/linux/partman: $(src)tools/partman/partman.c $(src)tools/partman/parse_dt.c
 	@mkdir -p $(@D)
-	$(call show,build $(<:$(src)%=%) into $@)
-	$(V)$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -DVERSION=\"$(PROJECTVERSION)\" -o $@ $<
+	$(call show,build $(^:$(src)%=%) into $@)
+	$(V)$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -DVERSION=\"$(PROJECTVERSION)\" -o $@ $^
 	$(V)$(CROSS_COMPILE)strip $@
