@@ -179,6 +179,9 @@ static void usage(void)
 	printf("\t\t<handle> is the doorbell send handle for the doorbell to ring.\n\n");
 
 	printf("Specify -v for verbose output\n\n");
+
+	printf("For all commands, <handle> can be either the handle number or the\n");
+	printf("full handle name as displayed by the -s command.\n\n");
 }
 
 /**
@@ -938,6 +941,54 @@ int verify_dev(void)
 	return 1;
 }
 
+/**
+ * get_handle - return the numeric handle that matches the name of the node
+ * @param name: the full name of the node to search for
+ *
+ * This function tries to match a node's full name to its numeric handle.
+ *
+ * Returns the handle number, or -1 if error
+ */
+static int get_handle(const char *name)
+{
+	gdt_node_t *node = NULL;
+	gdt_prop_t *prop;
+	char *short_name = strrchr(name, '/');
+	char full_name[PATH_MAX];
+
+	if (!short_name)
+		node = gdt_find_next_name(NULL, name);
+	else {
+		// short_name is the part of the name after the last '/'
+		short_name++;
+
+		while ((node = gdt_find_next_name(node, short_name)) != NULL) {
+			// We found a match on the short name, so let's see if it
+			// matches the full name.
+			get_full_node_name(node, full_name, PATH_MAX);
+			if (strcmp(full_name, name) == 0)
+				break;
+		}
+	}
+
+	if (!node)
+		return -1;
+
+	// Receive doorbells have their handle in the "interrupts" property.
+	// Everyone else has it in the "reg" property.
+
+	if (gdt_is_compatible(node, "fsl,hv-doorbell-receive-handle"))
+		prop = gdt_get_property(node, "interrupts");
+	else
+		prop = gdt_get_property(node, "reg");
+
+	if (!prop || (prop->len < sizeof(uint32_t)))
+		return -1;
+
+	return *((uint32_t *) (prop->data));
+}
+
+
 int main(int argc, char *argv[])
 {
 	enum command cmd = e_none;
@@ -983,7 +1034,11 @@ int main(int argc, char *argv[])
 			verbose = 1;
 			break;
 		case 'h':
-			p.h = strtol(optarg, NULL, 0);
+			ret = get_handle(optarg);
+			if (ret < 0)
+				p.h = strtol(optarg, NULL, 0);
+			else
+				p.h = ret;
 			p.h_specified = 1;
 			break;
 		case 'f':
