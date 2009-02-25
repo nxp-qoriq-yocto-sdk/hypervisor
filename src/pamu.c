@@ -615,6 +615,18 @@ void setup_omt(void)
 	ome = pamu_get_ome(OMI_FMAN);
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+
+	/* Configure OMI_QMAN private */
+	ome = pamu_get_ome(OMI_QMAN_PRIV);
+	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READ;
+	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+	ome->moe[IOE_EREAD0_IDX] = EOE_VALID | EOE_RSA;
+	ome->moe[IOE_EWRITE0_IDX] = EOE_VALID | EOE_WWSA;
+
+	/* Configure OMI_CAAM */
+	ome = pamu_get_ome(OMI_CAAM);
+	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
+	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 }
 
 static int pamu_av_isr(void *arg)
