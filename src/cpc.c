@@ -41,10 +41,17 @@ void enable_cpcs(void)
 	uint32_t val;
 
 	for (int i = 0; i < NUMCPCS; i++){
+		if (!cpcs[i].cpccsr0) {
+			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			         "%s: ERROR: CPCs do not appear to be assigned to the hypervisor\n",
+			          __func__);
+			return;
+		}
 		val = in32(cpcs[i].cpccsr0);
 		val |= CPCCSR0_CPCE;
 		out32(cpcs[i].cpccsr0, val);
 	}
+
 }
 
 static inline void disable_cpc(int cpc_index)
