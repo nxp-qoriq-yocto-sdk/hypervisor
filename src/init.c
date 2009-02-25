@@ -459,7 +459,7 @@ static int claim_hv_pma(dt_node_t *node, void *arg)
 	list_add(&pma->owners, &owner->dev_node);
 	spin_unlock(&dt_owner_lock);
 
-	add_all_cpus_to_csd(node);
+	add_all_cpus_to_csd(pma);
 	return 0;
 }
 
