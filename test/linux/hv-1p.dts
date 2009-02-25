@@ -69,6 +69,14 @@
 			device = "/soc/pic";
 		};
 
+		cpc-0 {
+			device = "/soc/l3-cache-controller@10000";
+		};
+
+		cpc-1 {
+			device = "/soc/l3-cache-controller@11000";
+		};
+
 		corenet-law {
 			device = "/soc/corenet-law";
 		};
@@ -146,7 +154,7 @@
 				liodn-index = <1>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
-				stash-dest = <3>;
+				stash-dest = <1>;
 				snoop-cpu-only;
 			};
 
@@ -181,7 +189,7 @@
 				liodn-index = <1>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
-				stash-dest = <3>;
+				stash-dest = <1>;
 				snoop-cpu-only;
 			};
 		};

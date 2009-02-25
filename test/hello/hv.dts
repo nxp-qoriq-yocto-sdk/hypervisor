@@ -63,6 +63,14 @@
 			device ="/soc/l3-cache-controller@11000";
 		};
 
+		cpc-0 {
+			device = "/soc/l3-cache-controller@10000";
+		};
+
+		cpc-1 {
+			device = "/soc/l3-cache-controller@11000";
+		};
+
 		corenet-law {
 			device = "/soc/corenet-law";
 		};
