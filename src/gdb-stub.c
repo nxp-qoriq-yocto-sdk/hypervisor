@@ -159,10 +159,25 @@ void gdb_stub_init(void)
 void gdb_stub_start(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
-	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
+	gdb_stub_core_context_t *stub;
 	breakpoint_t *breakpoint;
 
 	DEBUG();
+
+	if (!gcpu->dbgstub_cpu_data) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
+		         "%s: stub vcpu start failed\n",
+		         __func__);
+		return;
+	}
+	stub = gcpu->dbgstub_cpu_data;
+
+	if (!stub->node->bch) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
+		         "%s: byte-channel handle is NULL\n",
+		         __func__);
+		return;
+	}
 
 	/* register the callbacks */
 	stub->node->bch->rx->consumer = gcpu;
