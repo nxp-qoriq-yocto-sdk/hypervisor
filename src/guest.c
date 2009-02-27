@@ -1508,13 +1508,11 @@ int restart_guest(guest_t *guest)
  */
 static int partition_config(guest_t *guest)
 {
-	dt_node_t *node = guest->partition;
 	dt_node_t *hv_node;
 	int ret;
 	
 	/* guest cache lock mode */
-	if (dt_get_prop(node, "guest-cache-lock", 0)) {
-		guest->guest_cache_lock = 1;
+	if (guest->guest_cache_lock) {
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
 		if (!hv_node)
 			return -1;
@@ -1524,8 +1522,7 @@ static int partition_config(guest_t *guest)
 	}
 
 	/* guest debug mode */
-	if (dt_get_prop(node, "guest-debug", 0)) {
-		guest->guest_debug_mode = 1;
+	if (guest->guest_debug_mode) {
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
 		if (!hv_node)
 			return -1;
@@ -1629,6 +1626,14 @@ guest_t *node_to_partition(dt_node_t *partition)
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "node_to_partition: path name too long\n");
 		}
+
+		/* guest cache lock mode */
+		if (dt_get_prop(partition, "guest-cache-lock", 0))
+			guests[i].guest_cache_lock = 1;
+
+		/* guest debug mode */
+		if (dt_get_prop(partition, "guest-debug", 0))
+			guests[i].guest_debug_mode = 1;
 
 		guests[i].name = name;
 		guests[i].state = guest_starting;

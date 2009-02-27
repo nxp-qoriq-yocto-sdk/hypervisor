@@ -90,12 +90,17 @@ void init_stubops(guest_t *guest)
 	const char *str;
 	size_t pos = 0;
 
-	if (guest->guest_debug_mode)
-		return;  /* no stub if guest debug mode is enabled */
-
 	node = dt_get_first_compatible(guest->partition, "debug-stub");
 	if (!node)
 		return;  /* no stubs for this partition */
+
+#ifndef CONFIG_DEBUG_STUB_PROGRAM_INTERRUPT
+	if (guest->guest_debug_mode) {
+		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR,
+		         "warning: guest debug mode overrides debug stub for %s\n", guest->name);
+		return;  /* no stub if guest debug mode is enabled */
+	}
+#endif
 
 	prop = dt_get_prop(node, "compatible", 0);
 
