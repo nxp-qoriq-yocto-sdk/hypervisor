@@ -158,6 +158,14 @@ static cpc_part_reg_t *allocate_ways(int cpc_index, dt_prop_t *prop, uint32_t cs
 	uint32_t val = 0;
 	int numways, pir_num, i;
 
+
+	if (!cpcs[cpc_index].cpccsr0) {
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+		         "%s: ERROR: CPCs do not appear to be assigned to the hypervisor\n",
+		          __func__);
+		return NULL;
+	}
+
 	pir_num = get_free_cpcpir(cpc_index);
 	if (pir_num == -1) {
 		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
