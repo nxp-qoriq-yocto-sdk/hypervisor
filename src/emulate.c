@@ -941,7 +941,7 @@ void hvpriv(trapframe_t *regs)
 			fault = emu_dcbtls(regs, insn);
 			break;
 
-		case 0x1d6:
+		case 0x1e6:
 			fault = emu_icbtls(regs, insn);
 			break;
 
@@ -949,7 +949,7 @@ void hvpriv(trapframe_t *regs)
 			fault = emu_dcblc(regs, insn);
 			break;
 
-		case 0xd6:
+		case 0xe6:
 			fault = emu_icblc(regs, insn);
 			break;
 		}
