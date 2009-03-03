@@ -692,7 +692,7 @@ static int emu_icbtls(trapframe_t *regs, uint32_t insn)
 			"emulating icbtls ct =%x, addr = %x\n", ct, addr);
 
 	if (ct == 0)
-		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR1) | L1CSR1_ICUL);
+		mtspr(SPR_L1CSR1, mfspr(SPR_L1CSR1) | L1CSR1_ICUL);
 
 	return 0;
 }
