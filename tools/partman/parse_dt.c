@@ -63,21 +63,20 @@ static int read_property(const char *filename, void **buffer, size_t *size)
 	}
 
 	off = buf.st_size;
-	if (!off) {
-		ret = -EIO;
-		goto fail;
-	}
+	if (off) {
+		*buffer = malloc(off);
+		if (!*buffer) {
+			ret = errno;
+			goto fail;
+		}
 
-	*buffer = malloc(off);
-	if (!*buffer) {
-		ret = errno;
-		goto fail;
-	}
+		if (read(f, *buffer, off) != off) {
+			ret = errno;
+			goto fail;
+		}
+	} else
+		*buffer = NULL;
 
-	if (read(f, *buffer, off) != off) {
-		ret = errno;
-		goto fail;
-	}
 
 	if (size)
 		*size = off;
@@ -103,17 +102,24 @@ fail:
  */
 static int is_compatible(const char *haystack, size_t length, const char *needle)
 {
-        while (length > 0) {
-                int l;
+	/* Length must be non-zero, and the last character of haystack must
+	 * be zero.  Otherwise, the strcmp() below could read past the end of
+	 * haystack.
+	 */
+	if (!length || haystack[length - 1])
+		return 0;
 
-                if (strcmp(haystack, needle) == 0)
-                        return 1;
-                l = strlen(haystack) + 1;
-                haystack += l;
-                length -= l;
-        }
+	while (length > 0) {
+		int l;
 
-        return 0;
+		if (strcmp(haystack, needle) == 0)
+			return 1;
+		l = strlen(haystack) + 1;
+		haystack += l;
+		length -= l;
+	}
+
+	return 0;
 }
 
 /**
@@ -128,7 +134,7 @@ int gdt_is_compatible(gdt_node_t *node, const char *compatible)
 {
 	gdt_prop_t *prop = gdt_get_property(node, "compatible");
 
-	if (!prop)
+	if (!prop || !prop->data)
 		return 0;
 
 	return is_compatible(prop->data, prop->len, compatible);
@@ -150,7 +156,6 @@ int gdt_is_compatible(gdt_node_t *node, const char *compatible)
 gdt_node_t *gdt_find_next_compatible(gdt_node_t *start, const char *compatible)
 {
 	gdt_node_t *node;
-	gdt_prop_t *prop;
 
 	if (start)
 		node = start->next;
@@ -158,8 +163,7 @@ gdt_node_t *gdt_find_next_compatible(gdt_node_t *start, const char *compatible)
 		node = root_node;
 
 	while (node) {
-		prop = gdt_get_property(node, "compatible");
-		if (prop && is_compatible(prop->data, prop->len, compatible))
+		if (gdt_is_compatible(node, compatible))
 			break;
 		node = node->next;
 	}

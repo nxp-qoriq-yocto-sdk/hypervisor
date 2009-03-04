@@ -42,6 +42,7 @@
 #include <sys/mman.h>
 #include <arpa/inet.h>
 #include <asm/ioctl.h>
+#include <limits.h>
 
 #include "parse_dt.h"
 
