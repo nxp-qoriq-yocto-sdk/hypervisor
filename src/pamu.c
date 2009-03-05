@@ -338,6 +338,9 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 				spaace->op_encode.index_ot.omi = omi;
 				spaace->impl_attr.cid = stash_dest;
 			}
+
+			/* Refer notes below on PAACE entry flush */
+			asm volatile("dcbf 0, %0" : : "r" (spaace) : "memory");
 		}
 	}
 	return subwindow_cnt;
@@ -519,6 +522,16 @@ skip_snoop_id:
 	ppaace->v = 1; // FIXME: for right now we are leaving PAACE
 	               // entries enabled by default.
 
+	/*
+	 * Explicitly flush PAACE entries to ensure that PAMU lookup
+	 * gets updated entries from memory during PAMU cache miss and as
+	 * we have a static PAMU table configuration, cached entries are
+	 * valid forever.
+	 * PAACE entries are implictly cache-line size aligned and each entry
+	 * is cache-line sized too.
+	 */
+	asm volatile("dcbf 0, %0" : : "r" (ppaace) : "memory");
+
 	return 0;
 }
 
@@ -611,10 +624,17 @@ void setup_omt(void)
 	ome->moe[IOE_DIRECT0_IDX] = EOE_VALID | EOE_LDEC;
 	ome->moe[IOE_DIRECT1_IDX] = EOE_VALID | EOE_LDECPE;
 
+	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
+	/* FIXME: e500mc cache-line size assumed, fixup on another core */
+	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
+
 	/* Configure OMI_FMAN */
 	ome = pamu_get_ome(OMI_FMAN);
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+
+	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
+	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
 
 	/* Configure OMI_QMAN private */
 	ome = pamu_get_ome(OMI_QMAN_PRIV);
@@ -623,10 +643,16 @@ void setup_omt(void)
 	ome->moe[IOE_EREAD0_IDX] = EOE_VALID | EOE_RSA;
 	ome->moe[IOE_EWRITE0_IDX] = EOE_VALID | EOE_WWSA;
 
+	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
+	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
+
 	/* Configure OMI_CAAM */
 	ome = pamu_get_ome(OMI_CAAM);
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+
+	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
+	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
 }
 
 static int pamu_av_isr(void *arg)
