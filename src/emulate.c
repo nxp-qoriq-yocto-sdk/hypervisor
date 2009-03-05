@@ -568,18 +568,22 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
 		                                &attr, PTE_PHYS_LEVELS, 0);
 
+		gmas3 = mas3 & PTE_MAS3_MASK;
+		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
+
 		/* If there's no valid mapping, request a virtualization
 		 * fault, so a machine check can be reflected upon use.
 		 */
 		if (unlikely(!(attr & PTE_VALID))) {
 			mas8 |= MAS8_VF;
+
+			/* VF does not prevent instruction execution. */
+			mas3 &= ~(MAS3_SX | MAS3_UX);
+
 			rpn = grpn;
 		} else {
 			mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 		}
-
-		gmas3 = mas3 & PTE_MAS3_MASK;
-		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 
 		inc_stat(stat_emu_tlbwe_tlb0);
 
