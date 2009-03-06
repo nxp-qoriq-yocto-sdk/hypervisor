@@ -28,6 +28,7 @@
 #include <libos/queue.h>
 #include <percpu.h>
 #include <errors.h>
+#include <thread.h>
 
 char *stripspace(const char *str)
 {
@@ -66,19 +67,21 @@ char *nextword(char **str)
 
 static int print_num_error(queue_t *out, char *endp, const char *numstr)
 {
+	int block = !is_idle();
+
 	if (cpu->errno) {
 		if (cpu->errno == ERR_RANGE)
-			qprintf(out, "Number exceeds range: %s\n", numstr);
+			qprintf(out, block, "Number exceeds range: %s\n", numstr);
 		else if (cpu->errno == ERR_INVALID)
-			qprintf(out, "Unrecognized number format: %s\n", numstr);
+			qprintf(out, block, "Unrecognized number format: %s\n", numstr);
 		else
-			qprintf(out, "get_number: error %d: %s\n", cpu->errno, numstr);
+			qprintf(out, block, "get_number: error %d: %s\n", cpu->errno, numstr);
 
 		return 1;
 	}
 
 	if (endp && *endp) {
-		qprintf(out, "Trailing junk after number: %s\n", numstr);
+		qprintf(out, block, "Trailing junk after number: %s\n", numstr);
 		cpu->errno = ERR_INVALID;
 		return 1;
 	}
@@ -109,7 +112,8 @@ static int get_base(queue_t *out, const char *numstr, int *skip)
 			return 8;
 		}
 
-		qprintf(out, "Unrecognized number format: %s\n", numstr);
+		qprintf(out, !is_idle(),
+		        "Unrecognized number format: %s\n", numstr);
 		cpu->errno = ERR_INVALID;
 		return 0;
 	}
@@ -127,7 +131,8 @@ uint64_t get_number64(queue_t *out, const char *numstr)
 
 	if (numstr[0] == '-') {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, "Number exceeds range: %s\n", numstr);
+		qprintf(out, !is_idle(),
+		        "Number exceeds range: %s\n", numstr);
 		return 0;
 	}
 
@@ -172,7 +177,8 @@ uint32_t get_number32(queue_t *out, const char *numstr)
 
 	if (ret >= 0x100000000ULL) {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, "Number exceeds range: %s\n", numstr);
+		qprintf(out, !is_idle(),
+		        "Number exceeds range: %s\n", numstr);
 		ret = 0;
 	}
 
@@ -187,7 +193,8 @@ int32_t get_snumber32(queue_t *out, const char *numstr)
 
 	if (ret >= 0x80000000LL || ret < -0x80000000LL) {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, "Number exceeds range: %s\n", numstr);
+		qprintf(out, !is_idle(),
+		        "Number exceeds range: %s\n", numstr);
 		ret = 0;
 	}
 

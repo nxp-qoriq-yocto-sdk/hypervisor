@@ -217,6 +217,7 @@ void gtlb0_to_mas(int index, int way)
 {
 	tlbcset_t *set = &cpu->client.tlbcache[index];
 	int bits = cpu->client.tlbcache_bits;
+	register_t mas3;
 
 	if (!set->tag[way].valid) {
 		mtspr(SPR_MAS1, mfspr(SPR_MAS1) & ~MAS1_VALID);
@@ -237,23 +238,25 @@ void gtlb0_to_mas(int index, int way)
 	                (index << PAGE_SHIFT) |
 	                set->entry[way].mas2);
 
+	unsigned long attr;
+	unsigned long grpn = (set->entry[way].mas7 << (32 - PAGE_SHIFT)) |
+	                     (set->entry[way].mas3 >> MAS3_RPN_SHIFT);
+	unsigned long rpn = vptbl_xlate(get_gcpu()->guest->gphys_rev,
+	                                grpn, &attr, PTE_PHYS_LEVELS, 0);
+
 	/* Currently, we only use virtualization faults for bad mappings. */
 	if (likely(!(set->entry[way].mas8 & 1))) {
-		unsigned long attr;
-		unsigned long grpn = (set->entry[way].mas7 << (32 - PAGE_SHIFT)) |
-		                     (set->entry[way].mas3 >> MAS3_RPN_SHIFT);
-		unsigned long rpn = vptbl_xlate(get_gcpu()->guest->gphys_rev,
-		                                grpn, &attr, PTE_PHYS_LEVELS, 0);
-
 		assert(attr & PTE_VALID);
 
-		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
-		                (set->entry[way].mas3 & (MAS3_FLAGS | MAS3_USER)));
+		mas3 = (rpn << PAGE_SHIFT) |
+		       (set->entry[way].mas3 & MAS3_USER);
 		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	} else {
-		mtspr(SPR_MAS3, set->entry[way].mas3);
+		mas3 = set->entry[way].mas3 & ~PTE_MAS3_MASK;
 		mtspr(SPR_MAS7, set->entry[way].mas7);
 	}
+
+	mtspr(SPR_MAS3, mas3 | set->entry[way].gmas3);
 }
 
 static void guest_inv_tlb0_all(void)

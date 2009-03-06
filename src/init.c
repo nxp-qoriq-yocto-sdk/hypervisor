@@ -214,8 +214,8 @@ extern queue_t early_console;
 
 static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 {
-	const void *fdt;
-	const char *str;
+	void *fdt;
+	char *str, *numstr;
 	int offset, len;
 	
 	fdt = map_fdt(devtree_ptr);
@@ -226,11 +226,13 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 		return offset;
 	}
 
-	str = fdt_getprop(fdt, offset, "bootargs", &len);
-	if (!str) {
-		printf("Cannot find bootargs in /chosen, error %d\n", len);
+	str = fdt_getprop_w(fdt, offset, "bootargs", &len);
+	if (!str || len == 0 || str[len - 1] != 0) {
+		printf("Bad/missing bootargs in /chosen, error %d\n", len);
 		return len;
 	}
+
+	printf("Hypervisor command line: %s\n", str);
 
 	str = strstr(str, "config-addr=");
 	if (!str) {
@@ -239,8 +241,9 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 	}
 
 	str += strlen("config-addr=");
+	numstr = nextword(&str);
 
-	*cfg_addr = get_number64(&consolebuf, str);
+	*cfg_addr = get_number64(&consolebuf, numstr);
 	if (cpu->errno) 
 		return cpu->errno;
 
