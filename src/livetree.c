@@ -972,7 +972,7 @@ static void print_strlist(print_ctx_t *ctx, dt_prop_t *prop)
 	size_t pos = 0;
 
 	while (pos < prop->len) {
-		qprintf(ctx->out, "%s\"%s\"",
+		qprintf(ctx->out, 1, "%s\"%s\"",
 		        pos == 0 ? " = " : ", ", &str[pos]);
 		pos += strlen(&str[pos]) + 1;
 	}
@@ -983,11 +983,11 @@ static void print_hex_bytes(print_ctx_t *ctx, dt_prop_t *prop)
 	uint8_t *data = prop->data;
 
 	for (int j = 0; j < prop->len; j++) {
-		qprintf(ctx->out, "%s%02x",
+		qprintf(ctx->out, 1, "%s%02x",
 		        j == 0 ? " = [" : " ", data[j]);
 	}
 
-	qprintf(ctx->out, "]");
+	qprintf(ctx->out, 1, "]");
 }
 
 static void print_cells(print_ctx_t *ctx, dt_prop_t *prop, int always_dec)
@@ -997,11 +997,11 @@ static void print_cells(print_ctx_t *ctx, dt_prop_t *prop, int always_dec)
 	for (int j = 0; j < prop->len / 4; j++) {
 		int dec = always_dec || data[j] < 256;
 
-		qprintf(ctx->out, dec ? "%s%u" : "%s%#x",
+		qprintf(ctx->out, 1, dec ? "%s%u" : "%s%#x",
 		        j == 0 ? " = <" : " ", data[j]);
 	}
 
-	qprintf(ctx->out, ">");
+	qprintf(ctx->out, 1, ">");
 }
 
 static int print_pre(dt_node_t *tree, void *arg)
@@ -1009,12 +1009,12 @@ static int print_pre(dt_node_t *tree, void *arg)
 	print_ctx_t *ctx = arg;
 
 	for (int i = 0; i < ctx->depth; i++)
-		qprintf(ctx->out, "\t");
+		qprintf(ctx->out, 1, "\t");
 
 	if (ctx->depth == 0)
-		qprintf(ctx->out, "/ {\n");
+		qprintf(ctx->out, 1, "/ {\n");
 	else
-		qprintf(ctx->out, "%s {\n", tree->name);
+		qprintf(ctx->out, 1, "%s {\n", tree->name);
 
 	ctx->depth++;
 
@@ -1022,9 +1022,9 @@ static int print_pre(dt_node_t *tree, void *arg)
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
 
 		for (int j = 0; j < ctx->depth; j++)
-			qprintf(ctx->out, "\t");
+			qprintf(ctx->out, 1, "\t");
 
-		qprintf(ctx->out, "%s", prop->name);
+		qprintf(ctx->out, 1, "%s", prop->name);
 
 		if (prop->len == 0)
 			goto done;
@@ -1058,7 +1058,7 @@ static int print_pre(dt_node_t *tree, void *arg)
 			print_cells(ctx, prop, 0);
 
 done:
-		qprintf(ctx->out, ";\n");
+		qprintf(ctx->out, 1, ";\n");
 	}
 
 	return 0;
@@ -1070,9 +1070,9 @@ static int print_post(dt_node_t *tree, void *arg)
 	ctx->depth--;
 
 	for (int i = 0; i < ctx->depth; i++)
-		qprintf(ctx->out, "\t");
+		qprintf(ctx->out, 1, "\t");
 
-	qprintf(ctx->out, "};\n");
+	qprintf(ctx->out, 1, "};\n");
 	return 0;
 }
 

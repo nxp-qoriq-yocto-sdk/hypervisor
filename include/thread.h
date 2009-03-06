@@ -68,6 +68,10 @@ typedef struct sched {
 
 static inline int is_idle(void)
 {
+	/* No thread during early boot is also "idle" in that we cannot block. */
+	if (!cpu->thread)
+		return 1;
+
 	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
 	return thread == &thread->sched->idle;
 }

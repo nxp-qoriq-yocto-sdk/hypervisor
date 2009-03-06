@@ -68,7 +68,7 @@ static int get_partition_num(shell_t *shell, char *numstr)
 		return -1;
 
 	if (num >= last_lpid) {
-		qprintf(shell->out, "Partition %u does not exist.\n", num);
+		qprintf(shell->out, 1, "Partition %u does not exist.\n", num);
 		return -1;
 	}
 
@@ -89,7 +89,7 @@ static int shell_action(void *user_ctx, char *buf)
 	if (cmd)
 		cmd->action(shell, buf);
 	else
-		qprintf(shell->out, "Unknown command '%s'.\n", cmdname);
+		qprintf(shell->out, 1,"Unknown command '%s'.\n", cmdname);
 
 	return 0;
 }
@@ -137,14 +137,14 @@ static void print_aliases(shell_t *shell, command_t *cmd)
 	if (cmd->aliases) {
 		const char **a = cmd->aliases;
 		
-		qprintf(shell->out, " (");
+		qprintf(shell->out, 1, " (");
 		while (*a) {
-			qprintf(shell->out, "%s", *a);
+			qprintf(shell->out, 1, "%s", *a);
 			a++;
 			if (*a)
-				qprintf(shell->out, ",");
+				qprintf(shell->out, 1, ",");
 		}
-		qprintf(shell->out, ")");
+		qprintf(shell->out, 1, ")");
 	}
 }
 
@@ -156,13 +156,13 @@ static void help_fn(shell_t *shell, char *args)
 	if (!cmdname) {
 		command_t **i, *cmd;
 
-		qprintf(shell->out, "Commands:\n");
+		qprintf(shell->out, 1, "Commands:\n");
 
 		for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 			cmd = *i;
-			qprintf(shell->out, " %s", cmd->name);
+			qprintf(shell->out, 1, " %s", cmd->name);
 			print_aliases(shell, cmd);
-			qprintf(shell->out, " - %s\n",cmd->shorthelp);
+			qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 		}
 		
 		return;
@@ -171,16 +171,16 @@ static void help_fn(shell_t *shell, char *args)
 	cmd = find_command(cmdname);
 
 	if (!cmd) {
-		qprintf(shell->out, "help: unknown command '%s'.\n", cmdname);
+		qprintf(shell->out, 1, "help: unknown command '%s'.\n", cmdname);
 		return;
 	}
 	
-	qprintf(shell->out, " %s", cmd->name);
+	qprintf(shell->out, 1, " %s", cmd->name);
 	print_aliases(shell, cmd);
-	qprintf(shell->out, " - %s\n",cmd->shorthelp);
+	qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 
 	if (cmd->longhelp)
-		qprintf(shell->out, "\n%s\n", cmd->longhelp);
+		qprintf(shell->out, 1, "\n%s\n", cmd->longhelp);
 }
 
 static command_t help = {
@@ -207,10 +207,10 @@ static void lp_fn(shell_t *shell, char *args)
 {
 	int i;
 	
-	qprintf(shell->out, "Partition   Name\n");
+	qprintf(shell->out, 1, "Partition   Name\n");
 	
 	for (i = 0; i < last_lpid; i++)
-		qprintf(shell->out, "%-11d %s\n", i, guests[i].name);
+		qprintf(shell->out, 1, "%-11d %s\n", i, guests[i].name);
 }
 
 static command_t lp = {
@@ -236,7 +236,7 @@ static void print_stat(shell_t *shell, guest_t *guest,
 			total += guest->gcpus[i]->stats[stat];
 	}
 
-	qprintf(shell->out, "%s %-10u\n", str, total);
+	qprintf(shell->out, 1, "%s %-10u\n", str, total);
 }
 
 static void pi_fn(shell_t *shell, char *args)
@@ -249,7 +249,7 @@ static void pi_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -258,7 +258,7 @@ static void pi_fn(shell_t *shell, char *args)
 		return;
 
 	guest = &guests[num];
-	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
+	qprintf(shell->out, 1, "Partition %u: %s\n", num, guest->name);
 	print_stat(shell, guest, stat_emu_total,
 	           "Total emulated instructions:          ");
 	print_stat(shell, guest, stat_emu_tlbwe,
@@ -323,7 +323,7 @@ static void gdt_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr || !cmdstr) {
-		qprintf(shell->out, "Usage: guest-device-tree <cmd> <number>\n");
+		qprintf(shell->out, 1, "Usage: guest-device-tree <cmd> <number>\n");
 		return;
 	}
 
@@ -332,7 +332,7 @@ static void gdt_fn(shell_t *shell, char *args)
 		return;
 
 	guest = &guests[num];
-	qprintf(shell->out, "Partition %u: %s\n", num, guest->name);
+	qprintf(shell->out, 1, "Partition %u: %s\n", num, guest->name);
 
 	if(!strcmp(cmdstr, "print"))
 		dt_print_tree(guest->devtree, shell->out);
@@ -406,7 +406,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 		if (entry && entry->v) {
 			memset(str, 0, BUFF_SIZE);
 			decode_wse(entry->wse, str);
-			qprintf(shell->out, "liodn#: %d(0x%x)"
+			qprintf(shell->out, 1, "liodn#: %d(0x%x)"
 				"\n\tWindow Base Address: 0x%x"
 				"\n\tTranslated Window Base Address: 0x%x"
 				"\n\tsize: %s\n\n",
@@ -434,7 +434,7 @@ static void start_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -444,7 +444,7 @@ static void start_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	if (start_guest(guest))
-		qprintf(shell->out, "Couldn't start partition.\n");
+		qprintf(shell->out, 1, "Couldn't start partition.\n");
 }
 
 static command_t start = {
@@ -466,7 +466,7 @@ static void restart_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -476,7 +476,7 @@ static void restart_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	if (restart_guest(guest))
-		qprintf(shell->out, "Couldn't restart partition.\n");
+		qprintf(shell->out, 1, "Couldn't restart partition.\n");
 }
 
 static command_t restart = {
@@ -498,7 +498,7 @@ static void stop_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -508,7 +508,7 @@ static void stop_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	if (stop_guest(guest))
-		qprintf(shell->out, "Couldn't stop partition.\n");
+		qprintf(shell->out, 1, "Couldn't stop partition.\n");
 }
 
 
@@ -531,7 +531,7 @@ static void pause_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -541,7 +541,7 @@ static void pause_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	if (pause_guest(guest))
-		qprintf(shell->out, "Couldn't pause partition.\n");
+		qprintf(shell->out, 1, "Couldn't pause partition.\n");
 }
 
 
@@ -564,7 +564,7 @@ static void resume_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr) {
-		qprintf(shell->out, "Usage: partition-info <number>\n");
+		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
 	
@@ -574,7 +574,7 @@ static void resume_fn(shell_t *shell, char *args)
 
 	guest = &guests[num];
 	if (resume_guest(guest))
-		qprintf(shell->out, "Couldn't resume partition.\n");
+		qprintf(shell->out, 1, "Couldn't resume partition.\n");
 }
 
 
