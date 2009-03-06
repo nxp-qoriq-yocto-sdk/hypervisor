@@ -200,6 +200,6 @@ lib:
 	$(SIMICS) -q -e 'echo (resolve-file "%simics%" + sim->host_arch + "-" + sim->host_os + "/lib"); quit' | tail -1
 
 docs:
-	doxygen doc/Doxyfile
+	doxygen $(src)doc/Doxyfile
 
 .SECONDARY:
