@@ -34,6 +34,7 @@
 #include <percpu.h>
 #include <errors.h>
 #include <devtree.h>
+#include <zlib.h>
 
 #define UIMAGE_SIGNATURE 0x27051956
 
@@ -41,6 +42,13 @@
 #define IMAGE_TYPE_STANDALONE   1
 #define IMAGE_TYPE_KERNEL       2
 #define IMAGE_TYPE_RAMDISK      3
+
+#define GZIP_ID1       0x1f
+#define GZIP_ID2       0x8b
+#define GZIP_FHCRC     2
+#define GZIP_FEXTRA    4
+#define GZIP_FNAME     8
+#define GZIP_FCOMMENT  16
 
 /*
  * uimage header
@@ -60,6 +68,146 @@ struct image_header {
 	uint8_t comp;     /* Compression Type */
 	uint8_t name[32]; /* Image Name */
 };
+
+static void *inflate_malloc(void *opaque, unsigned int item, unsigned int size)
+{
+	return malloc(item * size);
+}
+
+static void inflate_free(void *opaque, void *address, unsigned int bytes)
+{
+	free(address);
+}
+
+static int parse_gzip_header(unsigned char *buffer)
+{
+	int compression_method;
+	int gzip_flags;
+	int gzip_xflags;
+	int os;
+	int index;
+	int len;
+	char c;
+
+	if (buffer[0] != GZIP_ID1 || buffer[1] != GZIP_ID2) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"uImage is not compressed using gzip\n");
+		return -1;
+	}
+
+	index = 2;
+	compression_method = buffer[index++];
+
+	gzip_flags = buffer[index++];
+	index += 4;
+	gzip_xflags = buffer[index++];
+
+	os = buffer[index++];
+
+	if (gzip_flags & GZIP_FEXTRA) {
+		len = buffer[index++];
+		len += buffer[index++] << 8;
+		index += len;
+	}
+
+	if (gzip_flags & GZIP_FNAME)
+		while ((c = buffer[index++]) != 0);
+
+	if (gzip_flags & GZIP_FCOMMENT)
+		while ((c = buffer[index++]) != 0);
+
+	if (gzip_flags & GZIP_FHCRC)
+		index += 2;
+
+	return index;
+}
+
+static void do_inflate(guest_t *guest, phys_addr_t target,
+		       phys_addr_t image_phys, uint32_t size)
+{
+	int err;
+	z_stream d_stream;
+	int index;
+	unsigned char *compr, *uncompr;
+	uint32_t uncomprlen;
+	uint32_t comprlen = size >= PAGE_SIZE ? 1UL << ilog2(size) : size;
+
+	comprlen = comprlen > 16*1024*1024 ? 16*1024*1024 : comprlen;
+	uncompr = map_gphys(TEMPTLB1, guest->gphys, target, temp_mapping[0],
+			    &uncomprlen, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
+	compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1], &comprlen,
+			TLB_MAS2_MEM);
+	size -= comprlen;
+	index = parse_gzip_header(compr);
+	compr += index;
+	comprlen -= index;
+	image_phys += index;
+
+	d_stream.zalloc = inflate_malloc;
+	d_stream.zfree = inflate_free;
+	d_stream.opaque = NULL;
+	d_stream.outcb = NULL;
+
+	d_stream.next_in  = compr;
+	d_stream.avail_in = comprlen;
+
+	err = inflateInit2(&d_stream, -MAX_WBITS);
+	if (err < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"load_uimage: inflateInit2 failed with zlib error"
+			"code %d\n", err);
+		return;
+	}
+
+	d_stream.next_out = uncompr;
+	d_stream.avail_out = uncomprlen;
+
+	do {
+		err = inflate(&d_stream, Z_NO_FLUSH);
+
+		if (d_stream.avail_out == 0) {
+			size_t chunk;
+			target += uncomprlen;
+			uncompr = map_gphys(TEMPTLB1, guest->gphys, target,
+					    temp_mapping[0], &chunk,
+					    TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
+			uncomprlen = chunk;
+			d_stream.next_out = uncompr;
+			d_stream.avail_out = uncomprlen;
+		}
+
+		if (d_stream.avail_in == 0) {
+			uint32_t tsize;
+
+			tsize = size >= PAGE_SIZE ? 1UL << ilog2(size) : size;
+			tsize = tsize > 16*1024*1024 ? 16*1024*1024 : tsize;
+			image_phys += comprlen;
+			compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1],
+					&tsize, TLB_MAS2_MEM);
+			size -= tsize;
+			d_stream.next_in  = compr;
+			d_stream.avail_in = tsize;
+			comprlen = tsize;
+		}
+
+		if (err == Z_STREAM_END)
+			break;
+
+		if (err < 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				"load_uimage: uImage decompression failed with"
+				"zlib error code %d\n", err);
+			return;
+		}
+
+	} while (1);
+
+	err = inflateEnd(&d_stream);
+	if (err < 0)
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			"load_uimage: inflateEnd failed with zlib error code"
+			"%d\n", err);
+}
 
 /**
  * Parse uImage, generated using mkimage and load it in guest memory
@@ -95,12 +243,20 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 
 	*length = size;
 
-	ret = copy_phys_to_gphys(guest->gphys, target,
-	                         image_phys + sizeof(hdr), size);
-	if (ret != size) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "load_uimage: cannot copy\n");
-		return ERR_BADADDR;
+	image_phys += sizeof(hdr);
+
+	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_KERNEL) {
+		if (cpu_from_be32(hdr.comp) == 1)
+			do_inflate(guest, target, image_phys, size);
+		else {
+			ret = copy_phys_to_gphys(guest->gphys, target,
+						image_phys, size);
+			if (ret != size) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					"load_uimage: cannot copy\n");
+				return ERR_BADADDR;
+			}
+		}
 	}
 
 	if (entry)
