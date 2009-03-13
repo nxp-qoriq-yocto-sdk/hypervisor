@@ -390,6 +390,84 @@ static void decode_wse(unsigned int wse, char *str)
 		sprintf(str, "%d KB", 1<<(i+1));
 }
 
+static void ppaace_entry_dump_fn(shell_t *shell, ppaace_t *entry)
+{
+	qprintf(shell->out, 1, "\n\tStash Cache id: %d",
+		entry->impl_attr.cid);
+	qprintf(shell->out, 1, "\n\tOperation Translation Mode:");
+	if (!entry->otm)
+		qprintf(shell->out, 1, "\n\t\t0:"
+			"No operation Translation\n");
+	else {
+		if (entry->otm == 1)
+			qprintf(shell->out, 1, "\n\t\t1:"
+				"Immediate Operation Mode\n");
+
+		if (entry->otm == 2) {
+			qprintf(shell->out, 1, "\n\t\t2:"
+				"Indexed Translation Mode");
+			qprintf(shell->out, 1, "\n\t\t\tOMI: %d\n",
+				entry->op_encode.index_ot.omi);
+		}
+	}
+}
+
+static void spaace_entry_dump_fn(shell_t *shell, spaace_t *sentry)
+{
+	char str[BUFF_SIZE];
+
+	memset(str, 0, BUFF_SIZE);
+	decode_wse(sentry->swse, str);
+	qprintf(shell->out, 1, "\tTranslated Window Base Address %x"
+		"\n\t\tsize: %s",
+		sentry->twbal << PAGE_SHIFT, str);
+	qprintf(shell->out, 1, "\n\t\tStash Cache id: %d",
+		sentry->impl_attr.cid);
+	qprintf(shell->out, 1, "\n\t\tOperation Translation Mode:");
+	if (!sentry->otm)
+		qprintf(shell->out, 1, "\n\t\t\t0:"
+			"No operation Translation\n");
+	else {
+		if (sentry->otm == 1)
+			qprintf(shell->out, 1, "\n\t\t1:"
+				"Immediate Operation Mode\n");
+
+		if (sentry->otm == 2) {
+			qprintf(shell->out, 1, "\n\t\t2:"
+				"Indexed Translation Mode");
+			qprintf(shell->out, 1, "\n\t\t\tOMI: %d\n",
+				sentry->op_encode.index_ot.omi);
+		}
+	}
+}
+
+static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
+{
+	int wcount = 0;
+	spaace_t *sentry;
+	int wce;
+
+	qprintf(shell->out, 1, "\n\tSubwindows:");
+	if (entry->swse) {
+		char str[BUFF_SIZE];
+
+		memset(str, 0, BUFF_SIZE);
+		decode_wse(entry->swse, str);
+		qprintf(shell->out, 1, "\n\t%d\tsize: %s",
+			wcount, str);
+	}
+
+	wce = 2 * (1 << entry->wce);
+	for (int i = 0; i < wce; i++) {
+		sentry = pamu_get_spaace(entry->fspi, i);
+		if (sentry->v) {
+			wcount++;
+			qprintf(shell->out, 1, "\n\t%d", wcount);
+			spaace_entry_dump_fn(shell, sentry);
+		}
+	}
+}
+
 static void paact_dump_fn(shell_t *shell, char *args)
 {
 	int liodn;
@@ -409,9 +487,12 @@ static void paact_dump_fn(shell_t *shell, char *args)
 			qprintf(shell->out, 1, "liodn#: %d(0x%x)"
 				"\n\tWindow Base Address: 0x%x"
 				"\n\tTranslated Window Base Address: 0x%x"
-				"\n\tsize: %s\n\n",
+				"\n\tsize: %s",
 				liodn, liodn, (entry->wbal << PAGE_SHIFT),
 				(entry->twbal << PAGE_SHIFT), str);
+			ppaace_entry_dump_fn(shell, entry);
+			if (entry->mw)
+				spaact_dump_fn(shell, entry);
 		}
 	}
 }
