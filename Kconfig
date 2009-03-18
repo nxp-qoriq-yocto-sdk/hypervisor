@@ -156,6 +156,14 @@ config GDB_STUB
 		remotely with GDB.  The stub is located in the hypervisor, 
 		allowing non-intrusive debugging.
 
+config HYPERTRK
+	bool "CodeWarrior HyperTRK Stub Support"
+	depends on DEBUG_STUB
+	help
+		Enable CodeWarrior HyperTRK debug stub support.  This allows
+                debugging of a a guest remotely with CodeWarrior.  The stub
+                is located in the hypervisor, allowing non-intrusive debugging.
+
 config DEBUG_STUB_PROGRAM_INTERRUPT
 	bool "Use program interrupt for debugging"
 	depends on DEBUG_STUB

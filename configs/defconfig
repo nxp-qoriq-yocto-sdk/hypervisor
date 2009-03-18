@@ -1,6 +1,5 @@
 #
 # Automatically generated make config: don't edit
-# Thu Feb 12 14:14:38 2009
 #
 CONFIG_LIBOS_INIT=y
 CONFIG_LIBOS_EXCEPTION=y
@@ -38,4 +37,5 @@ CONFIG_VIRTUAL_I2C=y
 # CONFIG_STATISTICS is not set
 CONFIG_DEBUG_STUB=y
 CONFIG_GDB_STUB=y
+# CONFIG_HYPERTRK is not set
 # CONFIG_DEBUG_STUB_PROGRAM_INTERRUPT is not set
