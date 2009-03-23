@@ -248,7 +248,7 @@ void gtlb0_to_mas(int index, int way)
 	if (likely(!(set->entry[way].mas8 & 1))) {
 		assert(attr & PTE_VALID);
 
-		mas3 = (rpn << PAGE_SHIFT) |
+		mas3 = (uint32_t)(rpn << PAGE_SHIFT) |
 		       (set->entry[way].mas3 & MAS3_USER);
 		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	} else {
@@ -363,7 +363,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 
 	entry = &set->entry[way];
 	entry->mas2 = mas2;
-	entry->mas3 = (rpn << PAGE_SHIFT) | mas3flags;
+	entry->mas3 = (uint32_t)(rpn << PAGE_SHIFT) | mas3flags;
 	entry->mas7 = rpn >> (32 - PAGE_SHIFT);
 	entry->tsize = 1;
 	entry->mas8 = mas8 >> 30;
@@ -377,7 +377,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	mtspr(SPR_MAS1, mas1);
 	mtspr(SPR_MAS2, mas2);
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3flags);
+	mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) | mas3flags);
 	mtspr(SPR_MAS8, mas8);
 	asm volatile("tlbwe" : : : "memory");
 
@@ -528,7 +528,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 	gcpu->gtlb1[entry].mas1 = mas1;
 	gcpu->gtlb1[entry].mas2 = (epn << PAGE_SHIFT) | mas2flags;
-	gcpu->gtlb1[entry].mas3 = (grpn << PAGE_SHIFT) | mas3flags;
+	gcpu->gtlb1[entry].mas3 = (uint32_t)(grpn << PAGE_SHIFT) | mas3flags;
 	gcpu->gtlb1[entry].mas7 = grpn >> (32 - PAGE_SHIFT);
 
 	if (!(mas1 & MAS1_VALID))
@@ -685,7 +685,7 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	mtspr(SPR_MAS1, mas1);
 	mtspr(SPR_MAS2, mas2);
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
-	mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) | mas3flags);
+	mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) | mas3flags);
 	mtspr(SPR_MAS8, mas8);
 	asm volatile("tlbwe" : : : "memory");
 	return 0;
@@ -770,8 +770,8 @@ void fixup_tlb_sx_re(void)
 
 		assert(attr & PTE_VALID);
 
-		mtspr(SPR_MAS3, (rpn << PAGE_SHIFT) |
-		     (mas3 & (MAS3_FLAGS | MAS3_USER)));
+		mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) |
+		                (mas3 & (MAS3_FLAGS | MAS3_USER)));
 		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	}
 
@@ -1108,7 +1108,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 	if (tsize > maxtsize)
 		tsize = maxtsize;
 
-	bytesize = (uintptr_t)tsize_to_pages(tsize) << PAGE_SHIFT;
+	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
 	offset = addr & (bytesize - 1);
 	physaddr = (phys_addr_t)rpn << PAGE_SHIFT;
 

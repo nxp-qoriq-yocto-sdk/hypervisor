@@ -125,7 +125,7 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn,
 		}
 
 		size_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
-		mach_phys_contig_size += (size_pages << PAGE_SHIFT);
+		mach_phys_contig_size += ((phys_addr_t)size_pages << PAGE_SHIFT);
 		grpn += size_pages;
 		next_rpn = rpn + size_pages;
 	}

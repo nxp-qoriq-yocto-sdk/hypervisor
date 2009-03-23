@@ -115,7 +115,7 @@ static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
 	unsigned long pages = (gaddr + size -
-	                       (grpn << PAGE_SHIFT) +
+	                       ((phys_addr_t)grpn << PAGE_SHIFT) +
 	                       (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 	int flags = dmaonly ? PTE_MAS3_MASK | PTE_GS | PTE_DMA : PTE_ALL;
 

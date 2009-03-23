@@ -81,7 +81,8 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 	if (unlikely(!ptep)) {
 		*attr = 0;
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
-		         "2 vtable xlate %p 0x%lx %i\n", tbl, epn << PAGE_SHIFT, level);
+		         "2 vtable xlate %p 0x%llx %i\n", tbl,
+		         (uint64_t)epn << PAGE_SHIFT, level);
 		return (1UL << (PGDIR_SHIFT * level)) - 1;
 	}
 
@@ -90,8 +91,8 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 	unsigned long size_pages;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
-	         "vtable xlate %p 0x%lx 0x%lx\n", tbl,
-	         epn << PAGE_SHIFT, pte.attr);
+	         "vtable xlate %p 0x%llx 0x%lx\n", tbl,
+	         (uint64_t)epn << PAGE_SHIFT, pte.attr);
 
 	size = pte.attr >> PTE_SIZE_SHIFT;
 
@@ -153,7 +154,7 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 				         "vptbl_map: Tried to overwrite a large page with "
 				         "a small page at %llx\n",
-				         ((uint64_t)epn) << PAGE_SHIFT);
+				         (uint64_t)epn << PAGE_SHIFT);
 
 				/* FIXME: verify that the rpn is the same, and that
 				 * the permissions of the small page are a subset.
@@ -168,7 +169,7 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 				         "vptbl_map: Overwriting a small page with "
 				         "a large page at %llx\n",
-				         ((uint64_t)epn) << PAGE_SHIFT);
+				         (uint64_t)epn << PAGE_SHIFT);
 
 				/* FIXME: verify that the all rpns are the same,
 				 * and that permissions of the large page are a
