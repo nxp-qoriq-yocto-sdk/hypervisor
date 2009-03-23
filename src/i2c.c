@@ -274,7 +274,7 @@ static int count_devices_callback(dt_node_t *node, void *arg)
 	if (ret < 0)
 		return 0;
 
-	paddr &= ~(PAGE_SIZE - 1);
+	paddr &= ~((phys_addr_t)PAGE_SIZE - 1);
 
 	if (paddr == ctx->paddr)
 		ctx->count++;
@@ -297,7 +297,7 @@ static int count_devices_in_page(dt_node_t *tree, phys_addr_t paddr)
 {
 	count_devices_ctx_t ctx = {
 		// Round down to the nearest page
-		.paddr = paddr & ~(PAGE_SIZE - 1)
+		.paddr = paddr & ~((phys_addr_t)PAGE_SIZE - 1)
 	};
 
 	dt_for_each_node(tree, &ctx, count_devices_callback, NULL);

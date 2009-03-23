@@ -177,8 +177,8 @@ void *map_fdt(phys_addr_t devtree_ptr)
 	void *vaddr;
 
 	/* Map guarded, as we don't know where the end of memory is yet. */
-	vaddr = map_phys(TEMPTLB1, devtree_ptr & ~(mapsize - 1), temp_mapping[0],
-	                 &len, TLB_MAS2_MEM | MAS2_G);
+	vaddr = map_phys(TEMPTLB1, devtree_ptr & ~((phys_addr_t)mapsize - 1),
+	                 temp_mapping[0], &len, TLB_MAS2_MEM | MAS2_G);
 
 	vaddr += devtree_ptr & (mapsize - 1);
 
@@ -354,7 +354,7 @@ static void process_hv_mem(void *fdt, int offset, int add)
 		if (add)
 			add_memory(addr, size);
 		else if (addr < bigmap_phys)
-			bigmap_phys = addr & ~(BIGPHYSBASE - 1);
+			bigmap_phys = addr & ~((phys_addr_t)BIGPHYSBASE - 1);
 	}
 }
 

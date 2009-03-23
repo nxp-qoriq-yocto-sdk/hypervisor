@@ -1115,7 +1115,8 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 	if (len)
 		*len = bytesize - offset;
 
-	tlb1_set_entry(tlbentry, (unsigned long)vpage, physaddr & ~(bytesize - 1),
+	tlb1_set_entry(tlbentry, (unsigned long)vpage,
+	               physaddr & ~((phys_addr_t)bytesize - 1),
 	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 	return vpage + offset;
@@ -1297,7 +1298,8 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
 	offset = paddr & (bytesize - 1);
 
-	tlb1_set_entry(tlbentry, (unsigned long)vpage, paddr & ~(bytesize - 1),
+	tlb1_set_entry(tlbentry, (unsigned long)vpage,
+	               paddr & ~((phys_addr_t)bytesize - 1),
 	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 	*len = min(bytesize - offset, *len);
