@@ -141,6 +141,15 @@ config STATISTICS
 		Detailed hypervisor emulated instruction statistics.
 		Gives a count of emulated instructions executed.
 
+config ZLIB
+	bool "Compressed uImage Support"
+	help
+		Enable this option to support compressed uImage
+		(u-boot image format) images being loaded 
+		by the hypervisor when specified in the guest-image
+		or load-image-table properties in the configuration
+		device tree.
+
 config DEBUG_STUB
 	bool "Debug Stub Support"
 	depends on BYTE_CHAN

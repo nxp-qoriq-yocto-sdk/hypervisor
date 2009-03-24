@@ -88,7 +88,7 @@ partman: bin/linux/partman
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
             gspr.c misc.S livetree.c ipi_doorbell.c util.c ccm.c cpc.c \
-            thread.o zlib.c
+            thread.o
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c
@@ -99,6 +99,7 @@ hv-src-$(CONFIG_PAMU) += pamu.c
 hv-src-$(CONFIG_VIRTUAL_I2C) += i2c.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 hv-src-$(CONFIG_LIBOS_NS16550) += ns16550.c
+hv-src-$(CONFIG_ZLIB) += zlib.c
 
 LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
 

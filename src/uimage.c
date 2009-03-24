@@ -43,12 +43,14 @@
 #define IMAGE_TYPE_KERNEL       2
 #define IMAGE_TYPE_RAMDISK      3
 
+#ifdef CONFIG_ZLIB
 #define GZIP_ID1       0x1f
 #define GZIP_ID2       0x8b
 #define GZIP_FHCRC     2
 #define GZIP_FEXTRA    4
 #define GZIP_FNAME     8
 #define GZIP_FCOMMENT  16
+#endif
 
 /*
  * uimage header
@@ -69,6 +71,7 @@ struct image_header {
 	uint8_t name[32]; /* Image Name */
 };
 
+#ifdef CONFIG_ZLIB
 static void *inflate_malloc(void *opaque, unsigned int item, unsigned int size)
 {
 	return malloc(item * size);
@@ -122,7 +125,7 @@ static int parse_gzip_header(unsigned char *buffer)
 	return index;
 }
 
-static void do_inflate(guest_t *guest, phys_addr_t target,
+static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 		       phys_addr_t image_phys, uint32_t size)
 {
 	int err;
@@ -133,7 +136,7 @@ static void do_inflate(guest_t *guest, phys_addr_t target,
 	uint32_t comprlen = size >= PAGE_SIZE ? 1UL << ilog2(size) : size;
 
 	comprlen = comprlen > 16*1024*1024 ? 16*1024*1024 : comprlen;
-	uncompr = map_gphys(TEMPTLB1, guest->gphys, target, temp_mapping[0],
+	uncompr = map_gphys(TEMPTLB1, guest_gphys, target, temp_mapping[0],
 			    &uncomprlen, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 	compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1], &comprlen,
 			TLB_MAS2_MEM);
@@ -168,7 +171,7 @@ static void do_inflate(guest_t *guest, phys_addr_t target,
 		if (d_stream.avail_out == 0) {
 			size_t chunk;
 			target += uncomprlen;
-			uncompr = map_gphys(TEMPTLB1, guest->gphys, target,
+			uncompr = map_gphys(TEMPTLB1, guest_gphys, target,
 					    temp_mapping[0], &chunk,
 					    TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			uncomprlen = chunk;
@@ -208,6 +211,7 @@ static void do_inflate(guest_t *guest, phys_addr_t target,
 			"load_uimage: inflateEnd failed with zlib error code"
 			"%d\n", err);
 }
+#endif
 
 /**
  * Parse uImage, generated using mkimage and load it in guest memory
@@ -246,9 +250,15 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 	image_phys += sizeof(hdr);
 
 	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_KERNEL) {
-		if (cpu_from_be32(hdr.comp) == 1)
-			do_inflate(guest, target, image_phys, size);
-		else {
+		if (cpu_from_be32(hdr.comp) == 1) {
+#ifdef CONFIG_ZLIB
+			do_inflate(guest->gphys, target, image_phys, size);
+#else
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "load_uimage: compressed uimages not supported\n");
+			return ERR_BADIMAGE;
+#endif
+		} else {
 			ret = copy_phys_to_gphys(guest->gphys, target,
 						image_phys, size);
 			if (ret != size) {
@@ -257,6 +267,8 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 				return ERR_BADADDR;
 			}
 		}
+	} else {
+		return ERR_UNHANDLED;
 	}
 
 	if (entry)
