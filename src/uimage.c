@@ -249,26 +249,23 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 
 	image_phys += sizeof(hdr);
 
-	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_KERNEL) {
-		if (cpu_from_be32(hdr.comp) == 1) {
+ 	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_KERNEL &&
+ 	    cpu_from_be32(hdr.comp) == 1) {
 #ifdef CONFIG_ZLIB
-			do_inflate(guest->gphys, target, image_phys, size);
+		do_inflate(guest->gphys, target, image_phys, size);
 #else
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "load_uimage: compressed uimages not supported\n");
-			return ERR_BADIMAGE;
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "load_uimage: compressed uimages not supported\n");
+		return ERR_BADIMAGE;
 #endif
-		} else {
-			ret = copy_phys_to_gphys(guest->gphys, target,
-						image_phys, size);
-			if (ret != size) {
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-					"load_uimage: cannot copy\n");
-				return ERR_BADADDR;
-			}
+ 	} else {
+ 		ret = copy_phys_to_gphys(guest->gphys, target,
+ 					image_phys, size);
+ 		if (ret != size) {
+ 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+ 				"load_uimage: cannot copy\n");
+ 			return ERR_BADADDR;
 		}
-	} else {
-		return ERR_UNHANDLED;
 	}
 
 	if (entry)
