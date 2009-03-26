@@ -93,6 +93,8 @@ void dump_dev_tree(void)
 #endif
 }
 
+extern uint8_t *uart_virt;
+
 void start(unsigned long devtree_ptr)
 {
 	int ret;
@@ -128,7 +130,7 @@ void start(unsigned long devtree_ptr)
 	fh_vmpic_set_int_config(*handle_p,1,15,0x00000001);
 
 	/* enable TX interrupts at the UART */
-	out8((uint8_t *)(CCSRBAR_VA+0x11d501),0x2);
+	out8(&uart_virt[1], 0x2);
 
 	/* enable interrupts at the CPU */
 	enable_extint();
