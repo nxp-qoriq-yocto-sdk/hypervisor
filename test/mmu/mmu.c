@@ -419,7 +419,7 @@ void start(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 	test_mem = alloc(65536 + 4096, 65536);
-	test_map = valloc(65536 + 4096, 4096);
+	test_map = valloc(65536 + 4096, 65536);
 
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
