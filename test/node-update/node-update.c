@@ -28,11 +28,14 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
 
 void init(unsigned long devtree_ptr);
 
 extern void *fdt;
+
+#define PAGE_SIZE 4096
 
 #define UART 1
 #define DMA 2
@@ -49,10 +52,19 @@ void mcheck_interrupt(trapframe_t *frameptr)
 	frameptr->srr0 += 4;
 }
 
+extern int dt_get_reg(const void *tree, int node, int res,
+                      phys_addr_t *addr, phys_addr_t *size);
+
+extern phys_addr_t uart_addr;
+
 void check_dma1_node(int node)
 {
 	const uint32_t *prop;
+	const uint32_t *reg;
 	int len;
+
+	uint32_t *dma_virt;
+	phys_addr_t dma_phys;
 
 	prop = fdt_getprop(fdt, node, "fsl,liodn", &len);
 	printf("delete-prop --- %s\n",
@@ -60,9 +72,28 @@ void check_dma1_node(int node)
 	node = fdt_subnode_offset(fdt, node, "dma-channel");
 	printf("delete-subnodes --- %s\n",
 		(node < 0)? "PASSED" : "FAILED");
+
 	/* checking reg resources are not assigned to the guest */
-	in32((uint32_t *)(CCSRBAR_VA + 0x110304));
-	printf("delete-property reg --- %s\n",
+	reg = fdt_getprop(fdt, node, "reg", &len);
+	printf("delete-property reg (property) --- %s\n",
+	       reg ? "FAILED" : "PASSED");
+
+	dma_phys = (uart_addr & ~0xffffffULL) + 0x101300;
+
+	dma_virt = valloc(4096, 4096);
+	if (!dma_virt) {
+		printf("valloc failed --- BROKEN\n");
+		return;
+	}
+	
+	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
+
+	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
+	               TLB_TSIZE_4K, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0, 0);
+	
+	in32(dma_virt);
+	printf("delete-property reg (access) --- %s\n",
 		(exception)? "PASSED" : "FAILED");
 }
 

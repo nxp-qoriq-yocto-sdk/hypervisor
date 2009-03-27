@@ -34,6 +34,7 @@
 #include <libfdt.h>
 
 #define DMA_CHAN_BSY 0x00000004
+#define PAGE_SIZE 4096
 
 void init(unsigned long devtree_ptr);
 
@@ -53,36 +54,86 @@ void dump_dev_tree(void)
 	printf("------\n");
 }
 
-int test_dma_memcpy(unsigned int gpa_src, unsigned int gpa_dst, int do_memset)
+extern int dt_get_reg(const void *tree, int node, int res,
+                      phys_addr_t *addr, phys_addr_t *size);
+
+phys_addr_t dma_phys;
+uint32_t *dma_virt;
+
+int dma_init(void)
+{
+	int node, parent, len;
+	uint32_t liodn;
+	const uint32_t *liodnp;
+
+	node = fdt_node_offset_by_compatible(fdt, 0, "fsl,eloplus-dma-channel");
+	if (node < 0)
+		return -1;
+
+	if (dt_get_reg(fdt, node, 0, &dma_phys, NULL) < 0)
+		return -2;
+
+	parent = fdt_parent_offset(fdt, node);
+	if (parent < 0)
+		return -3;
+
+	dma_virt = valloc(4096, 4096);
+	if (!dma_virt)
+		return -4;
+
+	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
+
+	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
+	               TLB_TSIZE_4K, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0, 0);
+
+	/* FIXME: reset all channels of DMA block before enabling liodn */
+	
+	liodnp = fdt_getprop(fdt, parent, "fsl,hv-dma-handle", &len);
+	if (!liodnp) {
+		printf("fsl,hv-dma-handle property not found %d\n", len);
+		return -5;
+	}
+
+	liodn = *liodnp;
+	printf("actual liodn = %d\n", liodn);
+
+	fh_dma_enable(liodn);
+	if (liodn != 0) {
+		printf("fh_dma_enable: failed %d\n", liodn);
+		return -6;
+	}
+	
+	return 0;
+}
+
+int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst, int do_memset)
 {
 	int count = 0x100;
 	unsigned char *gva_src, *gva_dst;
 
-	gva_src = (unsigned char *)(gpa_src + PHYSBASE);
+	gva_src = (unsigned char *)(uintptr_t)(gpa_src + PHYSBASE);
 	if (do_memset)
 		memset(gva_src, 0x5A, count);
 
 	/* basic DMA direct mode test */
-	out32((uint32_t *)(CCSRBAR_VA+0x100100), 0x00000404);
-	out32((uint32_t *)(CCSRBAR_VA+0x100120), count); /* count */
-	out32((uint32_t *)(CCSRBAR_VA+0x100110), 0x00050000); /* read,snoop */
-	out32((uint32_t *)(CCSRBAR_VA+0x100118), 0x00050000); /* write,snoop */
-	out32((uint32_t *)(CCSRBAR_VA+0x100114), gpa_src);
-	out32((uint32_t *)(CCSRBAR_VA+0x10011c), gpa_dst);
+	out32(&dma_virt[0], 0x00000404);
+	out32(&dma_virt[8], count); /* count */
+	out32(&dma_virt[4], 0x00050000); /* read,snoop */
+	out32(&dma_virt[6], 0x00050000); /* write,snoop */
+	out32(&dma_virt[5], gpa_src);
+	out32(&dma_virt[7], gpa_dst);
 
-	while (in32((uint32_t *)(CCSRBAR_VA+0x100104)) & DMA_CHAN_BSY);
+	while (in32(&dma_virt[1]) & DMA_CHAN_BSY);
 
-	gva_dst = (unsigned char *)(gpa_dst + PHYSBASE);
+	gva_dst = (unsigned char *)(uintptr_t)(gpa_dst + PHYSBASE);
 
 	return (!memcmp(gva_src, gva_dst, count));
 }
 
 void start(unsigned long devtree_ptr)
 {
-	int node = -1;
 	int ret;
-	int len;
-	unsigned long *liodnp;
 
 	init(devtree_ptr);
 
@@ -92,27 +143,11 @@ void start(unsigned long devtree_ptr)
 
 	printf("DMA test code for guest memcpy\n");
 
-	ret = fdt_node_offset_by_compatible(fdt, node, "fsl,p4080-dma");
-	if (ret == -FDT_ERR_NOTFOUND) {
-		printf("fdt_node_offset failed, NOT FOUND\n");
-		return;
-	}
+	ret = dma_init();
 	if (ret < 0) {
-		printf("fdt_node_offset failed = %d\n", ret);
+		printf("dma_init failed = %d\n", ret);
 		return;
 	}
-	node = ret;
-
-	liodnp = fdt_getprop_w(fdt, node, "fsl,hv-dma-handle", &len);
-	if (!liodnp) {
-		printf("fsl,hv-dma-handle property not found\n");
-		return;
-	}
-
-	fh_dma_enable(*liodnp);
-
-	liodnp = fdt_getprop_w(fdt, node, "fsl,liodn", &len);
-	printf("actual liodn = %ld\n", *liodnp);
 
 	/* test access violation failure and pass cases */
 	if (!test_dma_memcpy(0, 0x0e000000, 0))
