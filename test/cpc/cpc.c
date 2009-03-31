@@ -67,7 +67,7 @@ void cpc_perf_test(void)
 {
 	void *arr, *arr1;
 
-	arr = valloc(256 * 1024, 4096);
+	arr = valloc(256 * 1024, 256 * 1024);
 	if (!arr) {
 		printf("valloc failed \n");
 		return;
@@ -77,7 +77,7 @@ void cpc_perf_test(void)
 
 	init_buf(arr);
 
-	arr1 = valloc(256 * 1024, 4096);
+	arr1 = valloc(256 * 1024, 256 * 1024);
 	if (!arr1) {
 		printf("valloc failed \n");
 		return;
