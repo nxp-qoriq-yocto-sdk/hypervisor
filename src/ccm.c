@@ -280,13 +280,13 @@ static int set_law(dt_node_t *node, int csdid)
 		val = in32(&laws[lawidx].attr);
 
 		if (!(val & LAW_ENABLE)) {
-			val = in32(&laws[lawidx].high);
 			/* set the lower 4 bits of the LAWBARHn */
-			val |= ((uint32_t)(pma->start >> 32)) >> 28;
-			out32(&laws->high, val);
+			val = pma->start >> 32;
+			out32(&laws[lawidx].high, val);
+			printlog(LOGTYPE_CCM, LOGLEVEL_DEBUG,
+			         "LAW[%d]->high = %x \n", lawidx, val);
 
-			val = in32(&laws[lawidx].low);
-			val |= (uint32_t)pma->start;
+			val = (uint32_t)pma->start;
 			out32(&laws[lawidx].low, val);
 			printlog(LOGTYPE_CCM, LOGLEVEL_DEBUG,
 			         "LAW[%d]->low = %x \n", lawidx, val);
