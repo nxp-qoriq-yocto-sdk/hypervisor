@@ -448,45 +448,42 @@ static void tlb1_init(void)
 	cpu->console_ok = 1;
 }
 
-__attribute__((weak)) void dec_handler(trapframe_t *frameptr)
+void unknown_exception(trapframe_t *regs);
+
+void bad_exception(trapframe_t *regs)
 {
+	unknown_exception(regs);
 }
 
-__attribute__((weak)) void ext_int_handler(trapframe_t *frameptr)
-{
-}
+void dec_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void mcheck_interrupt(trapframe_t *frameptr)
-{
-}
+void ext_int_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void debug_handler(trapframe_t *frameptr)
-{
-}
+void mcheck_interrupt(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void fit_handler(trapframe_t *frameptr)
-{
-}
+void debug_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void ext_doorbell_handler(trapframe_t *frameptr)
-{
-}
+void fit_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void ext_critical_doorbell_handler(trapframe_t *frameptr)
-{
-}
+void ext_doorbell_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void dtlb_handler(trapframe_t *frameptr)
-{
-}
+void ext_critical_doorbell_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void watchdog_handler(trapframe_t *frameptr)
-{
-}
+void dtlb_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
-__attribute__((weak)) void program_handler(trapframe_t *frameptr)
-{
-}
+void watchdog_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
+
+void program_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
 
 extern int start_secondary_spin_table(struct boot_spin_table *table, int num,
 				      cpu_t *cpu);
