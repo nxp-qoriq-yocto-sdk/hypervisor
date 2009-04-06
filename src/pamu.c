@@ -83,16 +83,15 @@ static int is_subwindow_count_valid(int subwindow_cnt)
  *    rpn value on success
  */
 static unsigned long get_rpn(guest_t *guest, unsigned long grpn,
-	phys_addr_t size)
+                             unsigned long pages)
 {
 	unsigned long attr;
-	unsigned long mach_phys_contig_size = 0;
 	unsigned long start_rpn = ULONG_MAX;
-	unsigned long size_pages;
+	unsigned long cur_pages;
 	unsigned long next_rpn = ULONG_MAX;
+	unsigned long end = grpn + pages;
 
-	while (1) {
-
+	while (grpn < end) {
 		/*
 		 * Need to iterate over vptbl_xlate(), as it returns a single
 		 * mapping upto max. TLB page size on each call.
@@ -100,40 +99,31 @@ static unsigned long get_rpn(guest_t *guest, unsigned long grpn,
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr,
 		                                PTE_PHYS_LEVELS, 1);
 		if (!(attr & PTE_DMA)) {
-			if (start_rpn == ULONG_MAX) {
-				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-						"%s: invalid rpn\n", __func__);
-				return ULONG_MAX;
-			} else {
-				break;
-			}
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: dma-window has unmapped guest address at 0x%llx.\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
+			return ULONG_MAX;
 		}
 
 		if (start_rpn == ULONG_MAX) {
 			start_rpn = rpn;
 		} else if (rpn != next_rpn) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-				"%s: rpn = 0x%lx, size = 0x%lx\n",
-				__func__, start_rpn, mach_phys_contig_size);
-			break;
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: dma-window has discontiguity at guest address 0x%llx.\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
+			return ULONG_MAX;
 		}
 
 		if (!(attr & (PTE_SW | PTE_UW))) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"dma-window not writeable!\n");
+			         "%s: dma-window not writeable at guest address 0x%llx\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
 			return ULONG_MAX;
 		}
 
-		size_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
-		mach_phys_contig_size += ((phys_addr_t)size_pages << PAGE_SHIFT);
-		grpn += size_pages;
-		next_rpn = rpn + size_pages;
-	}
-
-	if (size > mach_phys_contig_size) {
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-		         "%s: dma-window size error\n", __func__);
-		return ULONG_MAX;
+		cur_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
+		grpn += cur_pages;
+		next_rpn = rpn + cur_pages;
 	}
 
 	return start_rpn;
@@ -302,7 +292,7 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 	if (primary_window_base_addr == window_addr[0]) {
 		*first_subwin_swse = map_addrspace_size_to_wse(window_size[0]);
 		rpn = get_rpn(guest, window_addr[0] >> PAGE_SHIFT,
-				 window_size[0]);
+		              window_size[0] >> PAGE_SHIFT);
 		if (rpn == ULONG_MAX)
 			return 0;
 		*first_subwin_rpn = rpn;
@@ -319,7 +309,7 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 
 			rpn = get_rpn(guest,
 				window_addr[def_window] >> PAGE_SHIFT,
-				window_size[def_window]);
+				window_size[def_window] >> PAGE_SHIFT);
 
 			if (rpn == ULONG_MAX)
 				return 0;
@@ -484,7 +474,8 @@ skip_snoop_id:
 		subwindow_cnt = *(const uint32_t *)prop->data;
 
 	if (!is_subwindow_count_valid(subwindow_cnt)) {
-		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size);
+		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT,
+		              window_size >> PAGE_SHIFT);
 		if (rpn == ULONG_MAX)
 			return ERR_NOTRANS;
 
