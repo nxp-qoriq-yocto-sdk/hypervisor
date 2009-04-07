@@ -56,7 +56,8 @@ static pte_t *vptbl_get_ptep(pte_t *tbl, int *levels, unsigned long epn,
 			if (*levels == 0)
 				return ptep;
 
-			tbl = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
+			tbl = alloc(PGDIR_SIZE * sizeof(pte_t),
+			            PGDIR_SIZE * sizeof(pte_t));
 			assert(tbl);
 
 			ptep->page = (unsigned long)tbl;
