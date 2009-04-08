@@ -485,6 +485,9 @@ __attribute__((weak, alias("bad_exception")));
 void program_handler(trapframe_t *regs)
 __attribute__((weak, alias("bad_exception")));
 
+void dsi_handler(trapframe_t *frameptr)
+__attribute__((weak, alias("bad_exception")));
+
 extern int start_secondary_spin_table(struct boot_spin_table *table, int num,
 				      cpu_t *cpu);
 

@@ -45,5 +45,6 @@ typedef int client_cpu_t;
 #define EXC_DTLB_HANDLER dtlb_handler
 #define EXC_WDOG_HANDLER watchdog_handler
 #define EXC_PROGRAM_HANDLER program_handler
+#define EXC_DSI_HANDLER dsi_handler
 
 #endif

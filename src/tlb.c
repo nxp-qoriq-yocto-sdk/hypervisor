@@ -444,7 +444,8 @@ int guest_tlb1_miss(register_t vaddr, int space, int pid)
 		tlb1_set_entry(index, epn << PAGE_SHIFT,
 		               ((phys_addr_t)rpn) << PAGE_SHIFT,
 		               mapsize, entry->mas2,
-		               entry->mas3 & ~MAS3_RPN,
+		               (entry->mas3 & ~MAS3_RPN)
+				& (attr & PTE_MAS3_MASK),
 		               pid, space, MAS8_GTS);
 
 		restore_mas(gcpu);
