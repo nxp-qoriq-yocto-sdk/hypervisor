@@ -1814,11 +1814,14 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
 		smp_mbar();
 
-		/* If we get a stop or a restart, take the gevent from idle state */
-		if (gcpu->gevent_pending & ((1 << gev_stop) |
-		                            (1 << gev_restart))) {
-			prepare_to_block();
-			block();
+		if (gcpu->gevent_pending & (1 << gev_stop)) {
+			atomic_and(&gcpu->gevent_pending, ~(1 << gev_stop));
+			stop_core(regs);
+		}
+
+		if (gcpu->gevent_pending & (1 << gev_restart)) {
+			atomic_and(&gcpu->gevent_pending, ~(1 << gev_restart));
+			restart_core(regs);
 		}
 
 		if (gcpu->gevent_pending & (1 << gev_pause)) {
