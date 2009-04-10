@@ -29,7 +29,7 @@ $use_uart2 = 1
 
 $create_fman = TRUE
 
-$guest_image[0]  = "uImage.4080"
+$guest_image[0]  = "uImage"
 $guest_addr[0]   = 0x00100000
 $guest_image[1]  = "hv-1p.dtb"
 $guest_addr[1]   = 0x00f00000
