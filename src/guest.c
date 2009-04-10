@@ -195,7 +195,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 
 	map_guest_addr_range(guest, gaddr, pma->start, pma->size, exc_flags);
 
-	if (exc_flags & PTE_VALID) {
+	if (!(exc_flags & PTE_VALID)) {
 		add_cpus_to_csd(guest, pma_node);
 
 		snprintf(buf, sizeof(buf), "memory@%llx", gaddr);
