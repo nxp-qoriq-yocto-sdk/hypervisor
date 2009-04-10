@@ -38,16 +38,14 @@ $guest_addr[1]   = 0x00f00000
 $guest_image[2]  = "rootfs.ext2.gz"
 $guest_addr[2]   = 0x01000000
 
-$kernel_image  = "hv.uImage"
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
 $kernel_cmdline = "config-addr=0xe8f00000"
 
 $dev_tree_blob  = "hardware-intmap.dtb"
 
 add-directory "%script%" -prepend
-add-directory "%script%/../../../sim" -prepend
-add-directory "%script%/../../../sim/images" -prepend
-add-directory "../bin" -prepend
-add-directory "bin" -prepend
 add-directory "bin/linux" -prepend
 
 run-command-file "boot.simics"

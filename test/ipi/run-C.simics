@@ -37,14 +37,10 @@ $guest_addr[1]  = 0x00300000
 $guest_image[2] = "hv-C.dtb"
 $guest_addr[2]  = 0x00100000
 
-$kernel_image  = "hv.uImage"
 
-$kernel_cmdline = "config-addr=0xe8100000"
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
 
-add-directory "%script%/../../../sim" -prepend
-add-directory "%script%/../../../sim/images" -prepend
-add-directory "../bin" -prepend
-add-directory "bin" -prepend
 add-directory "bin/ipi" -prepend
 
 run-command-file "boot.simics"

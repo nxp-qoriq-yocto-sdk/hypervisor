@@ -32,17 +32,13 @@ $use_uart1_net = 1
 $guest_image[0] = "gdebug"
 $guest_addr[0]  = 0x00200000
 
-$kernel_image  = "hv.uImage"
 
 $guest_image[1]  = "hv.dtb"
 $guest_addr[1]  = 0x00100000
 
-$kernel_cmdline = "config-addr=0xe8100000"
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
 
-add-directory "%script%/../../../sim" -prepend
-add-directory "%script%/../../../sim/images" -prepend
-add-directory "../bin" -prepend
-add-directory "bin" -prepend
 add-directory "bin/gdebug" -prepend
 
 run-command-file "boot.simics"
