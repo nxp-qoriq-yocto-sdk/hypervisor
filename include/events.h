@@ -45,6 +45,7 @@ void init_gevents(void);
 void idle_loop(void);
 void pause_core(trapframe_t *regs);
 void resume_core(trapframe_t *regs);
+void deliver_nmi(trapframe_t *regs);
 
 #define EV_ASSERT_VINT 0
 #define EV_TLBIVAX     1
@@ -58,5 +59,6 @@ extern int gev_restart;
 extern int gev_start_wait;
 extern int gev_pause;
 extern int gev_resume;
+extern int gev_nmi;
 
 #endif 
