@@ -26,9 +26,7 @@
 #include <string.h>
 #include "e500mc-data.h"
 
-void show_usage (char *program_name);
-
-void show_usage (char *program_name)
+static void show_usage (const char *program_name)
 {
 	printf ("Usage: %s [core|fpu|e500mc]\n", program_name);
 }

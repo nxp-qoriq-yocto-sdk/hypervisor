@@ -30,10 +30,9 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-void init(unsigned long devtree_ptr);
-
-volatile int count = 0;
+static volatile int count = 0;
 
 void fit_handler(trapframe_t *frameptr)
 {
@@ -42,7 +41,7 @@ void fit_handler(trapframe_t *frameptr)
 	count++;
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 	printf("Fixed Interval Timer test\n");

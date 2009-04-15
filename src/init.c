@@ -51,8 +51,6 @@
 
 #include <limits.h>
 
-extern cpu_t cpu0;
-
 static gcpu_t noguest[MAX_CORES] = {
 	{
 		.cpu = &cpu0,   /* link back to cpu */
@@ -66,13 +64,12 @@ cpu_t cpu0 = {
 	.client.gcpu = &noguest[0],
 };
 
-cpu_t secondary_cpus[MAX_CORES - 1];
-uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
+static cpu_t secondary_cpus[MAX_CORES - 1];
+static uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
 
 static void core_init(void);
 static void release_secondary_cores(void);
 static void partition_init(void);
-void init_guest(void);
 
 #define UART_OFFSET		0x11c500
 
@@ -81,7 +78,6 @@ uint32_t hw_devtree_lock;
 void *temp_mapping[2];
 extern char _end, _start;
 uint64_t text_phys, bigmap_phys;
-thread_t idle_thread[MAX_CORES];
 
 static void exclude_phys(phys_addr_t addr, phys_addr_t end)
 {
@@ -170,7 +166,7 @@ static int mpic_probe(driver_t *drv, device_t *dev)
 
 uint32_t rootnaddr, rootnsize;
 
-void *map_fdt(phys_addr_t devtree_ptr)
+static void *map_fdt(phys_addr_t devtree_ptr)
 {
 	const size_t mapsize = 4 * 1024 * 1024;
 	size_t len = mapsize;
@@ -201,7 +197,7 @@ void *map_fdt(phys_addr_t devtree_ptr)
 	return vaddr;
 }
 
-void unmap_fdt(void)
+static void unmap_fdt(void)
 {
 	/* We need to unmap the FDT, since we use temp_mapping[0] in
 	 * TEMPTLB2, which could otherwise cause a duplicate TLB entry.
@@ -264,7 +260,7 @@ static void add_memory(phys_addr_t start, phys_addr_t size)
 	if (vstart > 0x100000000ULL)
 		return;
 
-	if (vstart + size > 0x100000000UL ||
+	if (vstart + size > 0x100000000ULL ||
 	    vstart + size < vstart) {
 		size = 0x100000000ULL - vstart;
 
@@ -315,7 +311,7 @@ static void process_hv_mem(void *fdt, int offset, int add)
 		}
 
 		prop = fdt_getprop(fdt, offset, "phys-mem", &len);
-		if (prop < 0 || len != 4) {
+		if (!prop || len != 4) {
 			printf("%s: error %d getting phys-mem\n", __func__, len);
 			continue;
 		}
@@ -327,14 +323,14 @@ static void process_hv_mem(void *fdt, int offset, int add)
 		}
 
 		prop = fdt_getprop(fdt, pma, "addr", &len);
-		if (prop < 0 || len != 8) {
+		if (!prop || len != 8) {
 			printf("%s: error %d getting pma addr\n", __func__, len);
 			continue;
 		}
 		addr = (((uint64_t)prop[0]) << 32) | prop[1];
 
 		prop = fdt_getprop(fdt, pma, "size", &len);
-		if (prop < 0 || len != 8) {
+		if (!prop || len != 8) {
 			printf("%s: error %d getting pma size\n", __func__, len);
 			continue;
 		}
@@ -569,7 +565,7 @@ static phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size)
 	return addr;
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	phys_addr_t cfg_addr = 0;
 	size_t ccsr_size;

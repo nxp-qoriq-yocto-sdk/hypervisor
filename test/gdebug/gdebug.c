@@ -29,12 +29,11 @@
 #include <libos/trapframe.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
+#include <hvtest.h>
 
-void init(unsigned long devtree_ptr);
-extern void *fdt;
-int saved_trap_eip, saved_icmp_eip;
-volatile int loopcnt, loopcnt_monitor;
-uint32_t dac2_write_hit_pc, data_watchpoint_cmp;
+static int saved_trap_eip, saved_icmp_eip;
+static volatile int loopcnt, loopcnt_monitor;
+static uint32_t dac2_write_hit_pc, data_watchpoint_cmp;
 
 void debug_handler(trapframe_t *frameptr)
 {
@@ -84,7 +83,7 @@ static inline int infinite_loop(void)
 	return 0;
 }
 
-void hwbreaktestfunc(void)
+static void hwbreaktestfunc(void)
 {
 	if (loopcnt_monitor) {
 		data_watchpoint_cmp = get_pc();
@@ -92,7 +91,7 @@ void hwbreaktestfunc(void)
 	}
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int test_events = DBCR0_TRAP | DBCR0_ICMP | DBCR0_IAC1 | DBCR0_DAC2W;
 

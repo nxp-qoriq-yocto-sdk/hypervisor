@@ -28,10 +28,9 @@
 #include <libos/trapframe.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
-void unknown_exception(trapframe_t *regs);
-void init(unsigned long devtree_ptr);
+#include <hvtest.h>
 
-int state = 0;
+static int state = 0;
 
 void program_handler(trapframe_t *regs)
 {
@@ -55,7 +54,7 @@ static void trap_instruction(void)
 	asm volatile ("twge %r2, %r2");
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 

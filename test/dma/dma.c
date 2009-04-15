@@ -32,35 +32,17 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #define DMA_CHAN_BSY 0x00000004
 #define PAGE_SIZE 4096
 
 void init(unsigned long devtree_ptr);
 
-extern void *fdt;
+static phys_addr_t dma_phys;
+static uint32_t *dma_virt;
 
-void dump_dev_tree(void)
-{
-	int node = -1;
-	const char *s;
-	int len;
-
-	printf("dev tree ------\n");
-	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
-		s = fdt_get_name(fdt, node, &len);
-		printf("   node = %s\n",s);
-	}
-	printf("------\n");
-}
-
-extern int dt_get_reg(const void *tree, int node, int res,
-                      phys_addr_t *addr, phys_addr_t *size);
-
-phys_addr_t dma_phys;
-uint32_t *dma_virt;
-
-int dma_init(void)
+static int dma_init(void)
 {
 	int node, parent, len;
 	uint32_t liodn;
@@ -107,7 +89,8 @@ int dma_init(void)
 	return 0;
 }
 
-int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst, int do_memset)
+static int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst,
+                           int do_memset)
 {
 	int count = 0x100;
 	unsigned char *gva_src, *gva_dst;
@@ -131,13 +114,11 @@ int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst, int do_memset)
 	return (!memcmp(gva_src, gva_dst, count));
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int ret;
 
 	init(devtree_ptr);
-
-//	dump_dev_tree();
 
 //	enable_extint();
 

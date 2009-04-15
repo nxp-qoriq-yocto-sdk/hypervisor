@@ -67,21 +67,21 @@ char *nextword(char **str)
 
 static int print_num_error(queue_t *out, char *endp, const char *numstr)
 {
-	int block = !is_idle();
+	int blocking = !is_idle();
 
 	if (cpu->errno) {
 		if (cpu->errno == ERR_RANGE)
-			qprintf(out, block, "Number exceeds range: %s\n", numstr);
+			qprintf(out, blocking, "Number exceeds range: %s\n", numstr);
 		else if (cpu->errno == ERR_INVALID)
-			qprintf(out, block, "Unrecognized number format: %s\n", numstr);
+			qprintf(out, blocking, "Unrecognized number format: %s\n", numstr);
 		else
-			qprintf(out, block, "get_number: error %d: %s\n", cpu->errno, numstr);
+			qprintf(out, blocking, "get_number: error %d: %s\n", cpu->errno, numstr);
 
 		return 1;
 	}
 
 	if (endp && *endp) {
-		qprintf(out, block, "Trailing junk after number: %s\n", numstr);
+		qprintf(out, blocking, "Trailing junk after number: %s\n", numstr);
 		cpu->errno = ERR_INVALID;
 		return 1;
 	}

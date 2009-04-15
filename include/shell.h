@@ -42,6 +42,8 @@ typedef struct command {
 
 void shell_init(void);
 
-#define shell_cmd(x) __attribute__((section(".shellcmd"))) command_t *_##x##_PTR = (&x)
+#define shell_cmd(x) \
+	static __attribute__((used,section(".shellcmd"))) \
+	command_t *_##x##_PTR = (&x)
 
 #endif

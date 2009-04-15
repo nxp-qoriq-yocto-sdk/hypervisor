@@ -50,9 +50,14 @@ uint64_t get_number64(queue_t *out, const char *numstr);
 int64_t get_snumber64(queue_t *out, const char *numstr);
 uint32_t get_number32(queue_t *out, const char *numstr);
 int32_t get_snumber32(queue_t *out, const char *numstr);
-int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu);
+int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, unsigned int vcpu);
 
 void branch_to_reloc(void *bigmap_text_base,
                      register_t mas3, register_t mas7);
+
+void reflect_trap(trapframe_t *regs);
+void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar);
+
+__attribute__((noreturn)) void init_guest(void);
 
 #endif

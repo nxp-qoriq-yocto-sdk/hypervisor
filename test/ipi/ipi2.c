@@ -33,14 +33,12 @@
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #undef DEBUG
 
-extern void init(unsigned long devtree_ptr);
-int extint_cnt;
-int *handle_p_int;
-extern void *fdt;
-extern int coreint;
+static int extint_cnt;
+static const uint32_t *handle_p_int;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -69,23 +67,24 @@ void ext_critical_doorbell_handler(trapframe_t *frameptr)
 	printf("Critical doorbell\n");
 }
 
-int *get_specific_handle(const char *dbell_type, const char *prop, void *fdt,
-			uint32_t which_handle)
+static const uint32_t *get_specific_handle(const char *dbell_type,
+                                           const char *prop, void *tree,
+                                           uint32_t which_handle)
 {
 	int off = -1, ret;
 	int len;
 
-	ret = fdt_check_header(fdt);
+	ret = fdt_check_header(tree);
 	if (ret)
 		return NULL;
-	ret = fdt_node_offset_by_compatible(fdt, off, dbell_type);
+	ret = fdt_node_offset_by_compatible(tree, off, dbell_type);
 	if (ret == -FDT_ERR_NOTFOUND)
 		return NULL;
 	if (ret < 0)
 		return NULL;
 
-	for (int i = 0; i < which_handle; i++) {
-		ret = fdt_next_node(fdt, ret, &len);
+	for (uint32_t i = 0; i < which_handle; i++) {
+		ret = fdt_next_node(tree, ret, &len);
 		if (ret == -FDT_ERR_NOTFOUND)
 			return NULL;
 		if (ret < 0)
@@ -94,18 +93,19 @@ int *get_specific_handle(const char *dbell_type, const char *prop, void *fdt,
 
 	off = ret;
 
-	return (int *)fdt_getprop(fdt, off, prop, &len);
+	return fdt_getprop(tree, off, prop, &len);
 }
 
-int *get_handle(const char *dbell_type, const char *prop, void *fdt)
+static const uint32_t *get_handle(const char *dbell_type,
+                                  const char *prop, void *tree)
 {
 	int off = -1, ret;
 	int len;
 
-	ret = fdt_check_header(fdt);
+	ret = fdt_check_header(tree);
 	if (ret)
 		return NULL;
-	ret = fdt_node_offset_by_compatible(fdt, off, dbell_type);
+	ret = fdt_node_offset_by_compatible(tree, off, dbell_type);
 
 	if (ret == -FDT_ERR_NOTFOUND)
 		return NULL;
@@ -114,15 +114,15 @@ int *get_handle(const char *dbell_type, const char *prop, void *fdt)
 
 	off = ret;
 
-	return (int *)fdt_getprop(fdt, off, prop, &len);
+	return fdt_getprop(tree, off, prop, &len);
 }
 
-int test_init(void)
+static int test_init(void)
 {
-	int *handle_p;
+	const uint32_t *handle_p;
 
 	handle_p_int = get_specific_handle("fsl,hv-doorbell-receive-handle",
-						"interrupts", fdt, 32);
+	                                   "interrupts", fdt, 32);
 
 	if (!handle_p_int) {
 		printf("Couldn't get recv doorbell handle\n");
@@ -147,7 +147,7 @@ int test_init(void)
 	return 0;
 }
 
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -163,7 +163,7 @@ void dump_dev_tree(void)
 #endif
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int rc;
 

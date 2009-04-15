@@ -72,7 +72,7 @@ static void vmpic_reset_handle(handle_t *h)
 	vmpic_reset(h->intr);
 }
 
-handle_ops_t vmpic_handle_ops = {
+static handle_ops_t vmpic_handle_ops = {
 	.reset = vmpic_reset_handle,
 };
 
@@ -300,8 +300,8 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 		lcpu_mask = irq->ops->get_cpu_dest_mask(irq);
 	else if (irq->ops->get_cpu_dest_mask) {
 		uint32_t pcpu_mask = irq->ops->get_cpu_dest_mask(irq);
-		int pcpu_dest = count_lsb_zeroes(pcpu_mask);
-		int i;
+		unsigned int pcpu_dest = count_lsb_zeroes(pcpu_mask);
+		unsigned int i;
 
 		/* Map physical cpu to logical cpu within partition */
 		for (i = 0; i < guest->cpucnt; i++)

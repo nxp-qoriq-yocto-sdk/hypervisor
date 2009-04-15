@@ -40,7 +40,7 @@ static int find_stub_by_vcpu(dt_node_t *node, void *arg)
 	}
 
 	/* FIXME: Handle multiple vcpus */
-	int vcpu_num = *(const uint32_t *)prop->data;
+	uint32_t vcpu_num = *(const uint32_t *)prop->data;
 	if (vcpu_num == get_gcpu()->gcpu_num) {
 		*ret = node;
 		return 1;

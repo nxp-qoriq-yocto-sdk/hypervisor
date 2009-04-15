@@ -283,8 +283,8 @@ static void fh_byte_channel_send(trapframe_t *regs)
 		regs->gpregs[3] = EAGAIN;
 	else {
 		/* put chars into bytechannel queue here */
-		int ret = byte_chan_send(bc, buf, len);
-		assert(ret == len);
+		ssize_t ret = byte_chan_send(bc, buf, len);
+		assert(ret == (ssize_t)len);
 		regs->gpregs[3] = 0;  /* success */
 	}
 

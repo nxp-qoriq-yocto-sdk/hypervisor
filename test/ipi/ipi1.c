@@ -33,18 +33,16 @@
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #undef DEBUG
 
-extern void init(unsigned long);
-volatile int extint_cnt;
-int *handle_p_int;
-extern void *fdt;
-extern int coreint;
+static volatile int extint_cnt;
+static const uint32_t *handle_p_int;
  
 
 /* reads data from shared memory region on interrupt */
-void rd_shm(void)
+static void rd_shm(void)
 {
 	int ret, off = -1;
 	phys_addr_t addr = 0;
@@ -118,7 +116,7 @@ void ext_critical_doorbell_handler(trapframe_t *frameptr)
 	printf("Critical doorbell\n");
 }
 
-int test_init(void)
+static int test_init(void)
 {
 	int len;
 	int off = -1, ret;
@@ -132,7 +130,7 @@ int test_init(void)
 	if (ret < 0)
 		return ret;
 	off = ret;
-	handle_p_int = (int *)fdt_getprop(fdt, off, "interrupts", &len);
+	handle_p_int = fdt_getprop(fdt, off, "interrupts", &len);
 
 	/* VMPIC config */
 	fh_vmpic_set_int_config(*handle_p_int, 1, 15, 0x00000001);
@@ -143,7 +141,7 @@ int test_init(void)
 	return 0;
 }
 
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -159,7 +157,7 @@ void dump_dev_tree(void)
 #endif
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int rc;
 

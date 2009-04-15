@@ -125,7 +125,8 @@ none_avail:
  * is the responsibility of the caller.
  */
 
-int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp, int *way)
+int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag,
+                    tlbcset_t **setp, unsigned int *way)
 {
 	tlbcset_t *set;
 	tlbctag_t mask;
@@ -171,13 +172,14 @@ int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp, int *way)
  * @param[in]  space zero if AS0, 1 if AS1
  * @return non-zero if a conflicting entry was found
  */
-int check_tlb1_conflict(uintptr_t epn, int tsize, int pid, int space)
+int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
+                        unsigned int pid, unsigned int space)
 {
  	uintptr_t pages = tsize_to_pages(tsize);
  	int mask = (1 << cpu->client.tlbcache_bits) - 1;
-	int cache_entries = min(pages, cpu->client.tlbcache_bits);
-	int index = epn & mask;
-	int end = index + cache_entries;
+	unsigned int cache_entries = min(pages, cpu->client.tlbcache_bits);
+	unsigned int index = epn & mask;
+	unsigned int end = index + cache_entries;
 
 	tlbcset_t *set = &cpu->client.tlbcache[index];
 	
@@ -213,7 +215,7 @@ int check_tlb1_conflict(uintptr_t epn, int tsize, int pid, int space)
 	return 0;
 }
 
-void gtlb0_to_mas(int index, int way)
+void gtlb0_to_mas(unsigned int index, unsigned int way)
 {
 	tlbcset_t *set = &cpu->client.tlbcache[index];
 	int bits = cpu->client.tlbcache_bits;
@@ -273,7 +275,7 @@ static void guest_inv_tlb0_pid(int pid)
 {
 	tlbcset_t *set = cpu->client.tlbcache;
 	unsigned int num_sets = 1 << cpu->client.tlbcache_bits;
-	int i, j;
+	unsigned int i, j;
 
 	for (i = 0; i < num_sets; i++)
 		for (j = 0; j < TLBC_WAYS; j++)
@@ -304,11 +306,9 @@ static void guest_inv_tlb0_va(register_t vaddr, int pid)
 	set = &cpu->client.tlbcache[index];
 
 	for (i = 0; i < TLBC_WAYS; i++) {
-		int pid = set->tag[i].pid;
-
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "inv pid %d tag.pid %d set->tag %lx mask %lx\n",
-		         pid, tag.pid, set->tag[i].tag, mask.tag);
+		         set->tag[i].pid, tag.pid, set->tag[i].tag, mask.tag);
 
 		if (((tag.tag ^ set->tag[i].tag) & mask.tag) == 0)
 			set->tag[i].valid = 0;
@@ -325,7 +325,8 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	uintptr_t vaddr = mas2 & MAS2_EPN;
 	tlbctag_t tag = make_tag(vaddr, MAS1_GETTID(mas1),
 	                         (mas1 & MAS1_TS) >> MAS1_TS_SHIFT);
-	int way, ret;
+	unsigned int way;
+	int ret;
 
 	assert(!(mas0 & MAS0_TLBSEL1));
 
@@ -391,7 +392,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
  * @param[in] pid The value of SPR_PID.
  * @return TLB_MISS_REFLECT, TLB_MISS_HANDLED, or TLB_MISS_MCHECK
  */
-int guest_tlb1_miss(register_t vaddr, int space, int pid)
+int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 {
 	gcpu_t *gcpu = get_gcpu();
 	unsigned long epn = vaddr >> PAGE_SHIFT;
@@ -401,9 +402,9 @@ int guest_tlb1_miss(register_t vaddr, int space, int pid)
 		tlb_entry_t *entry = &gcpu->gtlb1[i];
 		unsigned long entryepn = entry->mas2 >> PAGE_SHIFT;
 		unsigned long grpn, rpn, baserpn, attr;
-		int entrypid = MAS1_GETTID(entry->mas1);
-		int tsize = MAS1_GETTSIZE(entry->mas1);
-		int mapsize, mappages, index;
+		unsigned int entrypid = MAS1_GETTID(entry->mas1);
+		unsigned int tsize = MAS1_GETTSIZE(entry->mas1);
+		unsigned int mapsize, mappages, index;
 		
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "checking %x/%lx/%lx for %lx/%d/%d\n",
@@ -484,7 +485,7 @@ void tlbcache_init(void)
  * @param[in] pid The value of SPR_PID.
  * @return TLB_MISS_REFLECT or TLB_MISS_MCHECK
  */
-int guest_tlb_isi(register_t vaddr, int space, int pid)
+int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid)
 {
 	gcpu_t *gcpu = get_gcpu();
 	int ret = TLB_MISS_REFLECT;
@@ -592,10 +593,11 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 #endif
 }
 
-static void guest_inv_tlb1(register_t va, int pid, int flags, int global)
+static void guest_inv_tlb1(register_t va, int pid,
+                           int flags, int global)
 {
 	gcpu_t *gcpu = get_gcpu();
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *tlbe = &gcpu->gtlb1[i];
@@ -612,7 +614,9 @@ static void guest_inv_tlb1(register_t va, int pid, int flags, int global)
 			if (!global && (va < begin || va > end))
 				continue;
 
-			if (pid >= 0 && pid != (tlbe->mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
+			if (pid >= 0 &&
+			    (unsigned int)pid !=
+			    (tlbe->mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
 				continue;
 
 			free_tlb1(i);
@@ -667,7 +671,7 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 				}
 			} else {
 				assert((mfspr(SPR_MAS6) & MAS6_SPID_MASK) ==
-				       (pid << MAS6_SPID_SHIFT));
+				       ((unsigned int)pid << MAS6_SPID_SHIFT));
 				tlb_inv_addr(va);
 			}
 		}
@@ -714,7 +718,7 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 {
 	gcpu_t *gcpu = get_gcpu();
 	int pid = MAS1_GETTID(mas1);
-	int i;
+	unsigned int i;
 	
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *other = &gcpu->gtlb1[i];
@@ -804,7 +808,7 @@ int guest_tlb_search_mas(uintptr_t va)
 	tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
 				mas6 & MAS6_SAS);
 	tlbcset_t *set;
-	int way;
+	unsigned int way;
 
 	if (find_gtlb_entry(va, tag, &set, &way)) {
 		gtlb0_to_mas(set - cpu->client.tlbcache, way);
@@ -1102,7 +1106,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 
 	if (!(attr & PTE_VALID) || (attr & PTE_VF))
 		return NULL;
-	if (write & !(attr & PTE_UW))
+	if (write && !(attr & PTE_UW))
 		return NULL;
 
 	tsize = attr >> PTE_SIZE_SHIFT;

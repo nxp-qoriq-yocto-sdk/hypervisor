@@ -56,29 +56,30 @@ LIBOS_CLIENT_H := $(testdir)common/libos-client.h
 
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
-        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H)
+        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H) \
+        -I$(testdir)common
 
 include $(SUBMAKES)
 
 #HDRS := $(shell cd $(testdir); find . -name '*.h')
 
 bin/%.d : $(testdir)%.c
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_C))
 
 bin/%.o : $(testdir)%.c bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 bin/%.d : $(testdir)%.S bin/libos/assym.s
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_ASM))
 
 bin/%.o : $(testdir)%.S bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM))
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM))
 
 bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_C))
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 bin/%.dtb : $(testdir)%.dts
 	@$(MKDIR) $(@D)

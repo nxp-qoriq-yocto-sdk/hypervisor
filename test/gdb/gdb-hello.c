@@ -34,7 +34,7 @@
 
 void init(unsigned long devtree_ptr);
 
-int irq;
+static int irq;
 extern void *fdt;
 extern int coreint;
 
@@ -51,10 +51,10 @@ void ext_int_handler(trapframe_t *frameptr)
 	fh_vmpic_eoi(irq);
 }
 
-int X = 9;
-int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
+static int X = 9;
+static int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
-int const32(void)
+static int const32(void)
 {
 	int i;
 	for (i = 0; i < 32;)
@@ -62,7 +62,7 @@ int const32(void)
 	return i;
 }
 
-int maximum(int *a, int n)
+static int maximum(int *a, int n)
 {
 	int m, *p;
 	m = a[0];
@@ -75,14 +75,14 @@ int maximum(int *a, int n)
 	return m;
 }
 
-int max_of_Y(void)
+static int max_of_Y(void)
 {
 	int n;
 	n = maximum(Y, sizeof(Y)/sizeof(Y[0]));
 	return n;
 }
 
-int dive(int n)
+static int dive(int n)
 {
 	int k;
 	switch (n % 2) {
@@ -94,7 +94,7 @@ int dive(int n)
 	return k;
 }
 
-void gorp(void)
+static void gorp(void)
 {
 	int i;
 	int a[64];
@@ -103,7 +103,8 @@ void gorp(void)
 	}
 	return;
 }
-void start(unsigned long devtree_ptr)
+
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int j, t;
 

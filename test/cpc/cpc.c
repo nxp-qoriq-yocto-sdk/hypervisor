@@ -29,10 +29,7 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
-
-extern void init(unsigned long devtree_ptr);
-
-extern void *fdt;
+#include <hvtest.h>
 
 /* insert simics markpoints */
 static inline void markpoint(const uint32_t markid)
@@ -44,7 +41,7 @@ static inline void markpoint(const uint32_t markid)
         );
 }
 
-void init_buf(char *buf)
+static void init_buf(char *buf)
 {
 	int i;
 
@@ -52,7 +49,7 @@ void init_buf(char *buf)
 		buf[i] = i;
 }
 
-void read_buf(char *arr)
+static void read_buf(char *arr)
 {
 	volatile uint32_t ch = 0;
 	int i;
@@ -63,7 +60,7 @@ void read_buf(char *arr)
 		ch += arr[i];
 }
 
-void cpc_perf_test(void)
+static void cpc_perf_test(void)
 {
 	void *arr, *arr1;
 
@@ -95,7 +92,7 @@ void cpc_perf_test(void)
 	markpoint(2);
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 

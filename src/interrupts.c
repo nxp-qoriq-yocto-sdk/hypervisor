@@ -28,9 +28,9 @@
 #include <libos/interrupts.h>
 #include <libos/mpic.h>
 #include <libos/percpu.h>
-#include <errors.h>
 
-extern void trap(trapframe_t *);
+#include <errors.h>
+#include <hv.h>
 
 void critical_interrupt(trapframe_t *frameptr)
 {

@@ -34,6 +34,7 @@
 #include <percpu.h>
 #include <errors.h>
 #include <devtree.h>
+#include <uimage.h>
 #include <zlib.h>
 
 #define UIMAGE_SIGNATURE 0x27051956
@@ -226,7 +227,6 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 {
 	struct image_header hdr;
 	uint32_t size;
-	int ret;
 
 	if (copy_from_phys(&hdr, image_phys, sizeof(hdr)) != sizeof(hdr))
 		return ERR_UNHANDLED;
@@ -259,8 +259,8 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 		return ERR_BADIMAGE;
 #endif
  	} else {
- 		ret = copy_phys_to_gphys(guest->gphys, target,
- 					image_phys, size);
+ 		size_t ret = copy_phys_to_gphys(guest->gphys, target,
+		                                image_phys, size);
  		if (ret != size) {
  			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
  				"load_uimage: cannot copy\n");

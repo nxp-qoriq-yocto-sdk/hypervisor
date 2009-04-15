@@ -42,7 +42,7 @@
  *
  * This function is registered via register_vf_handler()
  */
-void i2c_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
+static void i2c_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
 {
 	uint32_t insn;
 	void *vaddr;
@@ -131,7 +131,7 @@ void i2c_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
  *
  * @return int
  */
-int i2c_isr(void *arg)
+static int i2c_isr(void *arg)
 {
 	vf_range_t *vf = (vf_range_t *) arg;
 	uint8_t *i2c_sr = vf->vaddr + MPC_I2C_SR;

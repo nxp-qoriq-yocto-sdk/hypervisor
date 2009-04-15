@@ -67,10 +67,10 @@ void emit_registers(struct register_description *registers, unsigned int count)
 	}
 }
 
-char *xml_version = "<?xml version=\\\"1.0\\\"?>\\n\\\n\\n\\\n";
-char *doc_type_target =
+const char *xml_version = "<?xml version=\\\"1.0\\\"?>\\n\\\n\\n\\\n";
+const char *doc_type_target =
 	"<!DOCTYPE target SYSTEM \\\"gdb-target.dtd\\\">\\n\\\n\\n\\\n";
-char *e500mc_gnu_copyright = "\
+const char *e500mc_gnu_copyright = "\
 <!-- Copyright (C) 2009 Free Software Foundation, Inc.\\n\\\n\
 \\n\\\n\
      Copying and distribution of this file, with or without modification,"
@@ -78,31 +78,31 @@ char *e500mc_gnu_copyright = "\
      are permitted in any medium without royalty provided the copyright"
 "\\n\\\n\
      notice and this notice are preserved.  -->\\n\\\n\\n\\\n";
-char *freescale_version = "\
+const char *freescale_version = "\
 <!-- ************************************************************* -->\\n\\\n\
 <!-- *                                                           * -->\\n\\\n\
 <!-- *        Freescale e500mc machine description. (1.0)        * -->\\n\\\n\
 <!-- *                                                           * -->\\n\\\n\
 <!-- ************************************************************* -->\\n\\\n"
                                                                      "\\n\\\n";
-char *target_version = "<target version=\\\"1.0\\\">\\n\\\n\\n\\\n";
-char *architecture_declaration = "\
+const char *target_version = "<target version=\\\"1.0\\\">\\n\\\n\\n\\\n";
+const char *architecture_declaration = "\
  <!-- Declare ourselves as a member of the PowerPC family. -->\\n\\\n\
  <architecture>powerpc:e500mc</architecture>\\n\\\n\\n\\\n";
-char *includes = "\
+const char *includes = "\
  <!-- Include standard PowerPC features. -->\\n\\\n\
  <xi:include href=\\\"power-core.xml\\\"/>\\n\\\n\
  <xi:include href=\\\"power-fpu.xml\\\"/>\\n\\\n\\n\\\n";
-char *e500_sprs_feature = "\
+const char *e500_sprs_feature = "\
  <!-- Define the e500mc SPR's. -->\\n\\\n\
  <feature name=\\\"freescale.e500mc.sprs\\\">\\n\\\n\\n\\\n";
-char *e500_pmrs_feature = "\
+const char *e500_pmrs_feature = "\
  <!-- Define the e500mc PMR's. -->\\n\\\n\
  <feature name=\\\"freescale.e500mc.pmrs\\\">\\n\\\n\\n\\\n";
-char *close_feature = " </feature>\\n\\\n\\n\\\n";
-char *close_target = "</target>\\n\\\n";
+const char *close_feature = " </feature>\\n\\\n\\n\\\n";
+const char *close_target = "</target>\\n\\\n";
 
-char *e500mc_description;
+const char *e500mc_description;
 
 void emit_e500mc_description(void)
 {
@@ -122,7 +122,7 @@ void emit_e500mc_description(void)
 	printf("%s", close_target);
 }
 
-char *power_core_gnu_copyright = "\
+const char *power_core_gnu_copyright = "\
 <!-- Copyright (C) 2007, 2008, 2009 Free Software Foundation, Inc.\\n\\\n\
 \\n\\\n\
      Copying and distribution of this file, with or without modification,"
@@ -130,9 +130,9 @@ char *power_core_gnu_copyright = "\
      are permitted in any medium without royalty provided the copyright"
 "\\n\\\n\
      notice and this notice are preserved.  -->\\n\\\n";
-char *doc_type_feature = "<!DOCTYPE feature SYSTEM \\\""
+const char *doc_type_feature = "<!DOCTYPE feature SYSTEM \\\""
 			 "gdb-target.dtd\\\">\\n\\\n";
-char *power_core_feature = "<feature name=\\\"org.gnu.gdb.power.core"
+const char *power_core_feature = "<feature name=\\\"org.gnu.gdb.power.core"
 			   "\\\">\\n\\\n";
 
 void emit_power_core_description(void)
@@ -149,7 +149,7 @@ void emit_power_core_description(void)
 	printf("%s", close_feature);
 }
 
-char *power_fpu_feature = "<feature name=\\\"org.gnu.gdb.power.fpu"
+const char *power_fpu_feature = "<feature name=\\\"org.gnu.gdb.power.fpu"
 			  "\\\">\\n\\\n\\n\\\n";
 
 void emit_power_fpu_description(void)
@@ -163,7 +163,7 @@ void emit_power_fpu_description(void)
 	printf("%s", close_feature);
 }
 
-char *freescale_copyright = "\
+const char *freescale_copyright = "\
 /*\n\
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.\n\
  *\n\
@@ -190,7 +190,9 @@ char *freescale_copyright = "\
 
 static inline int reg_byte_count(struct register_description *registers, unsigned int count)
 {
-	int num_reg_bytes = 0, i;
+	int num_reg_bytes = 0;
+	unsigned int i;
+
 	for (i = 0; i < count; i++) {
 		num_reg_bytes += atoi(registers[i].bitsize)/8;
 	}
@@ -245,7 +247,8 @@ void emit_buf_macros(void)
 
 static inline void emit_reg_details(struct register_description *registers, unsigned int count)
 {
-	int i;
+	unsigned int i;
+
 	for (i = 0; i < count; i++) {
 		printf("\t{ .e500mc_num=%d, .bitsize=%s, .cat=%s, },\n",
 		       registers[i].inum, registers[i].bitsize,

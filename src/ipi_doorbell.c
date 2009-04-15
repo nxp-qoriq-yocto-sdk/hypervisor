@@ -204,7 +204,7 @@ static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
 	return dbell;
 }
 
-int send_dbell_init_one(dt_node_t *node, void *arg)
+static int send_dbell_init_one(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;
@@ -254,7 +254,7 @@ int send_dbell_init_one(dt_node_t *node, void *arg)
 	return 0;
 }
 
-int recv_dbell_init_one(dt_node_t *node, void *arg)
+static int recv_dbell_init_one(dt_node_t *node, void *arg)
 {
 	guest_t *guest = arg;
 	ipi_doorbell_t *dbell;

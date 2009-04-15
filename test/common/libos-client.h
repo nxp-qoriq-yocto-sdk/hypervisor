@@ -33,6 +33,21 @@
 
 #ifndef _ASM
 typedef int client_cpu_t;
+
+/* These are used by assembly code */
+struct trapframe;
+
+void dec_handler(struct trapframe *regs);
+void ext_int_handler(struct trapframe *regs);
+void mcheck_interrupt(struct trapframe *frameptr);
+void debug_handler(struct trapframe *regs);
+void fit_handler(struct trapframe *regs);
+void ext_doorbell_handler(struct trapframe *regs);
+void ext_critical_doorbell_handler(struct trapframe *regs);
+void dtlb_handler(struct trapframe *regs);
+void watchdog_handler(struct trapframe *regs);
+void program_handler(struct trapframe *regs);
+void dsi_handler(struct trapframe *regs);
 #endif
 
 #define EXC_DECR_HANDLER dec_handler

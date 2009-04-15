@@ -29,11 +29,9 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-extern void init(unsigned long devtree_ptr);
-
-extern void *fdt;
-int failed, exception;
+static int failed, exception;
 
 #define TLB0 0
 #define TLB1 1
@@ -42,7 +40,7 @@ void dsi_handler(trapframe_t *frameptr)
 {
 	if (mfspr(SPR_ESR) & ESR_ST) {
 		asm volatile("tlbsx 0, %0" : : "r" (mfspr(SPR_DEAR)) : "memory");
-		if (!mfspr(SPR_MAS1) & MAS1_VALID) {
+		if (!(mfspr(SPR_MAS1) & MAS1_VALID)) {
 			printf("TLBSX failed for address %x\n", (uint32_t)mfspr(SPR_DEAR));
 			failed = 1;
 			goto out;
@@ -75,7 +73,7 @@ static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa, int tsi
 	asm volatile("isync; tlbwe; msync; isync" : : : "memory");
 }
 
-void check_result(int tlb)
+static void check_result(int tlb)
 {
 	if (exception) {
 		if (!failed) {
@@ -92,7 +90,7 @@ void check_result(int tlb)
 	}
 }
 
-void gpma_test(void)
+static void gpma_test(void)
 {
 	void *arr;
 
@@ -111,7 +109,7 @@ void gpma_test(void)
 	check_result(TLB1);
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 

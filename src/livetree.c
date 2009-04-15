@@ -802,7 +802,7 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 		if (!prop->len || (prop->len % sizeof(uint32_t)))
 			return ERR_BADTREE;
 
-		const unsigned int count = prop->len / sizeof(uint32_t);
+		int count = prop->len / sizeof(uint32_t);
 		uint32_t *phandles = malloc(count * sizeof(uint32_t));
 		if (!phandles)
 			return ERR_NOMEM;
@@ -982,7 +982,7 @@ static void print_hex_bytes(print_ctx_t *ctx, dt_prop_t *prop)
 {
 	uint8_t *data = prop->data;
 
-	for (int j = 0; j < prop->len; j++) {
+	for (unsigned int j = 0; j < prop->len; j++) {
 		qprintf(ctx->out, 1, "%s%02x",
 		        j == 0 ? " = [" : " ", data[j]);
 	}
@@ -994,7 +994,7 @@ static void print_cells(print_ctx_t *ctx, dt_prop_t *prop, int always_dec)
 {
 	uint32_t *data = prop->data;
 
-	for (int j = 0; j < prop->len / 4; j++) {
+	for (unsigned int j = 0; j < prop->len / 4; j++) {
 		int dec = always_dec || data[j] < 256;
 
 		qprintf(ctx->out, 1, dec ? "%s%u" : "%s%#x",

@@ -29,14 +29,15 @@ $(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           $(libos-src-early-y:%=libos/%) \
                           $(libos-src-y:%=libos/%) \
                           $($(test)-src-y:$(dir)%=$(test)/%) \
-                          $(LIBFDT_SRCS:%=libfdt/%) \
-                          common/init.o)
+                          common/init.o $(LIBFDT_SRCS:%=libfdt/%))
+$(test)-nocheck-obj := 
 
 $(test)-obj := $($(test)-obj:%=bin/%.o)
+$(test)-nocheck-obj := $($(test)-nocheck-obj:%=bin/nocheck/%.o)
 
 $(test)-hv-dtb := $($(test)-dts-y:$(dir)%.dts=bin/$(test)/%.dtb)
 
-bin/$(test)/$(test): $($(test)-obj)
+bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc

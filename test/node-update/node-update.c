@@ -30,17 +30,14 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
-
-void init(unsigned long devtree_ptr);
-
-extern void *fdt;
+#include <hvtest.h>
 
 #define PAGE_SIZE 4096
 
 #define UART 1
 #define DMA 2
 
-volatile int exception;
+static volatile int exception;
 
 void mcheck_interrupt(trapframe_t *frameptr)
 {
@@ -55,9 +52,7 @@ void mcheck_interrupt(trapframe_t *frameptr)
 extern int dt_get_reg(const void *tree, int node, int res,
                       phys_addr_t *addr, phys_addr_t *size);
 
-extern phys_addr_t uart_addr;
-
-void check_dma1_node(int node)
+static void check_dma1_node(int node)
 {
 	const uint32_t *prop;
 	const uint32_t *reg;
@@ -97,7 +92,7 @@ void check_dma1_node(int node)
 		(exception)? "PASSED" : "FAILED");
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int node, ret, compat_found = 0;
 	int last_node = 0;

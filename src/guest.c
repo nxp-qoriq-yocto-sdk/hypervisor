@@ -54,7 +54,7 @@
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
 
-int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
+int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, unsigned int vcpu)
 {
 	unsigned int i, vcpu_base = 0;
 	
@@ -68,18 +68,20 @@ int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, int vcpu)
 	return ERR_RANGE;
 }
 
-static int cpu_in_cpulist(const uint32_t *cpulist, unsigned int len, int cpu)
+static int cpu_in_cpulist(const uint32_t *cpulist, unsigned int len,
+                          unsigned int cpunum)
 {
 	unsigned int i;
 	for (i = 0; i < len / 4; i += 2) {
-		if (cpu >= cpulist[i] && cpu < cpulist[i] + cpulist[i + 1])
+		if (cpunum >= cpulist[i] && cpunum < cpulist[i] + cpulist[i + 1])
 			return 1;
 	}
 
 	return 0;
 }
 
-static int get_gcpu_num(const uint32_t *cpulist, unsigned int len, int cpu)
+static int get_gcpu_num(const uint32_t *cpulist, unsigned int len,
+                        unsigned int cpunum)
 {
 	unsigned int i;
 	unsigned int total = 0; 
@@ -88,8 +90,8 @@ static int get_gcpu_num(const uint32_t *cpulist, unsigned int len, int cpu)
 		unsigned int base = cpulist[i];
 		unsigned int num = cpulist[i + 1];
 
-		if (cpu >= base && cpu < base + num)
-			return total + cpu - base;
+		if (cpunum >= base && cpunum < base + num)
+			return total + cpunum - base;
 
 		total += num;
 	}
@@ -237,7 +239,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	const uint32_t *ranges;
 	uint32_t *newranges, *newranges_base;
 	dt_node_t *hwnode = owner->hwnode;
-	int map = 0;
+	int map_ranges = 0;
 	int ret;
 
 	prop = dt_get_prop(owner->gnode, "ranges", 0);
@@ -246,12 +248,12 @@ static int map_guest_ranges(dev_owner_t *owner)
 
 	if (dt_get_prop(owner->cfgnode, "map-ranges", 0) &&
 	    owner->direct == owner)
-		map = 1;
+		map_ranges = 1;
 
 	/* Don't parse the ranges at all if it's a non-reparented child
 	 * without map-ranges.
 	 */
-	if (!map && owner->gnode->parent->parent)
+	if (!map_ranges && owner->gnode->parent->parent)
 		return 0;
 
 	dt_node_t *parent = hwnode->parent;
@@ -283,7 +285,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 		return ERR_NOMEM;
 
 	newranges_base = newranges;
-	for (int i = 0; i < len; i++, ranges += caddr + naddr + csize) {
+	for (unsigned int i = 0; i < len; i++, ranges += caddr + naddr + csize) {
 		uint32_t addrbuf[MAX_ADDR_CELLS];
 		phys_addr_t addr, size;
 
@@ -372,7 +374,7 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 
 typedef struct search_liodn_ctx {
 	dt_node_t *cfgnode;
-	int liodn_index;
+	uint32_t liodn_index;
 } search_liodn_ctx_t;
 
 static int search_liodn_index(dt_node_t *cfgnode, void *arg)
@@ -398,7 +400,7 @@ static int search_liodn_index(dt_node_t *cfgnode, void *arg)
 	return 0;
 }
 
-int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
+static int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_node_t *cfgnode;
 	dt_prop_t *liodn_prop = NULL;
@@ -535,7 +537,7 @@ void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree)
 	int len;
 
 	len = dt_get_path(NULL, gnode, path_buf, sizeof(path_buf));
-	if (len > sizeof(path_buf)) {
+	if (len > (int)sizeof(path_buf)) {
 		printlog(LOGTYPE_PARTITION, LOGTYPE_MISC,
  		         "%s: %s path too long for alias\n",
  		         __func__, node->name);
@@ -735,11 +737,11 @@ static int do_cpu_to_node(dt_node_t *node, void *arg)
 
 /**
  * cpu_to_node - return the HW node that corresponds to the given cpu number
- * @param[in] cpu the physical CPU number
+ * @param[in] pcpu the physical CPU number
  */
-static dt_node_t *cpu_to_node(unsigned int cpu)
+static dt_node_t *cpu_to_node(unsigned int pcpu)
 {
-	cpu_to_node_t ctx = { .cpu = cpu };
+	cpu_to_node_t ctx = { .cpu = pcpu };
 	dt_node_t *node = dt_get_subnode(hw_devtree, "cpus", 0);
 
 	dt_for_each_prop_value(node, "device_type", "cpu", sizeof("cpu"),
@@ -776,8 +778,8 @@ static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 	uint32_t vcpu = * ((uint32_t *) (prop->data));
 
 	// Get the physical CPU number
-	int cpu = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, vcpu);
-	if (cpu < 0) {
+	int pcpu = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, vcpu);
+	if (pcpu < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: 'vcpu' property in cfg node %s has invalid value %u\n",
 			 __func__, cfgnode->name, vcpu);
@@ -785,10 +787,10 @@ static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 	}
 
 	// Get the corresponding CPU node in the HW tree
-	dt_node_t *cpunode = cpu_to_node(cpu);
+	dt_node_t *cpunode = cpu_to_node(pcpu);
 	if (!cpunode) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "%s: cpu %u does not exist\n", __func__, cpu);
+			 "%s: cpu %u does not exist\n", __func__, pcpu);
 		return ERR_BADTREE;
 	}
 
@@ -879,7 +881,7 @@ fail:
 static void reset_spintbl(guest_t *guest)
 {
 	struct boot_spin_table *spintbl = guest->spintbl;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < guest->cpucnt; i++) {
 		spintbl[i].addr_hi = 0;
@@ -978,7 +980,8 @@ static int create_guest_spin_table_cpu(guest_t *guest, int vcpu)
 static int create_guest_spin_table(guest_t *guest)
 {
 	unsigned long rpn;
-	int ret, i;
+	int ret;
+	unsigned int i;
 
 	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
 	if (!guest->spintbl)
@@ -1573,11 +1576,12 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-uint32_t start_guest_lock;
+static uint32_t start_guest_lock;
 
 guest_t *node_to_partition(dt_node_t *partition)
 {
-	int i, ret;
+	unsigned int i;
+	int ret;
 	char *name;
 
 	// Verify that 'partition' points to a compatible node
@@ -1681,7 +1685,8 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest; 
-	int ret, i;
+	int ret;
+	unsigned int i;
 	
 	assert(guest->state == guest_starting);
 
@@ -1711,7 +1716,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
 	                    fdt, fdtsize);
 	free(fdt);
-	if (ret != fdtsize) {
+	if (ret != (ssize_t)fdtsize) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: cannot copy device tree to guest\n", __func__);
 		return;
@@ -1802,8 +1807,8 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	int pir = mfspr(SPR_PIR);
-	int gpir = gcpu->gcpu_num;
+	unsigned int pir = mfspr(SPR_PIR);
+	unsigned int gpir = gcpu->gcpu_num;
 
 	mtspr(SPR_GPIR, gpir);
 
@@ -2057,7 +2062,8 @@ int pause_guest(guest_t *guest)
 
 int resume_guest(guest_t *guest)
 {
-	int ret = 0, i;
+	int ret = 0;
+	unsigned int i;
 	spin_lock(&guest->state_lock);
 
 	if (guest->state != guest_paused) {
@@ -2340,7 +2346,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 
 	/* FIXME: hardcoded p4080 */
 	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform-p4080%csimple-bus", 0);
-	assert(ret < sizeof(buf));
+	assert(ret < (int)sizeof(buf));
 	
 	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1); 
 	if (ret < 0)
@@ -2348,7 +2354,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 
 	// Set the ePAPR version string.
 	ret = snprintf(buf, sizeof(buf), "ePAPR-%u.%u", 1, 0);
-	assert(ret < sizeof(buf));
+	assert(ret < (int)sizeof(buf));
 
 	ret = dt_set_prop(guest->devtree, "epapr-version", buf, ret + 1);
 	if (ret < 0)
@@ -2487,7 +2493,7 @@ static int init_guest_one(dt_node_t *node, void *arg)
  */
 __attribute__((noreturn)) void init_guest(void)
 {
-	int pir = mfspr(SPR_PIR);
+	unsigned int pir = mfspr(SPR_PIR);
 	init_guest_ctx_t ctx = {};
 	gcpu_t *gcpu = get_gcpu();
 

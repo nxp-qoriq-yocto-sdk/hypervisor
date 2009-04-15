@@ -33,23 +33,21 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #define PAGE_SIZE 4096
 
 void init(unsigned long devtree_ptr);
 
-int irq;
 extern void *fdt;
 
-unsigned long devtree;
+static unsigned long devtree;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
 }
 
-void release_secondary_cores(void);
-
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -66,10 +64,10 @@ void dump_dev_tree(void)
 }
 
 #define CPUCNT 4
-int cpus_complete[CPUCNT];
+static int cpus_complete[CPUCNT];
 
-void dump(int *a, int n, int pir, int i) __attribute__ ((noinline));
-void dump(int *a, int n, int pir, int i)
+static void dump(int *a, int n, int pir, int i) __attribute__ ((noinline));
+static void dump(int *a, int n, int pir, int i)
 {
 	int j;
 	printf("PIR: %d, iteration: %d\n", pir, i);
@@ -78,9 +76,9 @@ void dump(int *a, int n, int pir, int i)
 	printf("\n");
 }
 
-void gorp (void) __attribute__ ((noinline));
+static void gorp (void) __attribute__ ((noinline));
 
-void gorp(void)
+static void gorp(void)
 {
 	int i;
 	int a[64];
@@ -90,14 +88,14 @@ void gorp(void)
 	return;
 }
 
-volatile int gdb_attached[CPUCNT];
-volatile int a[CPUCNT];
-volatile int X = 9;
-volatile int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
+static volatile int gdb_attached[CPUCNT];
+static volatile int a[CPUCNT];
+static volatile int X = 9;
+static volatile int Y[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
-void debug_code (int pir) __attribute__ ((noinline));
+static void debug_code (int pir) __attribute__ ((noinline));
 
-void debug_code (int pir)
+static void debug_code (int pir)
 {
 	int j, t;
 
@@ -120,7 +118,7 @@ void debug_code (int pir)
 	}
 }
 
-void secondary_entry(void)
+static void secondary_entry(void)
 {
 	uint32_t cpu_index;
 	uint32_t pir = mfspr(SPR_PIR);
@@ -143,7 +141,7 @@ void secondary_entry(void)
 
 extern void (*secondary_startp)(void);
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int i;
 	int done = 0;

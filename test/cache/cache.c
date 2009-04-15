@@ -32,11 +32,9 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-extern void init(unsigned long devtree_ptr);
-
-extern void *fdt;
-volatile char *arr;
+static volatile char *arr;
 
 /* Eviction buffer, to evict L1 cache. Our L1 cache implements
  * seperate 32K 8 way set associative instruction and data cache.
@@ -55,17 +53,17 @@ volatile char *arr;
  * Predictability of Cache Replacement Policies by Jan Reineke, Daniel Grund,
  * Christoph Berg and Reinhard Wilhelm
  */
-volatile char evict_buf[48 * 1024];
+static volatile char evict_buf[48 * 1024];
 
-void evict_cache(void)
+static void evict_cache(void)
 {
-	int i;
+	unsigned int i;
 
 	for(i = 0; i < sizeof(evict_buf); i++)
 		evict_buf[i] = i;
 }
 
-int get_diff(void)
+static int get_diff(void)
 {
 	volatile register_t val;
 	int diff;
@@ -79,7 +77,7 @@ int get_diff(void)
 	return diff;
 }
 
-void cache_lock_perf_test(void)
+static void cache_lock_perf_test(void)
 {
 	uint32_t ct = 0;
 	int diff, diff1, i;
@@ -121,7 +119,7 @@ void cache_lock_perf_test(void)
 	printf("Cache locking performance test -- %s\n", (diff1 > diff)? "PASSED" : "FAILED");
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	uint32_t ct = 0;
 	uint32_t status;

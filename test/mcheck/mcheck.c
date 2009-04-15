@@ -32,12 +32,9 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-void init(unsigned long devtree_ptr);
-
-int irq;
-extern void *fdt;
-volatile int data_exception, inst_exception;
+static volatile int data_exception, inst_exception;
 
 void mcheck_interrupt(trapframe_t *frameptr)
 {
@@ -58,7 +55,7 @@ void mcheck_interrupt(trapframe_t *frameptr)
 	}
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	char *vaddr;
 	void (*func)(void);

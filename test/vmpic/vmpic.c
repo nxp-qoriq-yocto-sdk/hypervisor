@@ -32,14 +32,11 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-extern void init(unsigned long devtree_ptr);
-extern void *fdt;
+static const uint32_t *handle_p;
 
-int *handle_p;
-
-volatile int extint_cnt = 0;
-extern int coreint;
+static volatile int extint_cnt = 0;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -77,7 +74,7 @@ void ext_int_handler(trapframe_t *frameptr)
 		printf("Unexpected behavior : Interrupt in-service @eoi\n");
 }
 
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -95,7 +92,7 @@ void dump_dev_tree(void)
 
 extern uint8_t *uart_virt;
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int ret;
 	int node;
@@ -122,7 +119,7 @@ void start(unsigned long devtree_ptr)
 
 	/* get the interrupt handle for the serial device */
 	node = fdt_path_offset(fdt, path);
-	handle_p = (int *)fdt_getprop(fdt, node, "interrupts", &len);
+	handle_p = fdt_getprop(fdt, node, "interrupts", &len);
 
 	fh_vmpic_set_mask(*handle_p, 0);
 

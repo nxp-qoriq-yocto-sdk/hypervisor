@@ -33,11 +33,10 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <hvtest.h>
 
-extern void init(void);
-
-volatile unsigned int doorbell;
-volatile unsigned int critical_doorbell;
+static volatile unsigned int doorbell;
+static volatile unsigned int critical_doorbell;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -54,11 +53,11 @@ void ext_critical_doorbell_handler(trapframe_t *frameptr)
 	critical_doorbell = 1;
 }
 
-void start(void)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	volatile unsigned int timeout;
 
-	init();
+	init(devtree_ptr);
 
 	printf("msgsnd test\n");
 

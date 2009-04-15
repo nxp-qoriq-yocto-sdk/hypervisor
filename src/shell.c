@@ -61,7 +61,7 @@ static command_t *find_command(const char *str)
 
 static int get_partition_num(shell_t *shell, char *numstr)
 {
-	int num;
+	uint32_t num;
 
 	num = get_number32(shell->out, numstr);
 	if (cpu->errno)
@@ -94,7 +94,7 @@ static int shell_action(void *user_ctx, char *buf)
 	return 0;
 }
 
-void shell_thread(trapframe_t *regs, void *arg)
+static void shell_thread(trapframe_t *regs, void *arg)
 {
 	shell_t *shell = arg;
 	int ret;
@@ -154,7 +154,7 @@ static void help_fn(shell_t *shell, char *args)
 	const char *cmdname = nextword(&args);
 
 	if (!cmdname) {
-		command_t **i, *cmd;
+		command_t **i;
 
 		qprintf(shell->out, 1, "Commands:\n");
 
@@ -169,7 +169,6 @@ static void help_fn(shell_t *shell, char *args)
 	}
 	
 	cmd = find_command(cmdname);
-
 	if (!cmd) {
 		qprintf(shell->out, 1, "help: unknown command '%s'.\n", cmdname);
 		return;
@@ -205,7 +204,7 @@ shell_cmd(version);
 
 static void lp_fn(shell_t *shell, char *args)
 {
-	int i;
+	unsigned int i;
 	
 	qprintf(shell->out, 1, "Partition   Name\n");
 	
@@ -226,7 +225,7 @@ shell_cmd(lp);
 static void print_stat(shell_t *shell, guest_t *guest,
                        int stat, const char *str)
 {
-	int i;
+	unsigned int i;
 	unsigned int total = 0;
 	
 	for (i = 0; i < guest->cpucnt; i++) {
@@ -242,7 +241,7 @@ static void print_stat(shell_t *shell, guest_t *guest,
 static void pi_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);
@@ -315,7 +314,7 @@ shell_cmd(pi);
 static void gdt_fn(shell_t *shell, char *args)
 {
 	char *numstr, *cmdstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 
 	args = stripspace(args);
@@ -508,7 +507,7 @@ shell_cmd(paact);
 static void start_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);
@@ -528,19 +527,19 @@ static void start_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Couldn't start partition.\n");
 }
 
-static command_t start = {
+static command_t startcmd = {
 	.name = "start",
 	.action = start_fn,
 	.shorthelp = "Start a partition",
 	.longhelp = "  Usage: start <number>\n\n"
 	            "  The partition number can be obtained with list-partitions.",
 };
-shell_cmd(start);
+shell_cmd(startcmd);
 
 static void restart_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);
@@ -572,7 +571,7 @@ shell_cmd(restart);
 static void stop_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);
@@ -605,7 +604,7 @@ shell_cmd(stop);
 static void pause_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);
@@ -638,7 +637,7 @@ shell_cmd(pause);
 static void resume_fn(shell_t *shell, char *args)
 {
 	char *numstr;
-	unsigned int num;
+	int num;
 	guest_t *guest;
 	
 	args = stripspace(args);

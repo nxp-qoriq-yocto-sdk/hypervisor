@@ -155,7 +155,7 @@ void doorbell_int(trapframe_t *regs)
 
 	while (gcpu->dbell_pending) {
 		/* get the next event */
-		int bit = count_lsb_zeroes(gcpu->dbell_pending);
+		unsigned int bit = count_lsb_zeroes(gcpu->dbell_pending);
 		assert(bit < sizeof(event_table) / sizeof(eventfp_t));
 
 		/* clear the event */

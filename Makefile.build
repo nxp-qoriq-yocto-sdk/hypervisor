@@ -40,13 +40,28 @@ export CC=$(CROSS_COMPILE)gcc
 export GCCINCDIR := $(shell $(CC) -print-file-name=include)
 CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
-        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H)
+        -I$(LIBOS)/include-libc -std=gnu99 -include $(LIBOS_CLIENT_H)
 
 export CC_OPTS_NODEP := -include include/config/autoconf.h
 
-export CC_OPTS_C= -Wall -Werror -fno-strict-aliasing -fno-common -O2 -g3 \
-                  -msoft-float -pipe -ffixed-r2 -mmultiple -mno-altivec \
-                  -funit-at-a-time -mcpu=e500mc -include libfdt_env.h
+export WARNINGS := -Wwrite-strings -Wmissing-prototypes \
+                   -Wstrict-prototypes -Wold-style-definition \
+                   -Wmissing-declarations
+
+# Our code should build without any of these warnings, but some
+# external code may be excluded.
+export EXTRAWARNINGS := $(WARNINGS) -Werror -Wno-unused
+
+# These warnings may be useful in some cases, but it is not expected
+# that the code will build without triggering any of them.  Thus,
+# -Werror is excluded.
+export CRAZYWARNINGS := $(WARNINGS) -Wshadow -Wextra -Wcast-qual \
+                        -Wsign-compare -Wno-unused-parameter
+
+export CC_OPTS_C := -fno-strict-aliasing -fno-common -O2 -g3 \
+                    -msoft-float -pipe -ffixed-r2 -mmultiple \
+                    -mno-altivec -funit-at-a-time -mcpu=e500mc \
+                    -include $(LIBFDT_DIR)/libfdt_env.h
 
 export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
 export CC_OPTS_ASM_HV=$(CC_OPTS_ASM) -include bin/hv_assym.s
@@ -60,14 +75,8 @@ include $(TDGEN_DIR)/Makefile.tdgen
 
 HOSTCC=gcc
 HOSTCC_OPTS=-g -std=gnu99
-HOSTCC_OPTS_C= -Wall \
-  -Wundef \
-  -Wstrict-prototypes \
-  -Wno-trigraphs \
-  -O2 \
-  -I $(HEADERS_DIR) \
-  -I $(GEN_HEADERS_DIR) \
-  -I $(LIBOS_INC)
+HOSTCC_OPTS_C := $(EXTRAWARNINGS) -Wall -O2 -I $(HEADERS_DIR) \
+                 -I $(GEN_HEADERS_DIR) -I $(LIBOS_INC)
 
 include include/config/auto.conf
 
@@ -99,16 +108,19 @@ hv-src-$(CONFIG_PAMU) += pamu.c
 hv-src-$(CONFIG_VIRTUAL_I2C) += i2c.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 hv-src-$(CONFIG_LIBOS_NS16550) += ns16550.c
-hv-src-$(CONFIG_ZLIB) += zlib.c
+hv-src-nocheck-$(CONFIG_ZLIB) += zlib.c
 
 LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
 
 OBJS := $(basename $(libos-src-first-y:%=libos/%) \
                    $(libos-src-early-y:%=libos/%) \
-                   $(hv-src-early-y) \
-                   $(libos-src-y:%=libos/%) $(hv-src-y) \
-                   $(LIBFDT_SRCS:%=libfdt/%))
+                   $(hv-src-early-y) $(LIBFDT_SRCS:%=libfdt/%) \
+                   $(libos-src-y:%=libos/%) $(hv-src-y))
+
+OBJS_NOCHECK := $(basename $(hv-src-nocheck-y))
+
 OBJS := $(OBJS:%=bin/%.o)
+OBJS_NOCHECK := $(OBJS_NOCHECK:%=bin/nocheck/%.o)
 
 hypertrk-objs-$(CONFIG_HYPERTRK) := $(src)hypertrk/libHyperTRK.o
 
@@ -117,39 +129,44 @@ HDRS := $(shell cd $(src); find include -name '*.h' -print)
 bin/hv.uImage: bin/hv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
 
-bin/hv.bin.gz: bin/hv.bin
+Bbin/hv.bin.gz: bin/hv.bin
 	gzip -f $<
 
 bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
-bin/hv: include/config/auto.conf $(OBJS) $(src)hv.lds $(hypertrk-objs-y)
+bin/hv: include/config/auto.conf $(OBJS) $(OBJS_NOCHECK) \
+                $(src)hv.lds $(hypertrk-objs-y)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ $(OBJS) $(hypertrk-objs-y) -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ \
+		$(OBJS) $(OBJS_NOCHECK) $(hypertrk-objs-y) -lgcc
 
 bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/e500mc-data.h
 
 bin/%.d : $(src)src/%.c
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_C))
+
+bin/nocheck/%.o : $(src)src/%.c bin/%.d
+	$(call build,REAL_CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 bin/%.o : $(src)src/%.c bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) $(WARNINGS))
 
 bin/%.d : $(src)src/%.S bin/libos/assym.s bin/hv_assym.s
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_ASM_HV))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_ASM_HV))
 
 bin/%.o : $(src)src/%.S bin/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM_HV))
+	$(call build,REAL_CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_ASM_HV))
 
 bin/libfdt/%.d : $(LIBFDT_DIR)/%.c
-	$(call mkdep,CC,$(CC_OPTS) $(CC_OPTS_C))
+	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_C))
 
 bin/libfdt/%.o : $(LIBFDT_DIR)/%.c bin/libfdt/%.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
+	$(call build,REAL_CC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C))
 
 # No $(CC_OPTS_C), as we want the symbols to go in common rather than BSS.
 bin/hv_assym.o: $(src)src/hv_assym.c bin/hv_assym.d
-	$(call build,CC,$(CC_OPTS_NODEP) $(CC_OPTS))
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS))
 
 bin/hv_assym.s: bin/hv_assym.o
 	@$(MKDIR) $(@D)
@@ -162,6 +179,7 @@ ifneq ($(MAKECMDGOALS),clean)
 -include bin/hv_assym.d
 -include $(HDRS:include/%.h=bin/include/%.d)
 -include $(OBJS:%.o=%.d)
+-include $(OBJS_NOCHECK:%.o=%.d)
 endif
 
 bin/hv.map: bin/hv

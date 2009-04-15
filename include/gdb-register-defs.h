@@ -87,7 +87,7 @@ typedef enum reg_cat
 	reg_cat_count,
 } reg_cat_t;
 
-char *reg_cat_names[] =
+const char *reg_cat_names[] =
 {
 	REG_CAT_UNK,
 	REG_CAT_GPR,
@@ -102,13 +102,13 @@ char *reg_cat_names[] =
 
 struct register_description
 {
-	char *description;
-	char *name;
-	char *bitsize;
-	char *regnum;
-	char *save_restore;
-	char *type;
-	char *group;
+	const char *description;
+	const char *name;
+	const char *bitsize;
+	const char *regnum;
+	const char *save_restore;
+	const char *type;
+	const char *group;
 	reg_cat_t cat;
 	int inum; /* SPR number for SPR's. In general,
 	             inums are defined per category. */

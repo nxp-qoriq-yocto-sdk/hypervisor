@@ -70,7 +70,7 @@ typedef struct {
 	/* The number of virtual address bits used as an index
 	 * into the TLB cache.
 	 */
-	int tlbcache_bits;
+	unsigned int tlbcache_bits;
 #endif
 
 	/** HV dynamic TLB round-robin eviction pointer */
@@ -88,6 +88,24 @@ void prepare_to_block(void);
 void block(void);
 void libos_unblock(struct libos_thread *thread);
 
+/* These are used by assembly code */
+struct trapframe;
+
+void critical_interrupt(struct trapframe *frameptr);
+void guest_doorbell(struct trapframe *regs);
+void guest_critical_doorbell(struct trapframe *regs);
+void inst_storage(struct trapframe *regs);
+void powerpc_mchk_interrupt(struct trapframe *frameptr);
+void program_trap(struct trapframe *regs);
+void debug_trap(struct trapframe *regs);
+void data_storage(struct trapframe *regs);
+void tlb_miss(struct trapframe *regs);
+void doorbell_int(struct trapframe *regs);
+void hvpriv(struct trapframe *regs);
+void decrementer(struct trapframe *regs);
+void fit(struct trapframe *regs);
+void watchdog_trap(struct trapframe *regs);
+void hcall(struct trapframe *regs);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt

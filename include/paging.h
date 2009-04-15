@@ -45,7 +45,7 @@
 #define PHYS_BITS 36
 #define VIRT_BITS 32
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE 4096U
 #define PAGE_SHIFT 12
 
 #define PGDIR_SIZE 1024
@@ -171,8 +171,8 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 #define TLB_MISS_REFLECT 1
 #define TLB_MISS_MCHECK  2
 
-int guest_tlb1_miss(register_t vaddr, int space, int pid);
-int guest_tlb_isi(register_t vaddr, int space, int pid);
+int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid);
+int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid);
 
 struct trapframe;
 struct gcpu;

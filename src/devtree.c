@@ -388,8 +388,8 @@ void *ptr_from_node(dt_node_t *node, const char *type)
 	return *(void *const *)prop->data;
 }
 
-chardev_t *cd_console;
-byte_chan_handle_t *bc_console;
+static chardev_t *cd_console;
+static byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;
 
 int open_stdout_chardev(dt_node_t *node)
@@ -483,7 +483,7 @@ int open_stdout_bytechan(dt_node_t *node)
 		if (!stdout_node)
 			return ERR_NOMEM;
 	
-		stdout_node->name = "stdout";
+		stdout_node->name = strdup("stdout");
 	
 		bc = other_attach_byte_chan(node, stdout_node);
 		if (!bc)
@@ -505,7 +505,7 @@ int open_stdout_bytechan(dt_node_t *node)
 #endif
 
 #ifdef CONFIG_SHELL
-int open_stdin_chardev(chardev_t *cd)
+static int open_stdin_chardev(chardev_t *cd)
 {
 	queue_t *q;
 	int ret;
@@ -537,7 +537,7 @@ err_queue:
 }
 
 #ifdef CONFIG_BYTE_CHAN
-int open_stdin_bytechan(byte_chan_handle_t *bc)
+static int open_stdin_bytechan(byte_chan_handle_t *bc)
 {
 	stdin = bc->rx;
 	return 0;
@@ -813,7 +813,7 @@ dt_node_t *get_interrupt(dt_node_t *tree, dt_node_t *node, int intnum,
 
 typedef struct get_cpu_ctx {
 	dt_node_t *ret;
-	int cpunum;
+	uint32_t cpunum;
 } get_cpu_ctx_t;
 
 static int get_cpu_node_callback(dt_node_t *node, void *arg)
@@ -903,7 +903,7 @@ typedef struct assignportal_ctx {
 	uint32_t pcpu_num;
 } assignportal_ctx_t;
 
-int assign_callback(dt_node_t *node, void *arg)
+static int assign_callback(dt_node_t *node, void *arg)
 {
 	assign_ctx_t *ctx = arg;
 	const char *alias;
@@ -1262,7 +1262,7 @@ static intmap_entry_t *lookup_intmap(dt_node_t *domain,
 
 	for (int i = 0; i < domain->intmap_len; i++) {
 		intmap_entry_t *ent = &domain->intmap[i];
-		int j;
+		unsigned int j;
 
 		if (!ent->valid)
 			break;

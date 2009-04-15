@@ -36,6 +36,7 @@
 #include <libos/errors.h>
 #include <libos-client.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 extern uint8_t init_stack_top;
 
@@ -352,14 +353,14 @@ int dt_get_reg(const void *tree, int node, int res,
 	if (naddr == 0 || nsize == 0)
 		return ERR_NOTRANS;
 
-	if (len < (naddr + nsize) * 4 * (res + 1))
+	if ((unsigned int)len < (naddr + nsize) * 4 * (res + 1))
 		return ERR_BADTREE;
 
 	return xlate_reg(tree, node, &reg[(naddr + nsize) * res], addr, size);
 }
 
 
-phys_addr_t get_uart_addr()
+phys_addr_t get_uart_addr(void)
 {
 	phys_addr_t addr;
 	const char *path;
@@ -408,7 +409,7 @@ void init(unsigned long devtree_ptr)
 	core_init();
 
 	if (uart_addr)
-		console_init(ns16550_init(uart_virt, 0, 0, 16));
+		console_init(ns16550_init(uart_virt, NULL, 0, 16));
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (node >= 0)
@@ -450,7 +451,7 @@ static void tlb1_init(void)
 
 void unknown_exception(trapframe_t *regs);
 
-void bad_exception(trapframe_t *regs)
+static void bad_exception(trapframe_t *regs)
 {
 	unknown_exception(regs);
 }
@@ -568,17 +569,17 @@ void release_secondary_cores(void)
 
 		char *table_va = map;
 		table_va += *table & (PAGE_SIZE - 1);
-		cpu_t *cpu = alloc_type(cpu_t);
-		if (!cpu)
+		cpu_t *newcpu = alloc_type(cpu_t);
+		if (!newcpu)
 			goto nomem;
 
-		cpu->kstack = alloc(KSTACK_SIZE, 16);
-		if (!cpu->kstack)
+		newcpu->kstack = alloc(KSTACK_SIZE, 16);
+		if (!newcpu->kstack)
 			goto nomem;
 
-		cpu->kstack += KSTACK_SIZE - FRAMELEN;
+		newcpu->kstack += KSTACK_SIZE - FRAMELEN;
 
-		if (start_secondary_spin_table((void *)table_va, *reg, cpu))
+		if (start_secondary_spin_table((void *)table_va, *reg, newcpu))
 			printf("BROKEN: couldn't spin up CPU%u\n", *reg);
 
 next_core:

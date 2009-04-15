@@ -33,14 +33,12 @@
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #undef DEBUG
 
-extern void init(unsigned long devtree_ptr);
-int extint_cnt;
-int *handle_p_int;
-extern void *fdt;
-extern int coreint;
+static int extint_cnt;
+static const uint32_t *handle_p_int;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -70,7 +68,7 @@ void ext_critical_doorbell_handler(trapframe_t *frameptr)
 }
 
 /* Writes data to shared memory region with partition 2 */
-void wr_shm(void)
+static void wr_shm(void)
 {
 	int ret, off = -1;
 	phys_addr_t addr = 0;
@@ -108,12 +106,13 @@ void wr_shm(void)
 #endif
 }
 
-int *get_handle(const char *dbell_type, const char *prop, void *fdt)
+static const uint32_t *get_handle(const char *dbell_type,
+                                  const char *prop, void *tree)
 {
 	int off = -1, ret;
 	int len;
 
-	ret = fdt_check_header(fdt);
+	ret = fdt_check_header(tree);
 	if (ret)
 		return NULL;
 	ret = fdt_node_offset_by_compatible(fdt, off, dbell_type);
@@ -125,12 +124,12 @@ int *get_handle(const char *dbell_type, const char *prop, void *fdt)
 
 	off = ret;
 
-	return (int *)fdt_getprop(fdt, off, prop, &len);
+	return fdt_getprop(tree, off, prop, &len);
 }
 
-int test_init(void)
+static int test_init(void)
 {
-	int *handle_p;
+	const uint32_t *handle_p;
 
 	handle_p_int = get_handle("fsl,hv-doorbell-receive-handle", "interrupts", fdt);
 
@@ -157,7 +156,7 @@ int test_init(void)
 	return 0;
 }
 
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -173,7 +172,7 @@ void dump_dev_tree(void)
 #endif
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int rc;
 

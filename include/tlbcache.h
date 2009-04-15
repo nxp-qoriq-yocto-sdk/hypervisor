@@ -77,7 +77,7 @@ typedef struct __attribute__((aligned(64))) tlbcset {
 	tlbcentry_t entry[TLBC_WAYS];
 } tlbcset_t;
 
-static inline tlbctag_t make_tag(uintptr_t vaddr, int pid, int space)
+static inline tlbctag_t make_tag(uintptr_t vaddr, unsigned int pid, unsigned int space)
 {
 	tlbctag_t tag;
 
@@ -92,9 +92,10 @@ static inline tlbctag_t make_tag(uintptr_t vaddr, int pid, int space)
 
 void tlbcache_init(void);
 int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp,
-                    int *way);
-void gtlb0_to_mas(int index, int way);
-int check_tlb1_conflict(uintptr_t epn, int tsize, int pid, int space);
+                    unsigned int *way);
+void gtlb0_to_mas(unsigned int index, unsigned int way);
+int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
+                        unsigned int pid, unsigned int space);
 
 #endif
 #endif

@@ -73,7 +73,7 @@ void reflect_trap(trapframe_t *regs)
 		stopsim();
 	}
 
-	assert(regs->exc >= 0 && regs->exc < sizeof(gcpu->ivor) / sizeof(int));
+	assert(regs->exc < sizeof(gcpu->ivor) / sizeof(int));
 
 	mtspr(SPR_GSRR0, regs->srr0);
 	mtspr(SPR_GSRR1, regs->srr1);

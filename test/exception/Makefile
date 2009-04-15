@@ -25,39 +25,10 @@
 test := exception
 dir := $(testdir)$(test)/
 
-# test source
-$(test)-src-y := $(dir)$(test).c
-
-# define test and libos object files
-$(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
-                          $(libos-src-early-y:%=libos/%) \
-                          $(libos-src-y:%=libos/%) \
-                          $($(test)-src-y:$(dir)%=$(test)/%) \
-                          $(LIBFDT_SRCS:%=libfdt/%) \
-                          common/init.o)
-$(test)-obj := $($(test)-obj:%=bin/%.o)
-
-$(test)-dts := $(wildcard $(dir)*.dts)
-$(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
-$(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
-$(test)-part-dts := $(filter-out bin/$(test)/hv-%.dts,$($(test)-bin-dts))
-
-$(test)-hv-dtb := $($(test)-hv-dts:%.dts=%.dtb)
-$(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
-
-$($(test)-hv-dts): $($(test)-part-dtb)
-
-bin/$(test)/$(test): $($(test)-obj)
-	@$(MKDIR) $(@D)
-	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
-
-.PHONY: $(test)
-$(test): bin/$(test)/$(test) $($(test)-hv-dtb)
+include $(testdir)common/Makefile.inc
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
-$(test)-check-A: $(test)-run-A-batch
+$(test)-check-%: $(test)-run-%-batch
 	$(testdir)common/check-results 2
-

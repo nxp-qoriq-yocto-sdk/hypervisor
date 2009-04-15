@@ -164,7 +164,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 	}
 
 	/* find the hwnode that represents the cache */
-	for (int cache_level = L1; cache_level <= L3; cache_level++) {
+	for (uint32_t cache_level = L1; cache_level <= L3; cache_level++) {
 		if (stash_dest == cache_level) {
 			prop = dt_get_prop(node, "cache-stash-id", 0);
 			if (!prop || prop->len != 4) {
@@ -228,24 +228,22 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 
 #define MAX_SUBWIN_CNT 16
 
-int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
+static int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 	uint32_t liodn, uint64_t primary_window_base_addr,
 	uint32_t subwindow_cnt, phys_addr_t subwindow_size,
 	uint32_t omi, uint32_t stash_dest,
 	unsigned int *first_subwin_swse, unsigned long *fspi,
 	unsigned long *first_subwin_rpn)
 {
-	dt_node_t *dma_subwindow = NULL;
 	struct spaace_t *spaace = NULL;
 	int def_subwindow_cnt = -1, def_window;
 	unsigned long current_fspi;
-	int unit_address;
+	uint32_t unit_address;
 	unsigned long rpn;
 	uint64_t window_addr[MAX_SUBWIN_CNT], window_size[MAX_SUBWIN_CNT];
 	uint64_t next_window_addr;
-	int i;
 
-	for (i=0; i < MAX_SUBWIN_CNT; i++) {
+	for (int i = 0; i < MAX_SUBWIN_CNT; i++) {
 		window_addr[i] = ULLONG_MAX;
 		window_size[i] = ULLONG_MAX;
 	}
@@ -280,8 +278,8 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 	if (current_fspi == ULONG_MAX) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			 "%s: spaace indexes exhausted %s\n",
-			 __func__, dma_subwindow->name);
-		return 0;
+			 __func__, dma_window->name);
+		return ERR_BUSY;
 	}
 
 	next_window_addr = primary_window_base_addr + subwindow_size;
@@ -294,7 +292,7 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 		rpn = get_rpn(guest, window_addr[0] >> PAGE_SHIFT,
 		              window_size[0] >> PAGE_SHIFT);
 		if (rpn == ULONG_MAX)
-			return 0;
+			return ERR_BADTREE;
 		*first_subwin_rpn = rpn;
 		++def_window;
 	}
@@ -312,7 +310,7 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 				window_size[def_window] >> PAGE_SHIFT);
 
 			if (rpn == ULONG_MAX)
-				return 0;
+				return ERR_BADTREE;
 
 			spaace->atm = PAACE_ATM_WINDOW_XLATE;
 
@@ -323,7 +321,7 @@ int configure_dma_sub_windows(guest_t *guest, dt_node_t *dma_window,
 				window_size[def_window]);
 			def_window++;
 
-			if (omi != -1) {
+			if (omi != 0xffffffff) {
 				spaace->otm = PAACE_OTM_INDEXED;
 				spaace->op_encode.index_ot.omi = omi;
 				spaace->impl_attr.cid = stash_dest;
@@ -352,10 +350,10 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	dt_prop_t *gaddr;
 	dt_prop_t *size;
 	dt_node_t *dma_window;
-	phys_addr_t window_addr = -1;
+	phys_addr_t window_addr = ~0ULL;
 	phys_addr_t window_size = 0;
-	uint32_t stash_dest = -1;
-	uint32_t omi = -1;
+	uint32_t stash_dest = ~0UL;
+	uint32_t omi = ~0UL;
 	unsigned long fspi;
 	phys_addr_t subwindow_size;
 	unsigned int first_subwin_swse;
@@ -443,13 +441,13 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		stash_dest = get_stash_dest( *(const uint32_t *)
 				stash_prop->data , hwnode);
 
-		if (stash_dest != -1)
+		if (~stash_dest != 0)
 			ppaace->impl_attr.cid = stash_dest;
 	}
 
 	/* configure snoop-id if needed */
 	prop = dt_get_prop(cfgnode, "snoop-cpu-only", 0);
-	if (prop && stash_dest != -1) {
+	if (prop && ~stash_dest != 0) {
 		if ((*(const uint32_t *)stash_prop->data) >= L3) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_NORMAL,
 				"%s: warning: %s snoop-cpu-only property must have stash-dest as L1 or L2 cache\n",
@@ -491,7 +489,7 @@ skip_snoop_id:
 					      window_addr, subwindow_cnt - 1,
 					      subwindow_size, omi, stash_dest,
 					      &first_subwin_swse, &fspi,
-					      &first_subwin_rpn)) {
+					      &first_subwin_rpn) > 0) {
 			ppaace->mw = 1;
 			/*
 			 * NOTE: The first sub-window exists in the primary
@@ -582,7 +580,7 @@ int pamu_disable_liodn(unsigned int handle)
 	return 0;
 }
 
-void setup_omt(void)
+static void setup_omt(void)
 {
 	ome_t *ome;
 

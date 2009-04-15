@@ -234,7 +234,7 @@ static uint32_t get_law_target(pma_t *pma)
 {
 	phys_addr_t addr, size;
 	uint32_t val;
-	int lawidx;
+	uint32_t lawidx;
 
 	for (lawidx = 0; lawidx < numlaws; lawidx++) {
 		val = in32(&laws[lawidx].attr);
@@ -257,7 +257,8 @@ static uint32_t get_law_target(pma_t *pma)
 
 static int set_law(dt_node_t *node, int csdid)
 {
-	int lawidx, sizebit;
+	uint32_t lawidx;
+	unsigned int sizebit;
 	uint32_t val, tgt;
 	pma_t *pma = node->pma;
 
@@ -443,7 +444,7 @@ void ccm_init(void)
 	}
 
 	/* Mark the CSDs that are already in use */
-	for (int i = 0; i < numcsds; i++)
+	for (uint32_t i = 0; i < numcsds; i++)
 		if (in32(&csdids[i]))
 			csdid_map |= 1 << i;
 

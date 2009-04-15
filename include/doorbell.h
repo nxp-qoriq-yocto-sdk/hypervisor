@@ -75,9 +75,9 @@ static inline void send_local_crit_guest_doorbell(void)
  *  Always for hypervisor internal use only so
  *  the lpid is always 0.
  */
-static inline void send_crit_doorbell(int cpu)
+static inline void send_crit_doorbell(int cpunum)
 {
-	send_doorbell_msg(MSG_DBELL_CRIT | cpu);
+	send_doorbell_msg(MSG_DBELL_CRIT | cpunum);
 }
 
 /** Send doorbell.
@@ -85,9 +85,9 @@ static inline void send_crit_doorbell(int cpu)
  *  Always for hypervisor internal use only so
  *  the lpid is always 0.
  */
-static inline void send_doorbell(int cpu)
+static inline void send_doorbell(int cpunum)
 {
-	send_doorbell_msg(MSG_DBELL | cpu);
+	send_doorbell_msg(MSG_DBELL | cpunum);
 }
 
 #endif

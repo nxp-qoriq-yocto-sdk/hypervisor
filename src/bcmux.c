@@ -374,7 +374,7 @@ static byte_chan_t *mux_attach_chardev(dt_node_t *muxnode, dt_node_t *cdnode)
 	return NULL;	
 }
 
-int create_mux(dt_node_t *node, void *arg)
+static int create_mux(dt_node_t *node, void *arg)
 {
 	dt_prop_t *prop;
 	dt_node_t *endpoint;

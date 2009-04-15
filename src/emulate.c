@@ -226,7 +226,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	unsigned long va = get_ea_indexed(regs, insn);
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	int i;
+	unsigned int i;
 
 	inc_stat(stat_emu_tlbivax);
 	inc_stat(get_tlb_ivax_stat(va));

@@ -126,7 +126,7 @@ static void clear_gcpu_pending_virq(uint8_t irqnum, gcpu_t *gcpu)
 
 static int gcpu_virq_active(gcpu_t *gcpu)
 {
-	for (int i = 0; i < MAX_VINT_INDEX; i++) {
+	for (unsigned int i = 0; i < MAX_VINT_INDEX; i++) {
 		if (gcpu->vpic.active[i])
 			return 1;
 	}
@@ -136,7 +136,7 @@ static int gcpu_virq_active(gcpu_t *gcpu)
 
 static int gcpu_virq_pending(gcpu_t *gcpu)
 {
-	for (int i = 0; i < MAX_VINT_INDEX; i++) {
+	for (unsigned int i = 0; i < MAX_VINT_INDEX; i++) {
 		if (gcpu->vpic.pending[i])
 			return 1;
 	}
@@ -209,7 +209,7 @@ static vpic_interrupt_t *get_pending_virq(void)
 	guest_t *guest = gcpu->guest;
 	unsigned int irq = 0;
 
-	for (int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
+	for (unsigned int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
 		if (gcpu->vpic.pending[i]) {
 			irq += count_lsb_zeroes(gcpu->vpic.pending[i]);
 			return &guest->vpic.ints[irq];
@@ -225,7 +225,7 @@ static vpic_interrupt_t *get_active_virq(void)
 	guest_t *guest = gcpu->guest;
 	unsigned int irq = 0;
 
-	for (int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
+	for (unsigned int i = 0; i < MAX_VINT_INDEX; i++, irq += LONG_BITS) {
 		if (gcpu->vpic.active[i]) {
 			irq += count_lsb_zeroes(gcpu->vpic.active[i]);
 			return &guest->vpic.ints[irq];

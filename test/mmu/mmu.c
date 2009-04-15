@@ -29,12 +29,9 @@
 #include <libos/trapframe.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
+#include <hvtest.h>
 
-void release_secondary_cores(void);
-void init(unsigned long devtree_ptr);
-extern void (*secondary_startp)(void);
-extern void *fdt;
-int fail;
+static int fail;
 
 void dtlb_handler(trapframe_t *frameptr)
 {
@@ -127,7 +124,7 @@ static void expect(const char *name, int pass, int num,
 	}
 }
 
-int *test_mem, *test_map;
+static int *test_mem, *test_map;
 
 #define PRIMARY 0
 #define SECONDARY_NOINVAL 1
@@ -415,7 +412,7 @@ static void secondary_entry(void)
 	tlbilx_test(SECONDARY_NOINVAL);
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 	test_mem = alloc(65536 + 4096, 65536);

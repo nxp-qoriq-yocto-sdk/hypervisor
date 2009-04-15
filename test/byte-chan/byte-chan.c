@@ -31,20 +31,17 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
-
-extern void init(unsigned long devtree_ptr);
-extern int coreint;
+#include <hvtest.h>
 
 #define debug(X...)
 //#define debug(X...) printf(X)
 
-int *irq1, *irq2;
-uint32_t handle[2];
-extern void *fdt;
+static int *irq1, *irq2;
+static uint32_t handle[2];
 
 #define BC_INT_Q_SIZE 4096
 
-int process_status(int status)
+static int process_status(int status)
 {
 	switch (status) {
 	case 0 :
@@ -62,9 +59,9 @@ int process_status(int status)
 	return 0;
 }
 
-volatile int rx_intr_state= 0;
+static volatile int rx_intr_state = 0;
 
-void process_rx_intr(uint32_t handle_num)
+static void process_rx_intr(uint32_t handle_num)
 {
 	uint32_t status;
 	uint32_t rxavail;
@@ -153,7 +150,8 @@ void ext_int_handler(trapframe_t *frameptr)
 
 }
 
-int get_prop(const char *byte_channel, const char *prop, int **ptr)
+static int get_prop(const char *byte_channel,
+                    const char *prop, const int **ptr)
 {
 	int ret;
 	int len;
@@ -165,12 +163,12 @@ int get_prop(const char *byte_channel, const char *prop, int **ptr)
 	if (ret < 0)
 		return ret;
 
-	*ptr = (int *)fdt_getprop(fdt, ret, prop, &len);
+	*ptr = fdt_getprop(fdt, ret, prop, &len);
 
 	return 0;
 }
 
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -186,14 +184,14 @@ void dump_dev_tree(void)
 #endif
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
-	char *str;
+	const char *str;
 	uint32_t status;
 	uint32_t rxavail;
 	uint32_t txavail;
 	int ret;
-	int *prop;
+	const int *prop;
 	int avail, bal;
 
 	init(devtree_ptr);

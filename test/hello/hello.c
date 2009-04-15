@@ -31,12 +31,9 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
-void init(unsigned long devtree_ptr);
-
-int irq;
-extern void *fdt;
-extern int coreint;
+static int irq;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
@@ -51,10 +48,10 @@ void ext_int_handler(trapframe_t *frameptr)
 	fh_vmpic_eoi(irq);
 }
 
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	uint32_t status;
-	char *str;
+	const char *str;
 	uint32_t handle;
 	int node = -1;
 	int len;

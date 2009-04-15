@@ -36,6 +36,8 @@
 #include <paging.h>
 #include <percpu.h>
 #include <libos/errors.h>
+#include <elf.h>
+#include <limits.h>
 
 /* Elf file types that we support */
 #define ET_EXEC   2
@@ -84,14 +86,6 @@ struct program_header {
 };
 
 /**
- * Return non-zero if image is an ELF binary
- */
-int is_elf(void *image)
-{
-	return strncmp(image, "\177ELF", 4) == 0;
-}
-
-/**
  * Parse an ELF image and load the segments into guest memory
  *
  * @image: Pointer to the ELF image
@@ -115,9 +109,9 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 {
 	struct elf_header hdr;
 	struct program_header phdr;
-	unsigned long plowest = -1;
+	unsigned long plowest = ULONG_MAX;
 	unsigned long entry_paddr = 0;
-	unsigned long vbase = -1;
+	unsigned long vbase = ULONG_MAX;
 	unsigned int i, ret;
 
 	if (copy_from_phys(&hdr, image, sizeof(hdr)) != sizeof(hdr))
@@ -192,13 +186,13 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		}
 	}
 
-	if (plowest == -1) {
+	if (plowest == ULONG_MAX) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "load_elf: no PT_LOAD program headers in ELF image\n");
 		return ERR_BADIMAGE;
 	}
 
-	if (vbase == -1) {
+	if (vbase == ULONG_MAX) {
 		printf("%s: ELF image has invalid entry address %x\n",
 		       __func__, hdr.entry);
 		return ERR_BADIMAGE;

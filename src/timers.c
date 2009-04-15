@@ -39,6 +39,7 @@
 #include <libos/mpic.h>
 #include <events.h>
 #include <ipi_doorbell.h>
+#include <timers.h>
 
 void decrementer(trapframe_t *regs)
 {

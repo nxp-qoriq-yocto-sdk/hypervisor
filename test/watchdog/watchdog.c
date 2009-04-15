@@ -33,13 +33,9 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <hvtest.h>
 
-void init(void);
-
-extern void (*secondary_startp)(void);
-void release_secondary_cores(void);
-
-volatile unsigned int watchdog;
+static volatile unsigned int watchdog;
 
 #define TIMEOUT		48
 
@@ -47,13 +43,14 @@ void watchdog_handler(trapframe_t *frameptr)
 {
 	watchdog = 1;
 }
-void delay(void) {
+
+static void delay(void) {
 	// Wait a little extra to give the interrupt handler a chance to run
 	while (!(mfspr(SPR_TBL) & (1 << 5)));
 	while (mfspr(SPR_TBL) & (1 << 5));
 }
 
-void wait_for_timeout(unsigned int wp)
+static void wait_for_timeout(unsigned int wp)
 {
 	register_t mask = 1 << (31 - (wp & 31));
 
@@ -66,7 +63,7 @@ void wait_for_timeout(unsigned int wp)
 	}
 }
 
-int test1(void)
+static int test1(void)
 {
 	printf("> set watchdog, wait twice, check for interrupt: ");
 
@@ -81,7 +78,7 @@ int test1(void)
 	return watchdog != 0;
 }
 
-int test2(void)
+static int test2(void)
 {
 	printf("> disable critints, set watchdog, wait twice, enable critints, check for interrupt: ");
 	watchdog = 0;
@@ -100,7 +97,7 @@ int test2(void)
 	return watchdog != 0;
 }
 
-int test3(void)
+static int test3(void)
 {
 	printf("> set watchdog, wait, ping, wait twice, check for interrupt: ");
 
@@ -121,7 +118,7 @@ int test3(void)
 	return watchdog != 0;
 }
 
-int test4(void)
+static int test4(void)
 {
 	printf("> disable WIE, set watchdog, wait twice, enable WIE, check for interrupt: ");
 
@@ -141,7 +138,7 @@ int test4(void)
 	return watchdog != 0;
 }
 
-int test5(void)
+static int test5(void)
 {
 	printf("> set watchdog, wait thrice, check for no reboot: FAILED");
 
@@ -159,7 +156,7 @@ int test5(void)
         return (mfspr(SPR_TSR) & TSR_WRS) != 0;
 }
 
-int test6(void)
+static int test6(void)
 {
 	printf("> set timeout reset, set watchdog, wait thrice, check for reboot: PASSED");
 
@@ -177,7 +174,7 @@ int test6(void)
 	return 0;
 }
 
-void secondary_entry(void)
+static void secondary_entry(void)
 {
 
 	// If the WRS bits are set, then it means that we just rebooted from
@@ -199,11 +196,11 @@ void secondary_entry(void)
 	printf("Test Complete\n");
 }
 
-void start(void)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	unsigned int cpu_index;
 
-	init();
+	init(devtree_ptr);
 
 	printf("\n\nWatchdog test\n");
 

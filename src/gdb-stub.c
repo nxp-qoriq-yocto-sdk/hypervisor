@@ -69,7 +69,7 @@ static int debug_exception(trapframe_t *trap_frame);
 static void debug_gevent_handler(trapframe_t *trap_frame);
 #endif
 static void rx(queue_t *q);
-static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
+static breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type);
 
 #define CHECK_MEM(p) \
@@ -248,15 +248,12 @@ static uint8_t get_debug_char(gdb_stub_core_context_t *stub)
 
 static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c)
 {
-	size_t len = 1;
-	uint8_t buf[len];
-	buf[0] = c;
 	TRACE();
-	byte_chan_send(stub->node->bch, buf, len);
+	byte_chan_send(stub->node->bch, &c, 1);
 }
 
 /* TODO: Where do we call this? */
-static inline int bufsize_sanity_check(void)
+static int bufsize_sanity_check(void)
 {
 	return BUFMAX >= NUMREGBYTES * 2;
 }
@@ -264,7 +261,7 @@ static inline int bufsize_sanity_check(void)
 #define ACK '+'
 #define NAK '-'
 
-static const uint8_t hexit[] =
+static const uint8_t hexit_table[] =
 {
 	'0', '1', '2', '3',
 	'4', '5', '6', '7',
@@ -297,7 +294,7 @@ typedef enum token
 
 typedef struct lexeme_token_pair
 {
-	char *lexeme;
+	const char *lexeme;
 	token_t token;
 } lexeme_token_pair_t;
 
@@ -335,57 +332,57 @@ typedef enum brkpt
 } brkpt_t;
 
 /* Aux */
-static inline uint8_t checksum(uint8_t *p);
-static inline uint8_t hdtoi(uint8_t hexit);
-static inline uint8_t upper_nibble(uint8_t c);
-static inline uint8_t lower_nibble(uint8_t c);
-static inline uint32_t htoi(uint8_t *hex_string);
-static inline token_t tokenize(uint8_t *lexeme);
-static inline uint8_t hex(uint8_t c);
+static uint8_t checksum(uint8_t *p);
+static uint8_t hdtoi(uint8_t hexit);
+static uint8_t upper_nibble(uint8_t c);
+static uint8_t lower_nibble(uint8_t c);
+static uint32_t htoi(uint8_t *hex_string);
+static token_t tokenize(uint8_t *lexeme);
+static uint8_t hex(uint8_t c);
 
 /* PRT */
-static inline int bufsize_sanity_check(void);
-static inline int pkt_len(pkt_t *pkt);
-static inline int pkt_space(pkt_t *pkt);
-static inline void pkt_write_byte(pkt_t *pkt, uint8_t c);
-static inline void pkt_update_cur(pkt_t *pkt);
-static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
-static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c);
-static inline void pkt_cat_string(pkt_t *pkt, char *s);
-static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, uint32_t n);
-static inline uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i);
-static inline int pkt_full(pkt_t *pkt);
-static inline void pkt_reset(pkt_t *pkt);
-static inline uint8_t *content(pkt_t *pkt);
+static int bufsize_sanity_check(void);
+static int pkt_len(pkt_t *pkt);
+static int pkt_space(pkt_t *pkt);
+static void pkt_write_byte(pkt_t *pkt, uint8_t c);
+static void pkt_update_cur(pkt_t *pkt);
+static void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
+static void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c);
+static void pkt_cat_string(pkt_t *pkt, const char *s);
+static void pkt_cat_stringn(pkt_t *pkt, const uint8_t *s, uint32_t n);
+static uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i);
+static int pkt_full(pkt_t *pkt);
+static void pkt_reset(pkt_t *pkt);
+static uint8_t *content(pkt_t *pkt);
 static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c);
-static inline void ack(gdb_stub_core_context_t *stub);
-static inline void nak(gdb_stub_core_context_t *stub);
-static inline int got_ack(gdb_stub_core_context_t *stub);
+static void ack(gdb_stub_core_context_t *stub);
+static void nak(gdb_stub_core_context_t *stub);
+static int got_ack(gdb_stub_core_context_t *stub);
 static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static void transmit_response(gdb_stub_core_context_t *stub);
 static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
-static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
+static void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 
 /* RSP */
 
-static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length);
-static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
-static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
-static inline uint8_t *scan_till(uint8_t *q, char c);
-static inline uint32_t scan_num(uint8_t **buffer, char c);
-static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
+static void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length);
+static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
+static int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
+static uint8_t *scan_till(uint8_t *q, char c);
+static uint32_t scan_num(uint8_t **buffer, char c);
+static uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
 #ifndef USE_DEBUG_INTERRUPT
-static inline uint32_t *next_insn_addr(trapframe_t *trap_frame);
+static uint32_t *next_insn_addr(trapframe_t *trap_frame);
 #endif
-static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table);
-static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table);
-static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
-static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint);
+static void dump_breakpoint_table(breakpoint_t *breakpoint_table);
+static void clear_all_breakpoints(breakpoint_t *breakpoint_table);
+static breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr);
+static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint);
 
 /* Auxiliary routines required by the RSP Engine.
  */
 
-static inline uint8_t checksum(uint8_t *p)
+static uint8_t checksum(uint8_t *p)
 {
 	uint8_t s = 0;
 	TRACE();
@@ -395,7 +392,7 @@ static inline uint8_t checksum(uint8_t *p)
 	return s; /* Automatically, mod 256. */
 }
 
-static inline uint8_t hdtoi(uint8_t hexit)
+static uint8_t hdtoi(uint8_t hexit)
 {
 	TRACE();
 	if ('0' <= hexit && hexit <= '9')
@@ -411,20 +408,20 @@ static inline uint8_t hdtoi(uint8_t hexit)
 	return 0;
 }
 
-static inline uint8_t upper_nibble(uint8_t c)
+static uint8_t upper_nibble(uint8_t c)
 {
 	TRACE();
 	return (c & 0xf0) >> 4;
 }
 
-static inline uint8_t lower_nibble(uint8_t c)
+static uint8_t lower_nibble(uint8_t c)
 {
 	TRACE();
 	return c & 0x0f;
 }
 
 /* TODO: A more generalized vesion of this would be nice in libos. */
-static inline uint32_t htoi(uint8_t *hex_string)
+static uint32_t htoi(uint8_t *hex_string)
 {
 	uint8_t *p = hex_string;
 	uint32_t s = 0;
@@ -438,23 +435,23 @@ static inline uint32_t htoi(uint8_t *hex_string)
 	return s;
 }
 
-static inline token_t tokenize(uint8_t *lexeme)
+static token_t tokenize(uint8_t *lexeme)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0;
 	     i < sizeof (lexeme_token_pairs)/sizeof (lexeme_token_pairs[0]);
 	     i++)
-		if (strncmp((char *) lexeme, lexeme_token_pairs[i].lexeme,
+		if (strncmp((const char *) lexeme, lexeme_token_pairs[i].lexeme,
 			strlen(lexeme_token_pairs[i].lexeme)) == 0)
 			return lexeme_token_pairs[i].token;
 
 	return unknown_command;
 }
 
-static inline uint8_t hex(uint8_t c)
+static uint8_t hex(uint8_t c)
 {
-	return hexit[c];
+	return hexit_table[c];
 }
 /* Aux ends. */
 
@@ -462,19 +459,19 @@ static inline uint8_t hex(uint8_t c)
 /* Package Receive and Transmit.
  */
 
-static inline int pkt_len(pkt_t *pkt)
+static int pkt_len(pkt_t *pkt)
 {
 	TRACE();
 	return pkt->cur - pkt->buf;
 }
 
-static inline int pkt_space(pkt_t *pkt)
+static int pkt_space(pkt_t *pkt)
 {
 	TRACE();
 	return pkt->len;
 }
 
-static inline void pkt_write_byte(pkt_t *pkt, uint8_t c)
+static void pkt_write_byte(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
 	if (c == '#' || c == '$' || c == '}' || c == '*') {
@@ -488,7 +485,7 @@ static inline void pkt_write_byte(pkt_t *pkt, uint8_t c)
 	return;
 }
 
-static inline void pkt_update_cur(pkt_t *pkt)
+static void pkt_update_cur(pkt_t *pkt)
 {
 	TRACE();
 	if (pkt->cur < (pkt->buf + pkt->len))
@@ -496,7 +493,7 @@ static inline void pkt_update_cur(pkt_t *pkt)
 	return;
 }
 
-static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
+static void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
 	pkt_write_byte(pkt, c);
@@ -504,7 +501,7 @@ static inline void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 	return;
 }
 
-static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
+static void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
 	TRACE("Upper nibble hexed: '%c'", hex(upper_nibble(c)));
@@ -514,9 +511,9 @@ static inline void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c)
 	return;
 }
 
-static inline void pkt_cat_string(pkt_t *pkt, char *s)
+static void pkt_cat_string(pkt_t *pkt, const char *s)
 {
-	char *p;
+	const char *p;
 	TRACE();
 	p = s;
 	while (*p) {
@@ -526,34 +523,34 @@ static inline void pkt_cat_string(pkt_t *pkt, char *s)
 	return;
 }
 
-static inline void pkt_cat_stringn(pkt_t *pkt, uint8_t *s, uint32_t n)
+static void pkt_cat_stringn(pkt_t *pkt, const uint8_t *s, uint32_t n)
 {
-        uint8_t *p;
-        TRACE();
-        p = s;
-        while (*p && (p - s) < n) {
-                pkt_write_byte_update_cur(pkt, *p++);
-        }
-        pkt_write_byte(pkt, 0);
-        return;
+	const uint8_t *p;
+	TRACE();
+	p = s;
+	while (*p && (uint32_t)(p - s) < n) {
+		pkt_write_byte_update_cur(pkt, *p++);
+	}
+	pkt_write_byte(pkt, 0);
+	return;
 }
 
-static inline uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i)
+static uint8_t pkt_read_byte(pkt_t *pkt, uint32_t i)
 {
 	TRACE();
-	if (0 <= i && i < (pkt->cur - pkt->buf))
+	if (i < (uint32_t)(pkt->cur - pkt->buf))
 		return pkt->buf[i];
 	else
 		return 0;
 }
 
-static inline int pkt_full(pkt_t *pkt)
+static int pkt_full(pkt_t *pkt)
 {
 	TRACE();
 	return (pkt->cur == (pkt->buf + pkt->len));
 }
 
-static inline void pkt_reset(pkt_t *pkt)
+static void pkt_reset(pkt_t *pkt)
 {
 	TRACE();
 	memset(pkt->buf, 0, pkt->len);
@@ -561,27 +558,27 @@ static inline void pkt_reset(pkt_t *pkt)
 	return;
 }
 
-static inline uint8_t *content(pkt_t *pkt)
+static uint8_t *content(pkt_t *pkt)
 {
 	TRACE();
 	return pkt->buf;
 }
 
-static inline void ack(gdb_stub_core_context_t *stub)
+static void ack(gdb_stub_core_context_t *stub)
 {
 	TRACE();
 	put_debug_char(stub, ACK);
 	return;
 }
 
-static inline void nak(gdb_stub_core_context_t *stub)
+static void nak(gdb_stub_core_context_t *stub)
 {
 	TRACE();
 	put_debug_char(stub, NAK);
 	return;
 }
 
-static inline int got_ack(gdb_stub_core_context_t *stub)
+static int got_ack(gdb_stub_core_context_t *stub)
 {
 	uint8_t c;
 	TRACE();
@@ -661,7 +658,7 @@ static void transmit_response(gdb_stub_core_context_t *stub)
 	return;
 }
 
-static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length)
+static void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length)
 {
 	uint32_t i;
 
@@ -678,9 +675,9 @@ static inline void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length)
 /* RSP Engine.
  */
 
-static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length)
+static void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length)
 {
-	int i, offset;
+	unsigned int i, offset;
 	offset = (byte_length == 4 ? 4 : 0);
 	for (i = 0; i < byte_length; i++) {
 		value[2*i] = hex(upper_nibble((int)
@@ -691,7 +688,7 @@ static inline void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint3
 	value[2*byte_length] = '\0';
 }
 
-static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
+static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint32_t byte_length = 0;
 	register_t reg_value = 0xdeadbeef;
@@ -736,7 +733,7 @@ static inline int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg
 	return c;
 }
 
-static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
+static int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint64_t reg_value;
 	uint32_t e500mc_reg_num;
@@ -779,7 +776,7 @@ static inline int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t re
 /* Scan forward until a 'c' is found or a '\0' is hit,
  * whichever happens earlier.
  */
-static inline uint8_t *scan_till(uint8_t *q, char c)
+static uint8_t *scan_till(uint8_t *q, char c)
 {
 	while (*q && *q != c)
 		q++;
@@ -792,7 +789,7 @@ static inline uint8_t *scan_till(uint8_t *q, char c)
  * character read (i.e. c or '\0' - whichever occurs
  * earlier).
  */
-static inline uint32_t scan_num(uint8_t **buffer, char c)
+static uint32_t scan_num(uint8_t **buffer, char c)
 {
 	uint8_t t, *sav_pos;
 	uint32_t n;
@@ -816,7 +813,7 @@ static inline uint32_t scan_num(uint8_t **buffer, char c)
 		break; \
 	}
 
-static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
+static uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
 {
 	int32_t result = n;
 	int32_t sign_bit, bitpos;
@@ -831,7 +828,7 @@ static inline uint32_t sign_extend(int32_t n, uint32_t sign_bit_position)
 }
 
 #ifndef USE_DEBUG_INTERRUPT
-static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
+static uint32_t *next_insn_addr(trapframe_t *trap_frame)
 {
 	uint32_t insn = 0x0;
 	uint32_t opcd, xo, aa, li, bd;
@@ -915,7 +912,7 @@ static inline uint32_t *next_insn_addr(trapframe_t *trap_frame)
 /* tw 12,r2,r2: 0x7d821008 */
 const uint32_t trap_insn = 0x7d821008;
 
-static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table)
+static void dump_breakpoint_table(breakpoint_t *breakpoint_table)
 {
 	uint32_t index, flag = 0;
 	TRACE("Breakpoint table:");
@@ -940,7 +937,7 @@ static inline void dump_breakpoint_table(breakpoint_t *breakpoint_table)
 		TRACE("\tEmpty.");
 }
 
-static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table)
+static void clear_all_breakpoints(breakpoint_t *breakpoint_table)
 {
 	uint32_t index;
 	breakpoint_t *breakpoint = NULL;
@@ -957,7 +954,7 @@ static inline void clear_all_breakpoints(breakpoint_t *breakpoint_table)
 	}
 }
 
-static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr)
+static breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, uint32_t *addr)
 {
 	uint32_t index;
 	DEBUG("Checking if there is an entry in the breakpoint table for address: 0x%p.", addr);
@@ -971,7 +968,7 @@ static inline breakpoint_t *locate_breakpoint(breakpoint_t *breakpoint_table, ui
 	return NULL;
 }
 
-static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type)
+static breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type)
 {
 	uint32_t index;
 	uint32_t status = 1;
@@ -1043,7 +1040,7 @@ static inline breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapf
 	return (status == 0) ? &breakpoint_table[index] : NULL;
 }
 
-static inline void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint)
+static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *breakpoint)
 {
 	DEBUG();
 	if (!breakpoint) {
@@ -1709,7 +1706,7 @@ return_to_guest:
 				DEBUG ("td-len: %d, offset: %d, length: %d", strlen (td), offset, length);
 				if (offset < strlen (td)) {
 					pkt_cat_string(stub->rsp, "m");
-					pkt_cat_stringn(stub->rsp, (uint8_t *)(td + offset), length);
+					pkt_cat_stringn(stub->rsp, (const uint8_t *)(td + offset), length);
 				} else {
 					pkt_cat_string(stub->rsp, "l");
 				}

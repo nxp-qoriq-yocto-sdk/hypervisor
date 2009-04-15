@@ -33,23 +33,17 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
+#include <hvtest.h>
 
 #define PAGE_SIZE 4096
 
-void init(unsigned long devtree_ptr);
-
-int irq;
-extern void *fdt;
-
-unsigned long devtree;
+static unsigned long devtree;
 
 void ext_int_handler(trapframe_t *frameptr)
 {
 }
 
-void release_secondary_cores(void);
-
-void dump_dev_tree(void)
+static void dump_dev_tree(void)
 {
 #ifdef DEBUG
 	int node = -1;
@@ -66,9 +60,9 @@ void dump_dev_tree(void)
 }
 
 #define CPUCNT 4
-int cpus_complete[CPUCNT];
+static int cpus_complete[CPUCNT];
 
-void secondary_entry(void)
+static void secondary_entry(void)
 {
 	uint32_t cpu_index;
 	uint32_t pir = mfspr(SPR_PIR);
@@ -83,9 +77,7 @@ void secondary_entry(void)
 	}
 }
 
-extern void (*secondary_startp)(void);
-
-void start(unsigned long devtree_ptr)
+void libos_client_entry(unsigned long devtree_ptr)
 {
 	int i;
 	int done = 0;

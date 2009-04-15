@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,45 +22,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef HVTEST_H
+#define HVTEST_H
 
+#include <libos/types.h>
 
-#include <libos/libos.h>
-#include <libos/hcalls.h>
-#include <libos/core-regs.h>
-#include <libos/trapframe.h>
-#include <libos/bitops.h>
-#include <libfdt.h>
-#include <hvtest.h>
+void init(unsigned long devtree_ptr);
+void release_secondary_cores(void);
 
-static volatile int exception;
+extern void (*secondary_startp)(void);
+extern void *fdt;
+extern int coreint;
 
-#define PMLCa0 144
+extern phys_addr_t uart_addr;
+extern uint8_t *uart_virt;
 
-void program_handler(trapframe_t *frameptr)
-{
-	printf("program interrupt exception -- FAILED\n");
-	exception++;
-	frameptr->srr0 += 4;
-}
+int get_addr_format(const void *tree, int node,
+                    uint32_t *naddr, uint32_t *nsize);
+int get_addr_format_nozero(const void *tree, int node,
+                           uint32_t *naddr, uint32_t *nsize);
 
-void libos_client_entry(unsigned long devtree_ptr)
-{
-	uint32_t pmr_reg, pmr_val;
+void copy_val(uint32_t *dest, const uint32_t *src, int naddr);
 
-	init(devtree_ptr);
+int xlate_one(uint32_t *addr, const uint32_t *ranges,
+              int rangelen, uint32_t naddr, uint32_t nsize,
+              uint32_t prev_naddr, uint32_t prev_nsize,
+              phys_addr_t *rangesize);
 
-	enable_extint();
+int xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
+                  uint32_t *addrbuf, phys_addr_t *size,
+                  uint32_t naddr, uint32_t nsize);
 
-	printf("PMR test\n");
+int xlate_reg(const void *tree, int node, const uint32_t *reg,
+              phys_addr_t *addr, phys_addr_t *size);
 
-	pmr_reg = PMLCa0;
-	asm volatile("mfpmr %0, %1" : "=r" (pmr_val) : "i" (pmr_reg) : "memory");
+int dt_get_reg(const void *tree, int node, int res,
+               phys_addr_t *addr, phys_addr_t *size);
 
-#ifdef DEBUG
-	printf("pmr reg read val =%x\n", pmr_val);
+phys_addr_t get_uart_addr(void);
+
 #endif
-	if (!exception)
-		printf("PMR reg read successful -- PASSED\n");
-
-	printf("Test Complete\n");
-}
