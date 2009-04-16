@@ -29,7 +29,7 @@ $use_uart1 = 1
 $use_uart2 = 1
 $use_uart3 = 0
 
-$guest_image[0]  = "vmlinux"
+$guest_image[0]  = "vmlinux.stripped"
 $guest_addr[0]   = 0x00100000
 $guest_image[1]  = "hv-2p.dtb"
 $guest_addr[1]   = 0x00f00000

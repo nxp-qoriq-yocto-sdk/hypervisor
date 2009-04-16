@@ -27,7 +27,7 @@
 # UART2 is Linux serial console
 $use_uart2 = 1
 
-$guest_image[0]  = "vmlinux"
+$guest_image[0]  = "vmlinux.stripped"
 $guest_addr[0]   = 0x00100000
 $guest_image[1]  = "hv-1core.dtb"
 $guest_addr[1]   = 0x00f00000
