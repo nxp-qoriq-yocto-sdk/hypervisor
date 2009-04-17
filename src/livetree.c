@@ -777,9 +777,8 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 
 	/* This function is called recursively, and the top-level node is the
 	 * "node-update-phandle" configuration node.  So we use notfirst to
-	 * skip the top level, so that we don't create a node called*
-	 * "node-update-phandle" in the guest.  We could have also just done
-	 * a strcmp on config->name.
+	 * skip the top level, so that we don't create a node called
+	 * "node-update-phandle" in the guest.
 	 */
 	if (!ctx->notfirst) {
 		ctx->notfirst = 1;
