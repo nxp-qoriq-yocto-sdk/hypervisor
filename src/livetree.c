@@ -788,8 +788,7 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, dt_merge_flags_t flags)
  * 	...
  * };
  *
- * This function creates the "foo = <&Gb>" property.  If necessary, it also
- * creates a phandle property in both hardware node Hb and guest node Gb.
+ * This function creates the "foo = <&Gb>" property.
  */
 static int do_merge_phandle(dt_node_t *src, void *arg)
 {
@@ -840,66 +839,22 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 			node = dt_lookup_phandle(config_tree, phandle);
 			if (!node) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-					 "%s: node %s: prop %s: invalid phandle 0x%x\n",
-					 __func__, src->name, prop->name, phandle);
+				         "%s: node %s/%s: prop %s: invalid phandle 0x%x\n",
+				         __func__, src->parent->name,
+				         src->name, prop->name, phandle);
 				ret = ERR_BADTREE;
 				break;
 			}
-			if (!node->endpoint) {
+			if (!node->guest_phandle) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-					 "%s: node %s: endpoint %s is not valid\n",
-					 __func__, src->parent->name, node->name);
+				         "%s: node %s/%s: no guest phandle for %s\n",
+				         __func__, src->name,
+				         src->parent->name, node->name);
 				ret = ERR_BADTREE;
 				break;
 			}
 
-			/* Find the hardware node that the other config-tree node
-			 * references.
-			 */
-			owner = dt_owned_by(node->endpoint, guest);
-			if (!owner) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-					 "%s: config-tree node %s: property %s: "
-					 "phandle to %s is invalid\n",
-					 __func__, src->parent->name, prop->name, node->name);
-				ret = ERR_BADTREE;
-				break;
-			}
-
-			node = owner->hwnode;
-
-			// Get the phandle stored in the hardware node, or
-			// allocate a new one since we might be modifying the
-			// hardware device tree, we need to grab the lock for
-			// it.
-			spin_lock(&hw_devtree_lock);
-			phandle = dt_get_phandle(node, 1);
-			if (!phandle) {
-				spin_unlock(&hw_devtree_lock);
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-					 "%s: could not get/set phandle for hardware node %s\n",
-					 __func__, node->name);
-				ret = ERR_BADTREE;
-				break;
-			}
-			spin_unlock(&hw_devtree_lock);
-
-			// If there is a node in the guest device tree that was
-			// already created from the node in the hardware tree
-			// referenced by the other config node, then we need to
-			// create phandle and linux,phandle properties in *that*
-			// node as well.
-			node = owner->gnode;
-			if (node) {
-				ret = dt_set_prop(node, "phandle", &phandle, 4);
-				if (!ret)
-					ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
-				if (ret)
-					break;
-			}
-
-			// Save the phandle
-			phandles[i] = phandle;
+			phandles[i] = node->guest_phandle;
 		}
 
 		if (!ret)
