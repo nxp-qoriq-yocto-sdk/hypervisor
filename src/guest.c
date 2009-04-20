@@ -2177,6 +2177,10 @@ static int assign_child(dt_node_t *node, void *arg)
 	dev_owner_t *direct = get_direct_owner(node->upstream, guest);
 	dev_owner_t *owner;
 
+	/* No direct owner means it was created with node-update.  Skip it. */
+	if (!direct)
+		return 0;
+
 	owner = dt_owned_by(node->upstream, guest);
 	if (!owner) {
 		owner = malloc(sizeof(dev_owner_t));
