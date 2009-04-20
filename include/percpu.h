@@ -154,6 +154,9 @@ typedef struct guest {
 	/** List of owned devices (dev_owner_t objects) */
 	list_t dev_list;
 
+	/** List of deferred node-update-phandles.  Nodes are update_phandle_t. */
+	list_t phandle_update_list;
+
 	/** The doorbell handle to use by a manager partition to send a shutdown
 	 *  request to this partition
 	 */

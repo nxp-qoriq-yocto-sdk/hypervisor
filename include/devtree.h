@@ -65,6 +65,17 @@ typedef struct intmap_entry {
 	int valid;
 } intmap_entry_t;
 
+typedef struct update_phandle {
+	list_t node;
+	struct dt_node *dest; /**< Guest node to merge into */
+	struct dt_node *src; /**< node-update-phandle node */
+
+	/** Tree containing phandles that src refers to.  This is usually 
+	 * the config tree, but in the future could be an hcall-supplied tree.
+	 */
+	struct dt_node *tree; 
+} update_phandle_t;
+
 typedef struct dt_node {
 	struct dt_node *parent;
 	list_t children, child_node, props;
@@ -161,8 +172,12 @@ enum {
 	dt_merge_notfirst = (__force dt_merge_flags_t)4,
 };
 
+struct guest;
+
 int dt_merge_tree(dt_node_t *dest, dt_node_t *src, dt_merge_flags_t flags);
-int dt_process_node_update(dt_node_t *target, dt_node_t *config);
+int dt_process_node_update(struct guest *guest, dt_node_t *target,
+                           dt_node_t *config);
+void dt_run_deferred_phandle_updates(struct guest *guest);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
 int dt_node_is_compatible(dt_node_t *node, const char *compat);

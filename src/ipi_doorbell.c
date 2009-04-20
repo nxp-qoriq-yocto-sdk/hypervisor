@@ -243,7 +243,7 @@ static int send_dbell_init_one(dt_node_t *node, void *arg)
 		// Out of memory
 		return ret;
 
-	ret = dt_process_node_update(hnode, node);
+	ret = dt_process_node_update(guest, hnode, node);
 	if (ret < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 			 "%s: error %d merging node-update on %s\n",
@@ -293,7 +293,7 @@ static int recv_dbell_init_one(dt_node_t *node, void *arg)
 		return ret;
 	}
 
-	ret = dt_process_node_update(hnode, node);
+	ret = dt_process_node_update(guest, hnode, node);
 	if (ret < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 			 "%s: error %d merging node-update on %s\n",

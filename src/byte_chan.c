@@ -267,7 +267,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 	if (dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec)) < 0)
 		goto nomem;
 
-	int ret = dt_process_node_update(gnode, node);
+	int ret = dt_process_node_update(guest, gnode, node);
 	if (ret < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 			 "%s: error %d merging node-update on %s\n",

@@ -917,14 +917,21 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 
 /**
  * dt_process_node_update - process the node-update subnodes
- * @target: the target node to update
- * @config: the node that contains the "node-update" subnodes
+ @ @param[in] guest guest whose tree to update
+ * @param[in] target target node to update
+ * @param[in] config node that contains the "node-update" subnodes
  *
  * This function scans a given configuration node for the node-update and
  * node-update-phandle subnodes, and then it updates the target node
  * accordingly.
+ *
+ * The phandle portion of the update will be deferred until all
+ * non-phandle merging has finished, to give a chance for the phandle
+ * linkage to be established with the config-tree nodes.  To run
+ * the phandle merges which have been queued up, call
+ * dt_run_deferred_phandle_updates().
  */
-int dt_process_node_update(dt_node_t *target, dt_node_t *config)
+int dt_process_node_update(guest_t *guest, dt_node_t *target, dt_node_t *config)
 {
 	int ret;
 
@@ -946,18 +953,46 @@ int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 		if (!strcmp(subnode->name, "node-update-phandle") ||
 		    !strncmp(subnode->name, "node-update-phandle@",
 		             strlen("node-update-phandle@"))) {
-			/* Merge the phandles into the target  */
-			merge_ctx_t ctx = {
-				.dest = target,
-			};
+			update_phandle_t *up = malloc(sizeof(update_phandle_t));
+			if (!up) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: out of memory\n", __func__);
+				return ERR_NOMEM;
+			}
 
-			ret = dt_for_each_node(subnode, &ctx, do_merge_phandle, merge_post);
-			if (ret)
-				return ret;
+			up->src = subnode;
+			up->dest = target;
+			up->tree = config_tree;
+			list_add(&guest->phandle_update_list, &up->node);
 		}
 	}
 
 	return 0;
+}
+
+void dt_run_deferred_phandle_updates(guest_t *guest)
+{
+	list_for_each_delsafe(&guest->phandle_update_list, i, next) {
+		update_phandle_t *up = to_container(i, update_phandle_t, node);
+		int ret;
+
+		/* Merge the phandles into the target  */
+		merge_ctx_t ctx = {
+			.dest = up->dest,
+		};
+
+		ret = dt_for_each_node(up->src, &ctx,
+		                       do_merge_phandle, merge_post);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: do_merge_phandle on %s/%s returned %d\n",
+			         __func__, up->src->parent->name,
+			         up->src->name, ret);
+		}
+
+		list_del(&up->node);
+		free(up);
+	}
 }
 
 typedef struct print_ctx {

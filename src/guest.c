@@ -213,7 +213,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		if (dt_set_prop(gnode, "reg", reg, (rootnaddr + rootnsize) * 4))
 			goto nomem;
 
-		if (dt_process_node_update(gnode, node))
+		if (dt_process_node_update(guest, gnode, node))
 			goto nomem;
 	}
 	
@@ -2262,7 +2262,7 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 
 	dt_record_guest_phandle(owner->gnode, owner->cfgnode);
 
-	if (dt_process_node_update(owner->gnode, owner->cfgnode))
+	if (dt_process_node_update(guest, owner->gnode, owner->cfgnode))
 		goto out_gnode;
 
 	ret = dt_for_each_node(owner->gnode, guest, assign_child, NULL);
@@ -2399,6 +2399,8 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	vmpic_partition_init(guest);
 
 	list_init(&guest->dev_list);
+	list_init(&guest->phandle_update_list);
+
  	read_phandle_aliases(guest);
 
 	ret = init_guest_devs(guest);
@@ -2444,11 +2446,13 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
 	guest->wd_notify = !!prop;
 
-	ret = dt_process_node_update(guest->devtree, guest->partition);
+	ret = dt_process_node_update(guest, guest->devtree, guest->partition);
 	if (ret < 0)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: error %d merging partition node-update\n",
 			 __func__, ret);
+
+	dt_run_deferred_phandle_updates(guest);
 
 	return 0;
 
