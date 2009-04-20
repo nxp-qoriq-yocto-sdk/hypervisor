@@ -719,8 +719,9 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
 }
 
 /**
- * dt_merge_phandle - process a node-update-handle configuration property
- * @param[in] config pointer to the node-update-handle node
+ * Process a node-update-handle configuration property.
+ *
+ * @param[in] src pointer to the node-update-handle node (or a child thereof)
  * @param[in] prop the specific property to process
  * @param[in] target the node in the guest device tree to update
  *
@@ -766,7 +767,7 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
  * This function creates the "foo = <&Gb>" property.  If necessary, it also
  * creates a phandle property in both hardware node Hb and guest node Gb.
  */
-static int do_merge_phandle(dt_node_t *config, void *arg)
+static int do_merge_phandle(dt_node_t *src, void *arg)
 {
 	merge_ctx_t *ctx = arg;
 	guest_t *guest = get_gcpu()->guest;
@@ -776,25 +777,23 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 	int i, ret;
 
 	/* This function is called recursively, and the top-level node is the
-	 * "node-update-phandle" configuration node.  So we use notfirst to
-	 * skip the top level, so that we don't create a node called
+	 * "node-update-phandle" source node.  So we use notfirst to skip the
+	 * top level, so that we don't create a node called
 	 * "node-update-phandle" in the guest.
 	 */
 	if (!ctx->notfirst) {
 		ctx->notfirst = 1;
 	} else {
-		/* Make sure the guest has a node with the same name as the
-		 * configuration node, and traverse into that node as well.
-		 * ctx->dest is the node in the guest device tree that we are
-		 * updating.
+		/* Make sure the guest has a node with the same name as the source
+		 * node, and traverse into that node as well.  ctx->dest is the
+		 * node in the guest device tree that we are updating.
 		 */
-		ctx->dest = dt_get_subnode(ctx->dest, config->name, 1);
+		ctx->dest = dt_get_subnode(ctx->dest, src->name, 1);
 		if (!ctx->dest)
 			return ERR_NOMEM;
 	}
 
-	list_for_each(&config->props, l) {
-		/* Get the phandle from the config node */
+	list_for_each(&src->props, l) {
 		dt_prop_t *prop = to_container(l, dt_prop_t, prop_node);
 
 		// Validate the property
@@ -808,34 +807,35 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 
 		// Iterate over all the phandles in this property
 		for (i = 0; i < count; i++) {
-			// Get the phandle from the config node
+			// Get the phandle from the src node
 			phandle = ((uint32_t *) prop->data)[i];
 
-			// Find the other config node the phandle points to
+			// Find the other config-tree node the phandle points to
 			node = dt_lookup_phandle(config_tree, phandle);
 			if (!node) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 					 "%s: node %s: prop %s: invalid phandle 0x%x\n",
-					 __func__, config->name, prop->name, phandle);
+					 __func__, src->name, prop->name, phandle);
 				ret = ERR_BADTREE;
 				break;
 			}
 			if (!node->endpoint) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 					 "%s: node %s: endpoint %s is not valid\n",
-					 __func__, config->parent->name, node->name);
+					 __func__, src->parent->name, node->name);
 				ret = ERR_BADTREE;
 				break;
 			}
 
-			/* Find the hardware node that the other config node
+			/* Find the hardware node that the other config-tree node
 			 * references.
 			 */
 			owner = dt_owned_by(node->endpoint, guest);
 			if (!owner) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-					 "%s: config node %s: property %s: phandle to %s is invalid \n",
-					 __func__, config->parent->name, prop->name, node->name);
+					 "%s: config-tree node %s: property %s: "
+					 "phandle to %s is invalid\n",
+					 __func__, src->parent->name, prop->name, node->name);
 				ret = ERR_BADTREE;
 				break;
 			}
@@ -843,7 +843,7 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 			node = owner->hwnode;
 
 			// Get the phandle stored in the hardware node, or
-			// allocate a new one Since we might be modifying the
+			// allocate a new one since we might be modifying the
 			// hardware device tree, we need to grab the lock for
 			// it.
 			spin_lock(&hw_devtree_lock);
