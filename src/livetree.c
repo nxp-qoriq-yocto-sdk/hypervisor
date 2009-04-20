@@ -793,9 +793,7 @@ int dt_merge_tree(dt_node_t *dest, dt_node_t *src, dt_merge_flags_t flags)
 static int do_merge_phandle(dt_node_t *src, void *arg)
 {
 	merge_ctx_t *ctx = arg;
-	guest_t *guest = get_gcpu()->guest;
 	uint32_t phandle;
-	dev_owner_t *owner;
 	dt_node_t *node;
 	int i, ret;
 
