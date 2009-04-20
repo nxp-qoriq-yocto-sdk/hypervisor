@@ -206,6 +206,8 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		if (!gnode)
 			goto nomem;
 
+		dt_record_guest_phandle(gnode, node);
+
 		if (dt_set_prop_string(gnode, "device_type", "memory"))
 			goto nomem;
 
