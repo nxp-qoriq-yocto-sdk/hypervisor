@@ -1402,12 +1402,12 @@ uint32_t dt_get_phandle(dt_node_t *node, int create)
 
 		ret = dt_set_prop(node, "phandle", &phandle, 4);
 		if (ret)
-			return 0;
+			goto nomem;
 
 		// Linux expects linux,phandle
 		ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
 		if (ret)
-			return 0;
+			goto nomem;
 
 		return phandle;
 	}
@@ -1416,6 +1416,12 @@ uint32_t dt_get_phandle(dt_node_t *node, int create)
 		return 0;
 
 	return *(const uint32_t *)prop->data;
+
+nomem:
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "%s: out of memory, cannot set phandle in %s\n", __func__,
+	         node->name);
+	return 0;
 }
 
 /** Retrieve the full path of a node, or a path relative to a subtree
