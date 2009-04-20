@@ -95,6 +95,9 @@ static void check_dma1_node(int node)
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	int node, ret, compat_found = 0;
+	int dma1, serial, bar;
+	uint32_t dma1ph, serialph, barph, memph;
+	const uint32_t *prop;
 	int last_node = 0;
 
 	init(devtree_ptr);
@@ -104,6 +107,16 @@ void libos_client_entry(unsigned long devtree_ptr)
 	node = fdt_path_offset(fdt, "/dma0");
 	printf("delete-node --- %s\n",
 			(node < 0)? "PASSED" : "FAILED");
+
+	dma1 = fdt_path_offset(fdt, "/dma1");
+	if (dma1 < 0) {
+		printf("dma1 does not exist --- FAILED\n");
+		goto out;
+	}
+
+	dma1ph = fdt_get_phandle(fdt, dma1);
+	if (!dma1ph)
+		printf("dma1 no phandle --- FAILED\n");
 
 	node = -1;
 
@@ -137,5 +150,87 @@ void libos_client_entry(unsigned long devtree_ptr)
 		}
 	}
 
+	serial = fdt_node_offset_by_compatible(fdt, -1, "ns16550");
+	if (serial < 0) {
+		printf("no serial node --- FAILED\n");
+		goto out;
+	}
+
+	serialph = fdt_get_phandle(fdt, serial);
+	if (!serialph)
+		printf("serial no phandle --- FAILED\n");
+
+	prop = fdt_getprop(fdt, serial, "fooph", &ret);
+	if (!prop || ret != 4) {
+		printf("no fooph --- FAILED\n");
+		goto out;
+	}
+
+	if (*prop != serialph)
+		printf("serialph %x serial/fooph %x --- FAILED\n", serialph, *prop);
+
+	prop = fdt_getprop(fdt, serial, "barph", &ret);
+	if (!prop || ret != 4) {
+		printf("no barph --- FAILED\n");
+		goto out;
+	}
+
+	bar = fdt_subnode_offset(fdt, serial, "bar");
+	if (bar < 0) {
+		printf("no bar --- FAILED\n");
+		goto out;
+	}
+
+	barph = fdt_get_phandle(fdt, bar);
+	if (*prop != barph)
+		printf("bar phandle %x serial/barph %x --- FAILED\n", barph, *prop);
+
+	prop = fdt_getprop(fdt, serial, "dmaph", &ret);
+	if (!prop || ret != 4) {
+		printf("no barph --- FAILED\n");
+		goto out;
+	}
+
+	if (*prop != dma1ph)
+		printf("dma1 phandle %x serial/dma1ph %x --- FAILED\n", dma1ph, *prop);
+
+	prop = fdt_getprop(fdt, bar, "blah", &ret);
+	if (!prop || ret != 5 || strcmp((const char *)prop, "test"))
+		printf("serial/bar, blah has bad value --- FAILED\n");
+
+	prop = fdt_getprop(fdt, 0, "ph", &ret);
+	if (!prop || ret != 12) {
+		printf("bad/missing ph --- FAILED\n");
+		goto out;
+	}
+
+	if (prop[0] != dma1ph)
+		printf("dma1 phandle %x ph[0] %x --- FAILED\n", dma1ph, prop[0]);
+	if (prop[1] !=  barph)
+		printf("bar phandle %x ph[0] %x --- FAILED\n", serialph, prop[1]);
+
+	node = fdt_subnode_offset(fdt, 0, "memory");
+	if (node < 0) {
+		printf("no memory --- FAILED\n");
+		goto out;
+	}
+
+	memph = fdt_get_phandle(fdt, node);
+	if (prop[2] != memph)
+		printf("gpma phandle %x ph[0] %x --- FAILED\n", memph, prop[2]);
+
+	prop = fdt_getprop(fdt, dma1, "serialph", &ret);
+	if (!prop || ret != 4) {
+		printf("no dma1/serialph --- FAILED\n");
+		goto out;
+	}
+	
+	if (*prop !=  serialph)
+		printf("serial phandle %x dma1/serialph %x --- FAILED\n",
+		       serialph, *prop);
+
+	printf("node-update-phandle --- PASSED\n");
+
+out:
 	printf("Test Complete\n");
 }

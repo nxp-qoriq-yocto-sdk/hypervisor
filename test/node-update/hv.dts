@@ -109,7 +109,7 @@
 		guest-image = <0 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
-		gpma {
+		gpma: gpma {
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma1>;
 			guest-addr = <0 0>;
@@ -117,13 +117,27 @@
 
 		uart2: uart2 {
 			device = "serial2";
-			node-update {
+			foo: node-update {
 				prepend-stringlist = "compatible", "addr-space";
+				
+				bar: bar {
+					blah = "test";
+				};
+			};
+			
+			node-update-phandle {
+				fooph = <&foo>;
+				barph = <&bar>;
+				dmaph = <&dma1>;
 			};
 		};
 
 		node-update {
 			delete-node = "dma0";
+		};
+
+		node-update-phandle {
+			ph = <&dma1 &bar &gpma>;
 		};
 
 		dma0: dma0 {
@@ -138,6 +152,9 @@
 				prepend-stringlist = "compatible", "addr-space";
 				delete-subnodes;
 				delete-prop = "fsl,liodn", "reg";
+			};
+			node-update-phandle {
+				serialph = <&uart2>;
 			};
 		};
 
