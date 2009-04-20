@@ -523,7 +523,7 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 
 typedef struct merge_ctx {
 	dt_node_t *dest;
-	int notfirst, special;
+	dt_merge_flags_t flags;
 } merge_ctx_t;
 
 static void delete_nodes_by_strlist(dt_node_t *node,
@@ -622,12 +622,28 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
+/** Record a phandle in the config node's guest_phandle.
+ * The phandle will be created if it does not already exist.
+ *
+ * @param[in] gnode guest node to contain phandle
+ * @param[in] cfgnode config-tree node whose guest_phandle should be set
+ */
+int dt_record_guest_phandle(dt_node_t *gnode, dt_node_t *cfgnode)
+{
+	uint32_t phandle = dt_get_phandle(gnode, 1);
+	if (!phandle)
+		return ERR_UNKNOWN; // could be out-of-mem or no phandles available
+
+	cfgnode->guest_phandle = phandle;
+	return 0;
+}
+
 static int merge_pre(dt_node_t *src, void *arg)
 {
 	merge_ctx_t *ctx = arg;
 
-	if (!ctx->notfirst) {
-		ctx->notfirst = 1;
+	if (!(ctx->flags & dt_merge_notfirst)) {
+		ctx->flags |= dt_merge_notfirst;
 	} else {
 		ctx->dest = dt_get_subnode(ctx->dest, src->name, 1);
 
@@ -638,7 +654,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 	if (!ctx->dest->upstream)
 		ctx->dest->upstream = src;
 
-	if (ctx->special) {
+	if (ctx->flags & dt_merge_special) {
 		dt_prop_t *prop;
 	 
 		if (dt_get_prop(src, "delete-subnodes", 0)) {
@@ -657,10 +673,18 @@ static int merge_pre(dt_node_t *src, void *arg)
 			delete_props_by_strlist(ctx->dest, prop->data, prop->len);
 	}
 
+	if (ctx->flags & dt_merge_new_phandle)
+		dt_record_guest_phandle(ctx->dest, src); 
+
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
 
-		if (ctx->special) {
+		if ((ctx->flags & dt_merge_new_phandle) &&
+		    (!strcmp(prop->name, "phandle") ||
+		     !strcmp(prop->name, "linux,phandle")))
+			continue;
+
+		if (ctx->flags & dt_merge_special) {
 			if (!strcmp(prop->name, "delete-node"))
 				continue;
 			if (!strcmp(prop->name, "delete-subnodes"))
@@ -676,7 +700,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 			return ret;
 	}
 
-	if (ctx->special)
+	if (ctx->flags & dt_merge_special)
 		prepend_strlist(ctx->dest, src);
 
 	return 0;
@@ -708,11 +732,11 @@ static int merge_post(dt_node_t *src, void *arg)
  * if the name does not match, and the name of the resultant tree root
  * will be that of the destination input.
  */
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special)
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, dt_merge_flags_t flags)
 {
 	merge_ctx_t ctx = {
 		.dest = dest,
-		.special = special,
+		.flags = flags,
 	};
 
 	return dt_for_each_node(src, &ctx, merge_pre, merge_post);
@@ -781,8 +805,8 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 	 * top level, so that we don't create a node called
 	 * "node-update-phandle" in the guest.
 	 */
-	if (!ctx->notfirst) {
-		ctx->notfirst = 1;
+	if (!(ctx->flags & dt_merge_notfirst)) {
+		ctx->flags |= dt_merge_notfirst;
 	} else {
 		/* Make sure the guest has a node with the same name as the source
 		 * node, and traverse into that node as well.  ctx->dest is the
@@ -792,6 +816,8 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 		if (!ctx->dest)
 			return ERR_NOMEM;
 	}
+
+	dt_record_guest_phandle(ctx->dest, src); 
 
 	list_for_each(&src->props, l) {
 		dt_prop_t *prop = to_container(l, dt_prop_t, prop_node);
@@ -907,7 +933,8 @@ int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 
 		if (!strcmp(subnode->name, "node-update") ||
 		    !strncmp(subnode->name, "node-update@", strlen("node-update@"))) {
-			ret = dt_merge_tree(target, subnode, 1);
+			ret = dt_merge_tree(target, subnode,
+			                    dt_merge_special | dt_merge_new_phandle);
 			if (ret < 0) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 				         "%s: error %d merging %s on %s\n",
@@ -922,7 +949,6 @@ int dt_process_node_update(dt_node_t *target, dt_node_t *config)
 			/* Merge the phandles into the target  */
 			merge_ctx_t ctx = {
 				.dest = target,
-				.notfirst = 0,
 			};
 
 			ret = dt_for_each_node(subnode, &ctx, do_merge_phandle, merge_post);

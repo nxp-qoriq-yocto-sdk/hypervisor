@@ -90,6 +90,19 @@ typedef struct dt_node {
 	intmap_entry_t *intmap;
 	uint32_t intmap_mask[MAX_ADDR_CELLS + MAX_INT_CELLS];
 	int irqs_looked_up, intmap_len;
+
+	/* This is the phandle that will be used in the guest tree.
+	 * It is not the same as the phandle that exists as a property
+	 * in the config tree.  When this node is merged into another
+	 * tree, that node will have a phandle created if does not already
+	 * exist.  The phandle of the destination node, whether pre-existing
+	 * or newly created, will be placed in this field.
+	 *
+	 * Device config nodes, while not actually merged into the guest tree,
+	 * will also have this field updated to match the phandle of the node
+	 * in the guest tree.
+	 */
+	uint32_t guest_phandle;
 } dt_node_t;
 
 typedef struct dt_prop {
@@ -121,7 +134,34 @@ char *dt_get_prop_string(dt_node_t *node, const char *name);
 int dt_set_prop(dt_node_t *node, const char *name, const void *data, size_t len);
 int dt_set_prop_string(dt_node_t *node, const char *name, const char *str);
 
-int dt_merge_tree(dt_node_t *dest, dt_node_t *src, int special);
+typedef int __bitwise dt_merge_flags_t;
+
+enum {
+	/** Enable the special properties of node-update, such as
+	 * delete-prop and prepend-strlist (see external documentation
+	 * for a complete list).
+	 */
+	dt_merge_special = (__force dt_merge_flags_t)1,
+
+	/** Create a phandle in the destination if it does not already
+	 * have one.  Record that phandle in the guest_phandle field
+	 * of the source.  Do not allow any phandle property of the
+	 * source to be copied to the destination.
+	 *
+	 * Set this flag when merging from config tree into the guest.
+	 * Do not set it when merging from the hardware tree.
+	 *
+	 * To avoid conflicting phandles, any merges from the config tree
+	 * must happen after any potential merge from the hardware tree
+	 * into the same guest node.
+	 */
+	dt_merge_new_phandle = (__force dt_merge_flags_t)2,
+
+	/** Internal use only -- to differentiate recursive invocations. */
+	dt_merge_notfirst = (__force dt_merge_flags_t)4,
+};
+
+int dt_merge_tree(dt_node_t *dest, dt_node_t *src, dt_merge_flags_t flags);
 int dt_process_node_update(dt_node_t *target, dt_node_t *config);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
@@ -143,6 +183,7 @@ dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);
 dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 
 uint32_t dt_get_phandle(dt_node_t *node, int create);
+int dt_record_guest_phandle(dt_node_t *gnode, dt_node_t *cfgnode);
 
 dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest);
 void dt_read_aliases(void);
