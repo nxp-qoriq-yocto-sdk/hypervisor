@@ -142,7 +142,7 @@ dt_node_t *dt_lookup_alias(dt_node_t *tree, const char *name);
 dt_node_t *dt_lookup_path(dt_node_t *tree, const char *path, int create);
 dt_node_t *dt_lookup_phandle(dt_node_t *tree, uint32_t phandle);
 
-uint32_t dt_get_phandle(dt_node_t *tree, dt_node_t *node, int create);
+uint32_t dt_get_phandle(dt_node_t *node, int create);
 
 dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest);
 void dt_read_aliases(void);

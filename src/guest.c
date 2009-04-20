@@ -348,7 +348,7 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 			         __func__, s, config_child->name);
 			continue;
 		}
-		uint32_t hw_phandle_cfg = dt_get_phandle(hw_devtree, devnode, 0);
+		uint32_t hw_phandle_cfg = dt_get_phandle(devnode, 0);
 
 		prop = dt_get_prop(hwnode, "dev-handle", 0);
 		if (prop) {
@@ -795,7 +795,7 @@ static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 	}
 
 	// Get the phandle from the CPU node
-	uint32_t phandle = dt_get_phandle(hw_devtree, cpunode, 0);
+	uint32_t phandle = dt_get_phandle(cpunode, 0);
 	if (!phandle) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: cpu node %s does not have a phandle\n",

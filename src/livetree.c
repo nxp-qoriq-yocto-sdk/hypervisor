@@ -847,7 +847,7 @@ static int do_merge_phandle(dt_node_t *config, void *arg)
 			// hardware device tree, we need to grab the lock for
 			// it.
 			spin_lock(&hw_devtree_lock);
-			phandle = dt_get_phandle(hw_devtree, node, 1);
+			phandle = dt_get_phandle(node, 1);
 			if (!phandle) {
 				spin_unlock(&hw_devtree_lock);
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
@@ -1314,7 +1314,7 @@ static int find_free_phandle_callback(dt_node_t *node, void *arg)
 	uint32_t phandle;
 	uint32_t *free_phandle = (uint32_t *) arg;
 
-	phandle = dt_get_phandle(NULL, node, 0);
+	phandle = dt_get_phandle(node, 0);
 
 	// Check for wrap-around
 	if (phandle == ~0U) {
@@ -1331,13 +1331,12 @@ static int find_free_phandle_callback(dt_node_t *node, void *arg)
 
 /**
  * find_free_phandle - return the smallest unusued phandle
- * @param[in] tree device tree to scan
  *
  * Every time this function is called, it returns a new number.
  *
  * returns 0 if error, or >0 phandle to use
  */
-static uint32_t find_free_phandle(dt_node_t *tree)
+static uint32_t find_free_phandle(void)
 {
 	static uint32_t free_phandle;	// The next free phandle to use
 	static uint32_t lock;
@@ -1349,7 +1348,7 @@ static uint32_t find_free_phandle(dt_node_t *tree)
 	 */
 	spin_lock(&lock);
 	if (!free_phandle) {
-		ret = dt_for_each_node(tree, &free_phandle,
+		ret = dt_for_each_node(hw_devtree, &free_phandle,
 				       find_free_phandle_callback, NULL);
 		if (ret) {
 			spin_unlock(&lock);
@@ -1376,7 +1375,6 @@ static uint32_t find_free_phandle(dt_node_t *tree)
 
 /** Return the phandle of a node.
  *
- * @param[in] tree root of tree to which 'node' belongs
  * @param[in] node node of which to retrieve phandle
  * @param[in] create if non-zero, create a new phandle
  * @return if non-zero, the node's phandle
@@ -1386,30 +1384,34 @@ static uint32_t find_free_phandle(dt_node_t *tree)
  *
  * If 'create' is zero, then 'tree' is ignored.
  */
-uint32_t dt_get_phandle(dt_node_t *tree, dt_node_t *node, int create)
+uint32_t dt_get_phandle(dt_node_t *node, int create)
 {
 	dt_prop_t *prop = dt_get_prop(node, "phandle", 0);
+
 	if (!prop)
 		prop = dt_get_prop(node, "linux,phandle", 0);
+
 	if (!prop && create) {
 		// Create the phandle
 		uint32_t phandle;
 		int ret;
 
-		phandle = find_free_phandle(tree);
+		phandle = find_free_phandle();
 		if (!phandle)
 			return 0;
+
 		ret = dt_set_prop(node, "phandle", &phandle, 4);
 		if (ret)
 			return 0;
+
 		// Linux expects linux,phandle
 		ret = dt_set_prop(node, "linux,phandle", &phandle, 4);
 		if (ret)
 			return 0;
 
 		return phandle;
-
 	}
+
 	if (!prop || prop->len != 4)
 		return 0;
 
