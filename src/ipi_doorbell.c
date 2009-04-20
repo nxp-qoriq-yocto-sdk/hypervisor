@@ -226,6 +226,8 @@ static int send_dbell_init_one(dt_node_t *node, void *arg)
 	if (!hnode)
 		return ERR_NOMEM;
 
+	dt_record_guest_phandle(hnode, node);
+
 	// Insert the 'compatible' property.
 	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-send-handle");
 	if (ret)
@@ -274,6 +276,8 @@ static int recv_dbell_init_one(dt_node_t *node, void *arg)
 	hnode = dt_get_subnode(hnode, node->name, 1);
 	if (!hnode)
 		return ERR_NOMEM;
+
+	dt_record_guest_phandle(hnode, node);
 
 	// Insert the 'compatible' property.
 	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-receive-handle");

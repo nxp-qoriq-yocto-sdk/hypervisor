@@ -2251,10 +2251,12 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 	owner->gnode = dt_get_subnode(parent, name, 1);
 	if (!owner->gnode)
 		goto out;
-	
+
 	ret = dt_merge_tree(owner->gnode, hwnode, 0);
 	if (ret < 0) 
 		goto out_gnode;
+
+	dt_record_guest_phandle(owner->gnode, owner->cfgnode);
 
 	if (dt_process_node_update(owner->gnode, owner->cfgnode))
 		goto out_gnode;
