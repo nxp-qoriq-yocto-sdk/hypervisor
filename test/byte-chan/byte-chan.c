@@ -36,7 +36,7 @@
 #define debug(X...)
 //#define debug(X...) printf(X)
 
-static int *irq1, *irq2;
+static const uint32_t *irq1, *irq2;
 static uint32_t handle[2];
 
 #define BC_INT_Q_SIZE 4096
@@ -151,7 +151,7 @@ void ext_int_handler(trapframe_t *frameptr)
 }
 
 static int get_prop(const char *byte_channel,
-                    const char *prop, const int **ptr)
+                    const char *prop, const uint32_t **ptr)
 {
 	int ret;
 	int len;
@@ -191,7 +191,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	uint32_t rxavail;
 	uint32_t txavail;
 	int ret;
-	const int *prop;
+	const uint32_t *prop;
 	int avail, bal;
 
 	init(devtree_ptr);
