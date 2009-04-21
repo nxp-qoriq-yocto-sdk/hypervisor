@@ -661,7 +661,7 @@ dt_node_t *get_interrupt_domain(dt_node_t *tree, dt_node_t *node)
 		if (prop) {
 			if (prop->len != 4) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-				         "%s: bad interrupt-parent len %d in %s\n",
+				         "%s: bad interrupt-parent len %zu in %s\n",
 				         __func__, prop->len, node->name);
 
 				return NULL;
@@ -1298,7 +1298,7 @@ static interrupt_t *lookup_intmap_entry(dt_node_t *node,
 	domain = dt_lookup_phandle(hw_devtree, ent->parent);
 	if (!domain) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: %s: Invalid phandle %x in interrupt-map entry %d\n",
+		         "%s: %s: Invalid phandle %x in interrupt-map entry %zd\n",
 		         __func__, node->name, ent->parent, ent - node->intmap);
 		ent->valid = 0;
 		return NULL;
@@ -1323,7 +1323,7 @@ static interrupt_t *lookup_intmap_entry(dt_node_t *node,
 		                                     ent->parent_nint);
 		if (!next) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: No interrupt-map match in %s for %s, intmap %d\n", 
+			         "%s: No interrupt-map match in %s for %s, intmap %zd\n", 
 			         __func__, domain->name, node->name, ent - node->intmap);
 			ent->valid = 0;
 			return NULL;
@@ -1335,7 +1335,7 @@ static interrupt_t *lookup_intmap_entry(dt_node_t *node,
 
 	/* HV-owned, no supported IRQ controller, and no interrupt map */
 	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-	         "%s: %s intmap %d points to invalid domain %s\n",
+	         "%s: %s intmap %zd points to invalid domain %s\n",
 	         __func__, node->name, ent - node->intmap, domain->name);
 
 	ent->valid = 0;

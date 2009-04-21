@@ -1365,7 +1365,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
 			                &schunk, TLB_MAS2_MEM);
 			if (!vsrc) {
-				printf("%s: cannot map src %llx, %d bytes\n",
+				printf("%s: cannot map src %llx, %zu bytes\n",
 				       __func__, src, schunk);
 				break;
 			}
@@ -1375,7 +1375,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
 			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest) {
-				printf("%s: cannot map dest %llx, %d bytes\n",
+				printf("%s: cannot map dest %llx, %zu bytes\n",
 				       __func__, dest, dchunk);
 				break;
 			}
