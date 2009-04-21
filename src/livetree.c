@@ -795,7 +795,7 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 	merge_ctx_t *ctx = arg;
 	uint32_t phandle;
 	dt_node_t *node;
-	int i, ret;
+	int i, ret = 0;
 
 	/* This function is called recursively, and the top-level node is the
 	 * "node-update-phandle" source node.  So we use notfirst to skip the
