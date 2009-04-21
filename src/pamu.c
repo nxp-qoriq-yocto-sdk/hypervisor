@@ -152,7 +152,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 
 	prop = dt_get_prop(hwnode, "cpu-handle", 0);
 	if (!prop || prop->len != 4)
-		return ULONG_MAX ;  /* if no cpu-phandle assume that this is
+		return ~(uint32_t)0;  /* if no cpu-phandle assume that this is
 			      not a per-cpu portal */
 
 	node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
@@ -160,7 +160,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: bad cpu phandle reference in %s \n",
 		          __func__, hwnode->name);
-		return ULONG_MAX;
+		return ~(uint32_t)0;
 	}
 
 	/* find the hwnode that represents the cache */
@@ -171,7 +171,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 				         "%s: missing/bad cache-stash-id at %s \n",
 				          __func__, node->name);
-				return ULONG_MAX;
+				return ~(uint32_t)0;
 			}
 			return *(const uint32_t *)prop->data;
 		}
@@ -181,7 +181,7 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			         "%s: can't find next-level-cache at %s \n",
 			          __func__, node->name);
-			return ULONG_MAX;  /* can't traverse any further */
+			return ~(uint32_t)0;  /* can't traverse any further */
 		}
 
 		/* advance to next node in cache hierarchy */
@@ -190,14 +190,14 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			         "%s: bad cpu phandle reference in %s \n",
 			          __func__, hwnode->name);
-			return ULONG_MAX;
+			return ~(uint32_t)0;
 		}
 	}
 
 	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 	         "%s: stash dest not found for %d on %s \n",
 	          __func__, stash_dest, hwnode->name);
-	return ULONG_MAX;
+	return ~(uint32_t)0;
 }
 
 static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
@@ -207,21 +207,21 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 
 	prop = dt_get_prop(gnode, "cpu-handle", 0);
 	if (!prop || prop->len != 4)
-		return ULONG_MAX;
+		return ~(uint32_t)0;
 
 	node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
 	if (!node) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: bad cpu phandle reference in %s \n",
 		          __func__, gnode->name);
-		return ULONG_MAX;
+		return ~(uint32_t)0;
 	}
 	prop = dt_get_prop(node, "reg", 0);
 	if (!prop || prop->len != 4) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: bad reg in cpu node %s \n",
 		          __func__, node->name);
-		return ULONG_MAX;
+		return ~(uint32_t)0;
 	}
 	return *(const uint32_t *)prop->data;
 }
@@ -350,10 +350,10 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	dt_prop_t *gaddr;
 	dt_prop_t *size;
 	dt_node_t *dma_window;
-	phys_addr_t window_addr = ~0ULL;
+	phys_addr_t window_addr = ~(phys_addr_t)0;
 	phys_addr_t window_size = 0;
-	uint32_t stash_dest = ~0UL;
-	uint32_t omi = ~0UL;
+	uint32_t stash_dest = ~(uint32_t)0;
+	uint32_t omi = ~(uint32_t)0;
 	unsigned long fspi;
 	phys_addr_t subwindow_size;
 	unsigned int first_subwin_swse;

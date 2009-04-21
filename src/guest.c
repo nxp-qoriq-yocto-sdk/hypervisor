@@ -598,8 +598,8 @@ bad:
 			         "%s: couldn't grant interrupt %d for %s\n",
 			         __func__, i, hwnode->name);
 
- 			intspec[i * 2 + 0] = ~0UL;
- 			intspec[i * 2 + 1] = ~0UL;
+ 			intspec[i * 2 + 0] = 0xffffffff;
+ 			intspec[i * 2 + 1] = 0xffffffff;
 
 			continue;
 		}
