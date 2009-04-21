@@ -69,9 +69,8 @@ static inline uint32_t get_pc(void)
 	register uint32_t retval asm("r3") = 0;
 
 	asm ("mflr %%r0;"
-	     "bl dummy;"
-	     "dummy: ;"
-	     "mflr %0;"
+	     "bl 1f;"
+	     "1: mflr %0;"
 	     "mtlr %%r0;" : "=r" (retval) : :"r0","memory" );
 
 	return retval;
