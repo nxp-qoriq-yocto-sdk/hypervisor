@@ -68,7 +68,7 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.
 	$(call unmount,bin/linux/rootfs)
 	$(call mount,rootfs-partman)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
-	sudo cp -af $(testdir)../../sim/images/vmlinux bin/linux/rootfs-partman/
+	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	$(call unmount,bin/linux/rootfs-partman)
 
