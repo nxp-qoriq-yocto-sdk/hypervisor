@@ -53,6 +53,7 @@ int gev_restart;
 int gev_start_wait;
 int gev_pause;
 int gev_resume;
+int gev_nmi;
 
 /* Guest events are processed when returning to the guest, but
  * without regard for the MSR[EE/CE/ME] bits of the guest.
@@ -178,9 +179,10 @@ void init_gevents(void)
 	gev_start_wait = register_gevent(&start_wait_core);
 	gev_pause = register_gevent(&pause_core);
 	gev_resume = register_gevent(&resume_core);
+	gev_nmi = register_gevent(&deliver_nmi);
 
 	if (gev_stop < 0 || gev_start < 0 ||
 	    gev_restart < 0 || gev_start_wait < 0 ||
-	    gev_pause < 0 || gev_resume < 0)
+	    gev_pause < 0 || gev_resume < 0 || gev_nmi < 0)
 		BUG();
 }

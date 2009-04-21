@@ -43,6 +43,7 @@
 #include <paging.h>
 #include <doorbell.h>
 #include <debug-stub.h>
+#include <events.h>
 
 void program_trap(trapframe_t *regs)
 {
@@ -250,6 +251,11 @@ void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
 		regs->srr1 &= MSR_GS | MSR_UCLE;
 	else
 		regs->srr1 &= MSR_GS | MSR_UCLE | MSR_DE;
+}
+
+void deliver_nmi(trapframe_t *regs)
+{
+	reflect_mcheck(regs, MCSR_NMI, 0);
 }
 
 typedef struct {

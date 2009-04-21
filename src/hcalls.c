@@ -123,6 +123,27 @@ static void fh_whoami(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
+static void fh_send_nmi(trapframe_t *regs)
+{
+	unsigned int ncpu = get_gcpu()->guest->active_cpus;
+	unsigned int vcpu_mask = regs->gpregs[3];
+	int bit;
+
+	bit = 31 - count_msb_zeroes(vcpu_mask) + 1;
+	if (bit > ncpu) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+
+	while (vcpu_mask) {
+		bit = count_lsb_zeroes(vcpu_mask);
+		setgevent(get_gcpu()->guest->gcpus[bit], gev_nmi);
+		vcpu_mask &= ~(1 << bit);
+	}
+
+	regs->gpregs[3] = 0; /* success */
+}
+
 /**
  * Structure definition for the fh_partition_memcpy scatter-gather list
  *
@@ -430,7 +451,7 @@ static hcallfp_t hcall_table[] = {
 	fh_byte_channel_receive,
 	fh_byte_channel_poll,              /* 20 */
 	fh_vmpic_iack,
-	unimplemented,
+	fh_send_nmi,
 	unimplemented,
 	unimplemented,                     /* 24 */
 	unimplemented,
