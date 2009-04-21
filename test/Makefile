@@ -31,13 +31,8 @@ ifeq ($(goals),)
 	goals := all
 endif
 
-.PHONY: config 
-$(goals): config
+$(goals): include/config/auto.conf
 
-config:
-	@cp -f $(testdir)common/config .config
-	@$(MAKE) -f $(src)kconfig/Makefile Kconfig=$(testdir)Kconfig silentoldconfig
-	@$(MAKE) -f $(testdir)Makefile $(goals)
 else
 
 SUBMAKES = $(wildcard $(testdir)*/Makefile)
@@ -90,5 +85,10 @@ ifneq ($(wildcard bin),)
 -include $(shell find bin -path bin/libos -prune -o -name '*.d' -print) ''
 endif
 endif
+
+include/config/auto.conf: $(testdir)common/config $(testdir)Kconfig $(LIBOS_DIR)/Kconfig
+	@cp -f $(testdir)common/config .config
+	@$(MAKE) -f $(src)kconfig/Makefile Kconfig=$(testdir)Kconfig silentoldconfig
+	@$(MAKE) -f $(testdir)Makefile $(goals)
 
 .SECONDARY:
