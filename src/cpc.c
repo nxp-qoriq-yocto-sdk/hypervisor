@@ -102,7 +102,8 @@ static inline void remove_pir0_ways(int cpc_index, uint32_t way_mask)
 static void init_cpc_dev(int cpc_index, void *vaddr)
 {
 	cpcs[cpc_index].cpccsr0 = vaddr;
-	cpcs[cpc_index].cpc_part_base = (cpc_part_reg_t *)((uint32_t)vaddr + CPCPIR0);
+	cpcs[cpc_index].cpc_part_base =
+		(cpc_part_reg_t *)((uintptr_t)vaddr + CPCPIR0);
 	/*cpc_reg_map requires 16 bits*/
 	cpcs[cpc_index].cpc_reg_map = ~0xffffUL;
 

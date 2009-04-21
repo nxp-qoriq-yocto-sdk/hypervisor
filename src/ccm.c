@@ -78,7 +78,7 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 		return ERR_BADTREE;
 	}
 
-	csdids = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x600);
+	csdids = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x600);
 
 	/*
 	 * Snoop domains are meant specifically for (PAMU based) stashing
@@ -103,7 +103,7 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 		return ERR_BADTREE;
 	}
 	
-	sidmr = (uint32_t *) ((uint32_t)dev->regs[0].virt + 0x200);
+	sidmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x200);
 
 	/*
 	 * NOTE: Looks like SIDMR00 is used for snoop-id 0, i.e, to enable
@@ -138,7 +138,7 @@ static int law_probe(driver_t *drv, device_t *dev)
 		return ERR_BADTREE;
 	}
 
-	laws = (law_t *) ((uint32_t)dev->regs[0].virt + 0xc00);
+	laws = (law_t *) ((uintptr_t)dev->regs[0].virt + 0xc00);
 
 	dev->driver = &law;
 
