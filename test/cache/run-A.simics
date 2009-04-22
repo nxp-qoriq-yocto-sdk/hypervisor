@@ -46,5 +46,5 @@ b 0
 continue
 continue
 write-configuration cache-lock-A.ckpt
-restart-simics ../../test/cache/run-cache-A.simics
+restart-simics ../../test/cache/hybrid-cache-A.simics
 

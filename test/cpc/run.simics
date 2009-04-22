@@ -46,4 +46,4 @@ b 0
 continue
 continue
 write-configuration cpc-test.ckpt
-restart-simics ../../test/cpc/run-cpc.simics
+restart-simics ../../test/cpc/hybrid-cpc.simics
