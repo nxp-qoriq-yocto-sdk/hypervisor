@@ -100,3 +100,6 @@ $(test)-check-B: $(test)-run-B-batch
 
 $(test)-check-C: $(test)-run-C-batch
 	$(testdir)common/check-results 2 3
+
+$(test)-check-D: $(test)-run-D-batch
+	$(testdir)common/check-results 2

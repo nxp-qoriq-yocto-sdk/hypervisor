@@ -28,14 +28,5 @@ add-directory "%script%/" -prepend
 
 run-command-file "run.simics"
 
-$test_con = ($con3:con) # uart 2
-script-branch {
-    $test_con.wait-for-string "watchdog"
-    stop
-    echo "passed"
-    exit 0
-}
-
-rc 3_000_000_000
-echo "failed"
-exit 1
+$test_con = ($con3:con) # uart 1
+run-command-file "%script%/../common/test-done.simics"

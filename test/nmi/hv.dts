@@ -83,7 +83,7 @@
 	// =====================================================
 	part1 {
 		compatible = "partition";
-		label = "mcheck-test";
+		label = "nmi-test";
 		cpus = <0 5>;
 		guest-image = <0 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;

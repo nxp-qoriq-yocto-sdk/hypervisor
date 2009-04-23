@@ -96,5 +96,5 @@ void libos_client_entry(unsigned long devtree_ptr)
 		if (vcpu_mask)
 			printf("\nvcpu mask = %08x: FAILED\n", vcpu_mask);
 	}
-	printf("Test complete\n");
+	printf("Test Complete\n");
 }

@@ -31,5 +31,5 @@ $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
 $(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 1
+	$(testdir)common/check-results 2
 
