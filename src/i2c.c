@@ -247,7 +247,7 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 	vf->data = virq;
 
 	// Register our ISR.
-	ret = irq->ops->register_irq(irq, handler, vf);
+	ret = irq->ops->register_irq(irq, handler, vf, TYPE_CRIT);
 	if (ret < 0)
 		// Out of memory
 		return ret;

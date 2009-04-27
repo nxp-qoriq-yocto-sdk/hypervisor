@@ -746,7 +746,7 @@ void pamu_global_init(void)
 	if (dev->num_irqs >= 1) {
 		interrupt_t *irq = dev->irqs[0];
 		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, pamu_av_isr, dev);
+			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_CRIT);
 	}
 
 	/* Enable all relevant PAMU(s) */
