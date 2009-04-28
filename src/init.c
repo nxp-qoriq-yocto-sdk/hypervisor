@@ -1,7 +1,7 @@
-
 /** @file
  * Initialization
  */
+
 /*
  * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
  *
@@ -25,6 +25,9 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <limits.h>
+
 #include <libos/console.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
@@ -32,6 +35,7 @@
 #include <libos/mpic.h>
 #include <libos/ns16550.h>
 #include <libos/interrupts.h>
+#include <libos/alloc.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -48,8 +52,6 @@
 #include <doorbell.h>
 #include <events.h>
 #include <thread.h>
-
-#include <limits.h>
 
 static gcpu_t noguest[MAX_CORES] = {
 	{
@@ -112,7 +114,7 @@ static void exclude_memrsv(void *fdt)
 	for (i = 0; i < num; i++) {
 		uint64_t addr, size, end;
 		int ret;
-		
+
 		ret = fdt_get_mem_rsv(fdt, i, &addr, &size);
 		if (ret < 0) {
 			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
@@ -185,7 +187,7 @@ static void *map_fdt(phys_addr_t devtree_ptr)
 	    len < fdt_totalsize(vaddr)) {
 		devtree_ptr += len;
 		len = mapsize;
-		
+
 		map_phys(TEMPTLB2, devtree_ptr, temp_mapping[0] + mapsize,
 		         &len, TLB_MAS2_MEM | MAS2_G);
 
@@ -213,7 +215,7 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 	void *fdt;
 	char *str, *numstr;
 	int offset, len;
-	
+
 	fdt = map_fdt(devtree_ptr);
 
 	offset = fdt_subnode_offset(fdt, 0, "chosen");
@@ -240,7 +242,7 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 	numstr = nextword(&str);
 
 	*cfg_addr = get_number64(&consolebuf, numstr);
-	if (cpu->errno) 
+	if (cpu->errno)
 		return cpu->errno;
 
 	unmap_fdt();
@@ -296,7 +298,7 @@ static void process_hv_mem(void *fdt, int offset, int add)
 	uint64_t addr, size;
 	int pma, len;
 	int depth = 0;
-	
+
 	if (!add)
 		bigmap_phys = ~0ULL;
 
@@ -364,7 +366,7 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 	int depth = 0;
 
 	fdt = map_fdt(cfg_addr);
-	
+
 	offset = fdt_next_descendant_by_compatible(fdt, 0, &depth, "hv-config");
 	if (offset < 0) {
 		printf("%s: config tree has no hv-config, err %d\n",
@@ -374,7 +376,7 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 
 	process_hv_mem(fdt, offset, 0);
 	process_hv_mem(fdt, offset, 1);
-	
+
 	unmap_fdt();
 
 	fdt = map_fdt(devtree_ptr);
@@ -629,7 +631,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
-	assign_hv_devs(); 
+	assign_hv_devs();
 	enable_int();
 
 	init_gevents();
@@ -669,7 +671,7 @@ void secondary_init(void)
 {
 	secondary_map_mem();
 	cpu->console_ok = 1;
-	
+
 	core_init();
 	mpic_reset_core();
 	enable_int();
@@ -699,7 +701,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 		         "release_secondary: Unknown enable-method \"%s\"; not enabling\n",
 		         str);
 		return 0;
-	} 
+	}
 
 	prop = dt_get_prop(node, "reg", 0);
 	if (!prop || prop->len != 4) {
@@ -735,7 +737,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 		         "release_secondary: spin-table %llx spans page boundary\n",
 		         (unsigned long long)table);
 		return 0;
-	}	
+	}
 
 	/* Per-cpu data must be in the text mapping, or else secondaries
 	 * won't have it mapped.
@@ -774,10 +776,10 @@ static void core_init(void)
 	/* PIR was set by firmware-- record in cpu_t struct */
 	cpu->coreid = mfspr(SPR_PIR);
 
-	/* dec init sequence 
+	/* dec init sequence
 	 *  -disable DEC interrupts
 	 *  -disable DEC auto reload
-	 *  -set DEC to zero 
+	 *  -set DEC to zero
 	 *  -clear any pending DEC interrupts */
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_ARE);

@@ -27,14 +27,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string.h>
+
 #include <libos/libos.h>
 #include <libos/bitops.h>
+#include <libos/alloc.h>
 
 #include <ipi_doorbell.h>
 #include <errors.h>
 #include <devtree.h>
 
-#include <string.h>
 #include <vpic.h>
 #include <vmpic.h>
 

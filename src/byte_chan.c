@@ -4,7 +4,7 @@
 
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -26,8 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
+#include <string.h>
+
 #include <libos/queue.h>
-#include <libos/libos.h>
+#include <libos/alloc.h>
 #include <libos/bitops.h>
 #include <libos/ns16550.h>
 
@@ -35,9 +38,6 @@
 #include <bcmux.h>
 #include <errors.h>
 #include <devtree.h>
-
-#include <stdint.h>
-#include <string.h>
 #include <vpic.h>
 #include <vmpic.h>
 
@@ -69,7 +69,7 @@ byte_chan_t *byte_chan_alloc(void)
 	ret->handles[0].tx = &ret->q[0];
 	ret->handles[0].rx = &ret->q[1];
 	ret->handles[0].user.bc = &ret->handles[0];
-	
+
 	ret->handles[1].tx = &ret->q[1];
 	ret->handles[1].rx = &ret->q[0];
 	ret->handles[1].user.bc = &ret->handles[1];
@@ -93,7 +93,7 @@ byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 
 	if (lock)
 		spin_lock(&bchan_lock);
-	
+
 	for (i = 0; i < 2; i++) {
 		handle = &bc->handles[i];
 
@@ -221,7 +221,7 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 		         "%s: can't alloc vpic irqs\n", __func__);
 		return ERR_NOMEM;
 	}
-	
+
 	if (vpic_alloc_handle(rxirq, &intspec[0]) < 0||
 	    vpic_alloc_handle(txirq, &intspec[2]) < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
@@ -325,7 +325,7 @@ int init_byte_channel(dt_node_t *node)
 			         "%s: endpoint %s in %s does not match %s.\n",
 			         __func__, epnode->name, node->name,
 			         node->endpoint->name);
-			goto out;			         
+			goto out;
 		}
 
 		epnode = node->endpoint;
@@ -342,7 +342,7 @@ int init_byte_channel(dt_node_t *node)
 
 		if (dt_node_is_compatible(epnode, "byte-channel")) {
 			assert(epnode->endpoint != node);
-			
+
 			if (epnode->endpoint) {
 				printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 				         "%s: %s (endpoint of %s) is busy, other endpoint %s\n",
@@ -355,7 +355,7 @@ int init_byte_channel(dt_node_t *node)
 			epnode->bc = node->bc;
 		} else {
 			assert(!epnode->bc);
-		
+
 			int ret = connect_byte_channel(node->bc, epnode, node);
 			if (ret < 0) {
 				printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
@@ -406,14 +406,14 @@ byte_chan_t *other_attach_byte_chan(dt_node_t *bcnode, dt_node_t *onode)
 	byte_chan_t *ret = NULL;
 
 	spin_lock(&bchan_lock);
-	
+
 	if (bcnode->endpoint) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 		         "%s: endpoint %s of %s is busy\n",
 		         __func__, bcnode->name, onode->name);
 		goto out;
 	}
-	
+
 	ret = bcnode->bc;
 	if (!ret) {
 		bcnode->bc = ret = byte_chan_alloc();
@@ -451,7 +451,7 @@ void byte_chan_partition_init(guest_t *guest)
 ssize_t byte_chan_send(byte_chan_handle_t *bc, const uint8_t *buf, size_t len)
 {
 	int ret = queue_write(bc->tx, buf, len);
-	
+
 	if (ret > 0)
 		queue_notify_consumer(bc->tx);
 

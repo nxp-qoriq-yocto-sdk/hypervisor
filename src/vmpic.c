@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  *
@@ -22,10 +21,12 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libos/mpic.h>
 #include <libos/interrupts.h>
+#include <libos/alloc.h>
 
 #include <vpic.h>
 #include <hv.h>
@@ -323,7 +324,7 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
 	int mask = regs->gpregs[4];
-	
+
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
 		regs->gpregs[3] = EINVAL;

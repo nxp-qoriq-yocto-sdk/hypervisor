@@ -1,9 +1,10 @@
 /** @file
  * Command line shell
  */
+
 /* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -12,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -25,15 +26,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <limits.h>
+
 #include <libos/readline.h>
 #include <libos/pamu.h>
+#include <libos/alloc.h>
 
 #include <errors.h>
 #include <devtree.h>
 #include <shell.h>
 #include <percpu.h>
-
-#include <limits.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -43,7 +45,7 @@ static command_t *find_command(const char *str)
 
 	for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 		cmd = *i;
-	
+
 		if (!strcmp(str, cmd->name))
 			return cmd;
 
@@ -55,7 +57,7 @@ static command_t *find_command(const char *str)
 					return cmd;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -114,13 +116,13 @@ static void shell_thread(trapframe_t *regs, void *arg)
 void shell_init(void)
 {
 	open_stdin();
-	
+
 	if (stdin && stdout) {
 		thread_t *thread;
 		shell_t *shell = alloc_type(shell_t);
 		if (!shell)
 			return;
-		
+
 		shell->out = stdout;
 
 		thread = new_thread(shell_thread, shell, 1);
@@ -136,7 +138,7 @@ static void print_aliases(shell_t *shell, command_t *cmd)
 {
 	if (cmd->aliases) {
 		const char **a = cmd->aliases;
-		
+
 		qprintf(shell->out, 1, " (");
 		while (*a) {
 			qprintf(shell->out, 1, "%s", *a);
@@ -164,16 +166,16 @@ static void help_fn(shell_t *shell, char *args)
 			print_aliases(shell, cmd);
 			qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 		}
-		
+
 		return;
 	}
-	
+
 	cmd = find_command(cmdname);
 	if (!cmd) {
 		qprintf(shell->out, 1, "help: unknown command '%s'.\n", cmdname);
 		return;
 	}
-	
+
 	qprintf(shell->out, 1, " %s", cmd->name);
 	print_aliases(shell, cmd);
 	qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
@@ -205,9 +207,9 @@ shell_cmd(version);
 static void lp_fn(shell_t *shell, char *args)
 {
 	unsigned int i;
-	
+
 	qprintf(shell->out, 1, "Partition   Name\n");
-	
+
 	for (i = 0; i < last_lpid; i++)
 		qprintf(shell->out, 1, "%-11d %s\n", i, guests[i].name);
 }
@@ -227,10 +229,10 @@ static void print_stat(shell_t *shell, guest_t *guest,
 {
 	unsigned int i;
 	unsigned int total = 0;
-	
+
 	for (i = 0; i < guest->cpucnt; i++) {
 		gcpu_t *gcpu = guest->gcpus[i];
-		
+
 		if (gcpu)
 			total += guest->gcpus[i]->stats[stat];
 	}
@@ -243,7 +245,7 @@ static void pi_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -251,7 +253,7 @@ static void pi_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;
@@ -509,7 +511,7 @@ static void start_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -517,7 +519,7 @@ static void start_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;
@@ -541,7 +543,7 @@ static void restart_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -549,7 +551,7 @@ static void restart_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;
@@ -573,7 +575,7 @@ static void stop_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -581,7 +583,7 @@ static void stop_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;
@@ -606,7 +608,7 @@ static void pause_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -614,7 +616,7 @@ static void pause_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;
@@ -639,7 +641,7 @@ static void resume_fn(shell_t *shell, char *args)
 	char *numstr;
 	int num;
 	guest_t *guest;
-	
+
 	args = stripspace(args);
 	numstr = nextword(&args);
 
@@ -647,7 +649,7 @@ static void resume_fn(shell_t *shell, char *args)
 		qprintf(shell->out, 1, "Usage: partition-info <number>\n");
 		return;
 	}
-	
+
 	num = get_partition_num(shell, numstr);
 	if (num == -1)
 		return;

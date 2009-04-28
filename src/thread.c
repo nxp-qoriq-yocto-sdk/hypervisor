@@ -1,6 +1,7 @@
 /** @file
  * Threads and scheduling
  */
+
 /*
  * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
@@ -27,6 +28,7 @@
 
 #include <libos/trapframe.h>
 #include <libos/trap_booke.h>
+#include <libos/alloc.h>
 
 #include <thread.h>
 #include <hv.h>
@@ -62,7 +64,7 @@ void schedule(trapframe_t *regs)
 void prepare_to_block(void)
 {
 	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
-	
+
 	assert(!is_idle());
 	thread->state = sched_prep_block;
 	smp_sync();
@@ -73,7 +75,7 @@ void block(void)
 	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
 	sched_t *sched = thread->sched;
 	register_t saved;
-	
+
 	assert(!is_idle());
 
 	saved = spin_lock_intsave(&sched->lock);
@@ -85,7 +87,7 @@ void block(void)
 		restore_int(saved);
 		return;
 	}
-	
+
 	spin_unlock_intsave(&sched->lock, saved);
 }
 
@@ -131,7 +133,7 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 	regs->gpregs[2] = (register_t)cpu;
 	regs->gpregs[3] = (register_t)regs;
 	regs->gpregs[4] = (register_t)arg;
-	
+
 	regs->srr0 = (register_t)func;
 	regs->srr1 = MSR_ME | MSR_CE | MSR_EE;
 
@@ -144,7 +146,7 @@ thread_t *new_thread(void (*func)(trapframe_t *regs, void *arg),
 	thread_t *thread = malloc(sizeof(thread_t));
 	if (!thread)
 		return NULL;
-	
+
 	uint8_t *stack = alloc_type(kstack_t);
 	if (!stack) {
 		free(thread);
@@ -163,7 +165,7 @@ void sched_core_init(cpu_t *sched_cpu)
 	sched->idle.sched = sched;
 	sched->idle.libos_thread.kstack = sched_cpu->kstack;
 
-	for (int i = 0; i < NUM_PRIOS; i++) 
+	for (int i = 0; i < NUM_PRIOS; i++)
 		list_init(&sched->rq[i]);
 
 	sched_cpu->thread = &sched->idle.libos_thread;

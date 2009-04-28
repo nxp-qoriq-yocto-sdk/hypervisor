@@ -1,10 +1,11 @@
 /** @file
  * Guest management
  */
+
 /*
  * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -34,6 +35,7 @@
 #include <libos/mpic.h>
 #include <libos/trap_booke.h>
 #include <libos/thread.h>
+#include <libos/alloc.h>
 
 #include <hv.h>
 #include <paging.h>
@@ -57,7 +59,7 @@ unsigned long last_lpid;
 int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, unsigned int vcpu)
 {
 	unsigned int i, vcpu_base = 0;
-	
+
 	for (i = 0; i < len / 4; i += 2) {
 		if (vcpu >= vcpu_base && vcpu < vcpu_base + cpulist[i + 1])
 			return cpulist[i] + vcpu - vcpu_base;
@@ -84,7 +86,7 @@ static int get_gcpu_num(const uint32_t *cpulist, unsigned int len,
                         unsigned int cpunum)
 {
 	unsigned int i;
-	unsigned int total = 0; 
+	unsigned int total = 0;
 
 	for (i = 0; i < len / 4; i += 2) {
 		unsigned int base = cpulist[i];
@@ -105,7 +107,7 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 	unsigned int total = 0;
 
 	for (i = 0; i < len / 4; i += 2)
-		total += cpulist[i + 1];	
+		total += cpulist[i + 1];
 
 	return total;
 }
@@ -168,7 +170,7 @@ static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
 		*reg++ = start >> 32;
 
 	*reg++ = start & 0xffffffff;
-		
+
 	if (rootnsize == 2)
 		*reg++ = size >> 32;
 
@@ -251,7 +253,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		if (dt_process_node_update(guest, gnode, node))
 			goto nomem;
 	}
-	
+
 	return 0;
 
 nomem:
@@ -466,7 +468,7 @@ static int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	liodn_cnt = liodn_prop->len / 4;
 
 	dma_handles = malloc(liodn_cnt * sizeof(uint32_t));
-	if (!dma_handles) 
+	if (!dma_handles)
 		goto nomem;
 
 	for (i = 0; i < liodn_cnt; i++) {
@@ -492,23 +494,23 @@ static int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 		}
 
 		pamu_handle = alloc_type(pamu_handle_t);
-		if (!pamu_handle) 
+		if (!pamu_handle)
 			goto nomem;
 
 		pamu_handle->assigned_liodn = liodn[i];
 		pamu_handle->user.pamu = pamu_handle;
-		dma_handles[i] = alloc_guest_handle(owner->guest, 
+		dma_handles[i] = alloc_guest_handle(owner->guest,
 							&pamu_handle->user);
 	}
 
-	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles, 
-				i * sizeof(uint32_t)) < 0) 
+	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,
+				i * sizeof(uint32_t)) < 0)
 		goto nomem;
-	
+
 	free(dma_handles);
 	return 0;
 
-nomem: 
+nomem:
 	free(dma_handles);
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
         	 "%s: out of memory\n", __func__);
@@ -535,7 +537,7 @@ static int map_guest_reg(dev_owner_t *owner)
 
 	regs = hwnode->dev.regs;
 	num = hwnode->dev.num_regs;
-	
+
 	if (num == 0)
 		return 0;
 
@@ -588,7 +590,7 @@ void create_aliases(dt_node_t *node, dt_node_t *gnode, dt_node_t *tree)
 
 	list_for_each(&node->aliases, i) {
 		alias_t *alias = to_container(i, alias_t, list_node);
-		
+
 		if (dt_set_prop(aliases, alias->name, path_buf, len) < 0)
 			goto nomem;
 	}
@@ -621,11 +623,11 @@ static int map_guest_irqs(dev_owner_t *owner)
 
 	for (int i = 0; i < hwnode->dev.num_irqs; i++) {
 		interrupt_t *irq = hwnode->dev.irqs[i];
-		int handle;  
+		int handle;
 
 		if (!irq)
 			goto bad;
-		
+
 		/* FIXME: handle more than just mpic */
 		handle = vmpic_alloc_mpic_handle(owner->guest, irq);
 		if (handle < 0) {
@@ -665,12 +667,12 @@ static int calc_new_imaplen(dt_node_t *node, uint32_t naddr, uint32_t nint)
 
 	for (int i = 0; i < node->intmap_len; i++) {
 		intmap_entry_t *ent = &node->intmap[i];
-		
+
 		if (!ent->valid)
 			continue;
 
 		newmaplen += nint + naddr + 1;
-		
+
 		if (ent->irq)
 			newmaplen += 2; /* VMPIC */
 		else
@@ -714,7 +716,7 @@ static int patch_guest_intmaps(dev_owner_t *owner)
 	for (int i = 0; i < hwnode->intmap_len; i++) {
 		intmap_entry_t *ent = &hwnode->intmap[i];
 		int handle = -1;
-		
+
 		if (!ent->valid)
 			continue;
 
@@ -867,7 +869,7 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 	owner = dt_owned_by(hwnode, guest);
 	if (!owner)
 		return 0;
-	
+
 	assert(hwnode == owner->hwnode);
 
 	create_aliases(hwnode, owner->gnode, guest->devtree);
@@ -938,7 +940,7 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 	int pcpu, ret;
 	uint32_t cells;
 	char buf[32];
-	
+
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
 	if (pcpu < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -977,7 +979,7 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 	gnode = dt_get_subnode(gnode, buf, 1);
 	if (!gnode)
 		return ERR_NOMEM;
-	
+
 	ret = dt_merge_tree(gnode, node, 0);
 	if (ret < 0)
 		return ret;
@@ -988,14 +990,14 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 
 	*nodep = gnode;
 	return 0;
-} 
+}
 
 static int create_guest_spin_table_cpu(guest_t *guest, int vcpu)
 {
 	uint64_t spin_addr;
 	dt_node_t *node;
 	int ret;
-	
+
 	ret = copy_cpu_node(guest, vcpu, guest->cpulist, guest->cpulist_len, &node);
 	if (ret < 0)
 		return ret;
@@ -1322,7 +1324,7 @@ static int load_image_table(guest_t *guest, const char *table,
 			dt_node_t *chosen = dt_get_subnode(guest->devtree, "chosen", 1);
 			if (!chosen)
 				goto nomem;
-				
+
 			ret = dt_set_prop(chosen, "linux,initrd-start",
 			                  &guest_addr, sizeof(guest_addr));
 			if (ret < 0)
@@ -1346,7 +1348,7 @@ static int load_image_table(guest_t *guest, const char *table,
 		}
 		row++;
 	}
-	
+
 	return 1;
 
 nomem:
@@ -1521,7 +1523,7 @@ static int register_gcpu_with_guest(guest_t *guest)
 
 	while (!guest->gcpus)
 		barrier();
-	
+
 	guest->gcpus[gpir] = get_gcpu();
 	get_gcpu()->gcpu_num = gpir;
 	return gpir;
@@ -1548,13 +1550,13 @@ int restart_guest(guest_t *guest)
 	return ret;
 }
 
-/* Process configuration options in the partition node 
+/* Process configuration options in the partition node
  */
 static int partition_config(guest_t *guest)
 {
 	dt_node_t *hv_node;
 	int ret;
-	
+
 	/* guest cache lock mode */
 	if (guest->guest_cache_lock) {
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
@@ -1630,13 +1632,13 @@ guest_t *node_to_partition(dt_node_t *partition)
 	}
 
 	spin_lock(&start_guest_lock);
-	
+
 	for (i = 0; i < last_lpid; i++) {
 		assert(guests[i].lpid == i + 1);
 		if (guests[i].partition == partition)
 			break;
 	}
-	
+
 	if (i == last_lpid) {
 		if (last_lpid >= MAX_PARTITIONS) {
 			spin_unlock(&start_guest_lock);
@@ -1692,7 +1694,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 #endif
 
 	}
-	
+
 	spin_unlock(&start_guest_lock);
 	return &guests[i];
 }
@@ -1722,10 +1724,10 @@ static void guest_core_init(guest_t *guest)
 static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 {
 	gcpu_t *gcpu = get_gcpu();
-	guest_t *guest = gcpu->guest; 
+	guest_t *guest = gcpu->guest;
 	int ret;
 	unsigned int i;
-	
+
 	assert(guest->state == guest_starting);
 
 	guest_core_init(guest);
@@ -1772,7 +1774,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 		if (!guest->gcpus[i]) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			         "guest %s waiting for cpu %d...\n", guest->name, i);
-		
+
 			while (!guest->gcpus[i])
 				barrier();
 		}
@@ -1795,7 +1797,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	// We only map 1GiB, so we don't support loading/booting an OS above
 	// that address.  We pass the guest physical address even though
 	// it should be a guest virtual address, but since we program the TLBs
-	// such that guest virtual == guest physical at boot time, this works. 
+	// such that guest virtual == guest physical at boot time, this works.
 
 	regs->gpregs[1] = 0xdeadbeef;
 	regs->gpregs[3] = guest->dtb_gphys;
@@ -1813,7 +1815,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 
 static void start_guest_primary(trapframe_t *regs, void *arg)
 {
-	guest_t *guest = get_gcpu()->guest; 
+	guest_t *guest = get_gcpu()->guest;
 	int ret = 1;
 
 	assert(guest->state == guest_starting);
@@ -2048,7 +2050,7 @@ int stop_guest(guest_t *guest)
 		guest->state = guest_stopping;
 
 	spin_unlock(&guest->state_lock);
-	
+
 	if (ret)
 		return ret;
 
@@ -2069,7 +2071,7 @@ int start_guest(guest_t *guest)
 		guest->state = guest_starting;
 
 	spin_unlock(&guest->state_lock);
-	
+
 	if (ret)
 		return ret;
 
@@ -2088,7 +2090,7 @@ int pause_guest(guest_t *guest)
 		guest->state = guest_pausing;
 
 	spin_unlock(&guest->state_lock);
-	
+
 	if (ret)
 		return ret;
 
@@ -2113,7 +2115,7 @@ int resume_guest(guest_t *guest)
 	}
 
 	spin_unlock(&guest->state_lock);
-	
+
 	if (ret)
 		return ret;
 
@@ -2126,7 +2128,7 @@ int resume_guest(guest_t *guest)
 static void read_phandle_aliases(guest_t *guest)
 {
 	dt_node_t *aliases;
-	
+
 	aliases = dt_get_subnode(guest->partition, "aliases", 0);
 	if (!aliases)
 		return;
@@ -2165,7 +2167,7 @@ dt_node_t *get_handles_node(guest_t *guest)
 {
 	dt_node_t *hv, *handles;
 	uint32_t propdata;
-	
+
 	hv = dt_get_subnode(guest->devtree, "hypervisor", 1);
 	if (!hv)
 		return NULL;
@@ -2202,7 +2204,7 @@ static dev_owner_t *get_direct_owner(dt_node_t *node, guest_t *guest)
 		owner = dt_owned_by(node, guest);
 		if (owner && owner->direct == owner)
 			return owner;
-		
+
 		node = node->parent;
 	}
 
@@ -2295,7 +2297,7 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 		goto out;
 
 	ret = dt_merge_tree(owner->gnode, hwnode, 0);
-	if (ret < 0) 
+	if (ret < 0)
 		goto out_gnode;
 
 	dt_record_guest_phandle(owner->gnode, owner->cfgnode);
@@ -2440,8 +2442,8 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	/* FIXME: hardcoded p4080 */
 	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform-p4080%csimple-bus", 0);
 	assert(ret < (int)sizeof(buf));
-	
-	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1); 
+
+	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1);
 	if (ret < 0)
 		goto fail;
 
@@ -2584,7 +2586,7 @@ static int init_guest_one(dt_node_t *node, void *arg)
 
 	ctx->guest = guest;
 	return 0;
-} 
+}
 
 /* init_guest() is called once per CPU
  */

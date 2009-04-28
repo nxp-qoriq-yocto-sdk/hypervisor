@@ -1,6 +1,7 @@
 /** @file
  * Operations on live (unflattened) device trees
  */
+
 /* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
@@ -26,6 +27,7 @@
  */
 
 #include <libos/queue.h>
+#include <libos/alloc.h>
 
 #include <errors.h>
 #include <devtree.h>
@@ -533,7 +535,7 @@ static void delete_nodes_by_strlist(dt_node_t *node,
 	const char *str = strlist;
 	dt_node_t *child;
 
-	for (;;) {	
+	for (;;) {
 		str = strlist_iterate(strlist, len, &pos);
 		if (!str)
 			return;
@@ -541,7 +543,7 @@ static void delete_nodes_by_strlist(dt_node_t *node,
 		child = dt_get_subnode(node, str, 0);
 		if (child) {
 			dt_delete_node(child);
-			
+
 			/* Rewind to try this name again; it may have lacked a unit address,
 			 * and thus hit more than one node.
 			 */
@@ -557,7 +559,7 @@ static void delete_props_by_strlist(dt_node_t *node,
 	const char *str = strlist;
 	dt_prop_t *prop;
 
-	for (;;) {	
+	for (;;) {
 		str = strlist_iterate(strlist, len, &pos);
 		if (!str)
 			return;
@@ -577,11 +579,11 @@ static void prepend_strlist(dt_node_t *dest, dt_node_t *src)
 	if (!prop)
 		return;
 
-	while (1) {		
+	while (1) {
 		const char *pname, *pdata;
 		char *newstr, *olddata;
 		size_t ppos;
-		
+
 		pname = strlist_iterate(prop->data, prop->len, &pos);
 		if (!pname)
 			return;
@@ -656,7 +658,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 
 	if (ctx->flags & dt_merge_special) {
 		dt_prop_t *prop;
-	 
+
 		if (dt_get_prop(src, "delete-subnodes", 0)) {
 			list_for_each_delsafe(&ctx->dest->children, i, next) {
 				dt_node_t *node = to_container(i, dt_node_t, child_node);
@@ -674,7 +676,7 @@ static int merge_pre(dt_node_t *src, void *arg)
 	}
 
 	if (ctx->flags & dt_merge_new_phandle)
-		dt_record_guest_phandle(ctx->dest, src); 
+		dt_record_guest_phandle(ctx->dest, src);
 
 	list_for_each(&src->props, i) {
 		dt_prop_t *prop = to_container(i, dt_prop_t, prop_node);
@@ -814,7 +816,7 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 			return ERR_NOMEM;
 	}
 
-	dt_record_guest_phandle(ctx->dest, src); 
+	dt_record_guest_phandle(ctx->dest, src);
 
 	list_for_each(&src->props, l) {
 		dt_prop_t *prop = to_container(l, dt_prop_t, prop_node);
@@ -1455,7 +1457,7 @@ size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen)
 
 	if (buflen != 0)
 		buf[buflen - 1] = 0;
-	
+
 	while (node != tree && node->parent) {
 		size_t namelen = strlen(node->name);
 

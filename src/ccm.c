@@ -1,9 +1,10 @@
 /** @file
  * CoreNet Coherency Manager
  */
+
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -12,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -27,6 +28,7 @@
 
 #include <libos/printlog.h>
 #include <libos/io.h>
+#include <libos/alloc.h>
 
 #include <p4080.h>
 #include <ccm.h>
@@ -102,7 +104,7 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 		         __func__, node->name);
 		return ERR_BADTREE;
 	}
-	
+
 	sidmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x200);
 
 	/*
@@ -195,7 +197,7 @@ void add_all_cpus_to_csd(dt_node_t *node)
 {
 	if (!node->csd)
 		return;
-	
+
 	set_csd_cpus(node->csd, HV_CPUS);
 }
 
@@ -341,7 +343,7 @@ static pma_t *read_pma(dt_node_t *node)
 {
 	pma_t *pma;
 	dt_prop_t *prop;
-	
+
 	pma = alloc_type(pma_t);
 	if (!pma) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,

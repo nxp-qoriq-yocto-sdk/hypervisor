@@ -5,7 +5,7 @@
 
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -14,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -27,10 +27,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include <libos/libos.h>
 #include <libos/queue.h>
 #include <libos/ns16550.h>
+#include <libos/alloc.h>
 
 #include <byte_chan.h>
 #include <bcmux.h>
@@ -50,7 +50,7 @@
 static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 {
 	connected_bc_t *bc = mux->first_bc;
-	
+
 	while (bc) {
 		if (bc->num == id)
 			return bc;
@@ -75,15 +75,15 @@ static void mux_get_data(queue_t *q)
 	mux_complex_t *mux = q->consumer;
 	queue_t *notify = NULL;
 	int ch;
-	
+
 	if (spin_lock_held(&mux->byte_chan->rx_lock)) {
 		printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
 			"mux_get_data: bcmux recursion detected\n");
 		return;
 	}
-	
+
 	register_t saved = spin_lock_intsave(&mux->byte_chan->rx_lock);
-	
+
 	/* Add a string to byte channel */
 	while ((ch = queue_readchar(mux->byte_chan->rx, 0)) >= 0) {
 		mux->rx_count++;
@@ -96,7 +96,7 @@ static void mux_get_data(queue_t *q)
 					queue_notify_consumer(notify);
 					notify = NULL;
 				}
-				
+
 				mux->current_rx_bc =
 					channel_find(mux, ch - CHAN0_MUX_CHAR);
 				printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
@@ -157,7 +157,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 
 	if (queue_empty(cbc->byte_chan->rx))
 		return 0;
- 
+
 	sent = mux_tx_switch(mux, cbc);
 	if (sent < 0)
 		return -1;
@@ -183,7 +183,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 			sent++;
 		}
 	}
-	
+
 	return sent;
 };
 
@@ -197,13 +197,13 @@ static void mux_send_data_pull(queue_t *q)
 			"mux_send_data_pull: bcmux recursion detected\n");
 		return;
 	}
-	
+
 	register_t saved = spin_lock_intsave(&mux->byte_chan->tx_lock);
 
 	connected_bc_t *first_cbc = mux->current_tx_bc;
 	if (!first_cbc)
 		first_cbc = mux->first_bc;
-	
+
 	connected_bc_t *cbc = first_cbc;
 
 	do {
@@ -225,7 +225,7 @@ static void mux_send_data_pull(queue_t *q)
 	/* If we stopped due to a lack of data, remove the pull callback. */
 	if (ret >= 0 && total < 64)
 		q->space_avail = NULL;
-	
+
 	spin_unlock_intsave(&mux->byte_chan->tx_lock, saved);
 }
 
@@ -252,7 +252,7 @@ static void mux_send_data_push(queue_t *q)
 	else if (ret < 0)
 		/* If we ran out of space, arm the pull callback. */
 		mux->byte_chan->tx->space_avail = mux_send_data_pull;
-	
+
 	if (lock)
 		spin_unlock(&mux->byte_chan->tx_lock);
 
@@ -307,20 +307,20 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	cbc = alloc_type(connected_bc_t);
 	if (!cbc)
 		return ERR_NOMEM;
-	
+
 	cbc->num = multiplexing_id;
 	cbc->byte_chan = handle;
 	cbc->mux_complex = mux;
 
 	handle->tx->producer = cbc;
 	handle->rx->consumer = cbc;
-	
+
 	handle->tx->space_avail = NULL;
 	handle->rx->data_avail = mux_send_data_push;
 
 	register_t saved = spin_lock_intsave(&mux->byte_chan->rx_lock);
 	spin_lock(&mux->byte_chan->tx_lock);
-	
+
 	if (mux->first_bc == NULL) {
 		mux->first_bc = cbc;
 		mux->current_rx_bc = mux->first_bc;
@@ -331,7 +331,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 			bc_chain = bc_chain->next;
 		bc_chain->next = cbc;
 	}
-	
+
 	mux->num_of_channels++;
 
 	spin_unlock(&mux->byte_chan->tx_lock);
@@ -344,7 +344,7 @@ static byte_chan_t *mux_attach_byte_chan(dt_node_t *muxnode, dt_node_t *bcnode)
 	if (dt_node_is_compatible(bcnode, "byte-channel"))
 		return other_attach_byte_chan(bcnode, muxnode);
 
-	return NULL;	
+	return NULL;
 }
 
 static byte_chan_t *mux_attach_chardev(dt_node_t *muxnode, dt_node_t *cdnode)
@@ -371,7 +371,7 @@ static byte_chan_t *mux_attach_chardev(dt_node_t *muxnode, dt_node_t *cdnode)
 		return bc;
 	}
 
-	return NULL;	
+	return NULL;
 }
 
 static int create_mux(dt_node_t *node, void *arg)
@@ -407,10 +407,10 @@ static int create_mux(dt_node_t *node, void *arg)
 	}
 
 	mux_complex_t *mux = mux_complex_init(bc);
-	if (!mux) 
+	if (!mux)
 		return ERR_NOMEM;
 
-	node->bcmux = mux;	
+	node->bcmux = mux;
 	return 0;
 }
 

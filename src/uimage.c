@@ -4,7 +4,8 @@
  * This file contains functions that will parse and extract the executable
  * binary, generated using mkimage tool.
  */
-/* Copyright (C) 2008 Freescale Semiconductor, Inc.
+
+/* Copyright (C) 2008 - 2009 Freescale Semiconductor, Inc.
  * Author: Naveen Burmi <naveenburmi@freescale.com>
  *
  *
@@ -29,6 +30,8 @@
  * (including negligence or otherwise) arising in any way out of the use of
  * this software, even if advised of the possibility of such damage.
  */
+
+#include <malloc.h>
 
 #include <libos/endian.h>
 #include <percpu.h>

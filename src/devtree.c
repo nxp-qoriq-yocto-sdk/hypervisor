@@ -1,9 +1,10 @@
 /** @file
  * Device tree semantic processing
  */
+
 /* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -12,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -25,16 +26,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <libos/queue.h>
+#include <libos/chardev.h>
+#include <libos/interrupts.h>
+#include <libos/mpic.h>
+#include <libos/alloc.h>
+
 #include <devtree.h>
 #include <paging.h>
 #include <errors.h>
 #include <byte_chan.h>
 #include <limits.h>
-
-#include <libos/queue.h>
-#include <libos/chardev.h>
-#include <libos/interrupts.h>
-#include <libos/mpic.h>
 
 int get_addr_format(dt_node_t *node, uint32_t *naddr, uint32_t *nsize)
 {
@@ -241,7 +243,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 
 	if (rangesize) {
 		copy_val(tmpaddr, ranges + prev_naddr + naddr, prev_nsize);
-	
+
 		if (!sub_reg(tmpaddr, addr))
 			return ERR_BADTREE;
 
@@ -259,7 +261,7 @@ int xlate_one(uint32_t *addr, const uint32_t *ranges,
 	 */
 	copy_val(tmpaddr, ranges + prev_naddr, naddr);
 	copy_val(tmpaddr2, ranges + prev_naddr + naddr, nsize);
-	
+
 	if (!add_reg(tmpaddr, tmpaddr2, naddr))
 		return ERR_NOTRANS;
 
@@ -352,7 +354,7 @@ int dt_get_reg(dt_node_t *node, int res,
 	uint32_t naddr, nsize;
 	dt_prop_t *prop;
 	const uint32_t *reg;
-	
+
 	prop = dt_get_prop(node, "reg", 0);
 	if (!prop)
 		return ERR_NOTFOUND;
@@ -433,7 +435,7 @@ int open_stdout_chardev(dt_node_t *node)
 		ret = cd->ops->set_tx_queue(cd, q);
 		if (ret < 0)
 			return ret;
-		
+
 		stdout = q;
 	}
 #endif
@@ -482,9 +484,9 @@ int open_stdout_bytechan(dt_node_t *node)
 		stdout_node = create_dev_tree();
 		if (!stdout_node)
 			return ERR_NOMEM;
-	
+
 		stdout_node->name = strdup("stdout");
-	
+
 		bc = other_attach_byte_chan(node, stdout_node);
 		if (!bc)
 			return ERR_INVALID;
@@ -524,7 +526,7 @@ static int open_stdin_chardev(chardev_t *cd)
 	ret = cd->ops->set_rx_queue(cd, q);
 	if (ret < 0)
 		goto err_queue_buf;
-		
+
 	stdin = q;
 	return 0;
 
@@ -532,7 +534,7 @@ err_queue_buf:
 	queue_destroy(q);
 err_queue:
 	free(q);
-	
+
 	return ret;
 }
 
@@ -582,7 +584,7 @@ phys_addr_t find_memory(void *fdt)
 	phys_addr_t mem_end = 0;
 	int memnode = -1;
 	int len;
-	
+
 	while (1) {
 		uint32_t naddr, nsize;
 		int parent;
@@ -648,7 +650,7 @@ phys_addr_t find_memory(void *fdt)
 				mem_end = addr;
 		}
 	}
-	
+
 	return mem_end;
 }
 
@@ -689,7 +691,7 @@ int dt_get_int_format(dt_node_t *domain, uint32_t *nint, uint32_t *naddr)
 {
 	dt_prop_t *prop;
 
-	if (nint) {	
+	if (nint) {
 		prop = dt_get_prop(domain, "#interrupt-cells", 0);
 		if (!prop) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
@@ -756,7 +758,7 @@ int get_num_interrupts(dt_node_t *tree, dt_node_t *node)
 	ret = dt_get_int_format(domain, &icell, NULL);
 	if (ret < 0)
 		return ret;
-	
+
 	return prop->len / icell;
 }
 
@@ -781,7 +783,7 @@ dt_node_t *get_interrupt(dt_node_t *tree, dt_node_t *node, int intnum,
 	if (!prop)
 		return NULL;
 	*intspec = prop->data;
-		
+
 	domain = get_interrupt_domain(tree, node);
 	if (!domain) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
@@ -832,7 +834,7 @@ static int get_cpu_node_callback(dt_node_t *node, void *arg)
 		ctx->ret = node;
 		return 1;
 	}
-	
+
 	return 0;
 }
 
@@ -874,7 +876,7 @@ static dev_owner_t *dt_owned_by_nolock(dt_node_t *node, struct guest *guest)
 {
 	list_for_each(&node->owners, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, dev_node);
-		
+
 		if (owner->guest == guest)
 			return owner;
 	}
@@ -908,7 +910,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 	assign_ctx_t *ctx = arg;
 	const char *alias;
 	dt_node_t *hwnode;
-	
+
 	/* Only process immediate children */
 	if (node->parent != ctx->tree)
 		return 0;
@@ -975,7 +977,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 			return 0;
 		}
 	}
-		
+
 	if (ctx->guest)
 		list_add(&ctx->guest->dev_list, &owner->guest_node);
 	else
@@ -993,7 +995,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 void dt_read_aliases(void)
 {
 	dt_node_t *aliases;
-	
+
 	aliases = dt_get_subnode(hw_devtree, "aliases", 0);
 	if (!aliases)
 		return;
@@ -1039,7 +1041,7 @@ void dt_read_aliases(void)
  */
 void dt_assign_devices(dt_node_t *tree, guest_t *guest)
 {
-	assign_ctx_t ctx = {	
+	assign_ctx_t ctx = {
 		.tree = tree,
 		.guest = guest
 	};
@@ -1058,19 +1060,19 @@ void dt_lookup_regs(dt_node_t *node)
 	spin_lock(&dt_owner_lock);
 
 	if (node->dev.regs)
-		goto out; 
-	
+		goto out;
+
 	prop = dt_get_prop(node, "reg", 0);
 	if (!prop)
 		goto out;
 
 	ret = get_addr_format_nozero(node->parent, &naddr, &nsize);
 	if (ret < 0)
-		goto out; 
+		goto out;
 
 	reg = prop->data;
 	node->dev.num_regs = prop->len / ((naddr + nsize) * 4);
-	
+
 	if (prop->len % ((naddr + nsize) * 4) != 0)
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: Ignoring junk at end of reg in %s\n",
@@ -1118,7 +1120,7 @@ int dt_bind_driver(dt_node_t *node)
 	/* Don't bind if we don't own it. */
 	if (!dt_owned_by_nolock(node, NULL))
 		return ERR_INVALID;
-	
+
 	compat = dt_get_prop(node, "compatible", 0);
 	if (!compat)
 		return ERR_UNHANDLED;
@@ -1155,7 +1157,7 @@ static void read_intmap(dt_node_t *node)
 	imap_prop = dt_get_prop(node, "interrupt-map", 0);
 	if (!imap_prop)
 		return;
-	
+
 	mask_prop = dt_get_prop(node, "interrupt-map-mask", 0);
 	if (mask_prop) {
 		if (mask_prop->len != (nint + naddr) * 4) {
@@ -1164,7 +1166,7 @@ static void read_intmap(dt_node_t *node)
 			         __func__, node->name);
 			return;
 		}
-	
+
 		memcpy(node->intmap_mask, mask_prop->data, mask_prop->len);
 	} else {
 		memset(node->intmap_mask, 0xff, sizeof(node->intmap_mask));
@@ -1178,7 +1180,7 @@ static void read_intmap(dt_node_t *node)
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: out of memory\n", __func__);
 		return;
-	} 
+	}
 
 	imap = imap_prop->data;
 	imap_end = imap_prop->data + imap_prop->len;
@@ -1323,7 +1325,7 @@ static interrupt_t *lookup_intmap_entry(dt_node_t *node,
 		                                     ent->parent_nint);
 		if (!next) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: No interrupt-map match in %s for %s, intmap %zd\n", 
+			         "%s: No interrupt-map match in %s for %s, intmap %zd\n",
 			         __func__, domain->name, node->name, ent - node->intmap);
 			ent->valid = 0;
 			return NULL;
@@ -1375,24 +1377,24 @@ static void lookup_irqs_in_intmap(dt_node_t *node, dt_node_t *domain,
 		reg = dt_get_prop(node, "reg", 0);
 		if (!reg || reg->len < naddr * 4) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: missing/invaid reg in %s\n", 
+			         "%s: missing/invaid reg in %s\n",
 			         __func__, node->name);
 			return;
 		}
-		
+
 		memcpy(intspec, reg->data, naddr * 4);
 		intspec_afteraddr += naddr;
 	}
 
 	for (int i = 0; i < node->dev.num_irqs; i++) {
 		intmap_entry_t *ent;
-	
+
 		memcpy(intspec_afteraddr, &ints[i * nint], nint * 4);
 
 		ent = lookup_intmap(domain, intspec, naddr + nint);
 		if (!ent) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: No interrupt-map match in %s for %s, int %d\n", 
+			         "%s: No interrupt-map match in %s for %s, int %d\n",
 			         __func__, domain->name, node->name, i);
 			continue;
 		}
@@ -1408,9 +1410,9 @@ static void dt_lookup_irqs_nolock(dt_node_t *node, int depth)
 	const uint32_t *ints;
 	dt_node_t *domain;
 	int ret;
-	
+
 	if (node->irqs_looked_up)
-		return; 
+		return;
 
 	if (depth > MAX_IRQ_DEPTH) {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
@@ -1423,7 +1425,7 @@ static void dt_lookup_irqs_nolock(dt_node_t *node, int depth)
 
 	if (!node->intmap && dt_get_prop(node, "interrupt-map", 0))
 		read_intmap(node);
-	
+
 	prop = dt_get_prop(node, "interrupts", 0);
 	if (!prop)
 		return;
@@ -1446,7 +1448,7 @@ static void dt_lookup_irqs_nolock(dt_node_t *node, int depth)
 
 	ints = prop->data;
 	node->dev.num_irqs = prop->len / (nint * 4);
-	
+
 	if (prop->len % (nint * 4) != 0)
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: Ignoring junk at end of interrupts in %s\n",

@@ -35,9 +35,12 @@
  */
 
 #include <stdint.h>
+#include <malloc.h>
+
 #include <libos/trapframe.h>
 #include <libos/core-regs.h>
 #include <libos/trap_booke.h>
+
 #include <events.h>
 #include <byte_chan.h>
 #include <guestmemio.h>

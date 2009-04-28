@@ -1,10 +1,11 @@
 /* @file
  * TLB management
  */
+
 /*
  * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
@@ -30,6 +31,7 @@
 #include <libos/core-regs.h>
 #include <libos/bitops.h>
 #include <libos/list.h>
+#include <libos/alloc.h>
 
 #include <percpu.h>
 #include <paging.h>
@@ -45,7 +47,7 @@ static void free_tlb1(unsigned int entry)
 		while (gcpu->tlb1_map[entry][i]) {
 			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
 			assert(idx + bit <= GUEST_TLB_END);
-			
+
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 			         "clearing tlb1[%d] for gtlb1[%d], cpu%lu\n",
 			         idx + bit, entry, mfspr(SPR_PIR));
@@ -76,7 +78,7 @@ static int alloc_tlb1(unsigned int entry, int evict)
 
 			if (idx + bit > GUEST_TLB_END)
 				goto none_avail;
-			
+
 			gcpu->tlb1_inuse[i] |= 1UL << bit;
 			gcpu->tlb1_map[entry][i] |= 1UL << bit;
 
@@ -97,7 +99,7 @@ none_avail:
 		i = gcpu->evict_tlb1++;
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 		         "alloc_tlb1: evicting entry %d\n", i);
-		
+
 		if (gcpu->evict_tlb1 > GUEST_TLB_END)
 			gcpu->evict_tlb1 = 0;
 
@@ -132,13 +134,13 @@ int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag,
 	tlbctag_t mask;
 	int index;
 	int i;
-	
+
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 	         "find vaddr %lx tag %lx\n", vaddr, tag.tag);
 
 	mask.tag = ~0UL;
 	mask.pid = 0;
-	
+
 	index = vaddr >> PAGE_SHIFT;
 	index &= (1 << cpu->client.tlbcache_bits) - 1;
 
@@ -182,7 +184,7 @@ int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
 	unsigned int end = index + cache_entries;
 
 	tlbcset_t *set = &cpu->client.tlbcache[index];
-	
+
 	uintptr_t tag_start = epn >> cpu->client.tlbcache_bits;
 	uintptr_t tag_end = (epn + pages - 1) >> cpu->client.tlbcache_bits;
 
@@ -290,16 +292,16 @@ static void guest_inv_tlb0_va(register_t vaddr, int pid)
 	tlbctag_t mask;
 	int index;
 	int i;
-	
+
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 	         "inv vaddr %lx pid %d\n", vaddr, pid);
 
 	mask.tag = ~0UL;
 	mask.space = 0;
-	
+
 	if (pid < 0)
 		mask.pid = 0;
-	
+
 	index = vaddr >> PAGE_SHIFT;
 	index &= (1 << cpu->client.tlbcache_bits) - 1;
 
@@ -397,7 +399,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 	gcpu_t *gcpu = get_gcpu();
 	unsigned long epn = vaddr >> PAGE_SHIFT;
 	int i;
-	
+
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *entry = &gcpu->gtlb1[i];
 		unsigned long entryepn = entry->mas2 >> PAGE_SHIFT;
@@ -405,7 +407,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		unsigned int entrypid = MAS1_GETTID(entry->mas1);
 		unsigned int tsize = MAS1_GETTSIZE(entry->mas1);
 		unsigned int mapsize, mappages, index;
-		
+
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "checking %x/%lx/%lx for %lx/%d/%d\n",
 		         i, entry->mas1, entry->mas2, vaddr, space, pid);
@@ -433,7 +435,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 
 		mapsize = max_page_tsize(baserpn, tsize);
 		mappages = tsize_to_pages(mapsize);
-		
+
 		rpn &= ~(mappages - 1);
 		epn &= ~(mappages - 1);
 
@@ -509,7 +511,7 @@ int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid)
 
 	restore_mas(gcpu);
 	enable_int();
-	
+
 	return ret;
 }
 
@@ -542,11 +544,11 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	while (epn < end) {
 		int size = max_page_size(epn, end - epn);
 
-		unsigned long attr, rpn; 
+		unsigned long attr, rpn;
 		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		/* If there's no valid mapping, try again at the next page. Note
-		 * that this can be slow.  
+		 * that this can be slow.
        *
 		 * Unfortunately, we'll have to reflect a TLB miss rather than
 		 * a machine check for accesses to these mapping holes,
@@ -586,7 +588,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		               (mas1 >> MAS1_TID_SHIFT) & 0xff,
 		               (mas1 >> MAS1_TS_SHIFT) & 1,
 		               mas8);
-		
+
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
@@ -601,16 +603,16 @@ static void guest_inv_tlb1(register_t va, int pid,
 
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *tlbe = &gcpu->gtlb1[i];
-		
+
 		if (!(tlbe->mas1 & MAS1_VALID))
 			continue;
-		
+
 		if ((flags & INV_IPROT) || !(tlbe->mas1 & MAS1_IPROT)) {
 			register_t begin = tlbe->mas2 & MAS2_EPN;
 			register_t end = begin;
-			
+
 			end += (tsize_to_pages(MAS1_GETTSIZE(tlbe->mas1)) - 1) * PAGE_SIZE;
-		
+
 			if (!global && (va < begin || va > end))
 				continue;
 
@@ -719,12 +721,12 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 	gcpu_t *gcpu = get_gcpu();
 	int pid = MAS1_GETTID(mas1);
 	unsigned int i;
-	
+
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *other = &gcpu->gtlb1[i];
 		unsigned long otherepn = other->mas2 >> PAGE_SHIFT;
 		int otherpid = MAS1_GETTID(other->mas1);
-		
+
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "checking %x/%lx/%lx against %x/%lx/%lx\n",
 		         entry, mas1, epn, i, other->mas1, other->mas2);
@@ -744,7 +746,7 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 
 		return i;
 	}
-	
+
 	return -1;
 }
 
@@ -882,7 +884,7 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 {
 	unsigned long start_page = me->start_page;
 	unsigned long start_phys;
-	
+
 	int tlbe = me->pinned_tlbe;
 
 	if (likely(!tlbe)) {
@@ -919,7 +921,7 @@ int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 
 	list_for_each(&maps, i) {
 		map_entry_t *me = to_container(i, map_entry_t, map_node);
-		
+
 		if (page < me->start_page)
 			continue;
 		if (page > me->end_page)
@@ -929,7 +931,7 @@ int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 		ret = 1;
 		break;
 	}
-	
+
 	spin_unlock_intsave(&map_lock, saved);
 	return ret;
 }
@@ -947,7 +949,7 @@ void secondary_map_mem(void)
 		if (me->pinned_tlbe)
 			insert_map_entry(me, me->start_page << PAGE_SHIFT);
 	}
-	
+
 	spin_unlock_intsave(&map_lock, saved);
 }
 
@@ -1042,18 +1044,18 @@ int map_hv_pma(phys_addr_t paddr, size_t len, int text)
 	map_entry_t *me;
 	int entries = order & 1 ? 2 : 1;
 	int ret = 0;
-	
+
 	saved = spin_lock_intsave(&map_lock);
 
 	for (int i = 0; i < entries; i++) {
 		unsigned long page = paddr >> PAGE_SHIFT;
 		int tlbe;
-		
+
 		if (next_pinned_tlbe > PERM_TLB_END) {
 			ret = ERR_BUSY;
 			goto out;
 		}
-			
+
 		tlbe = next_pinned_tlbe++;
 		me = &pma_maps[tlbe - PERM_TLB_START];
 
@@ -1068,7 +1070,7 @@ int map_hv_pma(phys_addr_t paddr, size_t len, int text)
 		me->mas3flags = TLB_MAS3_KERN;
 		me->tsize = tsize;
 		me->pinned_tlbe = tlbe;
-	
+
 		list_add(&maps, &me->map_node);
 		insert_map_entry(me, ret);
 
@@ -1142,7 +1144,7 @@ size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
 	while (len > 0) {
 		size_t chunk;
 		void *vdest;
-		
+
 		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
 		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 		if (!vdest)
@@ -1196,7 +1198,7 @@ size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
 }
 
 
-/** Copy from a guest physical address to a hypervisor virtual address 
+/** Copy from a guest physical address to a hypervisor virtual address
  *
  * @param[in] tbl Guest physical page table
  * @param[in] dest Hypervisor virtual address to copy to
@@ -1211,7 +1213,7 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len)
 	while (len > 0) {
 		size_t chunk;
 		void *vsrc;
-		
+
 		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping[0],
 		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 		if (!vsrc)
@@ -1244,7 +1246,7 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
                           pte_t *stbl, phys_addr_t src, size_t len)
 {
 	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
-	
+
 	/* Initializiations not needed, but GCC is stupid. */
 	void *vdest = NULL, *vsrc = NULL;
 
@@ -1311,7 +1313,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 	return vpage + offset;
 }
 
-/** Copy from a true physical address to a hypervisor virtual address 
+/** Copy from a true physical address to a hypervisor virtual address
  *
  * @param[in] dest Hypervisor virtual address to copy to
  * @param[in] src Physical address to copy from
@@ -1325,7 +1327,7 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
 	while (len > 0) {
 		size_t chunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
 		void *vsrc;
-		
+
 		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
 		                &chunk, TLB_MAS2_MEM);
 		if (!vsrc)
@@ -1355,10 +1357,10 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
                           phys_addr_t src, size_t len)
 {
 	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
-	
+
 	/* Initializiations not needed, but GCC is stupid. */
 	void *vdest = NULL, *vsrc = NULL;
-	
+
 	while (len > 0) {
 		if (!schunk) {
 			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
