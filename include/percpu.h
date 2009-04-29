@@ -100,6 +100,16 @@ typedef struct guest {
 	const char *name;
 	struct dt_node *devtree;
 	struct dt_node *partition; /**< Partition node in main device tree. */
+
+	/** Container for devices in guest tree.  This is normally the root
+	 * node, however an explicit container node will be created if
+	 * device-ranges is specified.
+	 */
+	struct dt_node *devices;
+	
+	/* device-ranges property, or NULL if none */
+	struct dt_prop *devranges;
+
 	handle_t handle;        /**< The handle of *this* guest */
 	handle_t *handles[MAX_HANDLES];
 	/** Used as a reference count when stopping a partition. */

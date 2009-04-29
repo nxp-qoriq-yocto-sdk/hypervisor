@@ -129,6 +129,39 @@ static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, flags, PTE_PHYS_LEVELS);
 }
 
+static void map_dev_range(guest_t *guest, phys_addr_t addr, phys_addr_t size)
+{
+	uint32_t tmpaddr[MAX_ADDR_CELLS];
+	phys_addr_t rangesize;
+	int ret;
+
+	if (!guest->devranges) {
+		map_guest_addr_range(guest, addr, addr, size, 0);
+		return;
+	}
+	
+	while (size > 0) {
+		val_from_int(tmpaddr, addr);
+
+		ret = xlate_one(tmpaddr, guest->devranges->data,
+		                guest->devranges->len, 2, 2, 2, 2, &rangesize);
+		if (ret < 0) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: 0x%llx does not translate through device-ranges\n",
+			         __func__, addr);
+			return;
+		}
+
+		phys_addr_t cursize = min(size, rangesize);
+		phys_addr_t gaddr = ((phys_addr_t)tmpaddr[MAX_ADDR_CELLS - 2] << 32) |
+		                    tmpaddr[MAX_ADDR_CELLS - 1];
+		map_guest_addr_range(guest, gaddr, addr, cursize, 0);
+
+		size -= cursize;
+		addr += cursize;
+	}
+}
+
 static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
 {
 	if (rootnaddr == 2)
@@ -255,7 +288,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	/* Don't parse the ranges at all if it's a non-reparented child
 	 * without map-ranges.
 	 */
-	if (!map_ranges && owner->gnode->parent->parent)
+	if (!map_ranges && owner->gnode->parent != owner->guest->devices)
 		return 0;
 
 	dt_node_t *parent = hwnode->parent;
@@ -303,7 +336,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 		assert(!addrbuf[0] && !addrbuf[1]);
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
-		map_guest_addr_range(owner->guest, addr, addr, size, 0);
+		map_dev_range(owner->guest, addr, size);
 
 		memcpy(newranges, ranges, caddr * 4);
 		newranges += caddr;
@@ -316,7 +349,7 @@ static int map_guest_ranges(dev_owner_t *owner)
 	}
 
 	/* Only change ranges if this is a top-level guest node */
- 	if (owner->gnode->parent->parent)
+ 	if (owner->gnode->parent != owner->guest->devices)
  		return 0;
 
 	return dt_set_prop(owner->gnode, "ranges", newranges_base,
@@ -506,23 +539,26 @@ static int map_guest_reg(dev_owner_t *owner)
 	if (num == 0)
 		return 0;
 
-	reg = regp = malloc(num * regsize);
-	if (!reg)
-		return ERR_NOMEM;
-
-	for (int i = 0; i < num; i++) {
-		map_guest_addr_range(owner->guest, regs[i].start,
-		                     regs[i].start, regs[i].size, 0);
-
-		regp = write_reg(regp, regs[i].start, regs[i].size);
-	}
+	for (int i = 0; i < num; i++)
+		map_dev_range(owner->guest, regs[i].start, regs[i].size);
 
 	/* Only change reg if this is a top-level guest node */
- 	if (!owner->gnode->parent->parent)
-		ret = dt_set_prop(owner->gnode, "reg", reg, num * regsize);
+ 	if (owner->gnode->parent == owner->guest->devices) {
+		reg = regp = malloc(num * regsize);
+		if (!reg)
+			return ERR_NOMEM;
 
-	free(reg);
-	return ret;
+		for (int i = 0; i < num; i++)
+			regp = write_reg(regp, regs[i].start, regs[i].size);
+
+		ret = dt_set_prop(owner->gnode, "reg", reg, num * regsize);
+		free(reg);
+		
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 /** Convert aliases in the config or hardware tree to aliases in the guest tree.
@@ -2211,7 +2247,7 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 {
 	guest_t *guest = arg;
 	dev_owner_t *owner;
-	dt_node_t *parent = guest->devtree;
+	dt_node_t *parent = guest->devices;
 	const char *name;
 	int ret;
 
@@ -2281,10 +2317,59 @@ out:
 	return ERR_NOMEM;
 }
 
+static void init_dev_ranges(guest_t *guest)
+{
+	guest->devices = guest->devtree;
+
+	guest->devranges = dt_get_prop(guest->partition, "device-ranges", 0);
+	if (!guest->devranges)
+		return;
+
+	if (guest->devranges->len == 0) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: device-ranges cannot be empty "
+		         "(omit the property instead)\n",
+		         __func__, guest->partition->name);
+
+		guest->devranges = NULL;
+		return;
+	}
+
+	/* Create a toplevel container node with a "ranges" property
+	 * equivalent to device-ranges, under which all devices will go.
+	 */
+	dt_node_t *container = dt_get_subnode(guest->devtree, "devices", 1);
+	if (!container)
+		goto nomem;
+
+	if (dt_set_prop_string(container, "compatible", "simple-bus") < 0)
+		goto nomem;
+
+	if (dt_set_prop(container, "ranges", guest->devranges->data,
+	                guest->devranges->len) < 0)
+		goto nomem;
+
+	uint32_t val = 2;
+	if (dt_set_prop(container, "#address-cells", &val, 4) < 0)
+		goto nomem;
+
+	if (dt_set_prop(container, "#size-cells", &val, 4) < 0)
+		goto nomem;
+
+	guest->devices = container;
+	return;
+
+nomem:
+	guest->devranges = NULL;
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+}
+
 static int init_guest_devs(guest_t *guest)
 {
 	int ret;
 
+	init_dev_ranges(guest);
 	dt_assign_devices(guest->partition, guest);
 
 	/* First, merge each assigned device and its sub-tree, and
