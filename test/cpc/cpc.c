@@ -22,7 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <libos/libos.h>
+#include <libos/alloc.h>
 #include <libos/hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
