@@ -339,7 +339,7 @@ static uint8_t checksum(uint8_t *p);
 static uint8_t hdtoi(uint8_t hexit);
 static uint8_t upper_nibble(uint8_t c);
 static uint8_t lower_nibble(uint8_t c);
-static uint32_t htoi(uint8_t *hex_string);
+static uint64_t htoi(uint8_t *hex_string);
 static token_t tokenize(uint8_t *lexeme);
 static uint8_t hex(uint8_t c);
 
@@ -372,7 +372,7 @@ static void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byt
 static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
 static int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
 static uint8_t *scan_till(uint8_t *q, char c);
-static uint32_t scan_num(uint8_t **buffer, char c);
+static uint64_t scan_num(uint8_t **buffer, char c);
 static uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
 #ifndef USE_DEBUG_INTERRUPT
 static uint32_t *next_insn_addr(trapframe_t *trap_frame);
@@ -424,10 +424,10 @@ static uint8_t lower_nibble(uint8_t c)
 }
 
 /* TODO: A more generalized vesion of this would be nice in libos. */
-static uint32_t htoi(uint8_t *hex_string)
+static uint64_t htoi(uint8_t *hex_string)
 {
 	uint8_t *p = hex_string;
-	uint32_t s = 0;
+	uint64_t s = 0;
 	TRACE();
 	if (*p == 0 && *(p + 1) && (*(p + 1) == 'x' || *(p + 1) == 'X'))
 		p += 2;
@@ -792,10 +792,10 @@ static uint8_t *scan_till(uint8_t *q, char c)
  * character read (i.e. c or '\0' - whichever occurs
  * earlier).
  */
-static uint32_t scan_num(uint8_t **buffer, char c)
+static uint64_t scan_num(uint8_t **buffer, char c)
 {
 	uint8_t t, *sav_pos;
-	uint32_t n;
+	uint64_t n;
 
 	/* Important assumption: The data of interest
 	 * starts /after/ the first character.
@@ -1322,7 +1322,7 @@ return_to_guest:
 			reg_num = scan_num(&cur_pos, '=');
 			BREAK_IF_END(cur_pos);
 			data = ++cur_pos;
-			DEBUG("Register: %d, write-value: %s (decimal: %d)",
+			DEBUG("Register: %d, write-value: %s (decimal: %lld)",
 			       reg_num, data, htoi(data));
 			err_flag = write_reg(trap_frame, data, reg_num);
 			if (err_flag == 0) {
@@ -1390,7 +1390,7 @@ return_to_guest:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'm' packet.\n");
 			cur_pos = content(stub->cmd);
-			addr = (uint32_t *)scan_num(&cur_pos, ',');
+			addr = (uint32_t *)(uintptr_t)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, '\0');
 			TRACE("Read memory at addr: 0x%p, length: %d", addr, length);
@@ -1419,7 +1419,7 @@ return_to_guest:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'M' packet.\n");
 			cur_pos = content(stub->cmd);
-			addr = (uint32_t *) scan_num(&cur_pos, ',');
+			addr = (uint32_t *)(uintptr_t)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, ':');
 			BREAK_IF_END(cur_pos);
@@ -1477,7 +1477,7 @@ return_to_guest:
 				break;
 			}
 			BREAK_IF_END(cur_pos);
-			addr = (uint32_t *)scan_num(&cur_pos, ',');
+			addr = (uint32_t *)(uintptr_t)scan_num(&cur_pos, ',');
 			BREAK_IF_END(cur_pos);
 			length = scan_num(&cur_pos, '\0');
 			if (length != 4) {
