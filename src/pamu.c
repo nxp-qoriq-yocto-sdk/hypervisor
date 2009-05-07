@@ -40,12 +40,12 @@
 #include <paging.h>
 #include <limits.h>
 
-static unsigned int map_addrspace_size_to_wse(unsigned long addrspace_size)
+static unsigned int map_addrspace_size_to_wse(phys_addr_t addrspace_size)
 {
 	assert(!(addrspace_size & (addrspace_size - 1)));
 
 	/* window size is 2^(WSE+1) bytes */
-	return count_lsb_zeroes(addrspace_size) - 1;
+	return count_lsb_zeroes(addrspace_size >> PAGE_SHIFT) + 11;
 }
 
 static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
