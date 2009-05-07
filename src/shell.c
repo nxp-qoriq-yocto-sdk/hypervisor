@@ -458,7 +458,7 @@ static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
 			wcount, str);
 	}
 
-	wce = 2 * (1 << entry->wce);
+	wce = 2 * (1 << entry->wce) - 1;
 	for (int i = 0; i < wce; i++) {
 		sentry = pamu_get_spaace(entry->fspi, i);
 		if (sentry->v) {
