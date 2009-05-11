@@ -121,9 +121,9 @@ void return_hook(trapframe_t *regs)
 		return;
 
 	assert(cpu->ret_hook);
+	assert(!(mfmsr() & MSR_EE));
 
 	gcpu->waiting_for_gevent = 0;
-	enable_int();
 	
 	while (gcpu->gevent_pending) {
 		cpu->ret_hook = 0;
@@ -142,10 +142,11 @@ void return_hook(trapframe_t *regs)
 		smp_lwsync();
 
 		/* invoke the function */
+		enable_int();
 		gevent_table[bit](regs);
+		disable_int();
 	}
 
-	disable_int();
 	gcpu->waiting_for_gevent = waiting;
 }
 
