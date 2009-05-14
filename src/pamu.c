@@ -415,6 +415,8 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	if (!ppaace)
 		return ERR_NOMEM;
 
+	// FIXME: need lock around ppaace->wse check
+
 	if (ppaace->wse) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: liodn %d or device in use\n", __func__, liodn);
