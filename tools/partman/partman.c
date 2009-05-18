@@ -86,6 +86,7 @@ struct parameters {
 #define ELFDATA2MSB  2  /* 2's complement, big endian */
 
 static int verbose = 0;
+static int quiet = 0;
 
 /*
  * ELF header
@@ -180,6 +181,7 @@ static void usage(void)
 	printf("\t\t<handle> is the doorbell send handle for the doorbell to ring.\n\n");
 
 	printf("Specify -v for verbose output\n\n");
+	printf("Specify -q for quiet mode (errors reported via return status only)\n\n");
 
 	printf("For all commands, <handle> can be either the handle number or the\n");
 	printf("full handle name as displayed by the -s command.\n\n");
@@ -200,18 +202,18 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 	int f = open("/dev/fsl-hv", O_RDWR | O_SYNC);
 	if (f == -1) {
 		ret = errno;
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 		return ret;
 	}
 
 	if (ioctl(f, _IOWR(0, cmd, union fsl_hv_ioctl_param), p) == -1) {
 		ret = errno;
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 	} else {
 		ret = p->ret;
-		if (verbose && ret)
+		if (!quiet && ret)
 			printf("Hypervisor returned error %u\n", ret);
 	}
 
@@ -273,34 +275,34 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	unsigned int i;
 
 	if (elf_length < sizeof(struct elf_header)) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: truncated ELF image\n", __func__);
 		return 0;
 	}
 
 	if (elf_length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: truncated ELF image\n", __func__);
 		return 0;
 	}
 
 	/* We only support 32-bit for now */
 	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: only 32-bit ELF images are supported\n", __func__);
 		return 0;
 	}
 
 	/* ePAPR only supports big-endian ELF images */
 	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: only big-endian ELF images are supported\n", __func__);
 		return 0;
 	}
 
 	/* We only support ET_EXEC images for now */
 	if (hdr->type != ET_EXEC) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: only fixed address ELF images are supported\n", __func__);
 		return 0;
 	}
@@ -312,12 +314,12 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	 */
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].offset + phdr[i].filesz > elf_length) {
-			if (verbose)
+			if (!quiet)
 				printf("%s: truncated ELF image\n", __func__);
 			return 0;
 		}
 		if (phdr[i].filesz > phdr[i].memsz) {
-			if (verbose)
+			if (!quiet)
 				printf("%s: invalid ELF program header file size\n", __func__);
 			return 0;
 		}
@@ -336,14 +338,14 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	}
 
 	if (plowest == -1) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: no PT_LOAD program headers in ELF image\n",
 			       __func__);
 		return 0;
 	}
 
 	if (vbase == -1) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: ELF image has invalid entry address %x\n",
 			       __func__, hdr->entry);
 		return 0;
@@ -367,7 +369,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				       __func__, phdr[i].filesz, phdr[i].offset, target_addr);
 			ret = copy_to_partition(partition, elf + phdr[i].offset, target_addr, phdr[i].filesz);
 			if (ret) {
-				if (verbose)
+				if (!quiet)
 					printf("Copy failed, error=%i\n", ret);
 				return 0;
 			}
@@ -381,7 +383,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 				buffer = malloc(phdr[i].memsz - phdr[i].filesz);
 				if (!buffer) {
-					if (verbose)
+					if (!quiet)
 						printf("could not allocate %u bytes\n",
 						       phdr[i].memsz - phdr[i].filesz);
 					return 0;
@@ -392,7 +394,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
                                                         phdr[i].memsz - phdr[i].filesz);
 				free(buffer);
 				if (ret) {
-					if (verbose)
+					if (!quiet)
 						printf("Copy failed, error=%i\n", ret);
 					return 0;
 				}
@@ -444,27 +446,27 @@ static int load_and_copy_image_file(unsigned int partition,
 
 	f = open(filename, O_RDONLY);
 	if (f == -1) {
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 		return 0;
 	}
 
 	if (fstat(f, &buf)) {
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 		goto fail;
 	}
 
 	off = buf.st_size;
 	if (off < 4) {
-		if (verbose)
+		if (!quiet)
 			printf("%s: file %s is too small\n", __func__, filename);
 		goto fail;
 	}
 
 	mapped = mmap(0, off, PROT_READ, MAP_SHARED, f, 0);
 	if (mapped == MAP_FAILED) {
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 		goto fail;
 	}
@@ -472,7 +474,7 @@ static int load_and_copy_image_file(unsigned int partition,
 	if (memcmp(mapped, "\177ELF", 4) == 0) {
 		ret = parse_and_copy_elf(partition, mapped, off, load_address, entry_address);
 		if (!ret) {
-			if (verbose)
+			if (!quiet)
 				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
 				       filename, partition, load_address, ret);
 			goto fail;
@@ -485,7 +487,7 @@ static int load_and_copy_image_file(unsigned int partition,
 		ret = copy_to_partition(partition,
 					&hdr->data,
 					load_address, ntohl(hdr->size));
-		if (ret) {
+		if (ret && !quiet) {
 			printf("Could not load file %s to partition %i "
 			       "at address %lx, error=%i\n",
 				filename, partition, load_address, ret);
@@ -501,7 +503,7 @@ static int load_and_copy_image_file(unsigned int partition,
 
 		ret = copy_to_partition(partition, mapped, load_address, off);
 		if (ret) {
-			if (verbose)
+			if (!quiet)
 				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
 				       filename, partition, load_address, ret);
 			goto fail;
@@ -693,17 +695,19 @@ static int cmd_load_image(struct parameters *p)
 		return EINVAL;
 	}
 
-	printf("Loading file %s\n", p->f);
+	if (verbose)
+		printf("Loading file %s\n", p->f);
 
 	load_address = p->a_specified ? p->a : (unsigned long) -1;
 
 	ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
-	if (!ret) {
+	if (!ret && !quiet) {
 		printf("Could not load and copy file %s\n", p->f);
 		return EIO;
 	}
 
-	printf("(Entry address is 0x%lx)\n", entry_address);
+	if (verbose)
+		printf("(Entry address is 0x%lx)\n", entry_address);
 
 	return ret;
 }
@@ -711,14 +715,14 @@ static int cmd_load_image(struct parameters *p)
 static int cmd_start(struct parameters *p)
 {
 	struct fsl_hv_ioctl_start im;
-	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
 
-	printf("Starting partition %i\n", p->h);
+	if (verbose)
+		printf("Starting partition %i\n", p->h);
 
 	if (!p->e_specified)
 		p->e = 0;
@@ -731,7 +735,8 @@ static int cmd_start(struct parameters *p)
 		unsigned long entry_address;
 		int ret = 0;
 
-		printf("Loading and copying file %s\n", p->f);
+		if (verbose)
+			printf("Loading and copying file %s\n", p->f);
 
 		load_address = p->a_specified ? p->a : (unsigned long) -1;
 
@@ -746,54 +751,48 @@ static int cmd_start(struct parameters *p)
 	im.partition = p->h;
 	im.entry_point = p->e;
 
-	printf("Starting partition at entry point 0x%lx\n", p->e);
+	if (verbose)
+		printf("Starting partition at entry point 0x%lx\n", p->e);
 
-	ret = hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
-	if (ret)
-		printf("Hypervisor returned error %i\n", ret);
-
-	return ret;
+	return hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
 }
 
 static int cmd_stop(struct parameters *p)
 {
 	struct fsl_hv_ioctl_stop im;
-	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
 
-	printf("Stopping partition %i\n", p->h);
+	if (verbose)
+		printf("Stopping partition %i\n", p->h);
 
 	im.partition = p->h;
 
-	ret = hv(FSL_HV_IOCTL_PARTITION_STOP, (void *) &im);
-	if (ret)
-		printf("Hypervisor returned error %i\n", ret);
-
-	return ret;
+	return hv(FSL_HV_IOCTL_PARTITION_STOP, (void *) &im);
 }
 
 static int cmd_restart(struct parameters *p)
 {
 	struct fsl_hv_ioctl_restart im;
-	int ret;
 
 	if (!p->h_specified) {
 		usage();
 		return EINVAL;
 	}
 
-	printf("Restarting partition %i\n", p->h);
+	if (verbose)
+		printf("Restarting partition %i\n", p->h);
 
 	if (p->f_specified) {
 		unsigned long load_address;
 		unsigned long entry_address;
 		int ret = 0;
 
-		printf("Loading and copying image %s\n", p->f);
+		if (verbose)
+			printf("Loading and copying image %s\n", p->f);
 
 		load_address = p->a_specified ? p->a : (unsigned long) -1;
 
@@ -805,13 +804,10 @@ static int cmd_restart(struct parameters *p)
 	// FIXME: restart partition should take an entry address
 	im.partition = p->h;
 
-	printf("Restarting partition\n");
+	if (verbose)
+		printf("Restarting partition\n");
 
-	ret = hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
-	if (ret)
-		printf("Hypervisor returned error %i\n", ret);
-
-	return ret;
+	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
 }
 
 static int cmd_doorbells(struct parameters *p)
@@ -834,11 +830,7 @@ static int cmd_doorbells(struct parameters *p)
 		struct fsl_hv_ioctl_doorbell im;
 
 		im.doorbell = p->h;
-		ret = hv(FSL_HV_IOCTL_DOORBELL, (void *) &im);
-		if (ret)
-			printf("Hypervisor returned error %i\n", ret);
-
-		return ret;
+		return hv(FSL_HV_IOCTL_DOORBELL, (void *) &im);
 	}
 
 	// The user specified -f, so he wants to monitor doorbells.
@@ -846,14 +838,15 @@ static int cmd_doorbells(struct parameters *p)
 	// executed.
 	snprintf(command, sizeof(command), "test -x %s", p->f);
 	if (system(command)) {
-		printf("%s is not a executable file\n", p->f);
+		if (!quiet)
+			printf("%s is not a executable file\n", p->f);
 		return EINVAL;
 	}
 
 	int f = open("/dev/fsl-hv", O_RDONLY);
 	if (f == -1) {
 		ret = errno;
-		if (verbose)
+		if (!quiet)
 			perror(__func__);
 		return ret;
 	}
@@ -861,7 +854,7 @@ static int cmd_doorbells(struct parameters *p)
 	while (1) {
 		ret = read(f, &dbell, sizeof(dbell));
 		if (ret <= 0) {
-			if (verbose)
+			if (!quiet)
 				perror(__func__);
 			break;
 		}
@@ -893,13 +886,16 @@ int verify_dev(void)
 
 	f = fopen("/sys/class/misc/fsl-hv/dev", "r");
 	if (!f) {
-		printf("Freescale HV management driver has not been loaded.\n");
-		printf("Please load the driver or rebuild the kernel with this driver enabled.\n");
+		if (!quiet) {
+			printf("Freescale HV management driver has not been loaded.\n");
+			printf("Please load the driver or rebuild the kernel with this driver enabled.\n");
+		}
 		return 0;
 	}
 	ret = fscanf(f, "%u:%u", &major, &minor);
 	if ((ret != 2) || (major == 0)) {
-		printf("Could not read the sysfs entry for the HV management driver.\n");
+		if (!quiet)
+			printf("Could not read the sysfs entry for the HV management driver.\n");
 		return 0;
 	}
 	fclose(f);
@@ -908,34 +904,43 @@ int verify_dev(void)
 	{
 		switch (errno) {
 		case EACCES:
-			printf("Permissions on /dev/fsl-hv are incorrect.  As root, try this:\n");
-			printf("chmod a+rw /dev/fsl-hv\n");
-			printf("and try partman again\n");
+			if (!quiet) {
+				printf("Permissions on /dev/fsl-hv are incorrect.  As root, try this:\n");
+				printf("chmod a+rw /dev/fsl-hv\n");
+				printf("and try partman again\n");
+			}
 			return 0;
 		case ENOENT:
-			printf("/dev/fsl-hv does not exist.  Please check your root file system.\n");
-			printf("As a temporary fix, do this as root:\n");
-			printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+			if (!quiet) {
+				printf("/dev/fsl-hv does not exist.  Please check your root file system.\n");
+				printf("As a temporary fix, do this as root:\n");
+				printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+			}
 			return 0;
 		default:
-			printf("Something is wrong with /dev/fsl-hv (errno=%i).\n", errno);
+			if (!quiet)
+				printf("Something is wrong with /dev/fsl-hv (errno=%i).\n", errno);
 			return 0;
 		}
 	}
 
 	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
-		printf("/dev/fsl-hv is not a character device.  Please check your root file system.\n");
-		printf("As a temporary fix, do this as root:\n");
-		printf("rm -f /dev/fsl-hv\n");
-		printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		if (!quiet) {
+			printf("/dev/fsl-hv is not a character device.  Please check your root file system.\n");
+			printf("As a temporary fix, do this as root:\n");
+			printf("rm -f /dev/fsl-hv\n");
+			printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		}
 		return 0;
 	}
 
 	if ((major(statbuf.st_rdev) != major) || (minor(statbuf.st_rdev) != minor)) {
-		printf("Major and/or minor number of /dev/fsl-hv are wrong.\n");
-		printf("Please check your root file system.  As a temporary fix, do this as root:\n");
-		printf("rm -f /dev/fsl-hv\n");
-		printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		if (!quiet) {
+			printf("Major and/or minor number of /dev/fsl-hv are wrong.\n");
+			printf("Please check your root file system.  As a temporary fix, do this as root:\n");
+			printf("rm -f /dev/fsl-hv\n");
+			printf("mknod /dev/fsl-hv c %u %u\n", major, minor);
+		}
 		return 0;
 	}
 
@@ -997,6 +1002,9 @@ int main(int argc, char *argv[])
 	int c;
 	int ret = 0;
 
+	/* FIXME: Process options first, so this can be suppressed based
+	 * on verbose/quiet.
+	 */
 	printf("Freescale Hypervisor Partition Manager %s\n\n", VERSION);
 
 	if (!verify_dev())
@@ -1033,6 +1041,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 'q':
+			quiet = 1;
 			break;
 		case 'h':
 			ret = get_handle(optarg);
