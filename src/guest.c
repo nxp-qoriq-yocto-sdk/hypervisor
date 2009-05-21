@@ -2321,7 +2321,26 @@ out:
 
 static void init_dev_ranges(guest_t *guest)
 {
-	guest->devices = guest->devtree;
+	/* Create a toplevel container node under which all devices will go. */
+	dt_node_t *container = dt_get_subnode(guest->devtree, "devices", 1);
+	if (!container)
+		goto nomem;
+
+	if (dt_set_prop_string(container, "compatible", "simple-bus") < 0)
+		goto nomem;
+
+	/* Create a "ranges" property equivalent to device-ranges */
+	if (dt_set_prop(container, "ranges", 0, 0) < 0)
+		goto nomem;
+
+	uint32_t val = 2;
+	if (dt_set_prop(container, "#address-cells", &val, 4) < 0)
+		goto nomem;
+
+	if (dt_set_prop(container, "#size-cells", &val, 4) < 0)
+		goto nomem;
+
+	guest->devices = container;
 
 	guest->devranges = dt_get_prop(guest->partition, "device-ranges", 0);
 	if (!guest->devranges)
@@ -2337,28 +2356,12 @@ static void init_dev_ranges(guest_t *guest)
 		return;
 	}
 
-	/* Create a toplevel container node with a "ranges" property
-	 * equivalent to device-ranges, under which all devices will go.
-	 */
-	dt_node_t *container = dt_get_subnode(guest->devtree, "devices", 1);
-	if (!container)
-		goto nomem;
-
-	if (dt_set_prop_string(container, "compatible", "simple-bus") < 0)
-		goto nomem;
-
+	/* Create a "ranges" property equivalent to device-ranges */
 	if (dt_set_prop(container, "ranges", guest->devranges->data,
 	                guest->devranges->len) < 0)
 		goto nomem;
 
-	uint32_t val = 2;
-	if (dt_set_prop(container, "#address-cells", &val, 4) < 0)
-		goto nomem;
 
-	if (dt_set_prop(container, "#size-cells", &val, 4) < 0)
-		goto nomem;
-
-	guest->devices = container;
 	return;
 
 nomem:
