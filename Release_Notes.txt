@@ -25,9 +25,9 @@
 -------------------------------------------------------
 Topaz Hypervisor Release Notes
 
-Topaz Version: 0.3
-Revsion: rc14
-Date: 2/13/2009
+Topaz Version: 0.4
+Revsion: 002
+Date: 5/21/2009
 
 -------------------------------------------------------
 Contents
@@ -46,202 +46,25 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.3-rc14 is compatible with Simics 4.0.29 / pre14 and
-    later
+   -Topaz 0.4-002 is compatible with Simics 4.0 4.0.45 /
+    pre35 and later
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.87
+    0.874
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -Topaz 0.3-rc14 bug fixes and changes
-      -bug 2750- improved heuristics for device tree
-       printing
-      -bug 2758- Linux hang in user space when doing flash
-       invalidates
-      -bug 2305- Hypervisor fails to initialize virtual 
-       devices like byte channel on increasing the number
-       of devices in the device tree
-      -bug 2751- snoop-cpu-only property warning in
-       partitions with more than 1 cpu 
-      -unit test additions and improvements
-      -copyright cleanup
-
-   -Topaz 0.3-rc13 bug fixes and changes
-      -support for snoop domains for DMA devices (bug 2606)
-      -gdb stub-- support fpscr register
-      -fix node-update-phandle processing of subnodes
-      -partman-- improve parameter checking
-      -support hypervisor console on a byte-channel
-      -support booting hypervisor from 4MB of memory
-      -support fsl,hv-dma-handle property in guest device
-       trees
-      -implment no-auto-start feature
-      -bug 2595-- crash with debug stub in multi cpu
-       partitions
-      -bug 2700-- gdb stub, give error when reading inaccessible
-       memory
-      -bug 2305-- support up to 64 virtual interrupt sources
-       per partition
-      -bug 2701-- fix PAMU address translations with subwindows
-
-   -Topaz 0.3-rc12 bug fixes and changes
-      -bug 2601-- State change interrupt not receieved when
-       FH_PARTITION_RESTART hypercall issued
-      -hypervisor stack is 4KB
-      -performance optimizations
-         -on tlbwe emulation, write to hardware TLB immediately
-         -use dcbz to zero memory
-      -debug stub api: added 'as_guest' argument to write_gmsr()
-      -gdb stub: support hardware breakpoints
-      -cpc cache: PMAs default to allocation defined in partition reg 0
-      -added size alignment error checking for DMA windows
-      -updates to unit tests to work with swift
-      -P4080 law register and ccf register addresses now come from
-       device tree
-
-   -Topaz 0.3-rc11 bug fixes and changes
-      -bug 2580-- hypervisor hang during boot if mux server attached
-      -base address of CCSR space comes from device tree
-      -bug 2346-- truncated guest device tree dumps from shell
-      -bug 2644-- hypervisor hangs if default logging level set to 10
-      -gdb stub-- support for running off of debug interrupt, enables
-       single step on smp
-      -support for cpu-count property is removed
-      -implicit handling of qman and bman portals is no longer
-       supported, device= assignment must be explity to the hardware
-       node
-      -support vcpu property on qman portal device assignment nodes
-       so hypevisor will update cpu-handle property on portal nodes
-
-   -Topaz 0.3-rc10 bug fixes and changes
-      -PAMU subwindows
-      -CPC partitioning
-      -bug fix for setting DEAR correctly on alignment exceptions
-      -threading infrastucture
-      -support for node-update-phandle
-      -debug stub API updates
-         -guest TLB search API
-         -build plugin support
-         -spr accessor updates
-         -mas2 flags supported on map_gphys()
-      -bug 2584 fixed-- doorbells don't work correctly in multiple
-       partition configuration
-
-   -Topaz 0.3-rc9 bug fixes and changes
-      -support guest debug mode (2490)
-      -support guest cache lock mode (bug 2491)
-      -debug stub updates
-         -implement support for debug stub with new-config
-          architecture
-         -implement 0.5 of the Freescale P4080 Topaz Hypervisor
-          Debug Stub API
-         -support pmr reads/writes
-         -don't clear stub data on cpu restart
-         -implement write_gpc()
-      -support coherence subdomains
-      -make 'coreint' the default interrupt configuration
-      -don't panic if a byte channel is attached twice (2534)
-      -print message on PAMU access violation (2259)
-      -support "fsl,dpaa" bus type (2558)
-
-   -Topaz 0.3-rc8 bug fixes and changes
-      -implements the new partition definition scheme specified
-       in version 0.83 of the hypervisor spec
-          -support for stashing through PAMU is implemented
-      -bug 1866: Issue with partition device tree when more than
-       32 bytechannels are attached to mux
-      -bug 2126: DE bit in emulation of debug interrupt and
-       rfci/rfmci
-
-   -Topaz 0.3-rc7 bug fixes and changes
-      -updates to enable unit tests to be run under swift
-       test harness
-      -ePAPR improvements-- the guest entry point is computed
-       as per the ePAPR
-      -fixed bug 2216: set TSR[WRS] to TCR[WRC] upon watchdog reset
-      -fixed bugs 2353, 2352: watchdog reset does not occur
-       with partition with more than 1 CPU
-
-   -Topaz 0.3-rc6 bug fixes and changes
-      -added I2C controller virtualization
-      -do not set interrupts to critical before they are registered--
-       fixes a problem where pending UART interrupts fired before
-       a handler was registered
-      -improved readability of shell 'paact' command output
-      -livetree integration-- no user visibile change from this, this
-       is groundwork for the upcoming new partition definition
-       change 
-      -removed obsolete ppid-to-liodn hcall
-
-   -Topaz 0.3-rc5 bug fixes and changes
-      -support for loading uncompressed uImages from partman
-      -fixed bug 2165-- watchdog unit test hangs after rebooting once
-      -guest debug mode emulation -- support for IAC and DAC
-      -removed CONFIG_IPI_DOORBELL option
-      -libos-- clear MSR after fixup_mmu()
-
-   -Topaz 0.3-rc4 bug fixes and changes
-      -support for loading uncompressed uImages for client program
-       images and ramdisk
-      -Bug 2121 is fixed. write_gmsr: mask out privileged bits
-      -Bug 2196 is fixed.  ISI interrupt comes when use TLB0
-       and machine check when TLB1.
-      -guest debug mode: add support for ICMP guest debug event
-      -support the partition management interrupts
-         Note: the 0.81 spec does not have these documented
-         currently
-      -support the fsl,hv-wd-mgr-notify property which specifies
-       that watchdog timeouts should signal the manager
-       partition
-      -all L2 cache control registers are now supported
-      -Bug 2169 is fixed. Set valid bit in tlbcache tag from MAS1,
-       rather than always 1.
-      -partman now supports copying ELF images with
-       discontiguous load segments
-      -hypervisor now catches machine checks and dumps
-       errors
-      -support building the hypervisor out of tree with the
-       O= option on the make command line.  By default all
-       objects produced by the build go into the output
-       directory
-
-   -Topaz 0.3-rc3 bug fixes and changes
-      -L1 and L2 cache control register access is now
-       supported (as per 0.81 Topaz spec)-- a few L2
-       registers are still missing
-      -TLB cache bug is fixed that resulted in segmentation
-       faults in Linux
-      -bug 2166 (TLB search not giving proper tsize for TLB0)
-       is fixed
-      -bug 2167 (Compilation error on changing PHYSMAPSIZE
-        macro used in head.S) is fixed
-      -bug 2152 - update to unit tests to run with new 
-       Simics model
-      -fix handling of multiple pending guest doorbells
-      -sim.git is now a submodule of the hypervisor and
-       will be used as basis for the unit tests-- u-boot
-       and boot.simics will come from here
-
-   -Topaz 0.3-rc2 bug fixes and changes
-      -guest watchdog support is implemented (see limitations
-       below)
-      -libos and dts are now submodules and do not need to
-       be cloned separately from the hypervisor
-      -bug 2129-- hypervisor console not working on byte-channel
-       on a mux
-
-   -Topaz 0.3-rc1 bug fixes and changes from 0.2
-      -guest cache lock mode is now supported as per
-      the Topaz spec
-      -TLB cache-- TLB0 and TLB1 are both fully virtualized
-       (CONFIG_TLB_CACHE)
-      -master and guest device printing support at the
-       HV console
-      -guest machine check cleanup and unit test
-      -initial guest debug mode support-- trap instruction
-       debug trap is implemented
+   -Topaz 0.4-002 bug fixes and changes
+      -36-bit physical addresses are supported
+      -compressed uImages are supported
+      -read-only GPMAs are supported
+      -support node-update-phandle referencing hypervisor
+       generated nodes
+      -support for fh_nmi_send hcall
+      -64-bit cleanup
+      -support device-ranges
+      -bug 3371: gdb stub is not 64-bit clean
 
 -------------------------------------------------------
 4.  Limitations
@@ -249,8 +72,6 @@ Contents
  A. Open Bugs
 
  B. CPU Feature Limitations
-
-   -physical addresses greater than 32 bits are not supported
 
    -CPU core performance monitor support
       -support for the CPU performance interrupt is not implemented
