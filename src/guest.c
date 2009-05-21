@@ -2372,6 +2372,9 @@ static int init_guest_devs(guest_t *guest)
 	int ret;
 
 	init_dev_ranges(guest);
+
+	vmpic_partition_init(guest);
+
 	dt_assign_devices(guest->partition, guest);
 
 	/* First, merge each assigned device and its sub-tree, and
@@ -2484,8 +2487,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 		goto fail;
 
 	map_guest_mem(guest);
-
-	vmpic_partition_init(guest);
 
 	list_init(&guest->dev_list);
 	list_init(&guest->phandle_update_list);

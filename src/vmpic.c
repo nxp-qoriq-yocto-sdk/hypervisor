@@ -178,19 +178,16 @@ out:
  */
 void vmpic_partition_init(guest_t *guest)
 {
-	dt_node_t *hv, *vmpic;
+	dt_node_t *vmpic;
 	uint32_t propdata;
 #if 0
 	vmpic_init_ctx_t ctx = {
 		.guest = guest
 	};
 #endif
-	hv = dt_get_subnode(guest->devtree, "hypervisor", 1);
-	if (!hv)
-		goto nomem;
 
 	/* find the vmpic node */
-	vmpic = dt_get_subnode(hv, "vmpic", 1);
+	vmpic = dt_get_subnode(guest->devices, "vmpic", 1);
 	if (!vmpic)
 		goto nomem;
 
