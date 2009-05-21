@@ -909,8 +909,7 @@ void hvpriv(trapframe_t *regs)
 			fault = emu_tlbivax(regs, insn);
 			break;
 
-		case 0x313: /* old opcode, p4080 rev 1 */
-		case 18: /* architected opcode */
+		case 18:
 			fault = emu_tlbilx(regs, insn);
 			break;
 	
