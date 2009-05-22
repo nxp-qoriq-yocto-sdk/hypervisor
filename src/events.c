@@ -38,9 +38,10 @@
 #include <thread.h>
 
 static eventfp_t event_table[] = {
-	&dbell_to_gdbell_glue,  /* EV_ASSERT_VINT */
-	&tlbivax_ipi,           /* EV_TLBIVAX */
-	&schedule,              /* EV_RESCHED */
+	&dbell_to_gdbell_glue,           /* EV_ASSERT_VINT */
+	&tlbivax_ipi,                    /* EV_TLBIVAX */
+	&schedule,                       /* EV_RESCHED */
+	&dbell_to_mcgdbell_glue,         /* EV_MCP */
 };
 
 /* Guest events are processed when returning to the guest, but
@@ -168,6 +169,11 @@ void doorbell_int(trapframe_t *regs)
 		/* invoke the function */
 		event_table[bit](regs);
 	}
+}
+
+void dbell_to_mcgdbell_glue(trapframe_t *regs)
+{
+	send_local_mchk_guest_doorbell();
 }
 
 /* Initialize the global gevents

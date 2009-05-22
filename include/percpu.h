@@ -192,7 +192,7 @@ typedef struct guest {
 
 extern struct guest guests[MAX_PARTITIONS];
 extern unsigned long last_lpid;
-
+/* The following flags correspond to crit_gdbell_pending */
 #define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
 #define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
@@ -201,6 +201,8 @@ extern unsigned long last_lpid;
 #define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
 #define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
+/* The following flag corresponds to mchk_gdbell_pending */
+#define GCPU_PEND_MCHK_MCP 0x00000001 /* MCP machine check event pending */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
@@ -252,6 +254,7 @@ typedef struct gcpu {
 	 * insert new fields before gdbell_pending.
 	 */
 	unsigned long gdbell_pending;
+	unsigned long mchk_gdbell_pending;
 	unsigned long crit_gdbell_pending;
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;

@@ -180,6 +180,41 @@ check_flags:
 		send_local_guest_doorbell();
 }
 
+static int check_wdog_crit_event(gcpu_t *gcpu, trapframe_t *regs)
+{
+	if (gcpu->crit_gdbell_pending & GCPU_PEND_WATCHDOG) {
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
+		reflect_watchdog(gcpu, regs);
+
+		return 1;
+	}
+
+	return 0;
+}
+
+static int check_msgsnd_crit_event(gcpu_t *gcpu, trapframe_t *regs)
+{
+	if (gcpu->crit_gdbell_pending & GCPU_PEND_MSGSNDC) {
+		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
+
+		/*
+		 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
+		 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
+		 * guest can't access CSRR0 or CSRR1 directly when the hypervisor is
+		 * running -- they need to be emulated.
+		 */
+		gcpu->csrr0 = regs->srr0;
+		gcpu->csrr1 = regs->srr1;
+
+		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELLC];
+		regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+
+		return 1;
+	}
+
+	return 0;
+}
+
 /**
  * Reflect a guest critical doorbell
  *
@@ -199,29 +234,23 @@ check_flags:
 void guest_critical_doorbell(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
+	int ret;
 
-	if (gcpu->crit_gdbell_pending & GCPU_PEND_WATCHDOG) {
-		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
+	if ((gcpu->mchk_gdbell_pending & GCPU_PEND_MCHK_MCP) && (regs->srr1 & MSR_ME)) {
+		atomic_and(&gcpu->mchk_gdbell_pending, ~GCPU_PEND_MCHK_MCP);
 
-		reflect_watchdog(gcpu, regs);
+		reflect_mcheck(regs, MCSR_MCP, 0);
 		goto check_flags;
 	}
 
-	if (gcpu->crit_gdbell_pending & GCPU_PEND_MSGSNDC) {
-		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
+	if (regs->srr1 & MSR_CE) {
+		ret = check_wdog_crit_event(gcpu, regs);
+		if (ret)
+			goto check_flags;
 
-		/*
-		 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
-		 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
-		 * guest can't access CSRR0 or CSRR1 directly when the hypervisor is
-		 * running -- they need to be emulated.
-		 */
-		gcpu->csrr0 = regs->srr0;
-		gcpu->csrr1 = regs->srr1;
-
-		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELLC];
-		regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
-		goto check_flags;
+		ret = check_msgsnd_crit_event(gcpu, regs);
+		if (ret)
+			goto check_flags;
 	}
 
 	return;
@@ -231,6 +260,9 @@ check_flags:
 	 * issue another guest doorbell so that we return to this function to
 	 * process them.
 	 */
+	if (gcpu->mchk_gdbell_pending)
+		send_local_mchk_guest_doorbell();
+
 	if (gcpu->crit_gdbell_pending)
 		send_local_crit_guest_doorbell();
 }

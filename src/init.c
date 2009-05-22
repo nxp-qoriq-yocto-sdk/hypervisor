@@ -633,6 +633,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	assign_hv_devs();
 	enable_int();
+	enable_mcheck();
 
 	init_gevents();
 
@@ -675,6 +676,7 @@ void secondary_init(void)
 	core_init();
 	mpic_reset_core();
 	enable_int();
+	enable_mcheck();
 	partition_init();
 }
 

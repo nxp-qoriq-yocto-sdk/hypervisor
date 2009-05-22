@@ -38,7 +38,11 @@
 #include <errors.h>
 #include <devtree.h>
 #include <paging.h>
+#include <events.h>
 #include <limits.h>
+
+static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
+static uint32_t pamu_lock;
 
 static unsigned int map_addrspace_size_to_wse(phys_addr_t addrspace_size)
 {
@@ -411,19 +415,24 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		return ERR_BADTREE;
 	}
 
+	spin_lock(&pamu_lock);
 	ppaace = pamu_get_ppaace(liodn);
-	if (!ppaace)
+	if (!ppaace) {
+		spin_unlock(&pamu_lock);
 		return ERR_NOMEM;
-
-	// FIXME: need lock around ppaace->wse check
+	}
 
 	if (ppaace->wse) {
+		spin_unlock(&pamu_lock);
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: liodn %d or device in use\n", __func__, liodn);
 		return ERR_BUSY;
 	}
 
 	ppaace->wse = map_addrspace_size_to_wse(window_size);
+	spin_unlock(&pamu_lock);
+
+	liodn_to_guest[liodn] = guest;
 
 	setup_default_xfer_to_host_ppaace(ppaace);
 
@@ -664,19 +673,36 @@ static int pamu_av_isr(void *arg)
 	phys_addr_t reg_size = dev->regs[0].size;
 	unsigned long reg_off;
 	int ret = -1;
+	struct pamu_error_regs regs;
+	uint32_t av_liodn, avah, aval;
 
 	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
 		void *reg = reg_base + reg_off;
 
 		uint32_t pics = in32((uint32_t *)(reg + PAMU_PICS));
 		if (pics & PAMU_ACCESS_VIOLATION_STAT) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, 
-			         "PAMU access violation on PAMU#%ld\n",
-			         reg_off / PAMU_OFFSET);
+			regs.pamu_avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
+			regs.pamu_avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+			regs.pamu_avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
+			regs.pamu_aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
+			av_liodn = regs.pamu_avs1 >> PAMU_AVS1_LIODN_SHIFT;
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+					"PAMU access violation on PAMU#%ld, liodn = %x\n",
+					 reg_off / PAMU_OFFSET, av_liodn);
+			regs.pamu_avs1 &= PAMU_AV_MASK;
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+					"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
+					 regs.pamu_avs1, regs.pamu_avs2, regs.pamu_avah, regs.pamu_aval);
 
+			guest_t *guest = liodn_to_guest[av_liodn];
+			if (guest) {
+				atomic_or(&guest->gcpus[0]->mchk_gdbell_pending, GCPU_PEND_MCHK_MCP);
+				setevent(guest->gcpus[0], EV_MCP);
+			}
+
+			out32((uint32_t *) (reg + PAMU_AVS1), regs.pamu_avs1);
 			/* De-assert access violation pin */
-			out32((uint32_t *)(reg + PAMU_PICS),
-			      PAMU_ACCESS_VIOLATION_STAT);
+			out32((uint32_t *)(reg + PAMU_PICS), pics);
 
 			ret = 0;
 		}

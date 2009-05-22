@@ -70,6 +70,12 @@ static inline void send_local_crit_guest_doorbell(void)
 	                  mfspr(SPR_GPIR));
 }
 
+static inline void send_local_mchk_guest_doorbell(void)
+{
+	send_doorbell_msg(MSG_GBELL_MCHK | (get_gcpu()->guest->lpid << 14) |
+	                  mfspr(SPR_GPIR));
+}
+
 /** Send critical doorbell.
  *
  *  Always for hypervisor internal use only so
@@ -89,5 +95,4 @@ static inline void send_doorbell(int cpunum)
 {
 	send_doorbell_msg(MSG_DBELL | cpunum);
 }
-
 #endif

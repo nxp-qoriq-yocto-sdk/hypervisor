@@ -47,10 +47,13 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	mcsr = mfspr(SPR_MCSR);
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"Machine check syndrome register = %lx\n", mcsr);
 
-	if (mcsr & MCSR_MAV)
+	if (mcsr & MCSR_MAV) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"Machine check %s address = %lx\n",
 			(mcsr & MCSR_MEA)? "effective" : "real",
 			 mfspr(SPR_MCAR));
+	} else if (mcsr & MCSR_MCP){
+		do_mpic_mcheck();
+	}
 
 	dump_regs(frameptr);
 
