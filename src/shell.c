@@ -668,3 +668,53 @@ static command_t resume = {
 	            "  The partition number can be obtained with list-partitions.",
 };
 shell_cmd(resume);
+
+static void gtlb_fn(shell_t *shell, char *args)
+{
+	tlb_entry_t gmas = {0};
+	uint32_t flags = TLB_READ_FIRST;
+	int rc, i = 0, tlb_num;
+	phys_addr_t paddr;
+	unsigned long vaddr, size;
+	char *numstr;
+
+	args = stripspace(args);
+	numstr = nextword(&args);
+	if (!numstr) {
+		qprintf(shell->out, 1, "Usage: gtlb <tlb-number>\n");
+		return;
+	}
+	tlb_num = get_number32(shell->out, numstr);
+	qprintf(shell->out, 1, "tlb %d dump\n", tlb_num);
+
+	gmas.mas0 |= MAS0_TLBSEL(tlb_num);
+	while (1) {
+		rc = guest_tlb_read(&gmas, &flags);
+		if (rc < 0)
+			break;
+		if (!(gmas.mas1 & MAS1_VALID))
+			continue;
+
+		paddr = (gmas.mas7 << (32 - PAGE_SHIFT)) |
+			(gmas.mas3 & ~(PAGE_SIZE - 1));
+		vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
+		size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
+
+		qprintf(shell->out, 1, "%01u\t",
+			(!tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
+
+		qprintf(shell->out, 1, "0x%08lx - 0x%08lx\t",
+				vaddr, vaddr + size - 1);
+		// FIXME: 64-bit paddr
+		qprintf(shell->out, 1, "0x%09llx - 0x%09llx\n",
+				paddr, paddr + size - 1 );
+	}
+}
+
+static command_t gtlb = {
+	.name = "gtlb",
+	.action = gtlb_fn,
+	.shorthelp = "Dump guest tlb entries",
+	.longhelp = "  Usage: gtlb <tlb-number>\n\n"
+};
+shell_cmd(gtlb);

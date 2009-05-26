@@ -1,4 +1,5 @@
 /* @file
+
  * TLB management
  */
 
@@ -530,6 +531,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 	free_tlb1(entry);
 
+	gcpu->gtlb1[entry].mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(entry);
 	gcpu->gtlb1[entry].mas1 = mas1;
 	gcpu->gtlb1[entry].mas2 = (epn << PAGE_SHIFT) | mas2flags;
 	gcpu->gtlb1[entry].mas3 = (uint32_t)(grpn << PAGE_SHIFT) | mas3flags;
@@ -549,7 +551,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		/* If there's no valid mapping, try again at the next page. Note
 		 * that this can be slow.
-       *
+		 *
 		 * Unfortunately, we'll have to reflect a TLB miss rather than
 		 * a machine check for accesses to these mapping holes,
 		 * as TLB1 entries are a limited resource that we don't want
@@ -1400,4 +1402,96 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 	}
 
 	return ret;
+}
+
+/** Dump the guest tlb entries
+ *
+ * @param[in] gmas pointer to guest tlb_entry
+ * @param[inout] flags pointer to flags  (self-clearing,
+ *    caller should not use it after initializing it to TLB_READ_FIRST )
+ * @return success or indication that there are no more tlbe's to be read
+ */
+int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
+{
+	uint32_t tlb_index, way, tlb0_nentries;
+	unsigned int tlb;
+	gcpu_t *gcpu = get_gcpu();
+
+#ifndef CONFIG_TLB_CACHE
+	tlb0_nentries = (mfspr(SPR_TLB0CFG) & 0xFFF) >> 2;
+#else
+	tlb0_nentries = 1 << (cpu->client.tlbcache_bits);
+#endif
+	tlb = MAS0_GET_TLBSEL(gmas->mas0);
+
+	switch (tlb) {
+	case 0:
+	{
+		if (*flags & TLB_READ_FIRST) {
+			tlb_index = way = 0;
+			*flags &= ~TLB_READ_FIRST;
+		} else {
+			tlb_index = ((gmas->mas2 >> PAGE_SHIFT) &
+				(tlb0_nentries - 1));
+			way = (MAS0_GET_TLB0ESEL(gmas->mas0) + 1) % 4;
+			if (!way)
+				++tlb_index;
+		}
+
+		if (tlb_index >= tlb0_nentries)
+			return ERR_NOTFOUND;
+
+		/*
+		 * TLB0 is pass-thorugh with grpn<->true-rpn fixups applied
+		 * in non TLB_CACHE case
+		 */
+		disable_int();
+		save_mas(gcpu);
+#ifndef CONFIG_TLB_CACHE
+		mtspr(SPR_MAS0, gmas->mas0 |  MAS0_ESEL(way));
+		mtspr(SPR_MAS2, tlb_index << PAGE_SHIFT);
+		asm volatile ("tlbre" : : : "memory");
+		fixup_tlb_sx_re();
+#else
+		gtlb0_to_mas(tlb_index, way);
+#endif
+		if (!(mfspr(SPR_MAS1) & MAS1_VALID)) {
+			gmas->mas0 = MAS0_ESEL(way);
+			gmas->mas1 = mfspr(SPR_MAS1);
+			gmas->mas2 = tlb_index << PAGE_SHIFT;
+		} else {
+			/*
+			 * FIXME: tlbre does not preserve ESEL(way-select), so
+			 * do it explicitly for now.
+			 */
+			gmas->mas0 = MAS0_ESEL(way);
+			gmas->mas1 = mfspr(SPR_MAS1);
+			gmas->mas2 = mfspr(SPR_MAS2);
+			gmas->mas3 = mfspr(SPR_MAS3);
+			gmas->mas7 = mfspr(SPR_MAS7);
+			gmas->mas8 = mfspr(SPR_MAS8);
+		}
+		restore_mas(gcpu);
+		enable_int();
+		break;
+	}
+	case 1:
+	{
+		if (*flags & TLB_READ_FIRST) {
+			tlb_index = 0;
+			*flags &= ~TLB_READ_FIRST;
+		} else {
+			tlb_index = MAS0_GET_TLB1ESEL(gmas->mas0);
+			++tlb_index;
+		}
+		if (tlb_index >= TLB1_GSIZE)
+			return ERR_NOTFOUND;
+		memcpy(gmas, &gcpu->gtlb1[tlb_index], sizeof(tlb_entry_t));
+		break;
+	}
+	default:
+		return ERR_NOTFOUND;
+	}
+
+	return 0;
 }

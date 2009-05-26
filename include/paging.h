@@ -167,6 +167,9 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len);
 size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
                           phys_addr_t src, size_t len);
 
+#define TLB_READ_FIRST 1
+int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags);
+
 #define TLB_MISS_HANDLED 0
 #define TLB_MISS_REFLECT 1
 #define TLB_MISS_MCHECK  2
