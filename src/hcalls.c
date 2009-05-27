@@ -130,7 +130,7 @@ static void fh_send_nmi(trapframe_t *regs)
 	int bit;
 
 	bit = 31 - count_msb_zeroes(vcpu_mask) + 1;
-	if (bit > ncpu) {
+	if (vcpu_mask != 0 && bit > ncpu) {
 		regs->gpregs[3] = EINVAL;
 		return;
 	}
