@@ -626,6 +626,7 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 		if (!(c = (checksum(content(stub->cmd)) == htoi(ccs)))) {
 			TRACE("Checksum mismatch. Sending NAK and getting next packet.");
 			nak(stub);
+			pkt_reset(stub->cmd);
 		}
 	} while (!c);
 
