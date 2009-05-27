@@ -41,7 +41,7 @@ $guest_addr[2]   = 0x01000000
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"
 
-$kernel_cmdline = "config-addr=0xe8f00000"
+$kernel_cmdline = "config-addr=0xfe8f00000"
 
 $dev_tree_blob  = "hardware-intmap.dtb"
 

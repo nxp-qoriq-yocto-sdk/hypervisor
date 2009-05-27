@@ -93,9 +93,14 @@
 		compatible = "partition";
 		label = "p1-linux";
 		cpus = <0 2>;
-		guest-image = <0 0xe8100000 0 0 0 0x00e00000>;
-		linux-rootfs = <0 0xe9000000 0 0x01300000 0 0x00800000>;
+		guest-image = <0xf 0xe8100000 0 0 0 0x00e00000>;
+		linux-rootfs = <0xf 0xe9000000 0 0x01300000 0 0x00800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
+
+                device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
+				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
+				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
+				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
 
 		serial2 {
 			device = "serial2";
@@ -112,12 +117,12 @@
 		};
 
 		bman-portalA {
-			device = "/bman-portals@f4000000/bman-portal@0";
+			device = "/bman-portals/bman-portal@0";
 			vcpu = <0>;
 		};
 
 		bman-portalB {
-			device = "/bman-portals@f4000000/bman-portal@4000";
+			device = "/bman-portals/bman-portal@4000";
 			vcpu = <1>;
 		};
 
@@ -126,7 +131,7 @@
 		};
 
 		qman-portalA {
-			device = "/qman-portals@f4200000/qman-portal@0";
+			device = "/qman-portals/qman-portal@0";
 			vcpu = <0>;
 			fman0 {
 				device = "fman0";
@@ -161,7 +166,7 @@
 		};
 
 		qman-portalB {
-			device = "/qman-portals@f4200000/qman-portal@4000";
+			device = "/qman-portals/qman-portal@4000";
 			vcpu = <1>;
 			fman0 {
 				device = "fman0";
