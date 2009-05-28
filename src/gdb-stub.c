@@ -611,12 +611,14 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 
 		TRACE("Begin Looping:");
 		while ((c = get_debug_char(stub)) != '#') {
-			TRACE("(Looping) Iteration: %d, got character: '%c'", i++, c);
+			TRACE("(Looping) Iteration: %d, got character: 0x%02x", i++, c);
 			pkt_write_byte_update_cur(stub->cmd, c);
 		}
 		TRACE("Done Looping.");
 		pkt_write_byte_update_cur(stub->cmd, '\0');
-		DEBUG("Received command: %s", content(stub->cmd));
+		DEBUG("Received command:");
+		for (i = 0; i < pkt_len(stub->cmd); i++)
+			DEBUG("cmd[%d] = 0x%02x", i, stub->cmd->buf[i]);
 
 		for (i = 0; i < 2; i++) {
 			ccs[i] = get_debug_char(stub);
