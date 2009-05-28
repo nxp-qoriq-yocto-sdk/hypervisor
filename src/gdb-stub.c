@@ -348,8 +348,10 @@ static int bufsize_sanity_check(void);
 static int pkt_len(pkt_t *pkt);
 static int pkt_space(pkt_t *pkt);
 static void pkt_write_byte(pkt_t *pkt, uint8_t c);
+static void pkt_write_byte_verbatim(pkt_t *pkt, uint8_t c);
 static void pkt_update_cur(pkt_t *pkt);
 static void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c);
+static void pkt_write_byte_verbatim_update_cur(pkt_t *pkt, uint8_t c);
 static void pkt_write_hex_byte_update_cur(pkt_t *pkt, uint8_t c);
 static void pkt_cat_string(pkt_t *pkt, const char *s);
 static void pkt_cat_stringn(pkt_t *pkt, const uint8_t *s, uint32_t n);
@@ -486,7 +488,15 @@ static void pkt_write_byte(pkt_t *pkt, uint8_t c)
 		pkt_update_cur(pkt);
 		if (pkt->cur < (pkt->buf + pkt->len))
 			*(pkt->cur) = c ^ 0x20;
-	} else if (pkt->cur < (pkt->buf + pkt->len))
+	} else
+		pkt_write_byte_verbatim(pkt, c);
+	return;
+}
+
+static void pkt_write_byte_verbatim(pkt_t *pkt, uint8_t c)
+{
+	TRACE();
+	if (pkt->cur < (pkt->buf + pkt->len))
 		*(pkt->cur) = c;
 	return;
 }
@@ -499,6 +509,18 @@ static void pkt_update_cur(pkt_t *pkt)
 	return;
 }
 
+/* Use pkt_write_byte_verbatim_update_cur() for incoming packets. */
+static void pkt_write_byte_verbatim_update_cur(pkt_t *pkt, uint8_t c)
+{
+	TRACE();
+	pkt_write_byte_verbatim(pkt, c);
+	pkt_update_cur(pkt);
+	return;
+}
+
+/* Use pkt_write_byte_update_cur() for outgoing packets, since
+ * pkt_write_byte() will escape [#$}*].
+ */
 static void pkt_write_byte_update_cur(pkt_t *pkt, uint8_t c)
 {
 	TRACE();
@@ -615,7 +637,7 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 		TRACE("Begin Looping:");
 		while ((c = get_debug_char(stub)) != '#') {
 			TRACE("(Looping) Iteration: %d, got character: 0x%02x", i++, c);
-			pkt_write_byte_update_cur(stub->cmd, c);
+ 			pkt_write_byte_verbatim_update_cur(stub->cmd, c);
 		}
 		TRACE("Done Looping.");
 		DEBUG("Received command:");
