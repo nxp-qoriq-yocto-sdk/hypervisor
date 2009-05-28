@@ -97,13 +97,13 @@
 	part1 {
 		compatible = "partition";
 		cpus = <0 1>;
-		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		/* Move I/O to end of 36-bit address space.  Invert this once
 		 * this is done by default in u-boot.
 		 */
-		device-ranges = <0 0 0xf 0 1 0>;
+		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000>;
 
 		gpma {
 			compatible = "guest-phys-mem-area";

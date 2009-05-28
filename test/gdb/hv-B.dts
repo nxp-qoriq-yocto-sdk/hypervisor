@@ -118,7 +118,7 @@
 	part1 {
 		compatible = "partition";
 		cpus = <0 1>;
-		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -141,7 +141,7 @@
 	part2 {
 		compatible = "partition";
 		cpus = <1 1>;
-		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -164,7 +164,7 @@
 	part3 {
 		compatible = "partition";
 		cpus = <2 1>;
-		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -187,7 +187,7 @@
 	part4 {
 		compatible = "partition";
 		cpus = <3 1>;
-		guest-image = <0 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {

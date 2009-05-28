@@ -34,7 +34,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	/* Invert this test once hardware tree is 36-bit */
 	printf("%s -- uart_addr is %llx\n",
-	       uart_addr < 0xf00000000ULL ? "FAILED" : "PASSED",
+	       uart_addr > 0x100000000ULL ? "FAILED" : "PASSED",
 	       (unsigned long long)uart_addr);
 
 	printf("Test Complete\n");
