@@ -335,7 +335,7 @@ typedef enum brkpt
 } brkpt_t;
 
 /* Aux */
-static uint8_t checksum(uint8_t *p);
+static uint8_t checksum(uint8_t *p, uint32_t length);
 static uint8_t hdtoi(uint8_t hexit);
 static uint8_t upper_nibble(uint8_t c);
 static uint8_t lower_nibble(uint8_t c);
@@ -385,12 +385,15 @@ static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *brea
 /* Auxiliary routines required by the RSP Engine.
  */
 
-static uint8_t checksum(uint8_t *p)
+static uint8_t checksum(uint8_t *p, uint32_t length)
 {
-	uint8_t s = 0;
-	TRACE();
-	while (*p)
-		s += *p++;
+	uint8_t s = 0, *q = p;
+	TRACE("length: %d", length);
+	while (q - p < length) {
+		TRACE("p[%d]: 0x%02x\n", q - p, *q);
+		s += *q++;
+	}
+	TRACE("checksum: %d", s);
 
 	return s; /* Automatically, mod 256. */
 }
@@ -615,7 +618,6 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 			pkt_write_byte_update_cur(stub->cmd, c);
 		}
 		TRACE("Done Looping.");
-		pkt_write_byte_update_cur(stub->cmd, '\0');
 		DEBUG("Received command:");
 		for (i = 0; i < pkt_len(stub->cmd); i++)
 			DEBUG("cmd[%d] = 0x%02x", i, stub->cmd->buf[i]);
@@ -625,7 +627,7 @@ static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *st
 		}
 		TRACE("Got checksum: %s", ccs);
 
-		if (!(c = (checksum(content(stub->cmd)) == htoi(ccs)))) {
+		if (!(c = (checksum(content(stub->cmd), pkt_len(stub->cmd)) == htoi(ccs)))) {
 			TRACE("Checksum mismatch. Sending NAK and getting next packet.");
 			nak(stub);
 			pkt_reset(stub->cmd);
@@ -656,9 +658,9 @@ static void transmit_response(gdb_stub_core_context_t *stub)
 			i++;
 		}
 		put_debug_char(stub, '#');
-		TRACE("Got checksum: %d", checksum(content(stub->rsp)));
-		put_debug_char(stub, hex(upper_nibble(checksum(content(stub->rsp)))));
-		put_debug_char(stub, hex(lower_nibble(checksum(content(stub->rsp)))));
+		TRACE("Got checksum: %d", checksum(content(stub->rsp), pkt_len(stub->rsp)));
+		put_debug_char(stub, hex(upper_nibble(checksum(content(stub->rsp), pkt_len(stub->rsp)))));
+		put_debug_char(stub, hex(lower_nibble(checksum(content(stub->rsp), pkt_len(stub->rsp)))));
 	} while (!got_ack(stub));
 	pkt_reset(stub->rsp);
 	return;
