@@ -1721,6 +1721,139 @@ static void guest_core_init(guest_t *guest)
 	mtspr(SPR_MSRP, msrp);
 }
 
+/* FIXME: better ePAPR compliance for default IMA -- need to
+ * look up the GPMA to find the size that is actually backed
+ * by RAM.
+ */
+static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
+{
+	unsigned long vpage = 0, ppage = 0, pages;
+	size_t size;
+	int tsize;
+	int need_two = 0; // Two TLB entries needed for non-power-of-4 IMA
+	guest_t *guest = get_gcpu()->guest;
+
+	if (secondary) {
+		ppage = entry >> PAGE_SHIFT;
+		tsize = pages_to_tsize(1);
+		size = PAGE_SIZE;
+		pages = 1;
+	} else {
+		dt_prop_t *prop;
+
+		prop = dt_get_prop(guest->partition, "init-map-size", 0);
+		if (prop) {
+			if (prop->len != 8 ||
+			    (sizeof(void *) != 8 &&
+			     ((const uint32_t *)prop->data)[0] != 0)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: Bad init-map-size\n", __func__);
+				return ERR_BADTREE;
+			}
+
+			size = *(const uint64_t *)prop->data;
+
+			if (size & (size - 1)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: init-map-size must be a power of two\n", __func__);
+				return ERR_BADTREE;
+			}
+
+			if (size < PAGE_SIZE) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: init-map-size must at least %d bytes\n",
+				         __func__, PAGE_SIZE);
+				return ERR_BADTREE;
+			}
+
+			pages = size >> PAGE_SHIFT;
+
+			tsize = pages_to_tsize(pages);
+			if (count_lsb_zeroes(pages) & 1)
+				need_two = 1;
+		} else {
+			tsize = TLB_TSIZE_1G;
+			size = 1 << 30;
+			pages = size >> PAGE_SHIFT;
+		}
+
+		prop = dt_get_prop(guest->partition, "init-map-paddr", 0);
+		if (prop) {
+			phys_addr_t paddr;
+
+			if (prop->len != 8) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: Bad init-map-paddr\n", __func__);
+				return ERR_BADTREE;
+			}
+
+			paddr = *(const uint64_t *)prop->data;
+			ppage = paddr >> PAGE_SHIFT;
+
+			if (paddr & (size - 1)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: init-map-paddr must be size-aligned\n", __func__);
+				return ERR_BADTREE;
+			}
+		}
+
+		prop = dt_get_prop(guest->partition, "init-map-vaddr", 0);
+		if (prop) {
+			uintptr_t vaddr;
+		
+			if (prop->len != 8 ||
+			    (sizeof(void *) != 8 &&
+			     ((const uint32_t *)prop->data)[0] != 0)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: Bad init-map-vaddr\n", __func__);
+				return ERR_BADTREE;
+			}
+
+			vaddr = *(const uint64_t *)prop->data;
+			vpage = vaddr >> PAGE_SHIFT;
+			
+			if (vaddr & (size - 1)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: init-map-vaddr must be size-aligned\n", __func__);
+				return ERR_BADTREE;
+			}
+		}
+	}
+
+	if ((entry >> PAGE_SHIFT) < ppage ||
+	    (entry >> PAGE_SHIFT) >= ppage + pages) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: entry point 0x%llx outside IMA 0x%llx-0x%llx\n",
+		         __func__, entry, (uint64_t)ppage << PAGE_SHIFT,
+		         ((uint64_t)(ppage + pages) << PAGE_SHIFT) - 1);
+		return ERR_BADTREE;
+	}
+
+	regs->gpregs[7] = size;
+	regs->srr0 = (vpage << PAGE_SHIFT) | (entry & (size - 1));
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL + 2,
+	         "%s: virtual IMA 0x%llx-0x%llx, entry 0x%lx\n",
+	         __func__, (uint64_t)vpage << PAGE_SHIFT,
+		      ((uint64_t)(vpage + pages) << PAGE_SHIFT) - 1, regs->srr0);
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL + 2,
+	         "%s: guest physical IMA 0x%llx-0x%llx, entry 0x%llx\n",
+	         __func__, (uint64_t)ppage << PAGE_SHIFT,
+		      ((uint64_t)(ppage + pages) << PAGE_SHIFT) - 1, entry);
+
+	for (int i = 0; i <= need_two; i++) {
+		guest_set_tlb1(i, MAS1_VALID | (tsize << MAS1_TSIZE_SHIFT) |
+		               MAS1_IPROT, vpage, ppage, TLB_MAS2_MEM,
+		               TLB_MAS3_KERN);
+
+		vpage += pages / 2;
+		ppage += pages / 2;
+	}
+
+	return 0;
+}
+
 static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -1762,8 +1895,8 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 		return;
 	}
 
-	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
-	                  MAS1_IPROT, 0, 0, TLB_MAS2_MEM, TLB_MAS3_KERN);
+	if (setup_ima(regs, guest->entry, 0) < 0)
+		return;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
@@ -1802,9 +1935,6 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	regs->gpregs[1] = 0xdeadbeef;
 	regs->gpregs[3] = guest->dtb_gphys;
 	regs->gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
-	regs->gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
-
-	regs->srr0 = guest->entry;
 	regs->srr1 = MSR_GS;
 
 #ifdef CONFIG_DEBUG_STUB
@@ -1849,6 +1979,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	guest_t *guest = gcpu->guest;
 	unsigned int pir = mfspr(SPR_PIR);
 	unsigned int gpir = gcpu->gcpu_num;
+	phys_addr_t entry;
 
 	mtspr(SPR_GPIR, gpir);
 
@@ -1890,21 +2021,18 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 		         "PIR to %ld, ignoring\n",
 		         pir, gpir, guest->spintbl[gpir].pir);
 
-	/* Mask for 256M mapping */
-	page = ((((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
-		guest->spintbl[gpir].addr_lo) & ~0xfffffff) >> PAGE_SHIFT;
-
-	guest_set_tlb1(0, MAS1_VALID | (TLB_TSIZE_1G << MAS1_TSIZE_SHIFT) |
-	                  MAS1_IPROT, page, page, TLB_MAS2_MEM, TLB_MAS3_KERN);
+	entry = ((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
+	        guest->spintbl[gpir].addr_lo;
 
 	assert(cpu->traplevel == 0);
 	assert(cpu->thread == &gcpu->thread.libos_thread);
 
 	regs->gpregs[1] = 0xdeadbeef;
-	regs->gpregs[3] = guest->spintbl[gpir].r3_lo;   // FIXME 64-bit
-	regs->gpregs[7] = 1 << 30;  // 1GB - This must match the TLB_TSIZE_xx value above
+	regs->gpregs[3] = ((uint64_t)guest->spintbl[gpir].r3_hi << 32) |
+	                  guest->spintbl[gpir].r3_lo;
 
-	regs->srr0 = guest->spintbl[gpir].addr_lo; // FIXME 64-bit
+	setup_ima(regs, entry, 1);
+
 	regs->srr1 = MSR_GS;
 
 #ifdef CONFIG_DEBUG_STUB
