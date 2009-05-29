@@ -46,14 +46,24 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.4-002 is compatible with Simics 4.0 4.0.45 /
-    pre35 and later
+   -Topaz 0.4-003 is compatible with Simics 4.0 4.0.45 /
+    pre35 and later. Requires the tlbilx patch on Simics pre35. 
 
    -in sync with Embedded Hypervisor Architecture specifciation
     0.874
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-003 bug fixes and changes
+      -bug 3527-- sim.git hv-1p scenario is not working
+        w/ 36-bit physical
+      -preliminary support for routing PAMU access
+       violation
+      -flexible IMA definition allowed (bug 3509)
+      -TLB read API for debug stubs
+      -migration of all unit tests to assume 36-bit
+       physical address map
 
    -Topaz 0.4-002 bug fixes and changes
       -36-bit physical addresses are supported
