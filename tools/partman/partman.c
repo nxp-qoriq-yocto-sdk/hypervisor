@@ -1058,11 +1058,11 @@ int main(int argc, char *argv[])
 			p.f_specified = 1;
 			break;
 		case 'a':
-			p.a = strtol(optarg, NULL, 0);
+			p.a = strtoul(optarg, NULL, 0);
 			p.a_specified = 1;
 			break;
 		case 'e':
-			p.e = strtol(optarg, NULL, 0);
+			p.e = strtoul(optarg, NULL, 0);
 			p.e_specified = 1;
 			break;
 		case '?':
