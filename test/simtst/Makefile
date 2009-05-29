@@ -28,7 +28,7 @@ dir := $(testdir)$(test)/
 .PHONY: tunctl
 
 tunctl:
-	ls /sys/class/net/fman* > /dev/null 2>&1 || \
+	ls /sys/class/net/*-f0e0* > /dev/null 2>&1 || \
 		$(testdir)../../sim/fm.sh -s -a up
 
 simtst-run-1p: simtst tunctl
