@@ -183,7 +183,7 @@ static int compare_reg(const uint32_t *reg, const uint32_t *range,
 	/* If the size forces a carry off the final cell, then
 	 * reg can't possibly be beyond the end.
 	 */
-	if (add_reg(end, rangesize, MAX_ADDR_CELLS))
+	if (!add_reg(end, rangesize, MAX_ADDR_CELLS))
 		return 1;
 
 	for (i = 0; i < MAX_ADDR_CELLS; i++) {
