@@ -25,10 +25,6 @@
 
 /**
  * Sample Linux partition management utility
- *
- * Support for restarting a parition has been disabled, since the hypervisor
- * does not fully support restarting a partition, and since the partman
- * utility does not accept "-1" as a partition handle.
  */
 
 #include <stdio.h>
@@ -51,16 +47,6 @@
  * tree.  So every time that file is updated, you need to copy it here.
  */
 #include "fsl_hypervisor.h"
-
-enum command {
-	e_none = 0,
-	e_status,
-	e_load,
-	e_start,
-	e_stop,
-	e_restart,
-	e_doorbell,
-};
 
 struct parameters {
 	int h;
@@ -150,41 +136,38 @@ struct image_header {
  */
 static void usage(void)
 {
-	printf("Usage:\n\n");
+	printf("partman usage:\n\n");
 
-	printf("Show partition status:\n\tpartman -s\n\n");
+	printf("Show partition status:\n\tpartman status\n");
 
-	printf("Load image:\n\tpartman -l -h <handle> -f <file> [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address\n");
-	printf("\t\tfor ELF images.\n\n");
+	printf("Load image:\n\tpartman load -h <handle> -f <file> [-a <address>]\n"
+	       "\tDefault value for -a is 0, or the base physical address "
+	       "for ELF images.\n");
 
-	printf("Start partition:\n\tpartman -g -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address\n");
-	printf("\t\tfor ELF images.\n");
-	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
-	printf("\t\timages.\n\n");
+	printf("Start partition:\n\tpartman start -h <handle> [-f <file>] "
+	       "[-e <addr>] [-a <addr>]\n"
+	       "\tDefault value for -a is 0, or the base physical address "
+	       "for ELF images.\n"
+	       "\tDefault value for -e is 0, or the entry "
+	       "point for ELF images.\n");
 
-	printf("Stop partition:\n\tpartman -x -h <handle>\n\n");
-/*
-	printf("Restart partition:\n\tpartman -r -h <handle> [-f <file>] [-e <address>] [-a <address>]\n");
-	printf("\t\tDefault value for -a is 0, or the base physical address\n");
-	printf("\t\tfor ELF images.\n");
-	printf("\t\tDefault value for -e is 0, or the entry point for ELF\n");
-	printf("\t\timages.\n\n");
-*/
+	printf("Stop partition:\n\tpartman stop -h <handle>\n");
+	printf("Restart partition:\n\tpartman restart -h <handle>\n");
 
-	printf("Monitor doorbells:\n\tpartman -d -f <file>\n");
-	printf("\t\t<file> is a shell script or program to run on every doorbell.\n");
-	printf("\t\tThe first parameter to the script is the doorbell handle.\n\n");
+	printf("Monitor doorbells:\n\tpartman doorbell -f <file>\n"
+	       "\t<file> is a shell script or program to run on every doorbell.\n"
+	       "\tThe first parameter to the script is the doorbell handle.\n");
 
-	printf("Ring a doorbell:\n\tpartman -d -h <handle>\n");
-	printf("\t\t<handle> is the doorbell send handle for the doorbell to ring.\n\n");
+	printf("Ring a doorbell:\n\tpartman doorbell -h <handle>\n"
+	       "\t<handle> is the doorbell send handle for the "
+	       "doorbell to ring.\n");
 
-	printf("Specify -v for verbose output\n\n");
-	printf("Specify -q for quiet mode (errors reported via return status only)\n\n");
+	printf("\nSpecify -v for verbose output\n");
+	printf("Specify -q for quiet mode (errors reported via "
+	       "return status only)\n");
 
-	printf("For all commands, <handle> can be either the handle number or the\n");
-	printf("full handle name as displayed by the -s command.\n\n");
+	printf("\nFor all commands, <handle> can be either the handle number or the\n"
+	       "full handle name as displayed by the -s command.\n");
 }
 
 /**
@@ -564,8 +547,6 @@ static int cmd_status(void)
 {
 	gdt_node_t *node = NULL;
 
-	printf("Partition status\n\n");
-
 	printf("Partition Name                  Handle  Status\n"
 	       "----------------------------------------------\n");
 
@@ -691,6 +672,8 @@ static int cmd_load_image(struct parameters *p)
 	int ret = 0;
 
 	if (!p->h_specified || !p->f_specified) {
+		fprintf(stderr, "partman load: requires a handle (-h) "
+		                "and file (-f).\n");
 		usage();
 		return EINVAL;
 	}
@@ -717,6 +700,7 @@ static int cmd_start(struct parameters *p)
 	struct fsl_hv_ioctl_start im;
 
 	if (!p->h_specified) {
+		fprintf(stderr, "partman start: requires a handle (-h).\n");
 		usage();
 		return EINVAL;
 	}
@@ -762,6 +746,7 @@ static int cmd_stop(struct parameters *p)
 	struct fsl_hv_ioctl_stop im;
 
 	if (!p->h_specified) {
+		fprintf(stderr, "partman stop: requires a handle (-h).\n");
 		usage();
 		return EINVAL;
 	}
@@ -779,6 +764,7 @@ static int cmd_restart(struct parameters *p)
 	struct fsl_hv_ioctl_restart im;
 
 	if (!p->h_specified) {
+		fprintf(stderr, "partman restart: requires a handle (-h).\n");
 		usage();
 		return EINVAL;
 	}
@@ -786,26 +772,7 @@ static int cmd_restart(struct parameters *p)
 	if (verbose)
 		printf("Restarting partition %i\n", p->h);
 
-	if (p->f_specified) {
-		unsigned long load_address;
-		unsigned long entry_address;
-		int ret = 0;
-
-		if (verbose)
-			printf("Loading and copying image %s\n", p->f);
-
-		load_address = p->a_specified ? p->a : (unsigned long) -1;
-
-		ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
-		if (!ret)
-			return EIO;
-	}
-
-	// FIXME: restart partition should take an entry address
 	im.partition = p->h;
-
-	if (verbose)
-		printf("Restarting partition\n");
 
 	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
 }
@@ -821,6 +788,8 @@ static int cmd_doorbells(struct parameters *p)
 
 	if ((p->h_specified && p->f_specified) ||
 	    (!p->h_specified && !p->f_specified)) {
+		fprintf(stderr, "partman doorbell: requires a handle (-h) "
+		                "*or* file (-f), but not both.\n");
 		usage();
 		return EINVAL;
 	}
@@ -997,48 +966,14 @@ static int get_handle(const char *name)
 
 int main(int argc, char *argv[])
 {
-	enum command cmd = e_none;
-	struct parameters p;
+	struct parameters p = {};
 	int c;
-	int ret = 0;
-
-	/* FIXME: Process options first, so this can be suppressed based
-	 * on verbose/quiet.
-	 */
-	printf("Freescale Hypervisor Partition Manager %s\n\n", VERSION);
-
-	if (!verify_dev())
-		return 1;
-
-	if (!gdt_load_tree("/proc/device-tree/hypervisor/handles")) {
-		printf("Could not load device tree\n");
-		return 1;
-	}
-
-	memset(&p, 0, sizeof(p));
+	const char *handlestr;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "slgxdvh:f:a:e:")) != -1) {
+	while ((c = getopt(argc, argv, ":vqh:f:a:e:")) != -1) {
 		switch (c) {
-		case 's':
-			cmd = e_status;
-			break;
-		case 'l':
-			cmd = e_load;
-			break;
-		case 'g':
-			cmd = e_start;
-			break;
-		case 'x':
-			cmd = e_stop;
-			break;
-		case 'r':
-			cmd = e_restart;
-			break;
-		case 'd':
-			cmd = e_doorbell;
-			break;
 		case 'v':
 			verbose = 1;
 			break;
@@ -1046,12 +981,7 @@ int main(int argc, char *argv[])
 			quiet = 1;
 			break;
 		case 'h':
-			ret = get_handle(optarg);
-			if (ret < 0)
-				p.h = strtol(optarg, NULL, 0);
-			else
-				p.h = ret;
-			p.h_specified = 1;
+			handlestr = optarg;
 			break;
 		case 'f':
 			p.f = optarg;
@@ -1066,36 +996,61 @@ int main(int argc, char *argv[])
 			p.e_specified = 1;
 			break;
 		case '?':
-			break;
-		default:
+			fprintf(stderr, "%s: unrecognized option '%c'\n",
+			        argv[0], optopt);
 			usage();
-			return 0;
+			return 1;
+		case ':':
+			fprintf(stderr, "%s: missing argument to option '%c'\n",
+			        argv[0], optopt);
+			usage();
+			return 1;
+		default:
+			/* Shouldn't happen... */
+			usage();
+			return 1;
 		}
 	}
 
-	switch (cmd) {
-	case e_status:
-		ret = cmd_status();
-		break;
-	case e_load:
-		ret = cmd_load_image(&p);
-		break;
-	case e_start:
-		ret = cmd_start(&p);
-		break;
-	case e_stop:
-		ret = cmd_stop(&p);
-		break;
-	case e_restart:
-		ret = cmd_restart(&p);
-		break;
-	case e_doorbell:
-		ret = cmd_doorbells(&p);
-		break;
-	default:
+	if (optind > argc - 1) {
 		usage();
-		break;
+		return 1;
 	}
 
-	return ret ? 1 : 0;
+	if (verbose)
+		printf("Freescale Hypervisor Partition Manager %s\n\n", VERSION);
+
+	if (!verify_dev())
+		return 1;
+
+	if (!gdt_load_tree("/proc/device-tree/hypervisor/handles")) {
+		printf("Could not load device tree\n");
+		return 1;
+	}
+
+	if (handlestr) {
+		int ret = get_handle(handlestr);
+		if (ret < 0)
+			p.h = strtol(handlestr, NULL, 0);
+		else
+			p.h = ret;
+		p.h_specified = 1;
+	}
+
+	if (!strcmp(argv[optind], "status"))
+		return cmd_status();
+	if (!strcmp(argv[optind], "load"))
+		return cmd_load_image(&p);
+	if (!strcmp(argv[optind], "start"))
+		return cmd_start(&p);
+	if (!strcmp(argv[optind], "stop"))
+		return cmd_stop(&p);
+	if (!strcmp(argv[optind], "restart"))
+		return cmd_restart(&p);
+	if (!strcmp(argv[optind], "doorbell"))
+		return cmd_doorbells(&p);
+
+	fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], argv[optind]);
+	usage();
+	return 1;
 }
