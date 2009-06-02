@@ -2117,9 +2117,11 @@ void do_stop_core(trapframe_t *regs, int restart)
 	memset(&gcpu->gdbell_pending, 0,
 	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
-	prepare_to_block();
-	block();
-	BUG();
+	if (!is_idle()) {
+		prepare_to_block();
+		block();
+		BUG();
+	}
 }
 
 void stop_core(trapframe_t *regs)
