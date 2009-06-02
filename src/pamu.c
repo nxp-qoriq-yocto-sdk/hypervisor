@@ -32,6 +32,7 @@
 #include <libos/bitops.h>
 #include <libos/percpu.h>
 #include <libos/console.h>
+#include <libos/alloc.h>
 
 #include <pamu.h>
 #include <percpu.h>
@@ -39,6 +40,7 @@
 #include <devtree.h>
 #include <paging.h>
 #include <events.h>
+#include <ccm.h>
 #include <limits.h>
 
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
@@ -330,9 +332,6 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 
 			lwsync();
 			spaace->v = 1;
-
-			/* Refer notes below on PAACE entry flush */
-			asm volatile("dcbf 0, %0" : : "r" (spaace) : "memory");
 		}
 	}
 
@@ -533,16 +532,6 @@ skip_snoop_id:
 	ppaace->v = 1; // FIXME: for right now we are leaving PAACE
 	               // entries enabled by default.
 
-	/*
-	 * Explicitly flush PAACE entries to ensure that PAMU lookup
-	 * gets updated entries from memory during PAMU cache miss and as
-	 * we have a static PAMU table configuration, cached entries are
-	 * valid forever.
-	 * PAACE entries are implictly cache-line size aligned and each entry
-	 * is cache-line sized too.
-	 */
-	asm volatile("dcbf 0, %0" : : "r" (ppaace) : "memory");
-
 	return 0;
 }
 
@@ -635,17 +624,10 @@ static void setup_omt(void)
 	ome->moe[IOE_DIRECT0_IDX] = EOE_VALID | EOE_LDEC;
 	ome->moe[IOE_DIRECT1_IDX] = EOE_VALID | EOE_LDECPE;
 
-	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
-	/* FIXME: e500mc cache-line size assumed, fixup on another core */
-	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
-
 	/* Configure OMI_FMAN */
 	ome = pamu_get_ome(OMI_FMAN);
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
-
-	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
-	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
 
 	/* Configure OMI_QMAN private */
 	ome = pamu_get_ome(OMI_QMAN_PRIV);
@@ -654,16 +636,10 @@ static void setup_omt(void)
 	ome->moe[IOE_EREAD0_IDX] = EOE_VALID | EOE_RSA;
 	ome->moe[IOE_EWRITE0_IDX] = EOE_VALID | EOE_WWSA;
 
-	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
-	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
-
 	/* Configure OMI_CAAM */
 	ome = pamu_get_ome(OMI_CAAM);
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
-
-	asm volatile("dcbf 0, %0" : : "r" (ome) : "memory");
-	asm volatile("dcbf 0, %0" : : "r" ((uint8_t *) ome + 0x40) : "memory");
 }
 
 static int pamu_av_isr(void *arg)
@@ -717,6 +693,8 @@ void pamu_global_init(void)
 	int ret;
 	phys_addr_t addr, size;
 	unsigned long pamu_reg_base, pamu_reg_off;
+	unsigned long pamumem_size;
+	void *pamumem;
 	dt_node_t *guts_node, *pamu_node;
 	phys_addr_t guts_addr, guts_size;
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
@@ -758,6 +736,26 @@ void pamu_global_init(void)
 		return;
 	}
 
+	pamumem_size = align(PAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) +
+			 align(SPAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) + OMT_SIZE;
+
+	pamumem_size = 1 << ilog2_roundup(pamumem_size);
+	pamumem = alloc(pamumem_size, pamumem_size);
+	if (!pamumem) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: Unable to allocate space for PAMU tables.\n",
+				__func__);
+		return;
+	}
+
+	pamu_node->pma = alloc_type(pma_t);
+	if (!pamu_node->pma) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: out of memory\n", __func__);
+		goto fail_mem;
+	}
+
+	pamu_node->pma->start = virt_to_phys(pamumem);
+	pamu_node->pma->size = pamumem_size;
+
 	pamubypenr_ptr = map(guts_addr + PAMUBYPENR, 4,
 	                     TLB_MAS2_IO, TLB_MAS3_KERN);
 	pamubypenr = in32(pamubypenr_ptr);
@@ -766,19 +764,24 @@ void pamu_global_init(void)
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
 
 		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
-		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off);
+		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off,
+					pamumem, pamumem_size);
 		if (ret < 0) {
 			/* This can only fail for the first instance due to
-			 * memory allocation issues, hence this failure
+			 * memory alignment issues, hence this failure
 			 * implies global pamu init failure and let all
 			 * PAMU(s) remain in bypass mode.
 			 */
-			return;
+			goto fail_pma;
 		}
 
 		/* Disable PAMU bypass for this PAMU */
 		pamubypenr &= ~pamu_counter;
 	}
+
+	ret = setup_pamu_law(pamu_node);
+	if (ret < 0)
+		goto fail_pma;
 
 	setup_omt();
 
@@ -790,4 +793,12 @@ void pamu_global_init(void)
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
+
+	return;
+
+fail_pma:
+	free(pamu_node->pma);
+
+fail_mem:
+	free(pamumem);
 }

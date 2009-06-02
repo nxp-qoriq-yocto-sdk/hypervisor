@@ -632,6 +632,14 @@ void libos_client_entry(unsigned long devtree_ptr)
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	assign_hv_devs();
+#ifdef CONFIG_PAMU
+	/* PAMU hardware initialization should happen before ccm init as we need
+	 * a higher priority LAW for PAMU CSD. PAMU LAW would point to memory
+	 * corresponding to all PAMU tables and CSD would contain all PAMUS
+	 * and cores
+	 */
+	pamu_global_init();
+#endif
 	enable_int();
 	enable_mcheck();
 
@@ -658,10 +666,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 #endif
 
 	create_doorbells();
-
-#ifdef CONFIG_PAMU
-	pamu_global_init();
-#endif
 
 	/* Main device tree must be const after this point. */
 	release_secondary_cores();

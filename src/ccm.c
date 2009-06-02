@@ -37,7 +37,8 @@
 #include <percpu.h>
 #include <errors.h>
 
-#define HV_CPUS (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
+#define HV_CPUS         (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
+#define PAMU_CSD_PORTS  0xfff80000
 
 static law_t *laws;
 static uint32_t *csdids;
@@ -81,6 +82,11 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	}
 
 	csdids = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x600);
+
+	/* Mark the CSDs that are already in use */
+	for (uint32_t i = 0; i < numcsds; i++)
+		if (in32(&csdids[i]))
+			csdid_map |= 1 << i;
 
 	/*
 	 * Snoop domains are meant specifically for (PAMU based) stashing
@@ -396,18 +402,12 @@ out_free:
 	return NULL;
 }
 
-static int setup_csd(dt_node_t *node, void *arg)
+static int setup_csd_law(dt_node_t *node)
 {
-	pma_t *pma;
-	int csdid, lawid;
-	int ret = ERR_BADTREE;
-
-	pma = read_pma(node);
-	if (!pma)
-		goto fail;
+	int csdid, lawid, ret;
 
 	ret = csdid = get_free_csd();
-	if (ret < 0)
+	if (csdid < 0)
 		goto fail;
 
 	ret = lawid = set_law(node, csdid);
@@ -423,8 +423,6 @@ static int setup_csd(dt_node_t *node, void *arg)
 	node->csd->law_id = lawid;
 	node->csd->csd_id = csdid;
 
-	pma_setup_cpc(node);
-
 	return 0;
 
 fail_law:
@@ -437,6 +435,37 @@ fail:
 	return ret;
 }
 
+#ifdef CONFIG_PAMU
+int setup_pamu_law(dt_node_t *node)
+{
+	int ret;
+
+	ret = setup_csd_law(node);
+	if (ret == 0)
+		/* CSD contains all the cores and PAMUs */
+		set_csd_cpus(node->csd, PAMU_CSD_PORTS);
+
+	return ret;
+}
+#endif
+
+static int setup_csd(dt_node_t *node, void *arg)
+{
+	pma_t *pma;
+	int ret = ERR_BADTREE;
+
+	pma = read_pma(node);
+	if (!pma)
+		goto fail;
+
+	ret = setup_csd_law(node);
+	if (ret == 0)
+		pma_setup_cpc(node);
+
+fail:
+	return ret;
+}
+
 void ccm_init(void)
 {
 	if (!laws || !csdids) {
@@ -444,11 +473,6 @@ void ccm_init(void)
 				"CCM initialization failed\n");
 		return;
 	}
-
-	/* Mark the CSDs that are already in use */
-	for (uint32_t i = 0; i < numcsds; i++)
-		if (in32(&csdids[i]))
-			csdid_map |= 1 << i;
 
 	/* Set up coherency sub domains based on the available pmas in the
 	 * config tree
