@@ -30,6 +30,33 @@
 #include <libos/trapframe.h>
 #include <libos/io.h>
 
+#define GUESTMEM_OK 0
+#define GUESTMEM_TLBMISS 1
+#define GUESTMEM_TLBERR 2
+
+/* function to synchronize a cache block in guest memory
+ * when modifying instructions.  This follows the recommended sequence
+ *  in the EREF for self modifying code.
+ */
+static inline int guestmem_icache_block_sync(char *ptr)
+{
+	register int stat asm("r3") = GUESTMEM_OK;
+
+	asm volatile("1: dcbfep %y1;"
+	    "2: msync;"
+	    "3: icbiep %y1;"
+	    "4: msync;"
+	    "isync;"
+	    ".section .extable,\"a\";"
+	    ".long 1b;"
+	    ".long 2b;"
+	    ".long 3b;"
+	    ".long 4b;"
+	    ".previous;" : "+r" (stat) : "Z" (*ptr) : "memory");
+
+	return stat;
+}
+
 /* The relevent guestmem_set() call must be made prior
  * to executing any guestmem_in() calls.  It is not
  * required for guestmem_out().
@@ -62,13 +89,10 @@ static inline void guestmem_set_insn(trapframe_t *regs)
 	}
 }
 
-#define GUESTMEM_OK 0
-#define GUESTMEM_TLBMISS 1
-#define GUESTMEM_TLBERR 2
 
 static inline int guestmem_in32(uint32_t *ptr, uint32_t *val)
 {
-	register int stat asm("r3") = 0;
+	register int stat asm("r3") = GUESTMEM_OK;
 
 	asm("1: lwepx %0, %y2;"
 	    "2:"
@@ -82,7 +106,7 @@ static inline int guestmem_in32(uint32_t *ptr, uint32_t *val)
 
 static inline int guestmem_in8(uint8_t *ptr, uint8_t *val)
 {
-	register int stat asm("r3") = 0;
+	register int stat asm("r3") = GUESTMEM_OK;
 
 	asm("1: lbepx %0, %y2;"
 	    "2:"
@@ -96,7 +120,7 @@ static inline int guestmem_in8(uint8_t *ptr, uint8_t *val)
 
 static inline int guestmem_out32(uint32_t *ptr, uint32_t val)
 {
-	register int stat asm("r3") = 0;
+	register int stat asm("r3") = GUESTMEM_OK;
 
 	asm("1: stwepx %2, %y1;"
 	    "2:"
@@ -110,7 +134,7 @@ static inline int guestmem_out32(uint32_t *ptr, uint32_t val)
 
 static inline int guestmem_out8(uint8_t *ptr, uint8_t val)
 {
-	register int stat asm("r3") = 0;
+	register int stat asm("r3") = GUESTMEM_OK;
 
 	asm("1: stbepx %2, %y1;"
 	    "2:"
