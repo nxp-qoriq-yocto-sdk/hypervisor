@@ -40,13 +40,6 @@
 
 static uint32_t vmpic_lock;
 
-static const uint8_t vmpic_intspec_to_config[4] = {
-	IRQ_EDGE | IRQ_HIGH,
-	IRQ_LEVEL | IRQ_LOW,
-	IRQ_LEVEL | IRQ_HIGH,
-	IRQ_EDGE | IRQ_LOW
-};
-
 static void vmpic_reset(vmpic_interrupt_t *vmirq)
 {
 	interrupt_t *irq = vmirq->irq;
@@ -63,7 +56,7 @@ static void vmpic_reset(vmpic_interrupt_t *vmirq)
 			1 << (vmirq->guest->gcpus[0]->cpu->coreid));
 
 	if (irq->ops->set_config)
-		irq->ops->set_config(irq, vmpic_intspec_to_config[vmirq->config]);
+		irq->ops->set_config(irq, vmirq->config);
 	if (irq->ops->set_delivery_type)
 		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
@@ -191,8 +184,18 @@ void vmpic_partition_init(guest_t *guest)
 	if (!vmpic)
 		goto nomem;
 
-	if (dt_set_prop_string(vmpic, "compatible", "fsl,hv-vmpic") < 0)
-		goto nomem;
+	if (guest->mpic_direct_eoi) {
+		char s[64];
+		int len;
+
+		len = snprintf(s, sizeof(s),
+				"fsl,hv-mpic-per-cpu%cfsl,hv-vmpic", 0);
+		if (dt_set_prop(vmpic, "compatible", s, len + 1) < 0)
+			goto nomem;
+	} else {
+		if (dt_set_prop_string(vmpic, "compatible", "fsl,hv-vmpic") < 0)
+			goto nomem;
+	}
 
 	propdata = 2;
 	if (dt_set_prop(vmpic, "#interrupt-cells",
@@ -216,7 +219,54 @@ void vmpic_partition_init(guest_t *guest)
 	                &propdata, sizeof(propdata)) < 0)
 		goto nomem;
 
-//	dt_for_each_node(tree, &ctx, vmpic_init_one, NULL);
+	if (guest->mpic_direct_eoi) {
+		uint32_t pd[4];
+		uint32_t *ptr;
+		phys_addr_t addr;
+		uint32_t naddr, nsize;
+
+		dt_node_t *node = dt_get_first_compatible(hw_devtree,
+							 "chrp,open-pic");
+		if (!node) {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+				"%s: no open-pic node in hw_devtree\n",
+				__func__);
+			return;
+		}
+
+		if (node->dev.regs)
+			addr = node->dev.regs->start;
+		else {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+				"%s: open-pic address not found\n",
+				__func__);
+			return;
+		}
+
+		if (get_addr_format(vmpic->parent, &naddr, &nsize) < 0) {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+				"%s: Bad address format\n",
+				__func__);
+			return;
+		}
+
+		int i = 0;
+		while (naddr)
+			pd[i++] = (uint32_t)(addr >> (32 * --naddr));
+
+		while (nsize) {
+			pd[i++] = 0;
+			nsize--;
+		}
+
+		pd[i - 1] = PAGE_SIZE;
+
+		if (dt_set_prop(vmpic, "reg", &pd, i * 4) < 0)
+			goto nomem;
+
+		map_dev_range(guest, addr, (phys_addr_t)PAGE_SIZE);
+	}
+
 	return;
 
 nomem:
@@ -307,8 +357,11 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 				lcpu_mask = 1 << i;
 	}
 
-	if (irq->ops->get_config)
+	if (irq->ops->get_config) {
 		config = irq->ops->get_config(irq);
+		if (vmirq->config & IRQ_TYPE_MPIC_DIRECT)
+			config |= IRQ_TYPE_MPIC_DIRECT;
+	}
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;

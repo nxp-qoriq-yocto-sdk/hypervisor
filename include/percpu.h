@@ -142,6 +142,8 @@ typedef struct guest {
 
 	int guest_cache_lock;
 
+	int mpic_direct_eoi;
+
 	/** Watchdog notify manager partition on time-out: 0=no, 1=yes */
 	int wd_notify;
 

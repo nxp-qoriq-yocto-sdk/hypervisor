@@ -113,8 +113,8 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 }
 
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
-                                 phys_addr_t addr, phys_addr_t size,
-                                 uint32_t exc_flags)
+				phys_addr_t addr, phys_addr_t size,
+				uint32_t exc_flags)
 {
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
@@ -131,7 +131,7 @@ static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 	vptbl_map(guest->gphys_rev, rpn, grpn, pages, flags, PTE_PHYS_LEVELS);
 }
 
-static void map_dev_range(guest_t *guest, phys_addr_t addr, phys_addr_t size)
+void map_dev_range(guest_t *guest, phys_addr_t addr, phys_addr_t size)
 {
 	uint32_t tmpaddr[MAX_ADDR_CELLS];
 	phys_addr_t rangesize;
@@ -602,10 +602,6 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-static const uint8_t vmpic_config_to_intspec[4] = {
-	3, 0, 1, 2
-};
-
 static int map_guest_irqs(dev_owner_t *owner)
 {
 	dt_node_t *hwnode = owner->hwnode;
@@ -643,8 +639,12 @@ bad:
 		}
 
 		intspec[i * 2 + 0] = handle;
-		intspec[i * 2 + 1] =
-			vmpic_config_to_intspec[hwnode->dev.irqs[i]->config];
+		intspec[i * 2 + 1] = hwnode->dev.irqs[i]->config;
+		if (owner->guest->mpic_direct_eoi) {
+			intspec[i * 2 + 1] |= IRQ_TYPE_MPIC_DIRECT;
+			((vmpic_interrupt_t *)irq->priv)->config |=
+						IRQ_TYPE_MPIC_DIRECT;
+		}
 	}
 
 	ret = dt_set_prop(owner->gnode, "interrupts", intspec,
@@ -737,7 +737,7 @@ static int patch_guest_intmaps(dev_owner_t *owner)
 		if (ent->irq) {
 			*mapptr++ = owner->guest->vmpic_phandle;
 			*mapptr++ = handle;
-			*mapptr++ = vmpic_config_to_intspec[ent->irq->config];
+			*mapptr++ = ent->irq->config;
 		} else {
 			int parentlen = ent->parent_naddr + ent->parent_nint;
 
@@ -1681,6 +1681,9 @@ guest_t *node_to_partition(dt_node_t *partition)
 		/* guest debug mode */
 		if (dt_get_prop(partition, "guest-debug", 0))
 			guests[i].guest_debug_mode = 1;
+
+		if (dt_get_prop(partition, "mpic-direct-eoi", 0))
+			guests[i].mpic_direct_eoi = 1;
 
 		guests[i].name = name;
 		guests[i].state = guest_starting;
