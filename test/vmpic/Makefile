@@ -37,6 +37,18 @@ $(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           common/init.o)
 $(test)-obj := $($(test)-obj:%=bin/%.o)
 
+# vmpic1 source
+vmpic1-src-y := $(dir)vmpic1.c
+
+# define test and libos object files
+vmpic1-obj := $(basename $(libos-src-first-y:%=libos/%) \
+                          $(libos-src-early-y:%=libos/%) \
+                          $(libos-src-y:%=libos/%) \
+                          $(vmpic1-src-y:$(dir)%=$(test)/%) \
+                          $(LIBFDT_SRCS:%=libfdt/%) \
+                          common/init.o)
+vmpic1-obj := $(vmpic1-obj:%=bin/%.o)
+
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-bin-dts := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dts)
 $(test)-hv-dts := $(filter bin/$(test)/hv-%.dts,$($(test)-bin-dts))
@@ -52,8 +64,13 @@ bin/$(test)/$(test): $($(test)-obj)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
 
+bin/$(test)/vmpic1: $(vmpic1-obj)
+	@$(MKDIR) $(@D)
+	$(call show,link: $@)
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+
 .PHONY: $(test)
-$(test): bin/$(test)/$(test) $($(test)-hv-dtb)
+$(test): bin/$(test)/$(test) bin/$(test)/vmpic1 $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
@@ -61,6 +78,9 @@ $(test)-run-%: $(test)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
+
+$(test)-check-C: $(test)-run-C-batch
+	$(testdir)common/check-results 2
 
 $(test)-check-B: $(test)-run-B-batch
 	$(testdir)common/check-results 2
