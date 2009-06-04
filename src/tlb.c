@@ -38,6 +38,27 @@
 #include <paging.h>
 #include <errors.h>
 
+/* function to synchronize caches when modifying instructions
+ * This follows the recommended sequence in the EREF for
+ * self modifying code.
+ */
+static int icache_range_sync(void *start, size_t len)
+{
+	uintptr_t addr, end;
+	int blocks, i, ret;
+
+	addr = (uintptr_t)start & ~(cache_block_size - 1);
+	end = (((uintptr_t)start + len - 1) & ~(cache_block_size - 1)) + cache_block_size;
+	blocks = (end - addr) / cache_block_size;
+
+	for (i = 0; i < blocks; i++) {
+		icache_block_sync((char *)addr);
+		addr += cache_block_size;
+	}
+
+	return 0;
+}
+
 static void free_tlb1(unsigned int entry)
 {
 	gcpu_t *gcpu = get_gcpu();
