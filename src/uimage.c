@@ -263,7 +263,7 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 #endif
  	} else {
  		size_t ret = copy_phys_to_gphys(guest->gphys, target,
-		                                image_phys, size);
+		                                image_phys, size, 1);
  		if (ret != size) {
  			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
  				"load_uimage: cannot copy\n");

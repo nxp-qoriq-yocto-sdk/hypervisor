@@ -1158,9 +1158,11 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
  * @param[in] dest Guest physical address to copy to
  * @param[in] src Hypervisor virtual address to copy from
  * @param[in] len Bytes to copy
+ * @param[in] cache_sync flag indicating i-cache should be synced
  * @return number of bytes successfully copied
  */
-size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
+size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len,
+                     int cache_sync )
 {
 	size_t ret = 0;
 
@@ -1178,6 +1180,9 @@ size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
 
 		memcpy(vdest, src, chunk);
 
+		if (cache_sync)
+			icache_range_sync(vdest, chunk);
+
 		src += chunk;
 		dest += chunk;
 		ret += chunk;
@@ -1192,9 +1197,10 @@ size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len)
  * @param[in] tbl Guest physical page table
  * @param[in] dest Guest physical address to copy to
  * @param[in] len Bytes to zero
+ * @param[in] cache_sync flag indicating i-cache should be synced
  * @return number of bytes successfully zeroed
  */
-size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
+size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len, int cache_sync)
 {
 	size_t ret = 0;
 
@@ -1211,6 +1217,9 @@ size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len)
 			chunk = len;
 
 		memset(vdest, 0, chunk);
+
+		if (cache_sync)
+			icache_range_sync(vdest, chunk);
 
 		dest += chunk;
 		ret += chunk;
@@ -1374,10 +1383,11 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
  * @param[in] dest Guest physical address to copy to
  * @param[in] src Guest physical address to copy from
  * @param[in] len Bytes to copy
+ * @param[in] cache_sync flag indicating i-cache should be synced
  * @return number of bytes successfully copied
  */
 size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
-                          phys_addr_t src, size_t len)
+                          phys_addr_t src, size_t len, int cache_sync)
 {
 	size_t schunk = 0, dchunk = 0, chunk, ret = 0;
 
@@ -1411,6 +1421,9 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 			chunk = len;
 
 		memcpy(vdest, vsrc, chunk);
+
+		if (cache_sync)
+			icache_range_sync(vdest, chunk);
 
 		vsrc += chunk;
 		vdest += chunk;

@@ -215,7 +215,7 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 
 			ret = copy_phys_to_gphys(guest->gphys, seg_target,
 			                         image + phdr.offset,
-			                         phdr.filesz);
+			                         phdr.filesz, 1);
 			if (ret != phdr.filesz) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "load_elf: cannot copy segment %d\n", i);
@@ -225,7 +225,7 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 			}
 
 			ret = zero_to_gphys(guest->gphys, seg_target + phdr.filesz,
-			                    phdr.memsz - phdr.filesz);
+			                    phdr.memsz - phdr.filesz, 1);
 			if (ret != phdr.memsz - phdr.filesz) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "load_elf: cannot zero segment %d\n", i);

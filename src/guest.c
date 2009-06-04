@@ -1266,7 +1266,7 @@ static int load_image(guest_t *guest, phys_addr_t image,
 	         "loading binary image from %#llx to %#llx\n",
 	         image, guest_phys);
 
-	if (copy_phys_to_gphys(guest->gphys, guest_phys, image, *length) != *length)
+	if (copy_phys_to_gphys(guest->gphys, guest_phys, image, *length, 1) != *length)
 		return ERR_BADADDR;
 
 	if (entry)
@@ -1890,7 +1890,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	assert(fdtsize <= guest->dtb_window_len);
 
 	ret = copy_to_gphys(guest->gphys, guest->dtb_gphys,
-	                    fdt, fdtsize);
+	                    fdt, fdtsize, 0);
 	free(fdt);
 	if (ret != (ssize_t)fdtsize) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
