@@ -485,3 +485,24 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 	regs->gpregs[4] = vmirq->irq->ops->is_active(vmirq->irq);
 	regs->gpregs[3] = 0;  /* success */
 }
+
+void fh_vmpic_get_msir(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+	unsigned int handle = regs->gpregs[3];
+
+	// FIXME: race against handle closure
+	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+
+	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
+	if (!vmirq) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+
+	regs->gpregs[4] = vmirq->irq->ops->get_msir(vmirq->irq);
+	regs->gpregs[3] = 0;  /* success */
+}

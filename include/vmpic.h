@@ -54,5 +54,6 @@ void fh_vmpic_eoi(trapframe_t *regs);
 void fh_vmpic_iack(trapframe_t *regs);
 void fh_vmpic_get_mask(trapframe_t *regs);
 void fh_vmpic_get_activity(trapframe_t *regs);
+void fh_vmpic_get_msir(trapframe_t *regs);
 
 #endif

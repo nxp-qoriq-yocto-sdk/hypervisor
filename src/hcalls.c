@@ -566,7 +566,7 @@ static hcallfp_t hcall_table[] = {
 	fh_byte_channel_poll,              /* 20 */
 	fh_vmpic_iack,
 	fh_send_nmi,
-	unimplemented,
+	fh_vmpic_get_msir,
 	unimplemented,                     /* 24 */
 	unimplemented,
 	unimplemented,

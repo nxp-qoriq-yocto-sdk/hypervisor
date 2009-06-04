@@ -221,6 +221,59 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 	return *(const uint32_t *)prop->data;
 }
 
+static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
+                             dt_node_t *node, uint64_t gaddr,
+                             uint64_t *size)
+{
+	int ret;
+	dt_prop_t *prop;
+	dt_node_t *msi_node;
+	uint32_t phandle;
+	uint32_t msi_bank_addr;
+	char buf[32];
+	uint32_t reg[4];
+	dt_prop_t *regprop;
+	uint64_t msi_addr = 0;
+	dt_node_t *msi_gnode = NULL;
+	unsigned long rpn = ULONG_MAX;
+
+	prop = dt_get_prop(cfgnode, "msi", 0);
+	if (prop) {
+		phandle = *(const uint32_t *)prop->data;
+		msi_node = dt_lookup_phandle(config_tree, phandle);
+		if (!msi_node)
+			return ULONG_MAX;
+
+		msi_gnode = dt_lookup_alias(guest->devtree, msi_node->name);
+		if (!msi_gnode ||
+			!dt_node_is_compatible(msi_gnode, "fsl,mpic-msi"))
+			return ULONG_MAX;
+
+		dt_get_reg(msi_gnode, 0, &msi_addr, NULL);
+		msi_bank_addr = msi_addr & (PAGE_SIZE - 1);
+		rpn = msi_addr >> PAGE_SHIFT;
+		msi_addr = gaddr + msi_bank_addr;
+		if (*size > PAGE_SIZE)
+			*size = PAGE_SIZE;
+
+		ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi");
+		ret = dt_set_prop(msi_gnode, "compatible", buf, ret + 1);
+		if (ret < 0)
+			return ULONG_MAX;
+		regprop = dt_get_prop(msi_gnode, "reg", 0);
+		dt_delete_prop(regprop);
+
+		write_reg(reg, msi_addr, (phys_addr_t) 0x200);
+		ret = dt_set_prop(node, "fsl,hv-msi-regs", reg,
+			(rootnaddr + rootnsize) * 4);
+		if (ret < 0)
+			return ULONG_MAX;
+		dt_set_prop(node, "fsl,hv-msi", msi_gnode, sizeof(uint32_t));
+	}
+
+	return rpn;
+}
+
 #define MAX_SUBWIN_CNT 16
 
 static int setup_subwins(guest_t *guest, dt_node_t *parent,
@@ -228,7 +281,8 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
                          phys_addr_t primary_size,
                          uint32_t subwindow_cnt,
                          uint32_t omi, uint32_t stash_dest,
-                         ppaace_t *ppaace)
+                         ppaace_t *ppaace, dt_node_t *cfgnode,
+                         dt_node_t *hwnode)
 {
 	unsigned long fspi;
 	phys_addr_t subwindow_size = primary_size / subwindow_cnt;
@@ -298,11 +352,17 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			continue;
 		}
 
-		swse = map_addrspace_size_to_wse(size);
+		if (!dt_get_prop(node, "pcie-msi-subwindow", 0))
+			rpn = get_rpn(guest, gaddr >> PAGE_SHIFT,
+				size >> PAGE_SHIFT);
+		else
+			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
+					gaddr, &size);
 
-		rpn = get_rpn(guest, gaddr >> PAGE_SHIFT, size >> PAGE_SHIFT);
 		if (rpn == ULONG_MAX)
 			continue;
+
+		swse = map_addrspace_size_to_wse(size);
 
 		/* If we merge ppaace_t and spaace_t, we could
 		 * simplify this a bit.
@@ -510,7 +570,7 @@ skip_snoop_id:
 
 		ret = setup_subwins(guest, dma_window, liodn, window_addr,
 		                    window_size, subwindow_cnt, omi,
-		                    stash_dest, ppaace);
+		                    stash_dest, ppaace, cfgnode, hwnode);
 		if (ret < 0)
 			return ret;
 	} else {

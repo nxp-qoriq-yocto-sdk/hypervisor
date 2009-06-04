@@ -164,7 +164,7 @@ void map_dev_range(guest_t *guest, phys_addr_t addr, phys_addr_t size)
 	}
 }
 
-static uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
+uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size)
 {
 	if (rootnaddr == 2)
 		*reg++ = start >> 32;
