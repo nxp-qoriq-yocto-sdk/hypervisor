@@ -48,13 +48,24 @@
  */
 #include "fsl_hypervisor.h"
 
+struct strlist {
+	const char *str;
+	struct strlist *next;
+};
+
+#define PROP_MAX 4096
+
 struct parameters {
 	int h;
 	const char *f;
+	const char *n, *p;
+
+	char prop[4096];
+	int proplen;
+
 	unsigned long a;
 	unsigned long e;
 	unsigned int h_specified:1;
-	unsigned int f_specified:1;
 	unsigned int a_specified:1;
 	unsigned int e_specified:1;
 };
@@ -162,6 +173,13 @@ static void usage(void)
 	       "\t<handle> is the doorbell send handle for the "
 	       "doorbell to ring.\n");
 
+	printf("Set a guest device tree property:\n"
+	       "\tpartman setprop -h <handle> -p <path> -n <propname> "
+	       "[-t <data> [-t <data>]]\n");
+
+	printf("Get a guest device tree property:\n"
+	       "\tpartman getprop -h <handle> -p <path> -n <propname>\n");
+
 	printf("\nSpecify -v for verbose output\n");
 	printf("Specify -q for quiet mode (errors reported via "
 	       "return status only)\n");
@@ -223,7 +241,7 @@ static int copy_to_partition(unsigned int partition, void *buffer,
 	im.remote_paddr = target;
 	im.count = count;
 
-	return hv(FSL_HV_IOCTL_MEMCPY, (void *) &im);
+	return hv(FSL_HV_IOCTL_MEMCPY, (union fsl_hv_ioctl_param *)&im);
 }
 
 /**
@@ -671,7 +689,7 @@ static int cmd_load_image(struct parameters *p)
 	unsigned long entry_address;
 	int ret = 0;
 
-	if (!p->h_specified || !p->f_specified) {
+	if (!p->h_specified || !p->f) {
 		fprintf(stderr, "partman load: requires a handle (-h) "
 		                "and file (-f).\n");
 		usage();
@@ -714,7 +732,7 @@ static int cmd_start(struct parameters *p)
 	if (!p->a_specified)
 		p->a = 0;
 
-	if (p->f_specified) {
+	if (p->f) {
 		unsigned long load_address;
 		unsigned long entry_address;
 		int ret = 0;
@@ -738,7 +756,7 @@ static int cmd_start(struct parameters *p)
 	if (verbose)
 		printf("Starting partition at entry point 0x%lx\n", p->e);
 
-	return hv(FSL_HV_IOCTL_PARTITION_START, (void *) &im);
+	return hv(FSL_HV_IOCTL_PARTITION_START, (union fsl_hv_ioctl_param *)&im);
 }
 
 static int cmd_stop(struct parameters *p)
@@ -756,7 +774,7 @@ static int cmd_stop(struct parameters *p)
 
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_STOP, (void *) &im);
+	return hv(FSL_HV_IOCTL_PARTITION_STOP, (union fsl_hv_ioctl_param *)&im);
 }
 
 static int cmd_restart(struct parameters *p)
@@ -774,7 +792,7 @@ static int cmd_restart(struct parameters *p)
 
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (void *) &im);
+	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (union fsl_hv_ioctl_param *)&im);
 }
 
 static int cmd_doorbells(struct parameters *p)
@@ -786,8 +804,7 @@ static int cmd_doorbells(struct parameters *p)
 
 	// Either -h or -f, but not both, must be specified
 
-	if ((p->h_specified && p->f_specified) ||
-	    (!p->h_specified && !p->f_specified)) {
+	if ((p->h_specified && p->f) || (!p->h_specified && !p->f)) {
 		fprintf(stderr, "partman doorbell: requires a handle (-h) "
 		                "*or* file (-f), but not both.\n");
 		usage();
@@ -799,7 +816,7 @@ static int cmd_doorbells(struct parameters *p)
 		struct fsl_hv_ioctl_doorbell im;
 
 		im.doorbell = p->h;
-		return hv(FSL_HV_IOCTL_DOORBELL, (void *) &im);
+		return hv(FSL_HV_IOCTL_DOORBELL, (union fsl_hv_ioctl_param *)&im);
 	}
 
 	// The user specified -f, so he wants to monitor doorbells.
@@ -963,6 +980,75 @@ static int get_handle(const char *name)
 	return *((uint32_t *) (prop->data));
 }
 
+static int cmd_getprop(struct parameters *p)
+{
+	struct fsl_hv_ioctl_prop param;
+	int ret;
+
+	if (!p->h_specified || !p->n || !p->p) {
+		fprintf(stderr, "partman getprop: requires a handle (-h), "
+		                "a path (-p) and a property name (-n)\n");
+		usage();
+		return EINVAL;
+	}
+
+	if (verbose)
+		printf("Getting property %s of %s in guest %i\n",
+		       p->n, p->p, p->h);
+
+	param.handle = p->h;
+	param.path = (uint64_t)(uintptr_t)p->p;
+	param.propname = (uint64_t)(uintptr_t)p->n;
+	param.propval = (uint64_t)(uintptr_t)p->prop;
+	param.proplen = sizeof(p->prop);
+
+	ret = hv(FSL_HV_IOCTL_GETPROP, (union fsl_hv_ioctl_param *)&param);
+	if (ret == 0) {
+		// FIXME: pretty-print strlists, cells, bytes, etc.
+		fwrite(p->prop, param.proplen, 1, stdout);
+		printf("\n");
+	}
+
+	return ret;
+}
+
+static int cmd_setprop(struct parameters *p)
+{
+	struct fsl_hv_ioctl_prop param;
+
+	if (!p->h_specified || !p->n || !p->p) {
+		fprintf(stderr, "partman setprop: requires a handle (-h), "
+		                "a path (-p) and a property name (-n)\n");
+		usage();
+		return EINVAL;
+	}
+
+	if (verbose)
+		printf("Getting property %s of %s in guest %i\n",
+		       p->n, p->p, p->h);
+
+	param.handle = p->h;
+	param.path = (uint64_t)(uintptr_t)p->p;
+	param.propname = (uint64_t)(uintptr_t)p->n;
+	param.propval = (uint64_t)(uintptr_t)p->prop;
+	param.proplen = p->proplen;
+
+	return hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+}
+
+static void add_to_prop(struct parameters *p, const char *arg)
+{
+	/* FIXME: check for <> or [] */
+	size_t len = strlen(arg) + 1;
+
+	if (p->proplen + len > PROP_MAX) {
+		fprintf(stderr, "partman: %s: property too long\n", __func__);
+		exit(1);
+	}
+
+	memcpy(p->prop + p->proplen, arg, len);
+	p->proplen += len;
+}
 
 int main(int argc, char *argv[])
 {
@@ -972,7 +1058,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, ":vqh:f:a:e:")) != -1) {
+	while ((c = getopt(argc, argv, ":vqh:f:a:e:n:p:t:")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose = 1;
@@ -985,7 +1071,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			p.f = optarg;
-			p.f_specified = 1;
 			break;
 		case 'a':
 			p.a = strtoul(optarg, NULL, 0);
@@ -994,6 +1079,15 @@ int main(int argc, char *argv[])
 		case 'e':
 			p.e = strtoul(optarg, NULL, 0);
 			p.e_specified = 1;
+			break;
+		case 'n':
+			p.n = optarg;
+			break;
+		case 'p':
+			p.p = optarg;
+			break;
+		case 't':
+			add_to_prop(&p, optarg);
 			break;
 		case '?':
 			fprintf(stderr, "%s: unrecognized option '%c'\n",
@@ -1049,6 +1143,10 @@ int main(int argc, char *argv[])
 		return cmd_restart(&p);
 	if (!strcmp(argv[optind], "doorbell"))
 		return cmd_doorbells(&p);
+	if (!strcmp(argv[optind], "getprop"))
+		return cmd_getprop(&p);
+	if (!strcmp(argv[optind], "setprop"))
+		return cmd_setprop(&p);
 
 	fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], argv[optind]);
 	usage();

@@ -37,6 +37,8 @@
 #include <events.h>
 #include <errors.h>
 
+#include <malloc.h>
+
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
 /* This could have latency implications if compare_and_swap
@@ -86,6 +88,118 @@ static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
 	regs->gpregs[3] = FH_ERR_UNIMPLEMENTED;
+}
+
+static phys_addr_t reg_pair(trapframe_t *regs, int reg)
+{
+	return ((phys_addr_t)regs->gpregs[reg] << 32) + regs->gpregs[reg + 1];
+}
+
+static void dtprop_access(trapframe_t *regs, int set)
+{
+	size_t proplen;
+	ssize_t ret;
+	dt_node_t *node;
+	char *path = NULL, *propname = NULL, *propval = NULL;
+	guest_t *target_guest, *cur_guest = get_gcpu()->guest;
+
+	target_guest = handle_to_guest(regs->gpregs[3]);
+	if (!target_guest) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+	regs->gpregs[3] = 0;
+
+	ret = copy_string_from_gphys(cur_guest->gphys, reg_pair(regs, 4),
+	                             PAGE_SIZE, &path);
+	if (ret < 0) {
+		regs->gpregs[3] = -ret;
+		goto out;
+	}
+	
+	ret = copy_string_from_gphys(cur_guest->gphys, reg_pair(regs, 6),
+	                             PAGE_SIZE, &propname);
+	if (ret < 0) {
+		regs->gpregs[3] = -ret;
+		goto out;
+	}
+
+	proplen = regs->gpregs[10];
+	if (proplen > PAGE_SIZE * 8) {
+		regs->gpregs[3] = FH_ERR_TOO_LARGE;
+		goto out;
+	}
+
+	propval = malloc(proplen);
+	if (!propval) {
+		regs->gpregs[3] = ENOMEM;
+		goto out;
+	}
+	
+	if (set && copy_from_gphys(cur_guest->gphys, propval,
+	                           reg_pair(regs, 8), proplen) < proplen) {
+		regs->gpregs[3] = EFAULT;
+		goto out;
+	}
+
+	spin_lock(&target_guest->state_lock);
+
+	/* Don't collide with device tree setup being done by the
+	 * hypervisor.  The manager should wait until it receives a reset
+	 * request for the partition before it tries to set up its device
+	 * tree -- at that point the partition will be stopped.
+	 */
+	if (target_guest->state == guest_starting) {
+		regs->gpregs[3] = ERR_INVALID;
+		goto unlock;
+	}
+
+	node = dt_lookup_path(target_guest->devtree, path, set);
+	if (!node) {
+		regs->gpregs[3] = set ? ENOMEM : ENOENT;
+		goto unlock;
+	}
+
+	if (set) {
+		if (dt_set_prop(node, propname, propval, proplen) < 0)
+			regs->gpregs[3] = ENOMEM;
+	} else {
+		dt_prop_t *prop = dt_get_prop(node, propname, 0);
+		if (!prop) {
+			regs->gpregs[3] = ENOENT;
+		} else {
+			regs->gpregs[4] = prop->len;
+			if (prop->len <= proplen)
+				memcpy(propval, prop->data, prop->len);
+			else
+				regs->gpregs[3] = FH_ERR_BUFFER_OVERFLOW;
+		}
+	}
+
+unlock:
+	spin_unlock(&target_guest->state_lock);
+
+	if (!set && regs->gpregs[3] == 0) {
+		ret = copy_to_gphys(cur_guest->gphys, reg_pair(regs, 8),
+		                    propval, proplen);
+		if ((size_t)ret < proplen)
+			regs->gpregs[3] = EFAULT;
+	}
+
+out:
+	free(path);
+	free(propname);
+	free(propval);
+}
+
+static void fh_partition_get_dtprop(trapframe_t *regs)
+{
+	dtprop_access(regs, 0);
+}
+
+static void fh_partition_set_dtprop(trapframe_t *regs)
+{
+	dtprop_access(regs, 1);
 }
 
 static void fh_partition_restart(trapframe_t *regs)
@@ -432,8 +546,8 @@ static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	fh_whoami,
 	unimplemented,
-	unimplemented,
-	unimplemented,                     /* 4 */
+	fh_partition_get_dtprop,
+	fh_partition_set_dtprop,           /* 4 */
 	fh_partition_restart,
 	fh_partition_get_status,
 	fh_partition_start,
