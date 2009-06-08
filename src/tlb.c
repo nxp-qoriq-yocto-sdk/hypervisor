@@ -1316,6 +1316,77 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 	return ret;
 }
 
+/* length includes null terminator, unlike regular strnlen */
+static ssize_t guest_strnlen(pte_t *tbl, phys_addr_t gaddr, ssize_t maxlen)
+{
+	size_t len = 0;
+
+	while (1) {
+		size_t chunk;
+		char *vaddr;
+		char *end;
+
+		vaddr = map_gphys(TEMPTLB1, tbl, gaddr, temp_mapping[0],
+		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
+		if (!vaddr)
+			return -EFAULT;
+
+		if (maxlen > 0) {
+			if (chunk > (size_t)maxlen)
+				chunk = maxlen;
+
+			maxlen -= chunk;
+		}
+
+		end = memchr(vaddr, 0, chunk);
+		if (end) {
+			len += end - vaddr + 1;
+			break;
+		}
+
+		if (maxlen == 0)
+			return -FH_ERR_TOO_LARGE;
+
+		gaddr += chunk;
+		len += chunk;
+	}
+
+	return len;
+}
+
+/** Copy a null-terminated string from a guest physical address.
+ *
+ * A buffer (up to an optional maximum size) is dynamically allocated.
+ *
+ * @param[in] tbl Guest physical page table
+ * @param[in] src Guest physical address to copy from
+ * @param[in] maxlen Largest buffer to allocate, or -1 for unlimited.
+ * @param[out] free()able string
+ * @return size on success, -EFAULT or -ENOMEM on error.
+ */
+ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
+                               ssize_t maxlen, char **buf)
+{
+	ssize_t len;
+	size_t ret;
+	
+	len = guest_strnlen(tbl, src, maxlen);
+	if (len < 0)
+		return len;
+
+	*buf = malloc(len);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = copy_from_gphys(tbl, *buf, src, len);
+	if (ret < (size_t)len) {
+		free(*buf);
+		return -EFAULT;
+	}
+
+	return len;
+}
+
 /** Temporarily map physical memory into a hypervisor virtual address
  *
  * @param[in] tlbentry TLB1 entry index to use

@@ -164,6 +164,8 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
                            pte_t *stbl, phys_addr_t src, size_t len);
 
 size_t copy_from_phys(void *dest, phys_addr_t src, size_t len);
+ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
+                               ssize_t maxlen, char **buf);
 
 size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
                           phys_addr_t src, size_t len, int cache_sync);

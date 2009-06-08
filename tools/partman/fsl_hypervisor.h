@@ -1,36 +1,19 @@
-
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-
-/**
  * Freescale hypervisor ioctl interface
+ *
+ * Copyright (C) 2008-2009 Freescale Semiconductor, Inc. All rights reserved.
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file COPYING in the main directory of this archive
+ * for more details.
  *
  * This file is used by the Freescale hypervisor management driver.  It can
  * also be included by applications that need to communicate with the driver
  * via the ioctl interface.
  */
+
+#ifndef FSL_HYPERVISOR_H
+#define FSL_HYPERVISOR_H
 
 #include <linux/types.h>
 
@@ -158,6 +141,26 @@ union fsl_hv_ioctl_param {
 		__u32 ret;
 		__u32 doorbell;
 	} doorbell;
+
+	/**
+	 * struct fsl_hv_ioctl_prop: get/set a device tree property
+	 * @ret: return error code from the hypervisor
+	 * @handle: handle of partition whose tree to access
+	 * @path: virtual address of path name of node to access
+	 * @propname: virtual address of name of property to access
+	 * @propval: virtual address of property data buffer
+	 * @proplen: Size of property data buffer
+	 *
+	 * Used by FSL_HV_IOCTL_DOORBELL
+	 */
+	struct fsl_hv_ioctl_prop {
+		__u32 ret;
+		__u32 handle;
+		__u64 path;
+		__u64 propname;
+		__u64 propval;
+		__u32 proplen;
+	} prop;
 };
 
 /*
@@ -170,4 +173,12 @@ enum {
 	FSL_HV_IOCTL_PARTITION_STOP = 4, /* Stop this or another partition */
 	FSL_HV_IOCTL_MEMCPY = 5, /* Copy data from one partition to another */
 	FSL_HV_IOCTL_DOORBELL = 6, /* Ring a doorbell */
+
+	/* Get a property from another guest's device tree */
+	FSL_HV_IOCTL_GETPROP = 7, 
+
+	/* Set a property in another guest's device tree */
+	FSL_HV_IOCTL_SETPROP = 8, 
 };
+
+#endif
