@@ -371,8 +371,8 @@ static void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 /* RSP */
 
 static void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byte_length);
-static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
-static int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
+static int read_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
+static int write_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num);
 static uint8_t *scan_till(uint8_t *q, char c);
 static uint64_t scan_num(uint8_t **buffer, char c);
 static uint32_t sign_extend(int32_t n, uint32_t sign_bit_position);
@@ -718,7 +718,7 @@ static void stringize_reg_value(uint8_t *value, uint64_t reg_value, uint32_t byt
 	value[2*byte_length] = '\0';
 }
 
-static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
+static int read_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint32_t byte_length = 0;
 	register_t reg_value = 0xdeadbeef;
@@ -763,7 +763,7 @@ static int read_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 	return c;
 }
 
-static int write_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
+static int write_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint64_t reg_value;
 	uint32_t e500mc_reg_num;
@@ -1096,12 +1096,12 @@ static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_con
 	pkt_write_hex_byte_update_cur(stub->rsp, 5);
 	pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
 	pkt_cat_string(stub->rsp, ":");
-	read_reg(trap_frame, value, 1);
+	read_cpu_reg(trap_frame, value, 1);
 	pkt_cat_string(stub->rsp, (char *)value);
 	pkt_cat_string(stub->rsp, ";");
 	pkt_write_hex_byte_update_cur(stub->rsp, 64); /* pc */
 	pkt_cat_string(stub->rsp, ":");
-	read_reg(trap_frame, value, 64);
+	read_cpu_reg(trap_frame, value, 64);
 	pkt_cat_string(stub->rsp, (char *)value);
 	pkt_cat_string(stub->rsp, ";");
 	/* FIXME: This is a HACK. Is this the right fix? */
@@ -1326,7 +1326,7 @@ return_to_guest:
 				"Got 'p' packet.\n");
 			cur_pos = content(stub->cmd);
 			reg_num = scan_num(&cur_pos, '\0');
-			read_reg(trap_frame, value, reg_num);
+			read_cpu_reg(trap_frame, value, reg_num);
 			TRACE("Register: %d, read-value: %s", reg_num, value);
 			pkt_cat_string(stub->rsp, (char *)value);
 			break;
@@ -1335,7 +1335,7 @@ return_to_guest:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'g' packet.\n");
 			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
-				read_reg(trap_frame, value, reg_num);
+				read_cpu_reg(trap_frame, value, reg_num);
 				TRACE("Register: %d, read-value: %s", reg_num, value);
 				pkt_cat_string(stub->rsp, (char *)value);
 			}
@@ -1351,7 +1351,7 @@ return_to_guest:
 			data = ++cur_pos;
 			DEBUG("Register: %d, write-value: %s (decimal: %lld)",
 			       reg_num, data, htoi(data));
-			err_flag = write_reg(trap_frame, data, reg_num);
+			err_flag = write_cpu_reg(trap_frame, data, reg_num);
 			if (err_flag == 0) {
 				pkt_cat_string(stub->rsp, "OK");
 			} else {
@@ -1375,7 +1375,7 @@ return_to_guest:
 				strncpy((char *)value, (const char *)data, 2 * byte_length);
 				DEBUG("POST strncpy");
 				value[2 * byte_length] = '\0';
-				err_flag = write_reg(trap_frame, value, reg_num);
+				err_flag = write_cpu_reg(trap_frame, value, reg_num);
 				data += 2 * byte_length;
 			}
 			DEBUG("Done writing registers, sending: OK");
