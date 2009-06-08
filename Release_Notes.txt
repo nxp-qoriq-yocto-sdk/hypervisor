@@ -26,8 +26,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.4
-Revsion: 002
-Date: 5/21/2009
+Revsion: 004
+Date: 6/8/2009
 
 -------------------------------------------------------
 Contents
@@ -46,14 +46,19 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.4-003 is compatible with Simics 4.0 4.0.45 /
+   -Topaz 0.4-004 is compatible with Simics 4.0 4.0.45 /
     pre35 and later. Requires the tlbilx patch on Simics pre35. 
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.874
+    0.875
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-004 bug fixes and changes
+      -new partman command syntax is now used
+      -EOI with no hcall support is implemented
+      -cache flushing is implemented
 
    -Topaz 0.4-003 bug fixes and changes
       -bug 3527-- sim.git hv-1p scenario is not working
