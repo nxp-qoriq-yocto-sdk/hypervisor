@@ -181,7 +181,7 @@ unlock:
 
 	if (!set && regs->gpregs[3] == 0) {
 		ret = copy_to_gphys(cur_guest->gphys, reg_pair(regs, 8),
-		                    propval, proplen);
+		                    propval, proplen, 0);
 		if ((size_t)ret < proplen)
 			regs->gpregs[3] = EFAULT;
 	}
