@@ -295,6 +295,7 @@ typedef enum token
 	detach,
 	raw_write,
 	monitor,
+	kill,
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -327,6 +328,7 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "D", detach },
 	{ "X", raw_write },
 	{ "qRcmd", monitor },
+	{ "k", kill },
 };
 
 typedef enum brkpt
@@ -1858,6 +1860,13 @@ return_to_guest:
 				pkt_cat_string(stub->rsp, "E");
 				pkt_write_hex_byte_update_cur(stub->rsp, 0);
 			}
+			break;
+
+		case kill:
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'k' packet.\n");
+			DEBUG("Resetting partition.");
+			restart_guest(get_gcpu()->guest);
+			goto return_to_guest;
 			break;
 
 		default:
