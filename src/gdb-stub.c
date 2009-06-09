@@ -293,6 +293,7 @@ typedef enum token
 	supported_features,
 	qxfer,
 	detach,
+	raw_write,
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -323,6 +324,7 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "qSupported", supported_features },
 	{ "qXfer", qxfer },
 	{ "D", detach },
+	{ "X", raw_write },
 };
 
 typedef enum brkpt
@@ -1264,9 +1266,10 @@ void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type)
 	uint8_t *cur_pos, *sav_pos, *data;
 	uint32_t offset, length;
 	uint8_t err_flag = 0;
+	uint8_t escape_flag = 0;
 	uint32_t *addr = NULL;
 	uint8_t aux, value[17];
-	uint32_t reg_num, i;
+	uint32_t reg_num, i, j;
 	uint8_t breakpoint_type;
 	breakpoint_t *breakpoint = NULL;
 #ifndef USE_DEBUG_INTERRUPT
@@ -1463,6 +1466,46 @@ return_to_guest:
 			}
 			if (err_flag == 0) {
 				pkt_cat_string(stub->rsp, "OK");
+			} else {
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
+			}
+			break;
+
+		case raw_write:
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'X' packet.\n");
+			cur_pos = content(stub->cmd);
+			addr = (uint32_t *)(uintptr_t)scan_num(&cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			length = scan_num(&cur_pos, ':');
+			BREAK_IF_END(cur_pos);
+			cur_pos++;
+			data = cur_pos;
+			DEBUG("addr: 0x%p, length: %d", addr, length);
+			err_flag = 0;
+			escape_flag = 0;
+			j = 0;
+			for (i = 0; i < length; i++) {
+				DEBUG("X packet byte %d: 0x%2x", i, data[i]);
+				if (data[i] == '}') {
+					DEBUG("Skipping escape character in X packet at %d", i);
+					escape_flag = 1;
+					continue;
+				}
+				if (escape_flag == 0) {
+					DEBUG("Writing byte %d: 0x%2x in X packet to 0x%p[%d]", i, data[i], addr, j);
+					if (guestmem_out8((uint8_t *)addr + j, data[i]) != 0)
+						err_flag = 1;
+				} else {
+					DEBUG("Writing (escaped) byte %d: 0x%2x in X packet to 0x%p[%d]", i, 0x20 ^ data[i], addr, j);
+					escape_flag = 0;
+					if (guestmem_out8((uint8_t *)addr + j, 0x20 ^ data[i]) != 0)
+						err_flag = 1;
+				}
+				j++;
+			}
+			if (err_flag == 0) {
+			        pkt_cat_string(stub->rsp, "OK");
 			} else {
 				pkt_cat_string(stub->rsp, "E");
 				pkt_write_hex_byte_update_cur(stub->rsp, 0);
