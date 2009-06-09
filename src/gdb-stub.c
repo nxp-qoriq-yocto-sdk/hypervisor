@@ -294,6 +294,7 @@ typedef enum token
 	qxfer,
 	detach,
 	raw_write,
+	monitor,
 } token_t;
 
 typedef struct lexeme_token_pair
@@ -325,6 +326,7 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "qXfer", qxfer },
 	{ "D", detach },
 	{ "X", raw_write },
+	{ "qRcmd", monitor },
 };
 
 typedef enum brkpt
@@ -342,6 +344,7 @@ static uint8_t hdtoi(uint8_t hexit);
 static uint8_t upper_nibble(uint8_t c);
 static uint8_t lower_nibble(uint8_t c);
 static uint64_t htoi(uint8_t *hex_string);
+static uint8_t *htos(uint8_t *hex_string);
 static token_t tokenize(uint8_t *lexeme);
 static uint8_t hex(uint8_t c);
 
@@ -443,6 +446,28 @@ static uint64_t htoi(uint8_t *hex_string)
 		s += hdtoi(*p++);
 	}
 	return s;
+}
+
+/* Convert in situ, a GDB RSP hex coded string (i.e. having two hex chars/byte)
+ * into it's regular ASCII string.
+ * TODO: static inline stoh(uint8_t *hex_string); hex_string should contain
+ *       /twice/ as much space for the non trivial content.
+ */
+static uint8_t *htos(uint8_t *hex_string)
+{
+	uint8_t a[3] = { 0 };
+	uint8_t *p = hex_string;
+	uint8_t *q = hex_string;
+
+	while (*p) {
+		a[0] = p[0];
+		a[1] = p[1];
+		*q = htoi(a);
+		p += 2;
+		q += 1;
+	}
+	*q = '\0';
+	return hex_string;
 }
 
 static token_t tokenize(uint8_t *lexeme)
@@ -1806,6 +1831,33 @@ return_to_guest:
 			pkt_cat_string(stub->rsp, "OK");
 			transmit_response(stub);
 			goto return_to_guest;
+			break;
+
+		case monitor:
+			/* TODO: List monitor commands on "monitor help". And doc that! */
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'qRcmd' packet.\n");
+			err_flag = 0;
+			cur_pos = content(stub->cmd);
+			cur_pos = scan_till(cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			cur_pos++;
+			htos(cur_pos);
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got '%s' monitor command.\n", cur_pos);
+			if (strcmp((char *) cur_pos, "restart") == 0) {
+				printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Restarting partition.\n");
+				restart_guest(get_gcpu()->guest);
+				pkt_cat_string(stub->rsp, "OK");
+				transmit_response(stub);
+				goto return_to_guest;
+			} else {
+				err_flag = 1;
+			}
+			if (err_flag == 0) {
+				pkt_cat_string(stub->rsp, "OK");
+			} else {
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
+			}
 			break;
 
 		default:
