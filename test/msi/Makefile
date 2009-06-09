@@ -45,7 +45,7 @@ $(test): $($(test)-dtb)
 $(test)-run: $(test)
 	$(SIMICS) $(testdir)$</run-msi.simics
 
-define mount
+define mount-msi
 	$(call show,mount: bin/msi/$(1))
 	$(V)mkdir -p bin/msi/$(1)
 	$(V)gunzip < $(testdir)/linux/$(1).ext2.gz > bin/msi/$(1).ext2
@@ -54,7 +54,7 @@ define mount
 	$(V)sudo mount -t ext2 -o rw,loop bin/msi/$(1).ext2 bin/msi/$(1)
 endef
 
-define unmount
+define unmount-msi
 	$(call show,unmount: $(1))
 	$(V)sudo umount -d bin/msi/$(1)
 	$(V)gzip -f bin/msi/$(1).ext2
@@ -65,9 +65,9 @@ endef
 
 # Add our kernel module to rootfs
 bin/$(test)/rootfs.ext2.gz:
-	$(call mount,rootfs)
+	$(call mount-msi,rootfs)
 	sudo cp -af $(@D)/virt_pcie_msi.ko bin/msi/rootfs/lib
-	$(call unmount,rootfs)
+	$(call unmount-msi,rootfs)
 
 bin/$(test)/virt_pcie_msi.ko: $(dir)virt_pcie_msi.c
 	@cp $(IMAGES_DIR)/pcie-msi.so $(SIMICS_BASE_PACKAGE)/amd64-linux/lib
