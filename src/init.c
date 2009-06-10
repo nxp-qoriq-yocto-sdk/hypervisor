@@ -502,7 +502,7 @@ static void assign_hv_devs(void)
  *
  * Returns the CCSR base physical address, or 0 if error.
  */
-static phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size)
+phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size)
 {
 	unsigned int parent_addr_cells, parent_size_cells;
 	unsigned int child_addr_cells, child_size_cells;
