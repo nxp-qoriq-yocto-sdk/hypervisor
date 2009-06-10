@@ -48,7 +48,7 @@ $(test)-run: $(test)
 define mount-msi
 	$(call show,mount: bin/msi/$(1))
 	$(V)mkdir -p bin/msi/$(1)
-	$(V)gunzip < $(testdir)/linux/$(1).ext2.gz > bin/msi/$(1).ext2
+	$(V)gunzip < $(testdir)../../images/rootfs.tiny.ext2.gz > bin/msi/$(1).ext2
         $(V)/sbin/e2fsck bin/msi/$(1).ext2
         $(V)/sbin/resize2fs bin/msi/$(1).ext2 16384
 	$(V)sudo mount -t ext2 -o rw,loop bin/msi/$(1).ext2 bin/msi/$(1)
@@ -58,7 +58,6 @@ define unmount-msi
 	$(call show,unmount: $(1))
 	$(V)sudo umount -d bin/msi/$(1)
 	$(V)gzip -f bin/msi/$(1).ext2
-	sudo cp -af bin/msi/$(1).ext2.gz $(IMAGES_DIR)
 # step below is only needed for bare-metal testing.
 #	$(MKIMAGE) -A ppc -O Linux -T RAMDisk -C gzip -a 0 -e 0 -n "uboot ext2 ramdisk rootfs" -d $(IMAGES_DIR)/$(1).ext2.gz $(IMAGES_DIR)/$(1).ext2.gz.uboot
 endef
