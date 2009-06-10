@@ -4,7 +4,7 @@
  * This file contains functions that will parse and ELF image and extract
  * the executable binary from it.
  */
-/* Copyright (C) 2008 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
  *

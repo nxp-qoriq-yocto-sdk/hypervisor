@@ -5,7 +5,7 @@
  * binary, generated using mkimage tool.
  */
 
-/* Copyright (C) 2008 - 2009 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  * Author: Naveen Burmi <naveenburmi@freescale.com>
  *
  *
