@@ -47,7 +47,7 @@ $(test)-run-%: $(test)
 define mount
 	$(call show,mount: bin/linux/$(1))
 	$(V)mkdir -p bin/linux/$(1)
-	$(V)gunzip < $(testdir)linux/$(1).ext2.gz > bin/linux/$(1).ext2
+	$(V)gunzip < $(testdir)../../images/rootfs.tiny.ext2.gz > bin/linux/$(1).ext2
         $(V)/sbin/e2fsck bin/linux/$(1).ext2
         $(V)/sbin/resize2fs bin/linux/$(1).ext2 16384
 	$(V)sudo mount -t ext2 -o rw,loop bin/linux/$(1).ext2 bin/linux/$(1)
@@ -60,7 +60,7 @@ define unmount
 endef
 
 # Add vmlinux and partman to the rootfs
-bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.gz
+bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
 # We want partman on the managed partition, so that we can send and listen
 # for doorbells
 	$(call mount,rootfs)
@@ -72,7 +72,7 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(dir)rootfs-partman.ext2.
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	$(call unmount,bin/linux/rootfs-partman)
 
-bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(dir)rootfs-hello.ext2.gz
+bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
 	$(call mount,rootfs-hello)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-hello/bin/
 	sudo cp -af bin/hello/hello bin/linux/rootfs-hello/
