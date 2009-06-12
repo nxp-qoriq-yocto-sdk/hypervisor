@@ -1,5 +1,4 @@
 /* Copyright (C) 2009 Freescale Semiconductor, Inc.
- * Author: Timur Tabi <timur@freescale.com>
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
