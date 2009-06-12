@@ -33,7 +33,7 @@ $guest_image[0]  = "vmlinux.stripped"
 $guest_addr[0]   = 0x00100000
 $guest_image[1]  = "hv-2p.dtb"
 $guest_addr[1]   = 0x00f00000
-$guest_image[2]  = "rootfs.ext2.gz"
+$guest_image[2]  = "rootfs.tiny.ext2.gz"
 $guest_addr[2]   = 0x01000000
 
 add-directory "%script%/../common" -prepend
