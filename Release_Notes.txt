@@ -26,7 +26,7 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.4
-Revsion: 004
+Revsion: 005
 Date: 6/8/2009
 
 -------------------------------------------------------
@@ -46,14 +46,20 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.4-004 is compatible with Simics 4.0 4.0.45 /
-    pre35 and later. Requires the tlbilx patch on Simics pre35. 
+   -Topaz 0.4-005 is compatible with Simics 4.0 4.2.8 / pre6
+    and later.
 
    -in sync with Embedded Hypervisor Architecture specifciation
     0.875
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-005 bug fixes and changes
+      -MSIs are supported
+      -support for modifiying guest device trees from
+       partman is in place (e.g. /chosen node)
+      -gdb stub support reset and image loading
 
    -Topaz 0.4-004 bug fixes and changes
       -new partman command syntax is now used
