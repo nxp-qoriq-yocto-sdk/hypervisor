@@ -1685,6 +1685,9 @@ guest_t *node_to_partition(dt_node_t *partition)
 		if (dt_get_prop(partition, "mpic-direct-eoi", 0))
 			guests[i].mpic_direct_eoi = 1;
 
+		if (dt_get_prop(partition, "privileged", 0))
+			guests[i].privileged = 1;
+
 		guests[i].name = name;
 		guests[i].state = guest_starting;
 		guests[i].partition = partition;
