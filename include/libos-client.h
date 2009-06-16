@@ -140,5 +140,6 @@ void hcall(struct trapframe *regs);
 #define LOGTYPE_PAMU         (CLIENT_BASE_LOGTYPE + 8)
 #define LOGTYPE_CCM          (CLIENT_BASE_LOGTYPE + 9)
 #define LOGTYPE_CPC          (CLIENT_BASE_LOGTYPE + 10)
+#define LOGTYPE_GUTS         (CLIENT_BASE_LOGTYPE + 11)
 
 #endif

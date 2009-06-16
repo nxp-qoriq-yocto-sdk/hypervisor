@@ -36,6 +36,7 @@
 #include <paging.h>
 #include <events.h>
 #include <errors.h>
+#include <guts.h>
 
 #include <malloc.h>
 
@@ -542,6 +543,17 @@ static void fh_partition_stop(trapframe_t *regs)
 	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
+static void fh_system_reset(trapframe_t *regs)
+{
+	guest_t *guest = get_gcpu()->guest;
+
+	if (guest->privileged) {
+		regs->gpregs[3] = system_reset();
+	} else {
+		regs->gpregs[3] = EPERM;
+	}
+}
+
 static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	fh_whoami,
@@ -567,7 +579,7 @@ static hcallfp_t hcall_table[] = {
 	fh_vmpic_iack,
 	fh_send_nmi,
 	fh_vmpic_get_msir,
-	unimplemented,                     /* 24 */
+	fh_system_reset,                   /* 24 */
 	unimplemented,
 	unimplemented,
 	unimplemented,
