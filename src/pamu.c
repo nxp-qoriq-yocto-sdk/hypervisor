@@ -782,7 +782,7 @@ void pamu_global_init(void)
 		return;
 	}
 
-	guts_node = dt_get_first_compatible(hw_devtree, "fsl,p4080-guts");
+	guts_node = dt_get_first_compatible(hw_devtree, "fsl,qoriq-device-config-1.0");
 	if (!guts_node) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: pamu present, but no guts node found\n", __func__);
