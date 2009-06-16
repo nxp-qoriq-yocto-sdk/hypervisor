@@ -32,7 +32,7 @@
 test := msi
 dir := $(testdir)$(test)/
 LINUX_KERNEL_SRC_DIR ?= $(testdir)/../../linux-2.6-p4080
-SIMICS_BASE_PACKAGE ?= /opt/virtutech/simics-4.0/simics-4.0.45
+SIMICS_WKSPACE_DIR ?=
 MKIMAGE ?= mkimage
 IMAGES_DIR ?= $(testdir)../../images
 
@@ -68,8 +68,9 @@ bin/$(test)/rootfs.ext2.gz:
 	sudo cp -af $(@D)/virt_pcie_msi.ko bin/msi/rootfs/lib
 	$(call unmount-msi,rootfs)
 
-bin/$(test)/virt_pcie_msi.ko: $(dir)virt_pcie_msi.c
-	@cp $(IMAGES_DIR)/pcie-msi.so $(SIMICS_BASE_PACKAGE)/amd64-linux/lib
+bin/$(test)/virt_pcie_msi.ko: $(dir)virt_pcie_msi.c $(IMAGES_DIR)/pcie_msi.so
+	mkdir -p $(SIMICS_WKSPACE_DIR)/amd64-linux/lib
+	cp $(IMAGES_DIR)/pcie_msi.so $(SIMICS_WKSPACE_DIR)/amd64-linux/lib
 	@$(MKDIR) $(@D)
 	@cp $(testdir)/msi/virt_pcie_msi.c $(@D)
 	@echo "obj-m += virt_pcie_msi.o" > $(@D)/Makefile
