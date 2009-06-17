@@ -53,15 +53,16 @@ $uboot = "u-boot.32.bin"
 add-directory "%script%" -prepend
 add-directory "bin/msi" -prepend
 
-run-command-file "boot.simics"
+#run-command-file "boot.simics"
+run-command-file "boot_4_2.simics"
 add-directory "bin/linux" -prepend
 
 # add dummy PCIe endpoint w/t MSI support
-@SIM_create_object('pcie_msi', 'pcie-msi', [['pci_bus', conf.pcie_bus0]])
-@conf.pcie_bus0.pci_devices = [[0, 0, conf.pcie_msi]]
+@SIM_create_object('pcie_msi', 'pcie-msi', [['pci_bus', conf.p4080_simple0.soc.pcie_bus[0]]])
+@conf.p4080_simple0.soc.pcie_bus[0].pci_devices = [[0, 0, conf.pcie_msi]]
 # hack to add capability feature to device config status, otherwise linux
 # does not query capabiliities
 pcie_msi->pci_config_status = 0x10
 
-pamu0.log-level 4
+$system.soc.pamu[0].log-level 4
 pcie_msi.log-level 4
