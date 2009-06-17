@@ -372,6 +372,7 @@ static void nak(gdb_stub_core_context_t *stub);
 static int got_ack(gdb_stub_core_context_t *stub);
 static void receive_command(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static void transmit_response(gdb_stub_core_context_t *stub);
+static void pkt_write_dac_state(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub);
 static void pkt_hex_copy(pkt_t *pkt, uint8_t *p, uint32_t length);
 
@@ -1117,12 +1118,65 @@ static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *brea
 	}
 }
 
+static void pkt_write_dac_state(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
+{
+	uint8_t value[32], i;
+	static const struct dac_info
+	{
+		int32_t dbsr_rmask;
+		int32_t dbsr_wmask;
+		uint32_t reg_num;
+	} dac_tab[2] = {
+		{
+			DBSR_DAC1R,
+			DBSR_DAC1W,
+			77 /* DAC1 */
+		},
+		{
+			DBSR_DAC2R,
+			DBSR_DAC2W,
+			78 /* DAC2 */
+		}
+	};
+
+	DEBUG();
+
+	/* Iterate 0: DAC1
+	 * Iterate 1: DAC2
+         */
+	for (i = 0; i < 2; i++) {
+		if (stub->dbsr & (dac_tab[i].dbsr_rmask)) {
+			if (stub->dbsr & (dac_tab[i].dbsr_wmask)) {
+				DEBUG("awatch");
+				pkt_cat_string(stub->rsp, "awatch");
+			} else {
+				DEBUG("rwatch");
+				pkt_cat_string(stub->rsp, "rwatch");
+			}
+		} else if (stub->dbsr & (dac_tab[i].dbsr_wmask)) {
+			DEBUG("watch");
+			pkt_cat_string(stub->rsp, "watch");
+		} else {
+			continue;
+		}
+		pkt_cat_string(stub->rsp, ":");
+		read_cpu_reg(trap_frame, value, dac_tab[i].reg_num);
+		pkt_cat_string(stub->rsp, (char *)value);
+		pkt_cat_string(stub->rsp, ";");
+	}
+}
+
+/* TODO: Autogenerate defines for the e500mc_reg_table indexes (used in transmit_stop_reply_pkt_T (),
+ *       pkt_write_dac_state()) for calls to read_cpu_reg().
+ */
 static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
 {
 	uint8_t value[32];
+	register_t addr;
 	DEBUG("Sending T rsp");
 	pkt_cat_string(stub->rsp, "T");
 	pkt_write_hex_byte_update_cur(stub->rsp, 5);
+	pkt_write_dac_state(trap_frame, stub);
 	pkt_write_hex_byte_update_cur(stub->rsp, 1); /* r1 */
 	pkt_cat_string(stub->rsp, ":");
 	read_cpu_reg(trap_frame, value, 1);
@@ -1170,7 +1224,20 @@ static int debug_exception(trapframe_t *trap_frame)
  		stub->dbsr |= DBSR_IAC2;
 	}
 
-	if (dbsr & ~(DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 | DBSR_IAC2))
+	if (dbsr & DBSR_DAC1R)
+		stub->dbsr |= DBSR_DAC1R;
+
+	if (dbsr & DBSR_DAC1W)
+		stub->dbsr |= DBSR_DAC1W;
+
+	if (dbsr & DBSR_DAC2R)
+		stub->dbsr |= DBSR_DAC2R;
+
+	if (dbsr & DBSR_DAC2W)
+		stub->dbsr |= DBSR_DAC2W;
+
+	if (dbsr & ~(DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 | DBSR_IAC2 |
+	             DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W))
 		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, "%s: unknown debug event\n",
 		         __func__);
 
@@ -1550,20 +1617,14 @@ return_to_guest:
 			if (breakpoint_type != memory_breakpoint
 #ifdef USE_DEBUG_INTERRUPT
 			    && breakpoint_type != hardware_breakpoint
-/* FIXME: Add this when watchpoints work. */
-#if 0
 			    && breakpoint_type != write_watchpoint
 			    && breakpoint_type != read_watchpoint
 			    && breakpoint_type != access_watchpoint
 #endif
-#endif
 			) {
 #ifdef USE_DEBUG_INTERRUPT
-				DEBUG("We only support memory and hardware breakpoints.");
-/* FIXME: Add this when watchpoints work. */
-#if 0
+				DEBUG("We only support memory and hardware breakpoints,"
 				      "and read, write or access watchpoints.");
-#endif
 #else
 				DEBUG("We only support memory breakpoints.");
 #endif
@@ -1613,8 +1674,6 @@ return_to_guest:
 					}
 					DEBUG("HW breakpoint dbcr0: 0x%lx", mfspr(SPR_DBCR0));
 					break;
-/* FIXME: Watchpoints do not work yet. */
-#if 0
 				case write_watchpoint:
 				case read_watchpoint:
 				case access_watchpoint:
@@ -1643,7 +1702,6 @@ return_to_guest:
 					}
 					DEBUG("Watchpoint dbcr0: 0x%lx", mfspr(SPR_DBCR0));
 					break;
-#endif
 #endif
 				default:
 					/* If this is not a known breakpoint type;
@@ -1677,8 +1735,6 @@ return_to_guest:
 						err_flag = 1;
 					}
 					break;
-/* FIXME: Watchpoints do not work yet. */
-#if 0
 				case write_watchpoint:
 				case read_watchpoint:
 				case access_watchpoint:
@@ -1692,7 +1748,6 @@ return_to_guest:
 						err_flag = 1;
 					}
 					break;
-#endif
 #endif
 				default:
 					/* If this is not a known breakpoint type;
