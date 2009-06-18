@@ -557,6 +557,10 @@ static void restart_fn(shell_t *shell, char *args)
 		return;
 
 	guest = &guests[num];
+
+	set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "shell");
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "restart");
+
 	if (restart_guest(guest))
 		qprintf(shell->out, 1, "Couldn't restart partition.\n");
 }
@@ -589,6 +593,10 @@ static void stop_fn(shell_t *shell, char *args)
 		return;
 
 	guest = &guests[num];
+
+	set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "shell");
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "stop");
+
 	if (stop_guest(guest))
 		qprintf(shell->out, 1, "Couldn't stop partition.\n");
 }

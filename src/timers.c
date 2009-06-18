@@ -179,11 +179,18 @@ void watchdog_trap(trapframe_t *regs)
 
 			send_doorbells(guest->dbell_watchdog_expiration);
 		} else {
+			int ret;
+			char buf[64];
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 				"Watchdog: restarting partition\n");
 
 			// Save the current value of TCR[WRC]
 			gcpu->tsr = gcpu->timer_flags & TCR_WRC;
+
+			ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
+			assert(ret < (int)sizeof(buf));
+			set_hypervisor_strprop(guest, "fsl,hv-stopped-by", buf);
+			set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "watchdog");
 
 			restart_guest(guest);
 		}

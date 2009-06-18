@@ -26,5 +26,9 @@
 #define GUTS_H
 
 int system_reset(void);
+int get_sys_reset_status(void);
+
+#define SYS_RESET_STATUS_POR  1
+#define SYS_RESET_STATUS_HARD 2
 
 #endif

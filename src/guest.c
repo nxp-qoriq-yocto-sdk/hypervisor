@@ -53,6 +53,7 @@
 #include <ccm.h>
 #include <debug-stub.h>
 #include <error_log.h>
+#include <guts.h>
 
 guest_t *error_manager_guest;
 int error_manager_gcpu;
@@ -2561,7 +2562,7 @@ static int init_guest_devs(guest_t *guest)
 /* Don't inline this inside init_guest, to isolate its stack usage. */
 static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 {
-	int ret;
+	int ret, status;
 	dt_prop_t *prop;
 	dt_node_t *node;
 	const uint32_t *propdata;
@@ -2627,6 +2628,16 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 		ret = dt_set_prop(node, "fsl,hv-pic-legacy", NULL, 0);
 		if (ret < 0)
 			goto fail;
+	}
+
+	status = get_sys_reset_status();
+	if (status == SYS_RESET_STATUS_POR) {
+		set_hypervisor_strprop(guest, "fsl,hv-sys-reset-status", "power-on-reset");
+	} else if (status == SYS_RESET_STATUS_HARD) {
+		set_hypervisor_strprop(guest, "fsl,hv-sys-reset-status", "hard-reset");
+	} else {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: unknown hw reset status\n",__func__);
 	}
 
 	// FIXME: not in spec
@@ -2803,4 +2814,24 @@ __attribute__((noreturn)) void init_guest(void)
 	idle_loop();
 
 	BUG();
+}
+
+
+void set_hypervisor_strprop(guest_t *guest, const char *prop, const char *value)
+{
+	dt_node_t *node;
+	int ret;
+
+	if (!prop || !value)
+		return;
+
+	node = dt_get_subnode(guest->devtree, "hypervisor", 0);
+	if (node) {
+		ret = dt_set_prop_string(node, prop, value);
+		if (ret) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				 "%s: guest %s: cannot set '%s' property\n",
+				 __func__, guest->name, prop);
+		}
+	}
 }

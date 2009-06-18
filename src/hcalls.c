@@ -263,6 +263,13 @@ static void fh_partition_restart(trapframe_t *regs)
 	// TSR[WRS] is reset to zero during a normal restart
 	get_gcpu()->tsr = 0;
 
+	if (regs->gpregs[3] == -1)
+		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
+	else
+		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
+
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "restart");
+
 	regs->gpregs[3] = restart_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }
 
@@ -586,6 +593,13 @@ static void fh_partition_stop(trapframe_t *regs)
 
 	// TSR[WRS] is reset to zero during a normal restart
 	get_gcpu()->tsr = 0;
+
+	if (regs->gpregs[3] == -1)
+		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
+	else 
+		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
+
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "stop");
 
 	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_INVALID_STATE : 0;
 }

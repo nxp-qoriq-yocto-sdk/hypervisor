@@ -33,10 +33,17 @@
 #include <devtree.h>
 #include <errors.h>
 
-#define GUTS_RSTCR 0xB0       /* offset in guts dev config reset control reg */
+/* offsets in guts dev config */
+#define GUTS_RSTCR  0xB0       
+#define GUTS_CRSTR0 0x400
+
 #define RSTCR_RESET_REQ 0x2
 
-static uint32_t *guts_rstcr;
+#define CRSTR0_RST_HRST  0x1
+#define CRSTR0_RST_PORST 0x2
+
+static uint32_t *guts_rstcr;  /* reset control register */
+static uint32_t *guts_crstr0;  /* core reset status register */
 
 static int guts_devconfig_probe(driver_t *drv, device_t *dev);
 
@@ -57,10 +64,36 @@ static int guts_devconfig_probe(driver_t *drv, device_t *dev)
 	}
 
 	guts_rstcr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTCR);
+	guts_crstr0 = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_CRSTR0);
 
 	dev->driver = &guts_devconfig;
 
 	return 0;
+}
+
+/**
+ * returns the system hardware reset status
+ */
+int get_sys_reset_status(void)
+{
+	if (!guts_crstr0) {
+		printlog(LOGTYPE_GUTS, LOGLEVEL_ERROR,
+		        "%s: reset status reg not found\n", __func__);
+		return -ENODEV;
+	}
+
+	uint32_t val = in32(guts_crstr0);
+
+	// FIXME: simics always returns 0
+	// for CRSTR0, so for now consider
+	// that POR
+	if (val & CRSTR0_RST_PORST || val == 0) {
+		return SYS_RESET_STATUS_POR;
+	} else if (val & CRSTR0_RST_HRST) {
+		return SYS_RESET_STATUS_HARD;
+	} else {
+		return -EIO;
+	}
 }
 
 int system_reset(void)

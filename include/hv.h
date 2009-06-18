@@ -60,6 +60,8 @@ void reflect_trap(trapframe_t *regs);
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar);
 void reflect_crit_int(trapframe_t *regs, int trap_type);
 
+void set_hypervisor_strprop(struct guest *guest, const char *prop, const char *value);
+
 phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size);
 
 __attribute__((noreturn)) void init_guest(void);
