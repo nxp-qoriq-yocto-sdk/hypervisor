@@ -1195,28 +1195,30 @@ static int create_guest_special_doorbells(guest_t *guest)
 {
 	assert(!guest->dbell_state_change);
 
-	guest->dbell_state_change = alloc_type(ipi_doorbell_t);
+	guest->dbell_state_change = alloc_doorbell(IPI_DOORBELL_TYPE_NORMAL);
 	if (!guest->dbell_state_change) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s: out of memory\n", __func__);
 		goto error;
 	}
 
-	guest->dbell_watchdog_expiration = alloc_type(ipi_doorbell_t);
+	guest->dbell_watchdog_expiration =
+				alloc_doorbell(IPI_DOORBELL_TYPE_NORMAL);
 	if (!guest->dbell_watchdog_expiration) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s: out of memory\n", __func__);
 		goto error;
 	}
 
-	guest->dbell_restart_request = alloc_type(ipi_doorbell_t);
+	guest->dbell_restart_request =
+				alloc_doorbell(IPI_DOORBELL_TYPE_NORMAL);
 	if (!guest->dbell_restart_request) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s: out of memory\n", __func__);
 		goto error;
 	}
 
-	guest->dbell_shutdown = alloc_type(ipi_doorbell_t);
+	guest->dbell_shutdown = alloc_doorbell(IPI_DOORBELL_TYPE_NORMAL);
 	if (!guest->dbell_shutdown) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s: out of memory\n", __func__);
@@ -1226,10 +1228,10 @@ static int create_guest_special_doorbells(guest_t *guest)
 	return 0;
 
 error:
-	free(guest->dbell_shutdown);
-	free(guest->dbell_restart_request);
-	free(guest->dbell_watchdog_expiration);
-	free(guest->dbell_restart_request);
+	destroy_doorbell(guest->dbell_shutdown);
+	destroy_doorbell(guest->dbell_restart_request);
+	destroy_doorbell(guest->dbell_watchdog_expiration);
+	destroy_doorbell(guest->dbell_restart_request);
 
 	guest->dbell_shutdown = NULL;
 	guest->dbell_restart_request = NULL;

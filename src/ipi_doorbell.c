@@ -32,6 +32,7 @@
 #include <libos/libos.h>
 #include <libos/bitops.h>
 #include <libos/alloc.h>
+#include <libos/mpic.h>
 
 #include <ipi_doorbell.h>
 #include <errors.h>
@@ -53,9 +54,15 @@ int send_doorbells(struct ipi_doorbell *dbell)
 	if (!dbell)
 		return -ERR_INVALID;
 
+	if (dbell->fast_dbell) {
+		mpic_set_ipi_dispatch_register(dbell->fast_dbell->irq);
+		return 1;
+	}
+
 	saved = spin_lock_intsave(&dbell->dbell_lock);
-	if (dbell->recv_head) {
-		guest_recv_dbell_list_t *receiver = dbell->recv_head;
+	if (dbell->normal_dbell->recv_head) {
+		guest_recv_dbell_list_t *receiver =
+					dbell->normal_dbell->recv_head;
 		while (receiver) {
 			vpic_assert_vint(receiver->guest_vint);
 			receiver = receiver->next;
@@ -67,16 +74,106 @@ int send_doorbells(struct ipi_doorbell *dbell)
 	return count;
 }
 
+ipi_doorbell_t *alloc_doorbell(uint32_t type)
+{
+	ipi_doorbell_t *dbell = alloc_type(ipi_doorbell_t);
+	if (!dbell)
+		return NULL;
+
+	if (type == IPI_DOORBELL_TYPE_NORMAL) {
+		dbell->normal_dbell = alloc_type(ipi_normal_doorbell_t);
+		if (!dbell->normal_dbell) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+				"%s: Failed to allocate memory\n", __func__);
+			free(dbell);
+
+			return NULL;
+		}
+	} else if (type == IPI_DOORBELL_TYPE_FAST) {
+		dbell->fast_dbell = alloc_type(ipi_fast_doorbell_t);
+		if (!dbell->fast_dbell) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+				"%s: Failed to allocate memory\n", __func__);
+			free(dbell);
+
+			return NULL;
+		}
+	} else {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			"%s: Invalid doorbell type\n", __func__);
+		free(dbell);
+
+		return NULL;
+	}
+
+	return dbell;
+}
+
+void destroy_doorbell(ipi_doorbell_t *dbell)
+{
+	if (dbell) {
+		free(dbell->normal_dbell);
+		free(dbell->fast_dbell);
+		free(dbell);
+	}
+}
+
+static uint32_t fdbell_lock;
+
 static int create_doorbell(dt_node_t *node, void *arg)
 {
 	ipi_doorbell_t *dbell = alloc_type(ipi_doorbell_t);
 	if (!dbell)
 		return ERR_NOMEM;
 
+	if (dt_node_is_compatible(node, "fast-doorbell")) {
+		static uint32_t ipi_fast_dbell = 0;
+		if (ipi_fast_dbell >=  4) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+				"%s: cannot create more then"
+				"4 fast doorbells\n", __func__);
+			free(dbell);
+
+			return ERR_INVALID;
+		}
+
+		dbell->fast_dbell = alloc_type(ipi_fast_doorbell_t);
+		if (!dbell->fast_dbell) {
+			free(dbell);
+			return ERR_NOMEM;
+		}
+
+		register_t saved = spin_lock_intsave(&fdbell_lock);
+		dbell->fast_dbell->irq = mpic_get_ipi_irq(ipi_fast_dbell++);
+		dbell->fast_dbell->global_handle = alloc_global_handle();
+		if (dbell->fast_dbell->global_handle < 0) {
+			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+				"%s: global handle not available\n",
+				__func__);
+			free(dbell->fast_dbell);
+			free(dbell);
+			ipi_fast_dbell--;
+			spin_unlock_intsave(&fdbell_lock, saved);
+
+			return ERR_INVALID;
+		}
+
+		spin_unlock_intsave(&fdbell_lock, saved);
+
+		mpic_irq_set_vector(dbell->fast_dbell->irq,
+					dbell->fast_dbell->global_handle);
+	} else {
+		dbell->normal_dbell = alloc_type(ipi_normal_doorbell_t);
+		if (!dbell->normal_dbell) {
+			free(dbell);
+			return ERR_NOMEM;
+		}
+	}
+
 	int ret = dt_set_prop(node, "fsl,hv-internal-doorbell-ptr",
 	                      &dbell, sizeof(dbell));
 	if (ret < 0)
-		free(dbell);
+		destroy_doorbell(dbell);
 
 	return ret;
 }
@@ -108,18 +205,57 @@ int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
 	return ghandle;
 }
 
-/**
- * attach_receive_doorbell - attach a doorbell to a receive handle
- * @guest: the guest to update
- * @dbell: the doorbell to attach
- * @node: the receive handle node in the guest device tree
- *
- * Attach a doorbell to an existing doorbell receive handle node.  This
- * function also allocates a virq and creates an "interrupts" property in the
- * node with the virq values.
+static int attach_fast_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
+				dt_node_t *node)
+{
+	uint32_t handle[2];
+	int ret;
+
+	vmpic_interrupt_t *vmirq = alloc_type(vmpic_interrupt_t);
+	if (!vmirq) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			"%s: out of memory\n", __func__);
+
+		return ERR_NOMEM;
+	}
+
+	vmirq->guest = guest;
+	vmirq->irq = dbell->fast_dbell->irq;
+
+	vmirq->user.intr = vmirq;
+	vmirq->user.ops = NULL;
+
+	vmirq->handle = dbell->fast_dbell->global_handle;
+	ret = set_guest_global_handle(guest, &vmirq->user, vmirq->handle);
+	if (ret < 0) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			"%s: error in setting global handle\n", __func__);
+		free(vmirq);
+
+		return ret;
+	}
+
+	handle[0] = vmirq->handle;
+	handle[1] = 0;
+
+	ret = dt_set_prop(node, "interrupts", handle, sizeof(handle));
+	if (ret < 0) {
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+			"%s: Couldn't set 'interrupts' property: %i\n",
+			__func__, ret);
+		free(vmirq);
+
+		return ret;
+	}
+
+	return 0;
+}
+
+/* This function also allocates a virq and creates an "interrupts" property
+ * in the node with the virq values.
  */
-int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
-                            dt_node_t *node)
+static int attach_normal_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
+				  dt_node_t *node)
 {
 	uint32_t irq[2];
 	int ret;
@@ -159,8 +295,8 @@ int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 
 	// Add this receive handle to the list of receive handles for the doorbell
 	register_t saved = spin_lock_intsave(&dbell->dbell_lock);
-	recv_list->next = dbell->recv_head;
-	dbell->recv_head = recv_list;
+	recv_list->next = dbell->normal_dbell->recv_head;
+	dbell->normal_dbell->recv_head = recv_list;
 	spin_unlock_intsave(&dbell->dbell_lock, saved);
 
 	recv_list->guest_vint = virq;
@@ -172,6 +308,26 @@ error:
 	free(recv_list);
 
 	return ret;
+}
+
+/**
+ * attach_receive_doorbell - attach a doorbell to a receive handle
+ * @guest: the guest to update
+ * @dbell: the doorbell to attach
+ * @node: the receive handle node in the guest device tree
+ *
+ * Attach a doorbell to an existing doorbell receive handle node.
+ */
+int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
+			    dt_node_t *node)
+{
+	uint32_t irq[2];
+	int ret;
+
+	if (dbell->fast_dbell)
+		return attach_fast_doorbell(guest, dbell, node);
+	else
+		return attach_normal_doorbell(guest, dbell, node);
 }
 
 static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)

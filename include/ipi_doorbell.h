@@ -26,13 +26,26 @@
 #include <percpu.h>
 #include <vpic.h>
 
+#define IPI_DOORBELL_TYPE_NORMAL 1
+#define IPI_DOORBELL_TYPE_FAST   2
+
 typedef struct guest_recv_dbell_list {
 	vpic_interrupt_t *guest_vint;
 	struct guest_recv_dbell_list *next;
 } guest_recv_dbell_list_t;
 
-typedef struct ipi_doorbell {
+typedef struct ipi_normal_doorbell {
 	struct guest_recv_dbell_list *recv_head;
+} ipi_normal_doorbell_t;
+
+typedef struct ipi_fast_doorbell {
+	interrupt_t *irq;
+	uint32_t global_handle;
+} ipi_fast_doorbell_t;
+
+typedef struct ipi_doorbell {
+	ipi_normal_doorbell_t *normal_dbell;
+	ipi_fast_doorbell_t *fast_dbell;
 	uint32_t dbell_lock;
 } ipi_doorbell_t;
 
@@ -49,5 +62,7 @@ int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest);
 int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
                             struct dt_node *node);
 void create_doorbells(void);
+void destroy_doorbell(ipi_doorbell_t *dbell);
+ipi_doorbell_t *alloc_doorbell(uint32_t type);
 void send_dbell_partition_init(guest_t *guest);
 void recv_dbell_partition_init(guest_t *guest);
