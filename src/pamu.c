@@ -231,20 +231,22 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint32_t phandle;
 	uint32_t msi_bank_addr;
 	char buf[32];
-	uint32_t reg[4];
+	uint32_t reg[2];
 	dt_prop_t *regprop;
 	uint64_t msi_addr = 0;
 	dt_node_t *msi_gnode = NULL;
 	unsigned long rpn = ULONG_MAX;
 
-	prop = dt_get_prop(cfgnode, "msi", 0);
+	/*
+	 * pcie controller hwnode properties would have been passed-thru
+	 * to the guest devnode, hence look at pcie controller gnode directly.
+	 */
+
+	prop = dt_get_prop(node, "fsl,msi", 0);
 	if (prop) {
 		phandle = *(const uint32_t *)prop->data;
-		msi_node = dt_lookup_phandle(config_tree, phandle);
-		if (!msi_node)
-			return ULONG_MAX;
+		msi_gnode = dt_lookup_phandle(guest->devtree, phandle);
 
-		msi_gnode = dt_lookup_alias(guest->devtree, msi_node->name);
 		if (!msi_gnode ||
 			!dt_node_is_compatible(msi_gnode, "fsl,mpic-msi"))
 			return ULONG_MAX;
@@ -263,9 +265,13 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		regprop = dt_get_prop(msi_gnode, "reg", 0);
 		dt_delete_prop(regprop);
 
-		write_reg(reg, msi_addr, (phys_addr_t) 0x200);
-		ret = dt_set_prop(node, "fsl,hv-msi-regs", reg,
-			(rootnaddr + rootnsize) * 4);
+		reg[0] = msi_addr >> 32;
+		reg[1] = msi_addr & 0xffffffff;
+
+		// FIXME: This needs to be done via u-boot
+		reg[1] += 0x140;
+
+		ret = dt_set_prop(node, "msi-address-64", reg, rootnaddr * 4);
 		if (ret < 0)
 			return ULONG_MAX;
 		dt_set_prop(node, "fsl,hv-msi", msi_gnode, sizeof(uint32_t));

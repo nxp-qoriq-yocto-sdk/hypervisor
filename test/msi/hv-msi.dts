@@ -129,7 +129,6 @@
 			device = "pci0";
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
-			msi = <&msi0>;
 		};
 
 		pci1 {
