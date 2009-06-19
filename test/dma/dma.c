@@ -44,6 +44,7 @@ static int dma_init(void)
 	int node, parent, len;
 	uint32_t liodn;
 	const uint32_t *liodnp;
+	int rc;
 
 	node = fdt_node_offset_by_compatible(fdt, 0, "fsl,eloplus-dma-channel");
 	if (node < 0)
@@ -77,8 +78,8 @@ static int dma_init(void)
 	liodn = *liodnp;
 	printf("actual liodn = %d\n", liodn);
 
-	fh_dma_enable(liodn);
-	if (liodn != 0) {
+	rc = fh_dma_enable(liodn);
+	if (rc) {
 		printf("fh_dma_enable: failed %d\n", liodn);
 		return -6;
 	}
