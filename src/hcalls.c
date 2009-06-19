@@ -45,6 +45,50 @@
 
 typedef void (*hcallfp_t)(trapframe_t *regs);
 
+#define GLOBAL_HANDLES 64
+#define GLOBAL_HANDLE_INDEX ((GLOBAL_HANDLES + LONG_BITS - 1) / LONG_BITS)
+
+static unsigned long global_handles[GLOBAL_HANDLE_INDEX];
+static uint32_t global_handles_lock;
+
+int alloc_global_handle(void)
+{
+	int i = -1;
+	int j = -1;
+
+	spin_lock(&global_handles_lock);
+	for (j = 0; j < GLOBAL_HANDLE_INDEX; j++) {
+		if (global_handles[j] != -1) {
+			for (i = 0; i < LONG_BITS; i++) {
+				if (!(global_handles[j] & (1 << i))) {
+					global_handles[j] |= 1 << i;
+					spin_unlock(&global_handles_lock);
+
+					return i + (j * LONG_BITS);
+				}
+			}
+		}
+	}
+
+	spin_unlock(&global_handles_lock);
+
+	return i;
+}
+
+int set_guest_global_handle(guest_t *guest, handle_t *handle,
+				uint32_t global_handle)
+{
+	if (global_handle >= GLOBAL_HANDLES) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			"%s: Invalid global handle\n", __func__);
+		return -1;
+	}
+
+	guest->handles[global_handle] = handle;
+
+	return global_handle;
+}
+
 /* This could have latency implications if compare_and_swap
    fails often enough -- but it's unlikely. */
 int alloc_guest_handle(guest_t *guest, handle_t *handle)
@@ -54,7 +98,7 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 	do {
 		again = 0;
 	
-		for (int i = 0; i < MAX_HANDLES; i++) {
+		for (int i = GLOBAL_HANDLES; i < MAX_HANDLES; i++) {
 			if (guest->handles[i])
 				continue;
 		

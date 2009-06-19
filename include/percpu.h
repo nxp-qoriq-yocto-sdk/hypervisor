@@ -294,6 +294,9 @@ static inline void inc_stat(int stat)
 
 struct dt_node;
 
+int set_guest_global_handle(guest_t *guest, handle_t *handle,
+				uint32_t global_handle);
+int alloc_global_handle(void);
 int alloc_guest_handle(guest_t *guest, handle_t *handle);
 guest_t *node_to_partition(struct dt_node *partition);
 
