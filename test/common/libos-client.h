@@ -39,6 +39,7 @@ struct trapframe;
 
 void dec_handler(struct trapframe *regs);
 void ext_int_handler(struct trapframe *regs);
+void crit_int_handler(struct trapframe *regs);
 void mcheck_interrupt(struct trapframe *frameptr);
 void debug_handler(struct trapframe *regs);
 void fit_handler(struct trapframe *regs);
@@ -52,6 +53,7 @@ void dsi_handler(struct trapframe *regs);
 
 #define EXC_DECR_HANDLER dec_handler
 #define EXC_EXT_INT_HANDLER ext_int_handler
+#define EXC_CRIT_INT_HANDLER crit_int_handler
 #define EXC_MCHECK_HANDLER mcheck_interrupt
 #define EXC_DEBUG_HANDLER debug_handler
 #define EXC_FIT_HANDLER fit_handler

@@ -42,6 +42,7 @@ static eventfp_t event_table[] = {
 	&tlbivax_ipi,                    /* EV_TLBIVAX */
 	&schedule,                       /* EV_RESCHED */
 	&dbell_to_mcgdbell_glue,         /* EV_MCP */
+	&dbell_to_cgdbell_glue,         /* EV_GUEST_CRIT_INT */
 };
 
 /* Guest events are processed when returning to the guest, but
@@ -174,6 +175,11 @@ void doorbell_int(trapframe_t *regs)
 void dbell_to_mcgdbell_glue(trapframe_t *regs)
 {
 	send_local_mchk_guest_doorbell();
+}
+
+void dbell_to_cgdbell_glue(trapframe_t *regs)
+{
+	send_local_crit_guest_doorbell();
 }
 
 /* Initialize the global gevents

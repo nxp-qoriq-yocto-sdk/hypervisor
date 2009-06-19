@@ -459,6 +459,9 @@ __attribute__((weak, alias("bad_exception")));
 void ext_int_handler(trapframe_t *regs)
 __attribute__((weak, alias("bad_exception")));
 
+void crit_int_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
+
 void mcheck_interrupt(trapframe_t *regs)
 __attribute__((weak, alias("bad_exception")));
 

@@ -196,19 +196,35 @@ static int check_msgsnd_crit_event(gcpu_t *gcpu, trapframe_t *regs)
 {
 	if (gcpu->crit_gdbell_pending & GCPU_PEND_MSGSNDC) {
 		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_MSGSNDC);
+		reflect_crit_int(regs, EXC_DOORBELLC);
 
-		/*
-		 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
-		 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
-		 * guest can't access CSRR0 or CSRR1 directly when the hypervisor is
-		 * running -- they need to be emulated.
-		 */
-		gcpu->csrr0 = regs->srr0;
-		gcpu->csrr1 = regs->srr1;
+		return 1;
+	}
 
-		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELLC];
-		regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+	return 0;
+}
 
+void reflect_crit_int(trapframe_t *regs, int trap_type)
+{
+	gcpu_t *gcpu = get_gcpu();
+
+	/*
+	 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
+	 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
+	 * guest can't access CSRR0 or CSRR1 directly when the hypervisor is
+	 * running -- they need to be emulated.
+	 */
+	gcpu->csrr0 = regs->srr0;
+	gcpu->csrr1 = regs->srr1;
+
+	regs->srr0 = gcpu->ivpr | gcpu->ivor[trap_type];
+	regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+}
+
+static int check_crit_int_event(gcpu_t *gcpu, trapframe_t *regs)
+{
+	if (gcpu->crit_gdbell_pending & GCPU_PEND_CRIT_INT) {
+		reflect_crit_int(regs, EXC_CRIT_INT);
 		return 1;
 	}
 
@@ -236,15 +252,18 @@ void guest_critical_doorbell(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	int ret;
 
-	if ((gcpu->mchk_gdbell_pending & GCPU_PEND_MCHK_MCP) && (regs->srr1 & MSR_ME)) {
-		atomic_and(&gcpu->mchk_gdbell_pending, ~GCPU_PEND_MCHK_MCP);
-
+	if (((gcpu->mchk_gdbell_pending & GCPU_PEND_MCHK_MCP) || (gcpu->mcsr & MCSR_MCP))
+		 && (regs->srr1 & MSR_ME)) {
 		reflect_mcheck(regs, MCSR_MCP, 0);
 		goto check_flags;
 	}
 
 	if (regs->srr1 & MSR_CE) {
 		ret = check_wdog_crit_event(gcpu, regs);
+		if (ret)
+			goto check_flags;
+
+		ret = check_crit_int_event(gcpu, regs);
 		if (ret)
 			goto check_flags;
 

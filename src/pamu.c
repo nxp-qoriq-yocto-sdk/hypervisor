@@ -33,6 +33,7 @@
 #include <libos/percpu.h>
 #include <libos/console.h>
 #include <libos/alloc.h>
+#include <libos/platform_error.h>
 
 #include <pamu.h>
 #include <percpu.h>
@@ -42,7 +43,9 @@
 #include <events.h>
 #include <ccm.h>
 #include <limits.h>
+#include <error_log.h>
 
+uint32_t liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
 static uint32_t pamu_lock;
 
@@ -708,6 +711,16 @@ static void setup_omt(void)
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 }
 
+static void pamu_error_log(error_info_t *err, guest_t *guest)
+{
+	/* Access violations go to per guest and the global error queue*/
+	if (guest)
+		error_log(&guest->error_event_queue, err, &guest->error_log_prod_lock);
+
+	if (error_manager_guest)
+		error_log(&global_event_queue, err, &global_event_prod_lock);
+}
+
 static int pamu_av_isr(void *arg)
 {
 	device_t *dev = arg;
@@ -715,34 +728,47 @@ static int pamu_av_isr(void *arg)
 	phys_addr_t reg_size = dev->regs[0].size;
 	unsigned long reg_off;
 	int ret = -1;
-	struct pamu_error_regs regs;
-	uint32_t av_liodn, avah, aval;
+	error_info_t err;
+	pamu_av_error_t *av;
+	uint32_t av_liodn, avs1;
 
 	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
 		void *reg = reg_base + reg_off;
 
 		uint32_t pics = in32((uint32_t *)(reg + PAMU_PICS));
 		if (pics & PAMU_ACCESS_VIOLATION_STAT) {
-			regs.pamu_avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
-			regs.pamu_avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
-			regs.pamu_avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
-			regs.pamu_aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
-			av_liodn = regs.pamu_avs1 >> PAMU_AVS1_LIODN_SHIFT;
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			memset(&err, 0, sizeof(error_info_t));
+			err.error_code = ERROR_PAMU_AV;
+			av = &err.regs.av_err;
+			av->avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
+			av->aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
+			avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
+			av->avs1 = avs1;
+			av->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+			av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
+			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
 					"PAMU access violation on PAMU#%ld, liodn = %x\n",
 					 reg_off / PAMU_OFFSET, av_liodn);
-			regs.pamu_avs1 &= PAMU_AV_MASK;
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
 					"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
-					 regs.pamu_avs1, regs.pamu_avs2, regs.pamu_avah, regs.pamu_aval);
+					 av->avs1, av->avs2, av->avah, av->aval);
+
+			/*FIXME : LIODN index not in PPAACT table*/
+			assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
 
 			guest_t *guest = liodn_to_guest[av_liodn];
 			if (guest) {
-				atomic_or(&guest->gcpus[0]->mchk_gdbell_pending, GCPU_PEND_MCHK_MCP);
-				setevent(guest->gcpus[0], EV_MCP);
+				av->lpid = guest->lpid;
+				av->handle = liodn_to_handle[av_liodn];
 			}
 
-			out32((uint32_t *) (reg + PAMU_AVS1), regs.pamu_avs1);
+			pamu_error_log(&err, guest);
+
+			ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
+			ppaace->v = 0;
+
+			/* Clear the write one to clear bits in AVS1, mask out the LIODN */
+			out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
 			/* De-assert access violation pin */
 			out32((uint32_t *)(reg + PAMU_PICS), pics);
 
@@ -854,11 +880,14 @@ void pamu_global_init(void)
 	if (dev->num_irqs >= 1) {
 		interrupt_t *irq = dev->irqs[0];
 		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_CRIT);
+			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_MCHK);
 	}
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
+
+	for (int i = 0; i < PAACE_NUMBER_ENTRIES; i++)
+		liodn_to_handle[i] = -1;
 
 	return;
 

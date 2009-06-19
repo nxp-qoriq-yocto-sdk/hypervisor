@@ -52,6 +52,12 @@
 #include <doorbell.h>
 #include <ccm.h>
 #include <debug-stub.h>
+#include <error_log.h>
+
+guest_t *error_manager_guest;
+int error_manager_gcpu;
+queue_t global_event_queue;
+uint32_t global_event_prod_lock;
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
@@ -501,6 +507,7 @@ static int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 		pamu_handle->user.pamu = pamu_handle;
 		dma_handles[i] = alloc_guest_handle(owner->guest,
 							&pamu_handle->user);
+		liodn_to_handle[liodn[i]] = dma_handles[i];
 	}
 
 	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,
@@ -1688,6 +1695,19 @@ guest_t *node_to_partition(dt_node_t *partition)
 		if (dt_get_prop(partition, "privileged", 0))
 			guests[i].privileged = 1;
 
+		/* error manager */
+		dt_prop_t *prop = dt_get_prop(partition, "error-manager", 0);
+		if (prop && prop->len == 4) {
+			if (error_manager_guest == NULL) {
+				error_manager_guest = &guests[i];
+				error_manager_gcpu = *(const uint32_t *)prop->data;
+				error_log_init(&global_event_queue);
+			} else {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					"error-manager exists\n");
+			}
+		}
+
 		guests[i].name = name;
 		guests[i].state = guest_starting;
 		guests[i].partition = partition;
@@ -1698,7 +1718,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 #ifdef CONFIG_DEBUG_STUB
 		init_stubops(&guests[i]);
 #endif
-
+		error_log_init(&guests[i].error_event_queue);
 	}
 
 	spin_unlock(&start_guest_lock);

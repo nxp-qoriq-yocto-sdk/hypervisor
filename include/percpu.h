@@ -33,7 +33,6 @@
 #include <stdint.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
-#include <libos/list.h>
 #include <hv.h>
 #include <vpic.h>
 #include <tlbcache.h>
@@ -168,6 +167,12 @@ typedef struct guest {
 	/** List of owned devices (dev_owner_t objects) */
 	list_t dev_list;
 
+	/** Error event queue */
+	queue_t error_event_queue;
+
+	/** Platform error log producer lock*/
+	uint32_t error_log_prod_lock;
+
 	/** List of deferred node-update-phandles.  Nodes are update_phandle_t. */
 	list_t phandle_update_list;
 
@@ -205,6 +210,7 @@ extern unsigned long last_lpid;
 #define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
 #define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
+#define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
 /* The following flag corresponds to mchk_gdbell_pending */
 #define GCPU_PEND_MCHK_MCP 0x00000001 /* MCP machine check event pending */
 

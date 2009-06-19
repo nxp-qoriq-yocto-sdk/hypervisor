@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,40 +22,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PAMU_H_
-#define __PAMU_H_
+#include <libos/queue.h>
 
-#include <percpu.h>
-#include <devtree.h>
+struct pamu_av_error;
 
-typedef struct pamu_handle {
-	unsigned long assigned_liodn;
-	handle_t user;
-} pamu_handle_t;
+typedef struct error_info {
+	uint32_t error_code;
+	union {
+		struct pamu_av_error av_err;
+		uint32_t regs[7];
+	} regs;
+} error_info_t;
 
-typedef struct pamu_av_error {
-	uint32_t lpid;
-	uint32_t avah;
-	uint32_t aval;
-	uint32_t avs1;
-	uint32_t avs2;
-	uint32_t handle;
-	uint32_t pad;
-} pamu_av_error_t;
+extern guest_t *error_manager_guest;
+extern int error_manager_gcpu;
+extern queue_t global_event_queue;
+extern uint32_t global_event_prod_lock;
 
-/* define indexes for each operation mapping scenario */
-#define OMI_QMAN        0x00
-#define OMI_FMAN        0x01
-#define OMI_QMAN_PRIV   0x02
-#define OMI_CAAM        0x03
-#define OMI_MAX         0x03  /* define the max index defined */
-
-extern uint32_t liodn_to_handle[];
-
-void pamu_global_init(void);
-void pamu_partition_init(guest_t *guest);
-
-int pamu_enable_liodn(unsigned int liodn);
-int pamu_disable_liodn(unsigned int liodn);
-int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode);
-#endif
+void error_log_init(queue_t *q);
+int error_get(queue_t *q, error_info_t *err, unsigned long *flag,
+		 unsigned long mask);
+void error_log(queue_t *q, error_info_t *err, uint32_t *lock);

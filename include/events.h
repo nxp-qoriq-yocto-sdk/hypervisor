@@ -48,11 +48,13 @@ void resume_core(trapframe_t *regs);
 void deliver_nmi(trapframe_t *regs);
 void reflect_mcp_mcheck(trapframe_t *regs);
 void dbell_to_mcgdbell_glue(trapframe_t *regs);
+void dbell_to_cgdbell_glue(trapframe_t *regs);
 
-#define EV_ASSERT_VINT 0
-#define EV_TLBIVAX     1
-#define EV_RESCHED     2
-#define EV_MCP         3
+#define EV_ASSERT_VINT            0
+#define EV_TLBIVAX                1
+#define EV_RESCHED                2
+#define EV_MCP                    3
+#define EV_GUEST_CRIT_INT         4
 
 extern int gev_stop; /**< Stop guest on this core */
 extern int gev_start; /**< Start guest on this core */

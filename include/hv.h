@@ -58,6 +58,7 @@ void branch_to_reloc(void *bigmap_text_base,
 
 void reflect_trap(trapframe_t *regs);
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar);
+void reflect_crit_int(trapframe_t *regs, int trap_type);
 
 phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size);
 

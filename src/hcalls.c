@@ -26,6 +26,8 @@
 #include <libos/bitops.h>
 #include <libos/libos.h>
 #include <libos/trap_booke.h>
+#include <libos/alloc.h>
+#include <libos/platform_error.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -35,6 +37,7 @@
 #include <ipi_doorbell.h>
 #include <paging.h>
 #include <events.h>
+#include <error_log.h>
 #include <errors.h>
 #include <guts.h>
 
@@ -554,10 +557,45 @@ static void fh_system_reset(trapframe_t *regs)
 	}
 }
 
+static void fh_err_get_info(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	queue_t *q;
+	int ret;
+	unsigned long *flag;
+	unsigned long mask;
+
+	switch(regs->gpregs[3]) {
+	case GUEST_ERROR_EVENT_QUEUE:
+		q = &guest->error_event_queue;
+		flag = &gcpu->mchk_gdbell_pending;
+		mask = GCPU_PEND_MCHK_MCP;
+		break;
+
+	case GLOBAL_ERROR_EVENT_QUEUE:
+		if (guest != error_manager_guest) {
+			regs->gpregs[3] = EINVAL;
+			return;
+		}
+
+		q = &global_event_queue;
+		flag = &gcpu->crit_gdbell_pending;
+		mask = GCPU_PEND_CRIT_INT;
+		break;
+
+	default:
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
+
+	regs->gpregs[3] = error_get(q, (error_info_t *)&regs->gpregs[4], flag, mask);
+}
+
 static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	fh_whoami,
-	unimplemented,
+	fh_err_get_info,
 	fh_partition_get_dtprop,
 	fh_partition_set_dtprop,           /* 4 */
 	fh_partition_restart,
