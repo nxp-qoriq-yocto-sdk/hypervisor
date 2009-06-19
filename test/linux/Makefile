@@ -36,7 +36,7 @@ dir := $(testdir)$(test)/
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
-include $(src)tools/partman/Makefile
+include $(src)tools/partman/Makefile $(src)tools/shmem/Makefile
 
 .PHONY: $(test)
 $(test): $($(test)-dtb)
@@ -77,15 +77,18 @@ define hello-start.sh
 	$(V)sudo mv start.sh bin/linux/rootfs-hello/
 endef
 
-# Add vmlinux and partman to the rootfs
-bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
+# Add vmlinux, partman, and shmem to the rootfs
+bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)../../images/rootfs.tiny.ext2.gz
 # We want partman on the managed partition, so that we can send and listen
-# for doorbells
+# for doorbells.  We want shmem on the managed partition, so that we can read
+# and write the shared memory buffers.
 	$(call mount,rootfs)
 	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
+	sudo cp -af bin/linux/shmem bin/linux/rootfs/bin/
 	$(call unmount,bin/linux/rootfs)
 	$(call mount,rootfs-partman)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
+	sudo cp -af bin/linux/shmem bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	$(call linux-start.sh)

@@ -51,7 +51,19 @@
 	pma3:pma3 {
 		compatible = "phys-mem-area";
 		addr = <0x0 0x60000000>;
-		size = <0x0 0x20000000>;  // 512MB
+		size = <0x0 0x10000000>;  // 256MB
+	};
+
+	pma4:pma4 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x70000000>;
+		size = <0x0 0x00001000>;  // 4KB
+	};
+
+	pma5:pma5 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x70001000>;
+		size = <0x0 0x00001000>;  // 4KB
 	};
 
 	dma-windows {
@@ -71,7 +83,7 @@
 
 		hv-memory {
 			compatible = "hv-memory";
-			phys-mem = <&pma0>;
+			phys-mem = <&pma3>;
 		};
 
 		serial0:serial0 {
@@ -161,8 +173,31 @@
 
 		gpma0 {
 			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma1>;
+			phys-mem = <&pma0>;
 			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				/* We need to delete the "device_type" property
+				   otherwise Linux will use the memory buffer
+				   as regular memory. */
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
 		};
 
 		partition@1 {
@@ -213,8 +248,28 @@
 
 		gpma0 {
 			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma2>;
+			phys-mem = <&pma1>;
 			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
 		};
 
 		/* Currently, the hypervisor does not support updating the
@@ -223,7 +278,7 @@
 		 * hypervisor that a particular image is a root file system.
 		 * So we need to hard-code the memory ranges used for the
 		 * rootfs here.  To load the rootfs, use:
-		 * "partman -l -a X ...", where X is the value of
+		 * "partman load -a X ...", where X is the value of
 		 * linux,initrd-start below.
 		 */
 		node-update {
@@ -271,8 +326,28 @@
 
 		gpma0 {
 			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma3>;
+			phys-mem = <&pma2>;
 			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
 		};
 
 		/* Currently, the hypervisor does not support updating the
@@ -281,7 +356,7 @@
 		 * hypervisor that a particular image is a root file system.
 		 * So we need to hard-code the memory ranges used for the
 		 * rootfs here.  To load the rootfs, use:
-		 * "partman -l -a X ...", where X is the value of
+		 * "partman load -a X ...", where X is the value of
 		 * linux,initrd-start below.
 		 */
 		node-update {
