@@ -26,8 +26,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.4
-Revsion: 005
-Date: 6/8/2009
+Revsion: 006
+Date: 6/19/2009
 
 -------------------------------------------------------
 Contents
@@ -50,10 +50,17 @@ Contents
     and later.
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.875
+    0.876
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-006 bug fixes and changes
+      -added support for system reset hcall
+      -support data breakpoints in gdb stub
+      -added error logging support
+      -added support for fast doorbells
+      -support reset status properties
 
    -Topaz 0.4-005 bug fixes and changes
       -MSIs are supported
