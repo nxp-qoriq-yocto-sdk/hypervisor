@@ -38,11 +38,11 @@ void init(unsigned long devtree_ptr);
 
 static phys_addr_t dma_phys;
 static uint32_t *dma_virt;
+static uint32_t liodn;
 
 static int dma_init(void)
 {
 	int node, parent, len;
-	uint32_t liodn;
 	const uint32_t *liodnp;
 	int rc;
 
@@ -139,6 +139,15 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("DMA access violation test#2 : FAILED\n");
 
+	/* PPAACE entry correponding to access violation LIODN is marked
+	 * invalid by the hypervisor. We need to explicitly mark the entry
+	 * as valid using the hcall.
+	 */
+	ret = fh_dma_enable(liodn);
+	if (ret) {
+		printf("fh_dma_enable: failed %d\n", liodn);
+		return;
+	}
 	/*
 	 * create a hard-coded TLB1 entry for PAMU address-translation
 	 * verification test
