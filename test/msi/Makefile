@@ -31,8 +31,8 @@
 
 test := msi
 dir := $(testdir)$(test)/
-LINUX_KERNEL_SRC_DIR ?= $(testdir)/../../linux-2.6-p4080
-SIMICS_WKSPACE_DIR ?=
+LINUX_KERNEL_SRC_DIR ?= $(testdir)/../../linux-2.6
+SIMICS_WKSPACE_DIR ?= $(shell dirname $$(which $(SIMICS)))
 MKIMAGE ?= mkimage
 IMAGES_DIR ?= $(testdir)../../images
 
@@ -40,9 +40,9 @@ $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
 .PHONY: $(test)
-$(test): $($(test)-dtb)
+$(test): $($(test)-dtb) bin/$(test)/virt_pcie_msi.ko
 
-$(test)-run: $(test)
+$(test)-run: $(test) bin/$(test)/rootfs.ext2.gz
 	$(SIMICS) $(testdir)$</run-msi.simics
 
 define mount-msi
@@ -75,5 +75,3 @@ bin/$(test)/virt_pcie_msi.ko: $(dir)virt_pcie_msi.c $(IMAGES_DIR)/pcie_msi.so
 	@cp $(testdir)/msi/virt_pcie_msi.c $(@D)
 	@echo "obj-m += virt_pcie_msi.o" > $(@D)/Makefile
 	make -C $(LINUX_KERNEL_SRC_DIR) M=`pwd`\/bin\/msi modules
-
-$(test): bin/$(test)/virt_pcie_msi.ko bin/$(test)/rootfs.ext2.gz
