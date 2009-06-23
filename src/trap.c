@@ -252,8 +252,7 @@ void guest_critical_doorbell(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	int ret;
 
-	if (((gcpu->mchk_gdbell_pending & GCPU_PEND_MCHK_MCP) || (gcpu->mcsr & MCSR_MCP))
-		 && (regs->srr1 & MSR_ME)) {
+	if ((gcpu->mcsr & MCSR_MCP) && (regs->srr1 & MSR_ME)) {
 		reflect_mcheck(regs, MCSR_MCP, 0);
 		goto check_flags;
 	}
@@ -279,7 +278,7 @@ check_flags:
 	 * issue another guest doorbell so that we return to this function to
 	 * process them.
 	 */
-	if (gcpu->mchk_gdbell_pending)
+	if (gcpu->mcsr & MCSR_MCP)
 		send_local_mchk_guest_doorbell();
 
 	if (gcpu->crit_gdbell_pending)
@@ -291,6 +290,9 @@ void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
 	gcpu_t *gcpu = get_gcpu();
 
 	gcpu->mcsr = mcsr;
+	if (!queue_empty(&gcpu->guest->error_event_queue))
+		atomic_or(&gcpu->mcsr, MCSR_MCP);
+
 	gcpu->mcar = mcar;
 
 	gcpu->mcsrr0 = regs->srr0;

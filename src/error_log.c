@@ -56,9 +56,11 @@ int error_get(queue_t *q, error_info_t *err, unsigned long *flag,
 
 	ret = queue_read(q, (uint8_t *)err, sizeof(error_info_t), 0);
 
-	atomic_and(flag, ~mask);
-	if (!queue_empty(q))
-		atomic_or(flag, mask);
+	if (flag) {
+		atomic_and(flag, ~mask);
+		if (!queue_empty(q))
+			atomic_or(flag, mask);
+	}
 
 	return ret ? 0 : ENOENT;
 }
@@ -85,7 +87,7 @@ void error_log(queue_t *q, error_info_t *err, uint32_t *lock)
 		setevent(error_manager_guest->gcpus[error_manager_gcpu], EV_GUEST_CRIT_INT);
 	} else {
 		guest_t *guest = to_container(q, guest_t, error_event_queue);
-		atomic_or(&guest->gcpus[0]->mchk_gdbell_pending, GCPU_PEND_MCHK_MCP);
+		atomic_or(&guest->gcpus[0]->mcsr, MCSR_MCP);
 		setevent(guest->gcpus[0], EV_MCP);
 	}
 

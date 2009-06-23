@@ -211,8 +211,6 @@ extern unsigned long last_lpid;
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
 #define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
 #define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
-/* The following flag corresponds to mchk_gdbell_pending */
-#define GCPU_PEND_MCHK_MCP 0x00000001 /* MCP machine check event pending */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
@@ -264,7 +262,6 @@ typedef struct gcpu {
 	 * insert new fields before gdbell_pending.
 	 */
 	unsigned long gdbell_pending;
-	unsigned long mchk_gdbell_pending;
 	unsigned long crit_gdbell_pending;
 	register_t csrr0, csrr1, mcsrr0, mcsrr1, mcsr, dsrr0, dsrr1;
 	uint64_t mcar;

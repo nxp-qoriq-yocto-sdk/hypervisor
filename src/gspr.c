@@ -30,6 +30,7 @@
 #include <libos/trapframe.h>
 #include <libos/core-regs.h>
 #include <libos/fsl-booke-tlb.h>
+#include <libos/queue.h>
 #include <percpu.h>
 #include <greg.h>
 #include <timers.h>
@@ -598,7 +599,9 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_MCSR:
-		gcpu->mcsr &= ~val;
+		atomic_and(&gcpu->mcsr, ~val);
+		if ((val & MCSR_MCP) && (!queue_empty(&gcpu->guest->error_event_queue)))
+			atomic_or(&gcpu->mcsr, MCSR_MCP);
 		break;
 
 	case SPR_DSRR0:

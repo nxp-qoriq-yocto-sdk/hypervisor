@@ -621,14 +621,12 @@ static void fh_err_get_info(trapframe_t *regs)
 	guest_t *guest = gcpu->guest;
 	queue_t *q;
 	int ret;
-	unsigned long *flag;
-	unsigned long mask;
+	unsigned long *flag = NULL;
+	unsigned long mask = 0;
 
 	switch(regs->gpregs[3]) {
 	case GUEST_ERROR_EVENT_QUEUE:
 		q = &guest->error_event_queue;
-		flag = &gcpu->mchk_gdbell_pending;
-		mask = GCPU_PEND_MCHK_MCP;
 		break;
 
 	case GLOBAL_ERROR_EVENT_QUEUE:
