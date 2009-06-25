@@ -87,6 +87,12 @@
 			addr = <0x0 0x40000000>;
 			size = <0 0x2000000>;
 		};
+
+		pma2: pma2 {
+			compatible = "phys-mem-area";
+			addr = <0x0 0x60000000>;
+			size = <0 0x20000000>;
+		};
 	};
 
 	dma-windows {
@@ -105,6 +111,7 @@
 		cpus = <2 3>;
 		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
+		error-manager = <0>;
 
 		gpma {
 			compatible = "guest-phys-mem-area";
@@ -126,6 +133,37 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0xf 0xe8200000 0 0 0 0x300000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
+		};
+
+		uart3: uart3 {
+			device = "serial3";
+			node-update {
+				delete-prop = "interrupts";
+			};
+		};
+
+		dma1: dma1 {
+			device = "dma1";
+			dma-window = <&window0>;
+		};
+
+		aliases {
+			stdout = <&uart3>;
+		};
+	};
 	chosen {
 	};
 };

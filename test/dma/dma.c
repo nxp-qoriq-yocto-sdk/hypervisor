@@ -39,6 +39,34 @@ void init(unsigned long devtree_ptr);
 static phys_addr_t dma_phys;
 static uint32_t *dma_virt;
 static uint32_t liodn;
+volatile int mcheck_int, crit_int;
+uint32_t mcheck_err[8], crit_err[16];
+
+void crit_int_handler(trapframe_t *regs)
+{
+	uint32_t *ptr;
+
+	if (!crit_int)
+		ptr = crit_err;
+	else
+		ptr = &crit_err[8];
+
+	int ret = fh_err_get_info(1, ptr);
+	if (!ret)
+		crit_int++;
+}
+
+void mcheck_interrupt(trapframe_t *regs)
+{
+	if (!(mfspr(SPR_MCSR) & MCSR_MCP))
+		return;
+
+	int ret = fh_err_get_info(0, mcheck_err);
+	if (!ret)
+		mcheck_int++;
+
+	mtspr(SPR_MCSR, mfspr(SPR_MCSR));
+}
 
 static int dma_init(void)
 {
@@ -114,11 +142,13 @@ static int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst,
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
-	int ret;
+	int ret, len, i;
 
 	init(devtree_ptr);
 
-//	enable_extint();
+	enable_extint();
+	enable_critint();
+	enable_mcheck();
 
 	printf("DMA test code for guest memcpy\n");
 
@@ -134,35 +164,46 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("DMA access violation test#1 : FAILED\n");
 
-	if (!test_dma_memcpy(0x00000100, 0x0c000000, 0))
-		printf("DMA access violation test#2 : PASSED\n");
-	else
-		printf("DMA access violation test#2 : FAILED\n");
+	const char *label = fdt_getprop(fdt, 0, "label", &len);
 
-	/* PPAACE entry correponding to access violation LIODN is marked
-	 * invalid by the hypervisor. We need to explicitly mark the entry
-	 * as valid using the hcall.
-	 */
-	ret = fh_dma_enable(liodn);
-	if (ret) {
-		printf("fh_dma_enable: failed %d\n", liodn);
-		return;
+	while (!mcheck_int);
+	for(i = 0; i < 8; i++)
+		printf("%x, ", mcheck_err[i]);
+	printf("\n");
+
+	printf("Access violation test : PASSED\n");
+
+	if(!strcmp("/part1", label)) {
+		while (crit_int < 2 );
+		for(i = 0 ; i < 16 ; i++)
+			printf("%x, ", crit_err[i]);
+		printf("\n");
+		printf("Error Manager test : PASSED\n");
+
+		/* PPAACE entry correponding to access violation LIODN is marked
+		 * invalid by the hypervisor. We need to explicitly mark the entry
+		 * as valid using the hcall.
+		 */
+		ret = fh_dma_enable(liodn);
+		if (ret) {
+			printf("fh_dma_enable: failed %d\n", liodn);
+			return;
+		}
+		/*
+		 * create a hard-coded TLB1 entry for PAMU address-translation
+		 * verification test
+		 */
+
+		tlb1_set_entry(3, (unsigned long)(0x20000000 + PHYSBASE),
+			(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
+			TLB_MAS3_KERN, 0, 0, 0);
+
+		if ((test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
+			test_dma_memcpy(0x04000100, 0x20000100, 1)) ||
+				test_dma_memcpy(0x04000100, 0x05000100, 1))
+			printf("DMA access test : PASSED\n");
+		else
+			printf("DMA access test : FAILED\n");
 	}
-	/*
-	 * create a hard-coded TLB1 entry for PAMU address-translation
-	 * verification test
-	 */
-
-	tlb1_set_entry(3, (unsigned long)(0x20000000 + PHYSBASE),
-		(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
-		TLB_MAS3_KERN, 0, 0, 0);
-
-	if ((test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
-	     test_dma_memcpy(0x04000100, 0x20000100, 1)) ||
-	     test_dma_memcpy(0x04000100, 0x05000100, 1))
-		printf("DMA access test : PASSED\n");
-	else
-		printf("DMA access test : FAILED\n");
-
 	printf("Test Complete\n");
 }
