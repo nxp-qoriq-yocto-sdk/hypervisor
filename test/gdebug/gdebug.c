@@ -82,7 +82,7 @@ static inline int infinite_loop(void)
 	return 0;
 }
 
-static void hwbreaktestfunc(void)
+__attribute__((noinline)) static void hwbreaktestfunc(void)
 {
 	if (loopcnt_monitor) {
 		data_watchpoint_cmp = get_pc();
