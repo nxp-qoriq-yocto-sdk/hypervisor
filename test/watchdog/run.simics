@@ -39,4 +39,4 @@ run-command-file "common.simics"
 
 add-directory "bin/watchdog" -prepend
 
-run-command-file "boot.simics"
+run-command-file "boot_4_2.simics"

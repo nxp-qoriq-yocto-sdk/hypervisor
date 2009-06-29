@@ -53,7 +53,6 @@ $uboot = "u-boot.32.bin"
 add-directory "%script%" -prepend
 add-directory "bin/msi" -prepend
 
-#run-command-file "boot.simics"
 run-command-file "boot_4_2.simics"
 add-directory "bin/linux" -prepend
 

@@ -41,7 +41,7 @@ add-directory "bin/cpc" -prepend
 
 @os.system('rm cpc-test.ckpt*')
 
-run-command-file "boot.simics"
+run-command-file "boot_4_2.simics"
 b 0
 continue
 continue
