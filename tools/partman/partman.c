@@ -331,7 +331,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 			// The virtual base address is the virtual address of
 			// the phdr that contains the ELF entry point
 			if ((phdr[i].vaddr <= hdr->entry) &&
-			    (hdr->entry < (phdr[i].vaddr + phdr[i].memsz))) {
+			    (hdr->entry <= (phdr[i].vaddr + phdr[i].memsz - 1))) {
 				vbase = phdr[i].vaddr;
 				entry_paddr = phdr[i].paddr;
 			}
