@@ -36,3 +36,4 @@ config LIBOS_DEPS
 	select LIBOS_MP
 	select LIBOS_VIRT_ALLOC
 	select LIBOS_NS16550
+	select LIBOS_QUEUE
