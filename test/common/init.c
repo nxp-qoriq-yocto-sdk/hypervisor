@@ -114,7 +114,7 @@ void copy_val(uint32_t *dest, const uint32_t *src, int naddr)
 	memcpy(dest + pad, src, naddr * 4);
 }
 
-static int sub_reg(uint32_t *reg, uint32_t *sub)
+static int sub_reg(uint32_t *reg, const uint32_t *sub)
 {
 	int i, borrow = 0;
 
@@ -127,7 +127,7 @@ static int sub_reg(uint32_t *reg, uint32_t *sub)
 	return !borrow;
 }
 
-static int add_reg(uint32_t *reg, uint32_t *add, int naddr)
+static int add_reg(uint32_t *reg, const uint32_t *add, int naddr)
 {
 	int i, carry = 0;
 
@@ -146,8 +146,8 @@ static int add_reg(uint32_t *reg, uint32_t *add, int naddr)
 static int compare_reg(const uint32_t *reg, const uint32_t *range,
                        const uint32_t *rangesize)
 {
+	uint32_t end[MAX_ADDR_CELLS];
 	int i;
-	uint32_t end;
 
 	for (i = 0; i < MAX_ADDR_CELLS; i++) {
 		if (reg[i] < range[i])
@@ -156,12 +156,18 @@ static int compare_reg(const uint32_t *reg, const uint32_t *range,
 			break;
 	}
 
-	for (i = 0; i < MAX_ADDR_CELLS; i++) {
-		end = range[i] + rangesize[i];
+	memcpy(end, range, sizeof(end));
 
-		if (reg[i] < end)
+	/* If the size forces a carry off the final cell, then
+	 * reg can't possibly be beyond the end.
+	 */
+	if (!add_reg(end, rangesize, MAX_ADDR_CELLS))
+		return 1;
+
+	for (i = 0; i < MAX_ADDR_CELLS; i++) {
+		if (reg[i] < end[i])
 			return 1;
-		if (reg[i] > end)
+		if (reg[i] > end[i])
 			return 0;
 	}
 
