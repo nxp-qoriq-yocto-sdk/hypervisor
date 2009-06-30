@@ -133,7 +133,9 @@
 		};
 
 		node-update {
-			delete-node = "dma0";
+			devices {
+				delete-node = "dma0";
+			};
 		};
 
 		node-update-phandle {
@@ -162,5 +164,4 @@
 			stdout = <&uart2>;
 		};
 	};
-
 };

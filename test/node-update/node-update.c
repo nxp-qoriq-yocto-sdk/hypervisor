@@ -103,11 +103,11 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("node-update test\n");
 
-	node = fdt_path_offset(fdt, "/dma0");
+	node = fdt_path_offset(fdt, "/devices/dma0");
 	printf("delete-node --- %s\n",
 			(node < 0)? "PASSED" : "FAILED");
 
-	dma1 = fdt_path_offset(fdt, "/dma1");
+	dma1 = fdt_path_offset(fdt, "/devices/dma1");
 	if (dma1 < 0) {
 		printf("dma1 does not exist --- FAILED\n");
 		goto out;
@@ -125,7 +125,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 			if (compat_found != 2) {
 				printf("prepend-list --- FAILED\n");
 				if (last_node != DMA) {
-					node = fdt_path_offset(fdt, "/dma1");
+					node = fdt_path_offset(fdt, "/devices/dma1");
 					check_dma1_node(node);
 				}
 			} else {
