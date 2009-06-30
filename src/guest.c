@@ -345,7 +345,8 @@ static int map_guest_ranges(dev_owner_t *owner)
 		assert(!addrbuf[0] && !addrbuf[1]);
 		addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
 
-		map_dev_range(owner->guest, addr, size);
+		if (map_ranges)
+			map_dev_range(owner->guest, addr, size);
 
 		memcpy(newranges, ranges, caddr * 4);
 		newranges += caddr;
