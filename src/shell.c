@@ -677,6 +677,12 @@ static command_t resume = {
 };
 shell_cmd(resume);
 
+#if __WORDSIZE == 32
+#define VADDR_WIDTH	"8"
+#else
+#define VADDR_WIDTH	"16"
+#endif
+
 static void gtlb_fn(shell_t *shell, char *args)
 {
 	tlb_entry_t gmas = {0};
@@ -703,17 +709,18 @@ static void gtlb_fn(shell_t *shell, char *args)
 		if (!(gmas.mas1 & MAS1_VALID))
 			continue;
 
-		paddr = (gmas.mas7 << (32 - PAGE_SHIFT)) |
-			(gmas.mas3 & ~(PAGE_SIZE - 1));
+		paddr = ((uint64_t) gmas.mas7 << 32) |
+				(gmas.mas3 & ~(PAGE_SIZE - 1));
 		vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
 		size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
 
 		qprintf(shell->out, 1, "%01u\t",
 			(!tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
 
-		qprintf(shell->out, 1, "0x%08lx - 0x%08lx\t",
-				vaddr, vaddr + size - 1);
-		// FIXME: 64-bit paddr
+		qprintf(shell->out, 1,
+			"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx\t",
+			vaddr, vaddr + size - 1);
+
 		qprintf(shell->out, 1, "0x%09llx - 0x%09llx\n",
 				paddr, paddr + size - 1 );
 	}
