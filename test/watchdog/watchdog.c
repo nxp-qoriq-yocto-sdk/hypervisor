@@ -140,7 +140,7 @@ static int test4(void)
 
 static int test5(void)
 {
-	printf("> set watchdog, wait thrice, check for no reboot: FAILED");
+	printf("> set watchdog, wait thrice, check for no reboot: ");
 
 	watchdog = 0;
 	enable_critint();
@@ -153,12 +153,12 @@ static int test5(void)
 	delay();
 
 	// TSR[WRS] should be 0
-        return (mfspr(SPR_TSR) & TSR_WRS) != 0;
+	return (mfspr(SPR_TSR) & TSR_WRS) == 0;
 }
 
 static int test6(void)
 {
-	printf("> set timeout reset, set watchdog, wait thrice, check for reboot: PASSED");
+	printf("> set timeout reset, set watchdog, wait thrice, check for reboot.");
 
 	mtspr(SPR_TCR, TCR_WRC_RESET);
 
@@ -188,12 +188,12 @@ static void secondary_entry(void)
 
 		test6();
 		// If we get here, then we didn't reboot.  That's a failure.
-		printf("\010\010\010\010\010\010FAILED\n");
+		printf("test6 FAILED\n");
 		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 		mtspr(SPR_TCR, TCR_WP_SET(0));
+	} else {
+		printf("test6 PASSED\nTest Complete\n");
 	}
-
-	printf("Test Complete\n");
 }
 
 void libos_client_entry(unsigned long devtree_ptr)
@@ -237,8 +237,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 	mtspr(SPR_TCR, TCR_WP_SET(0));
 
-	test5();
-	printf("\010\010\010\010\010\010PASSED\n");
+	if (test5())
+		printf("PASSED\n");
+	else
+		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 	mtspr(SPR_TCR, TCR_WP_SET(0));
 
