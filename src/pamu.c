@@ -230,7 +230,6 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 {
 	int ret;
 	dt_prop_t *prop;
-	dt_node_t *msi_node;
 	uint32_t phandle;
 	uint32_t msi_bank_addr;
 	char buf[32];
@@ -430,10 +429,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	phys_addr_t window_size = 0;
 	uint32_t stash_dest = ~(uint32_t)0;
 	uint32_t omi = ~(uint32_t)0;
-	unsigned long fspi;
-	unsigned int first_subwin_swse;
 	uint32_t subwindow_cnt = 0;
-	unsigned long first_subwin_rpn;
 	int ret;
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);

@@ -681,7 +681,7 @@ static void gtlb_fn(shell_t *shell, char *args)
 {
 	tlb_entry_t gmas = {0};
 	uint32_t flags = TLB_READ_FIRST;
-	int rc, i = 0, tlb_num;
+	int rc, tlb_num;
 	phys_addr_t paddr;
 	unsigned long vaddr, size;
 	char *numstr;

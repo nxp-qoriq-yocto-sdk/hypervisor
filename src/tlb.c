@@ -45,7 +45,7 @@
 static int icache_range_sync(void *start, size_t len)
 {
 	uintptr_t addr, end;
-	int blocks, i, ret;
+	int blocks, i;
 
 	addr = (uintptr_t)start & ~(cache_block_size - 1);
 	end = (((uintptr_t)start + len - 1) & ~(cache_block_size - 1)) + cache_block_size;

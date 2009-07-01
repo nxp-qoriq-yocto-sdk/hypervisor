@@ -54,9 +54,6 @@ static driver_t __driver guts_devconfig = {
 
 static int guts_devconfig_probe(driver_t *drv, device_t *dev)
 {
-	dt_prop_t *prop;
-	dt_node_t *node = to_container(dev, dt_node_t, dev);
-
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 				"guts device config initialization failed\n");

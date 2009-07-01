@@ -53,12 +53,11 @@ static uint32_t global_handles_lock;
 
 int alloc_global_handle(void)
 {
-	int i = -1;
-	int j = -1;
+	unsigned int i, j;
 
 	spin_lock(&global_handles_lock);
 	for (j = 0; j < GLOBAL_HANDLE_INDEX; j++) {
-		if (global_handles[j] != -1) {
+		if (global_handles[j] != ~0UL) {
 			for (i = 0; i < LONG_BITS; i++) {
 				if (!(global_handles[j] & (1 << i))) {
 					global_handles[j] |= 1 << i;
@@ -72,11 +71,11 @@ int alloc_global_handle(void)
 
 	spin_unlock(&global_handles_lock);
 
-	return i;
+	return -1;
 }
 
 int set_guest_global_handle(guest_t *guest, handle_t *handle,
-				uint32_t global_handle)
+                            int global_handle)
 {
 	if (global_handle >= GLOBAL_HANDLES) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
@@ -263,7 +262,7 @@ static void fh_partition_restart(trapframe_t *regs)
 	// TSR[WRS] is reset to zero during a normal restart
 	get_gcpu()->tsr = 0;
 
-	if (regs->gpregs[3] == -1)
+	if ((int)regs->gpregs[3] == -1)
 		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
 	else
 		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
@@ -296,7 +295,7 @@ static void fh_send_nmi(trapframe_t *regs)
 {
 	unsigned int ncpu = get_gcpu()->guest->active_cpus;
 	unsigned int vcpu_mask = regs->gpregs[3];
-	int bit;
+	unsigned int bit;
 
 	bit = 31 - count_msb_zeroes(vcpu_mask) + 1;
 	if (vcpu_mask != 0 && bit > ncpu) {
@@ -594,7 +593,7 @@ static void fh_partition_stop(trapframe_t *regs)
 	// TSR[WRS] is reset to zero during a normal restart
 	get_gcpu()->tsr = 0;
 
-	if (regs->gpregs[3] == -1)
+	if ((int)regs->gpregs[3] == -1)
 		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
 	else 
 		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
@@ -620,7 +619,6 @@ static void fh_err_get_info(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	queue_t *q;
-	int ret;
 	unsigned long *flag = NULL;
 	unsigned long mask = 0;
 

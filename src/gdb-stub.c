@@ -1172,7 +1172,6 @@ static void pkt_write_dac_state(trapframe_t *trap_frame, gdb_stub_core_context_t
 static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
 {
 	uint8_t value[32];
-	register_t addr;
 	DEBUG("Sending T rsp");
 	pkt_cat_string(stub->rsp, "T");
 	pkt_write_hex_byte_update_cur(stub->rsp, 5);

@@ -2004,7 +2004,6 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 
 static void start_guest_secondary(trapframe_t *regs, void *arg)
 {
-	unsigned long page;
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	unsigned int pir = mfspr(SPR_PIR);

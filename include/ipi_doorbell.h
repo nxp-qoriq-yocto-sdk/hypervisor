@@ -40,7 +40,7 @@ typedef struct ipi_normal_doorbell {
 
 typedef struct ipi_fast_doorbell {
 	interrupt_t *irq;
-	uint32_t global_handle;
+	int global_handle;
 } ipi_fast_doorbell_t;
 
 typedef struct ipi_doorbell {

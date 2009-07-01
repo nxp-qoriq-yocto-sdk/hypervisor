@@ -321,9 +321,6 @@ error:
 int attach_receive_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 			    dt_node_t *node)
 {
-	uint32_t irq[2];
-	int ret;
-
 	if (dbell->fast_dbell)
 		return attach_fast_doorbell(guest, dbell, node);
 	else

@@ -221,7 +221,6 @@ void vmpic_partition_init(guest_t *guest)
 
 	if (guest->mpic_direct_eoi) {
 		uint32_t pd[4];
-		uint32_t *ptr;
 		phys_addr_t addr;
 		uint32_t naddr, nsize;
 
