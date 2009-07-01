@@ -39,8 +39,8 @@ void init(unsigned long devtree_ptr);
 static phys_addr_t dma_phys;
 static uint32_t *dma_virt;
 static uint32_t liodn;
-volatile int mcheck_int, crit_int;
-uint32_t mcheck_err[8], crit_err[16];
+static volatile int mcheck_int, crit_int;
+static uint32_t mcheck_err[8], crit_err[16];
 
 void crit_int_handler(trapframe_t *regs)
 {

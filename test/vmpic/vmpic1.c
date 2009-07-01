@@ -130,7 +130,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	if (handle_p[1] & IRQ_TYPE_MPIC_DIRECT) {
 		int off = -1;
-		int len;
 
 		node = fdt_subnode_offset(fdt, 0, "devices");
 		if (node < 0) {
