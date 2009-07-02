@@ -1565,11 +1565,7 @@ int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
 			gmas->mas1 = mfspr(SPR_MAS1);
 			gmas->mas2 = tlb_index << PAGE_SHIFT;
 		} else {
-			/*
-			 * FIXME: tlbre does not preserve ESEL(way-select), so
-			 * do it explicitly for now.
-			 */
-			gmas->mas0 = MAS0_ESEL(way);
+			gmas->mas0 = mfspr(SPR_MAS0);
 			gmas->mas1 = mfspr(SPR_MAS1);
 			gmas->mas2 = mfspr(SPR_MAS2);
 			gmas->mas3 = mfspr(SPR_MAS3);
