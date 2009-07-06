@@ -238,7 +238,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
  
-	spin_lock(&guest->inv_lock);
+	spin_lock_int(&guest->inv_lock);
 	guest->tlbivax_addr = va;
 	guest->tlbivax_count = guest->cpucnt;
 
@@ -251,7 +251,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	while (guest->tlbivax_count != 0)
 		barrier();
 
-	spin_unlock(&guest->inv_lock);
+	spin_unlock_int(&guest->inv_lock);
 	return 0;
 }
 
@@ -262,9 +262,8 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	unsigned int pid;
 	int type = (insn >> 21) & 3;
 	int ret = 0;
-	register_t saved;
 
-	saved = disable_int_save(); 
+	disable_int(); 
 	save_mas(gcpu);
 
 	inc_stat(stat_emu_tlbilx);
@@ -294,7 +293,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	}
 
 	restore_mas(gcpu);
-	restore_int(saved);
+	enable_int();
 
 	return ret;
 }
@@ -847,6 +846,8 @@ void hvpriv(trapframe_t *regs)
 	uint32_t insn, major, minor;
 	int fault = 1;
 	int ret;
+
+	assert(mfmsr() & MSR_EE);
 
 	inc_stat(stat_emu_total);
 

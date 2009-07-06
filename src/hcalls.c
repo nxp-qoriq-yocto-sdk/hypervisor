@@ -54,24 +54,24 @@ static uint32_t global_handles_lock;
 int alloc_global_handle(void)
 {
 	unsigned int i, j;
+	register_t saved = spin_lock_intsave(&global_handles_lock);
+	int ret = -1;
 
-	spin_lock(&global_handles_lock);
 	for (j = 0; j < GLOBAL_HANDLE_INDEX; j++) {
 		if (global_handles[j] != ~0UL) {
 			for (i = 0; i < LONG_BITS; i++) {
 				if (!(global_handles[j] & (1 << i))) {
 					global_handles[j] |= 1 << i;
-					spin_unlock(&global_handles_lock);
 
-					return i + (j * LONG_BITS);
+					ret = i + (j * LONG_BITS);
+					break;
 				}
 			}
 		}
 	}
 
-	spin_unlock(&global_handles_lock);
-
-	return -1;
+	spin_unlock_intsave(&global_handles_lock, saved);
+	return ret;
 }
 
 int set_guest_global_handle(guest_t *guest, handle_t *handle,
@@ -189,7 +189,7 @@ static void dtprop_access(trapframe_t *regs, int set)
 		goto out;
 	}
 
-	spin_lock(&target_guest->state_lock);
+	spin_lock_int(&target_guest->state_lock);
 
 	/* Don't collide with device tree setup being done by the
 	 * hypervisor.  The manager should wait until it receives a reset
@@ -224,7 +224,7 @@ static void dtprop_access(trapframe_t *regs, int set)
 	}
 
 unlock:
-	spin_unlock(&target_guest->state_lock);
+	spin_unlock_int(&target_guest->state_lock);
 
 	if (!set && regs->gpregs[3] == 0) {
 		ret = copy_to_gphys(cur_guest->gphys, reg_pair(regs, 8),
@@ -355,14 +355,14 @@ static void fh_partition_memcpy(trapframe_t *regs)
 		size_t bytes_to_copy = min(PAGE_SIZE, sg_size);
 		unsigned int sg_to_copy = min(SG_PER_PAGE, num_sgs);
 
-		spin_lock(&sg_lock);
+		spin_lock_int(&sg_lock);
 
 		/* Read the next page of the guest's scatter-gather list into
 		   memory. */
 		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
 				    bytes_to_copy) != bytes_to_copy) {
 			regs->gpregs[3] = EFAULT;
-			spin_unlock(&sg_lock);
+			spin_unlock_int(&sg_lock);
 			return;
 		}
 
@@ -377,12 +377,12 @@ static void fh_partition_memcpy(trapframe_t *regs)
 
 			if (size != sg_list[i].size) {
 				regs->gpregs[3] = EFAULT;
-				spin_unlock(&sg_lock);
+				spin_unlock_int(&sg_lock);
 				return;
 			}
 		}
 
-		spin_unlock(&sg_lock);
+		spin_unlock_int(&sg_lock);
 
 		sg_gphys += bytes_to_copy;
 		sg_size -= bytes_to_copy;

@@ -893,10 +893,11 @@ static dev_owner_t *dt_owned_by_nolock(dt_node_t *node, struct guest *guest)
 dev_owner_t *dt_owned_by(dt_node_t *node, struct guest *guest)
 {
 	dev_owner_t *ret;
+	register_t saved;
 
-	spin_lock(&dt_owner_lock);
+	saved = spin_lock_intsave(&dt_owner_lock);
 	ret = dt_owned_by_nolock(node, guest);
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_intsave(&dt_owner_lock, saved);
 
 	return ret;
 }
@@ -916,6 +917,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 	assign_ctx_t *ctx = arg;
 	const char *alias;
 	dt_node_t *hwnode;
+	register_t saved;
 
 	/* Only process immediate children */
 	if (node->parent != ctx->tree)
@@ -958,7 +960,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 	owner->direct = owner;
 	owner->gnode = NULL;
 
-	spin_lock(&dt_owner_lock);
+	saved = spin_lock_intsave(&dt_owner_lock);
 
 	if (!list_empty(&hwnode->owners)) {
 		dev_owner_t *other = to_container(hwnode->owners.next,
@@ -966,7 +968,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 
 		/* Hypervisor ownership of a device is exclusive */
 		if (!other->guest) {
-			spin_unlock(&dt_owner_lock);
+			spin_unlock_intsave(&dt_owner_lock, saved);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		   	      "%s: device %s in %s already assigned to the hypervisor\n",
 	         		__func__, alias, node->name);
@@ -975,7 +977,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 		}
 
 		if (other->guest == ctx->guest) {
-			spin_unlock(&dt_owner_lock);
+			spin_unlock_intsave(&dt_owner_lock, saved);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		   	      "%s: device %s in %s already assigned to %s\n",
 	         		__func__, alias, node->name, ctx->guest->name);
@@ -992,7 +994,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 	node->endpoint = hwnode;
 
 	list_add(&hwnode->owners, &owner->dev_node);
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_intsave(&dt_owner_lock, saved);
 
 	return 0;
 }
@@ -1061,9 +1063,10 @@ void dt_lookup_regs(dt_node_t *node)
 	dt_prop_t *prop;
 	uint32_t naddr, nsize;
 	const uint32_t *reg;
+	register_t saved;
 	int ret;
 
-	spin_lock(&dt_owner_lock);
+	saved = spin_lock_intsave(&dt_owner_lock);
 
 	if (node->dev.regs)
 		goto out;
@@ -1112,7 +1115,7 @@ void dt_lookup_regs(dt_node_t *node)
 	}
 
 out:
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_intsave(&dt_owner_lock, saved);
 }
 
 int dt_bind_driver(dt_node_t *node)
@@ -1480,14 +1483,14 @@ static void dt_lookup_irqs_nolock(dt_node_t *node, int depth)
 
 void dt_lookup_irqs(dt_node_t *node)
 {
-	spin_lock(&dt_owner_lock);
+	register_t saved = spin_lock_intsave(&dt_owner_lock);
 	dt_lookup_irqs_nolock(node, 0);
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_intsave(&dt_owner_lock, saved);
 }
 
 void dt_lookup_intmap(dt_node_t *node)
 {
-	spin_lock(&dt_owner_lock);
+	register_t saved = spin_lock_intsave(&dt_owner_lock);
 
 	if (!node->intmap)
 		read_intmap(node);
@@ -1497,5 +1500,5 @@ void dt_lookup_intmap(dt_node_t *node)
 			if (node->intmap[i].valid)
 				lookup_intmap_entry(node, &node->intmap[i], 0);
 
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_intsave(&dt_owner_lock, saved);
 }

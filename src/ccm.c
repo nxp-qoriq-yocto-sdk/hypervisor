@@ -211,6 +211,7 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 {
 	uint32_t i, core, base, num;
 	uint32_t cpus = 0;
+	register_t saved;
 
 	if (!node->csd)
 		return;
@@ -224,9 +225,10 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 			cpus |= 1 << (31 - core);
 		}
 	}
-	spin_lock(&node->csd->csd_lock);
+
+	saved = spin_lock_intsave(&node->csd->csd_lock);
 	set_csd_cpus(node->csd, cpus);
-	spin_unlock(&node->csd->csd_lock);
+	spin_unlock_intsave(&node->csd->csd_lock, saved);
 }
 
 static int get_sizebit(phys_addr_t size)
@@ -485,6 +487,7 @@ dt_node_t *get_pma_node(dt_node_t *node)
 {
 	dt_node_t *pma_node;
 	dt_prop_t *prop;
+	register_t saved;
 
 	prop = dt_get_prop(node, "phys-mem", 0);
 	if (!prop || prop->len != 4 ||
@@ -506,10 +509,10 @@ dt_node_t *get_pma_node(dt_node_t *node)
 	}
 
 	/* Don't depend on the ccm initialization to initialize pma */
-	spin_lock(&pma_lock);
+	saved = spin_lock_intsave(&pma_lock);
 	if (pma_node->pma == NULL)
 		read_pma(pma_node);
-	spin_unlock(&pma_lock);
+	spin_unlock_intsave(&pma_lock, saved);
 
 	return pma_node;
 }

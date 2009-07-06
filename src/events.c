@@ -66,8 +66,8 @@ static uint32_t gevent_lock;
 
 int register_gevent(eventfp_t handler)
 {
+	register_t saved = spin_lock_intsave(&gevent_lock);
 	int i;
-	spin_lock(&gevent_lock);
 
 	/* find an open event slot */
 	for (i = 0; i < MAX_GEVENTS; i++) {
@@ -82,8 +82,7 @@ int register_gevent(eventfp_t handler)
 
 	gevent_table[i] = handler;
 
-	spin_unlock(&gevent_lock);
-
+	spin_unlock_intsave(&gevent_lock, saved);
 	return i;
 }
 

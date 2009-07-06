@@ -456,10 +456,10 @@ static int claim_hv_pma(dt_node_t *node, void *arg)
 
 	owner->cfgnode = pma;
 
-	spin_lock(&dt_owner_lock);
+	spin_lock_int(&dt_owner_lock);
 	list_add(&hv_devs, &owner->guest_node);
 	list_add(&pma->owners, &owner->dev_node);
-	spin_unlock(&dt_owner_lock);
+	spin_unlock_int(&dt_owner_lock);
 
 	add_all_cpus_to_csd(pma);
 	return 0;

@@ -430,6 +430,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	uint32_t stash_dest = ~(uint32_t)0;
 	uint32_t omi = ~(uint32_t)0;
 	uint32_t subwindow_cnt = 0;
+	register_t saved;
 	int ret;
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
@@ -479,22 +480,22 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		return ERR_BADTREE;
 	}
 
-	spin_lock(&pamu_lock);
+	saved = spin_lock_intsave(&pamu_lock);
 	ppaace = pamu_get_ppaace(liodn);
 	if (!ppaace) {
-		spin_unlock(&pamu_lock);
+		spin_unlock_intsave(&pamu_lock, saved);
 		return ERR_NOMEM;
 	}
 
 	if (ppaace->wse) {
-		spin_unlock(&pamu_lock);
+		spin_unlock_intsave(&pamu_lock, saved);
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: liodn %d or device in use\n", __func__, liodn);
 		return ERR_BUSY;
 	}
 
 	ppaace->wse = map_addrspace_size_to_wse(window_size);
-	spin_unlock(&pamu_lock);
+	spin_unlock_intsave(&pamu_lock, saved);
 
 	liodn_to_guest[liodn] = guest;
 

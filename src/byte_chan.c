@@ -88,11 +88,12 @@ static uint32_t bchan_lock;
 byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 {
 	byte_chan_handle_t *handle;
+	register_t saved = 0;
 	int lock = !spin_lock_held(&bchan_lock);
 	int i;
 
 	if (lock)
-		spin_lock(&bchan_lock);
+		saved = spin_lock_intsave(&bchan_lock);
 
 	for (i = 0; i < 2; i++) {
 		handle = &bc->handles[i];
@@ -104,7 +105,7 @@ byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 	}
 
 	if (lock)
-		spin_unlock(&bchan_lock);
+		spin_unlock_intsave(&bchan_lock, saved);
 
 	return i == 2 ? NULL : handle;
 }
@@ -293,6 +294,7 @@ int init_byte_channel(dt_node_t *node)
 	dt_prop_t *endpoint;
 	dt_node_t *epnode = NULL;
 	uint32_t phandle;
+	register_t saved;
 
 	endpoint = dt_get_prop(node, "endpoint", 0);
 	if (endpoint) {
@@ -313,7 +315,7 @@ int init_byte_channel(dt_node_t *node)
 		}
 	}
 
-	spin_lock(&bchan_lock);
+	saved = spin_lock_intsave(&bchan_lock);
 	assert(!node->bch);
 	assert(!node->endpoint == !node->bc);
 
@@ -376,11 +378,11 @@ int init_byte_channel(dt_node_t *node)
 	assert(node->bch);
 
 out:
-	spin_unlock(&bchan_lock);
+	spin_unlock_intsave(&bchan_lock, saved);
 	return 0;
 
 nomem:
-	spin_unlock(&bchan_lock);
+	spin_unlock_intsave(&bchan_lock, saved);
 	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
 	         "%s: out of memory\n", __func__);
 	return ERR_NOMEM;
@@ -404,8 +406,7 @@ static int byte_chan_partition_init_one(dt_node_t *node, void *arg)
 byte_chan_t *other_attach_byte_chan(dt_node_t *bcnode, dt_node_t *onode)
 {
 	byte_chan_t *ret = NULL;
-
-	spin_lock(&bchan_lock);
+	register_t saved = spin_lock_intsave(&bchan_lock);
 
 	if (bcnode->endpoint) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
@@ -428,7 +429,7 @@ byte_chan_t *other_attach_byte_chan(dt_node_t *bcnode, dt_node_t *onode)
 	onode->endpoint = bcnode;
 
 out:
-	spin_unlock(&bchan_lock);
+	spin_unlock_intsave(&bchan_lock, saved);
 	return ret;
 }
 

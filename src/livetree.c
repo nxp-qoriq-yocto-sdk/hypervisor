@@ -1356,20 +1356,18 @@ static uint32_t find_free_phandle(void)
 {
 	static uint32_t free_phandle;	// The next free phandle to use
 	static uint32_t lock;
-	uint32_t phandle;
+	uint32_t phandle = 0;
+	register_t saved = spin_lock_intsave(&lock);
 	int ret;
 
 	/* The first time we're called, find the lowest phandle in the
 	 * hardware tree.
 	 */
-	spin_lock(&lock);
 	if (!free_phandle) {
 		ret = dt_for_each_node(hw_devtree, &free_phandle,
 				       find_free_phandle_callback, NULL);
-		if (ret) {
-			spin_unlock(&lock);
-			return 0;
-		}
+		if (ret)
+			goto out;
 
 		// What if there are no phandles in the device tree at all?
 		if (!free_phandle)
@@ -1377,15 +1375,16 @@ static uint32_t find_free_phandle(void)
 	}
 
 	if (free_phandle == ~0U) {
-		spin_unlock(&lock);
+		spin_unlock_intsave(&lock, saved);
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 			 "%s: no more phandles\n", __func__);
-		return ERR_BADTREE;
+		return 0;
 	}
 
 	phandle = free_phandle++;
-	spin_unlock(&lock);
 
+out:
+	spin_unlock_intsave(&lock, saved);
 	return phandle;
 }
 

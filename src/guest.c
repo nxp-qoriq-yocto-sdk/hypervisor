@@ -1544,15 +1544,14 @@ int restart_guest(guest_t *guest)
 {
 	int ret = 0;
 	unsigned int i;
-
-	spin_lock(&guest->state_lock);
+	register_t saved = spin_lock_intsave(&guest->state_lock);
 
 	if (guest->state != guest_running)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
 
-	spin_unlock(&guest->state_lock);
+	spin_unlock_intsave(&guest->state_lock, saved);
 
 	if (!ret)
 		for (i = 0; i < guest->cpucnt; i++)
@@ -1631,6 +1630,7 @@ static uint32_t start_guest_lock;
 
 guest_t *node_to_partition(dt_node_t *partition)
 {
+	register_t saved;
 	unsigned int i;
 	int ret;
 	char *name;
@@ -1642,7 +1642,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		return NULL;
 	}
 
-	spin_lock(&start_guest_lock);
+	saved = spin_lock_intsave(&start_guest_lock);
 
 	for (i = 0; i < last_lpid; i++) {
 		assert(guests[i].lpid == i + 1);
@@ -1652,7 +1652,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 	if (i == last_lpid) {
 		if (last_lpid >= MAX_PARTITIONS) {
-			spin_unlock(&start_guest_lock);
+			spin_unlock_intsave(&start_guest_lock, saved);
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "node_to_partition: too many partitions\n");
 			return NULL;
@@ -1664,7 +1664,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		// managers start looking for their managed partitions.
 		ret = create_guest_special_doorbells(&guests[i]);
 		if (ret < 0) {
-			spin_unlock(&start_guest_lock);
+			spin_unlock_intsave(&start_guest_lock, saved);
 			return NULL;
 		}
 
@@ -1673,7 +1673,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 			/* If no label, use the partition node path. */
 			name = malloc(MAX_DT_PATH);
 			if (!name) {
-				spin_unlock(&start_guest_lock);
+				spin_unlock_intsave(&start_guest_lock, saved);
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "node_to_partition: out of memory\n");
 				return NULL;
@@ -1725,7 +1725,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		error_log_init(&guests[i].error_event_queue);
 	}
 
-	spin_unlock(&start_guest_lock);
+	spin_unlock_intsave(&start_guest_lock, saved);
 	return &guests[i];
 }
 
@@ -2201,14 +2201,14 @@ void resume_core(trapframe_t *regs)
 int stop_guest(guest_t *guest)
 {
 	unsigned int i, ret = 0;
-	spin_lock(&guest->state_lock);
+	register_t saved = spin_lock_intsave(&guest->state_lock);
 
 	if (guest->state != guest_running && guest->state != guest_paused)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
 
-	spin_unlock(&guest->state_lock);
+	spin_unlock_intsave(&guest->state_lock, saved);
 
 	if (ret)
 		return ret;
@@ -2222,14 +2222,14 @@ int stop_guest(guest_t *guest)
 int start_guest(guest_t *guest)
 {
 	int ret = 0;
-	spin_lock(&guest->state_lock);
+	register_t saved = spin_lock_intsave(&guest->state_lock);
 
 	if (guest->state != guest_stopped)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_starting;
 
-	spin_unlock(&guest->state_lock);
+	spin_unlock_intsave(&guest->state_lock, saved);
 
 	if (ret)
 		return ret;
@@ -2241,14 +2241,14 @@ int start_guest(guest_t *guest)
 int pause_guest(guest_t *guest)
 {
 	unsigned int i, ret = 0;
-	spin_lock(&guest->state_lock);
+	register_t saved = spin_lock_intsave(&guest->state_lock);
 
 	if (guest->state != guest_running)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_pausing;
 
-	spin_unlock(&guest->state_lock);
+	spin_unlock_intsave(&guest->state_lock, saved);
 
 	if (ret)
 		return ret;
@@ -2263,7 +2263,7 @@ int resume_guest(guest_t *guest)
 {
 	int ret = 0;
 	unsigned int i;
-	spin_lock(&guest->state_lock);
+	register_t saved = spin_lock_intsave(&guest->state_lock);
 
 	if (guest->state != guest_paused) {
 		ret = ERR_INVALID;
@@ -2273,7 +2273,7 @@ int resume_guest(guest_t *guest)
 		guest->state = guest_resuming;
 	}
 
-	spin_unlock(&guest->state_lock);
+	spin_unlock_intsave(&guest->state_lock, saved);
 
 	if (ret)
 		return ret;
@@ -2382,11 +2382,13 @@ static int assign_child(dt_node_t *node, void *arg)
 
 	owner = dt_owned_by(node->upstream, guest);
 	if (!owner) {
+		register_t saved;
+
 		owner = malloc(sizeof(dev_owner_t));
 		if (!owner)
 			return ERR_NOMEM;
 
-		spin_lock(&dt_owner_lock);
+		saved = spin_lock_intsave(&dt_owner_lock);
 
 		list_add(&node->upstream->owners, &owner->dev_node);
 		list_add(&guest->dev_list, &owner->guest_node);
@@ -2394,7 +2396,7 @@ static int assign_child(dt_node_t *node, void *arg)
 		owner->guest = guest;
 		owner->hwnode = node->upstream;
 
-		spin_unlock(&dt_owner_lock);
+		spin_unlock_intsave(&dt_owner_lock, saved);
 	}
 
 	owner->cfgnode = direct->cfgnode;
