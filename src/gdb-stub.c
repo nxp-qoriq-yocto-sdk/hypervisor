@@ -288,6 +288,7 @@ typedef enum token
 	insert_breakpoint,
 	remove_breakpoint,
 	single_step,
+	compute_crc32,
 	return_current_thread_id,
 	get_section_offsets,
 	supported_features,
@@ -304,8 +305,12 @@ typedef struct lexeme_token_pair
 	token_t token;
 } lexeme_token_pair_t;
 
-/* Note: lexeme_token_pairs and enum token_t have to be kept in synch as the token
- *       values are used to index the array.
+/* Note: 0. lexeme_token_pairs and enum token_t have to be kept in synch as the token
+ *          values are used to index the array.
+ *       1. Place { "foobar", foobar } /before/ { "foob", foob } /before/ { "foo", foo }
+ *          in the table below so that tokenize() does not end-up returning the token
+ *          for a prefix of the intended lexeme (in the case that a prefix is also a valid
+ *          lexeme). e.g. qCRC, qC.
  */
 static const lexeme_token_pair_t lexeme_token_pairs[] =
 {
@@ -321,6 +326,7 @@ static const lexeme_token_pair_t lexeme_token_pairs[] =
 	{ "Z", insert_breakpoint },
 	{ "z", remove_breakpoint },
 	{ "s", single_step },
+	{ "qCRC", compute_crc32 },
 	{ "qC", return_current_thread_id },
 	{ "qOffsets", get_section_offsets },
 	{ "qSupported", supported_features },
@@ -349,6 +355,7 @@ static uint64_t htoi(uint8_t *hex_string);
 static uint8_t *htos(uint8_t *hex_string);
 static token_t tokenize(uint8_t *lexeme);
 static uint8_t hex(uint8_t c);
+static uint32_t crc32(trapframe_t *trap_frame, uint32_t *addr, uint32_t length, uint8_t *err_flag);
 
 /* PRT */
 static int bufsize_sanity_check(void);
@@ -491,6 +498,43 @@ static uint8_t hex(uint8_t c)
 {
 	return hexit_table[c];
 }
+
+static uint32_t crc32(trapframe_t *trap_frame, uint32_t *addr, uint32_t length, uint8_t *err_flag)
+{
+	uint32_t crc32_sum, crc32_pol, crc32_aux, crc32_flag;
+	uint8_t value[1];
+	uint32_t i, j;
+	/* Polynomial:
+	 * x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1
+	 * Representation: 0x04c11db7 (One bit per non-zero coefficient above. With the coefficient of
+	 *                 the leading term implied).
+	 * Initial value for checksum: 0xffffffff
+	 * Important: Must correspond to crc32() in remote.c in the GDB sources.
+	 */
+	crc32_sum = 0xffffffff;
+	crc32_pol = 0x04c11db7;
+	guestmem_set_data(trap_frame);
+	for (i = 0; i < length; i++) {
+		if (guestmem_in8((uint8_t *)addr + i, value) != 0) {
+			*err_flag = 1;
+			break;
+		}
+		crc32_flag = 0;
+		crc32_aux = (crc32_sum & 0xff000000) ^ (*value << 24);
+		for (j = 0; j < 8; j++) {
+			if (crc32_aux & 0x80000000)
+				crc32_flag = 1;
+			crc32_aux <<= 1;
+			if (crc32_flag) {
+				crc32_aux ^= crc32_pol;
+				crc32_flag = 0;
+			}
+		}
+		crc32_sum = (crc32_sum << 8) ^ crc32_aux;
+	}
+	return crc32_sum;
+}
+
 /* Aux ends. */
 
 
@@ -1358,6 +1402,7 @@ void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type)
 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	uint8_t *cur_pos, *sav_pos, *data;
 	uint32_t offset, length;
+	uint32_t crc32_sum;
 	uint8_t err_flag = 0;
 	uint8_t escape_flag = 0;
 	uint32_t *addr = NULL;
@@ -1921,6 +1966,27 @@ return_to_guest:
 			DEBUG("Resetting partition.");
 			restart_guest(get_gcpu()->guest);
 			goto return_to_guest;
+			break;
+
+		case compute_crc32:
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'qCRC' packet.\n");
+			cur_pos = content(stub->cmd);
+			cur_pos = scan_till(cur_pos, ':');
+			cur_pos++;
+			addr = (uint32_t *)(uintptr_t)scan_num(&cur_pos, ',');
+			BREAK_IF_END(cur_pos);
+			length = scan_num(&cur_pos, '\0');
+			DEBUG("addr: 0x%p, length: %d", addr, length);
+			err_flag = 0;
+			crc32_sum = crc32(trap_frame, addr, length, &err_flag);
+			if (err_flag == 0) {
+			        pkt_cat_string(stub->rsp, "C");
+				sprintf((char *)value, "%x", crc32_sum);
+			        pkt_cat_string(stub->rsp, (char *)value);
+			} else {
+				pkt_cat_string(stub->rsp, "E");
+				pkt_write_hex_byte_update_cur(stub->rsp, 0);
+			}
 			break;
 
 		default:
