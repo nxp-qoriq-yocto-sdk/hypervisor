@@ -679,8 +679,10 @@ shell_cmd(resume);
 
 #if __WORDSIZE == 32
 #define VADDR_WIDTH	"8"
+#define PADDR_WIDTH	"9"
 #else
 #define VADDR_WIDTH	"16"
+#define PADDR_WIDTH	"16"
 #endif
 
 static void gtlb_fn(shell_t *shell, char *args)
@@ -721,8 +723,9 @@ static void gtlb_fn(shell_t *shell, char *args)
 			"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx\t",
 			vaddr, vaddr + size - 1);
 
-		qprintf(shell->out, 1, "0x%09llx - 0x%09llx\n",
-				paddr, paddr + size - 1 );
+		qprintf(shell->out, 1,
+			"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx\n",
+			paddr, paddr + size - 1 );
 	}
 }
 
