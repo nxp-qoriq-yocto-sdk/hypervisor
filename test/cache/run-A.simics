@@ -39,7 +39,7 @@ run-command-file "common.simics"
 
 add-directory "bin/cache" -prepend
 
-@os.system('rm cache-lock-A.ckpt*')
+@os.system('rm -rf cache-lock-A.ckpt*')
 
 run-command-file "boot_4_2.simics"
 b 0

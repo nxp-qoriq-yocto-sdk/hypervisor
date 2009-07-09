@@ -26,13 +26,13 @@ cycle_count = 0
 def markpoint_hap_callback(callback_data, trigger_obj, id, vaddr, cyc, seq_num, cyc_last, cyc_last_this):
 	global cycle_count
 
-	if ((trigger_obj.name == "cpu0") and (id == 3)):
+	if ((trigger_obj.name == "p4080_simple0.soc.cpu[0]") and (id == 3)):
 		run_command("stop")
 		run_command("quit")
-	if ((trigger_obj.name == "cpu0") and (id == 1)):
+	if ((trigger_obj.name == "p4080_simple0.soc.cpu[0]") and (id == 1)):
 		print "cycle since markpooint 0 =%d\n" %(cyc_last)
 		cycle_count = cyc_last
-	if ((trigger_obj.name == "cpu0") and (id == 2)):
+	if ((trigger_obj.name == "p4080_simple0.soc.cpu[0]") and (id == 2)):
 		print "cycle since markpooint 1 =%d\n" %(cyc_last)
 		if (cyc_last > cycle_count):
 			print "CPC Test PASSED\n"

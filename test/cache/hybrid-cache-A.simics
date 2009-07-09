@@ -22,4 +22,5 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 read-configuration-to-ccmode cache-lock-A.ckpt
+p4080_simple0.soc.ccm->addr_map_CCSRAR=0x80000000
 c

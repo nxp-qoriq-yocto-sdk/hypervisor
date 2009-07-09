@@ -31,6 +31,7 @@ $ccmode_parameters = [
 ]
 read-configuration-to-ccmode csd.ckpt
 run-python-file "../../test/csd/csd.py"
-cpu0.trace -mark
-cpu4.trace -mark
+p4080_simple0.soc.cpu[0].trace -mark
+p4080_simple0.soc.cpu[4].trace -mark
+p4080_simple0.soc.ccm->addr_map_CCSRAR=0x80000000
 c
