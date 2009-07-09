@@ -39,6 +39,7 @@ void init(unsigned long devtree_ptr);
 static phys_addr_t dma_phys;
 static uint32_t *dma_virt;
 static uint32_t liodn;
+static int window_test, sub_window_test;
 static volatile int mcheck_int, crit_int;
 static uint32_t mcheck_err[8], crit_err[16];
 
@@ -73,6 +74,14 @@ static int dma_init(void)
 	int node, parent, len;
 	const uint32_t *liodnp;
 	int rc;
+
+	node = fdt_node_offset_by_compatible(fdt, 0, "window");
+	if (node >= 0)
+		window_test = 1;
+
+	node = fdt_node_offset_by_compatible(fdt, 0, "subwindow");
+	if (node >= 0)
+		sub_window_test = 1;
 
 	node = fdt_node_offset_by_compatible(fdt, 0, "fsl,eloplus-dma-channel");
 	if (node < 0)
@@ -197,13 +206,20 @@ void libos_client_entry(unsigned long devtree_ptr)
 		tlb1_set_entry(3, (unsigned long)(0x20000000 + PHYSBASE),
 			(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
 			TLB_MAS3_KERN, 0, 0, 0);
+		if (window_test) {
+			if (test_dma_memcpy(0x04000100, 0x05000100, 1))
+				printf("DMA access test : PASSED\n");
+			else
+				printf("DMA access test : FAILED\n");
+		}
 
-		if ((test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
-			test_dma_memcpy(0x04000100, 0x20000100, 1)) ||
-				test_dma_memcpy(0x04000100, 0x05000100, 1))
-			printf("DMA access test : PASSED\n");
-		else
-			printf("DMA access test : FAILED\n");
+		if (sub_window_test) {
+			if (test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
+				test_dma_memcpy(0x04000100, 0x20000100, 1))
+				printf("DMA access test : PASSED\n");
+			else
+				printf("DMA access test : FAILED\n");
+		}
 	}
 	printf("Test Complete\n");
 }

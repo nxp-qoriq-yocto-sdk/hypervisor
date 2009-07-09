@@ -126,6 +126,9 @@
 		dma0: dma0 {
 			device = "dma0";
 			dma-window = <&window0>;
+			node-update {
+				prepend-stringlist = "compatible", "window";
+			};
 		};
 
 		aliases {

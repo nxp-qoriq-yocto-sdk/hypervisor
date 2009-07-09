@@ -35,7 +35,7 @@ $guest_addr[0]  = 0x00200000
 $guest_image[1] = "dma"
 $guest_addr[1]  = 0x00300000
 
-$guest_image[2] = "hv-A.dtb"
+$guest_image[2] = "hv-B.dtb"
 $guest_addr[2]  = 0x00100000
 
 add-directory "%script%/../common" -prepend

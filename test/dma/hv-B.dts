@@ -148,6 +148,9 @@
 		dma0: dma0 {
 			device = "dma0";
 			dma-window = <&window1>;
+			node-update {
+				prepend-stringlist = "compatible", "subwindow";
+			};
 		};
 
 		aliases {
