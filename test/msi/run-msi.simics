@@ -48,7 +48,7 @@ run-command-file "common.simics"
 
 $kernel_cmdline = "config-addr=0xe8f00000"
 $dev_tree_blob = "p4080sim.dtb"
-$uboot = "u-boot.32.bin"
+$uboot = "u-boot.bin"
 
 add-directory "%script%" -prepend
 add-directory "bin/msi" -prepend
