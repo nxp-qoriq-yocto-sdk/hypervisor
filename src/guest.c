@@ -213,9 +213,6 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	if (dt_get_prop(node, "dma-only", 0))
 		exc_flags |= PTE_VALID;
 
-	if (dt_get_prop(node, "read-only", 0))
-		exc_flags |= PTE_SW | PTE_UW;
-
 	prop = dt_get_prop(node, "guest-addr", 0);
 	if (prop) {
 		if (prop->len != 8) {
