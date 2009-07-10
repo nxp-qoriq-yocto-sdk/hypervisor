@@ -26,8 +26,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.4
-Revsion: 007
-Date: 7/1/2009
+Revsion: 008
+Date: 7/10/2009
 
 -------------------------------------------------------
 Contents
@@ -46,7 +46,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.4-005 has been tested with Simics 4.2.8 / pre7.
+   -Topaz 0.4-008 has been tested with Simics 4.2.8 / pre7.
     It is *not* compatible with simics 4.0, at least without
     changing which simics script the test cases invoke.
 
@@ -58,6 +58,11 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-008 bug fixes and changes
+      -bug 3650: Always use interrupt-safe locks 
+      -bug 3592: shell tlbread command 64-bit cleanup
+      -misc unit test cleanup
 
    -Topaz 0.4-007 bug fixes and changes
       -removed hardcoded tlbilx opcode; updated toolchain now required
