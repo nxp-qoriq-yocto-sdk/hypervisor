@@ -162,7 +162,7 @@ static void help_fn(shell_t *shell, char *args)
 
 		for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 			cmd = *i;
-			qprintf(shell->out, 1, " %s", cmd->name);
+			qprintf(shell->out, 1, "%s", cmd->name);
 			print_aliases(shell, cmd);
 			qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 		}
@@ -176,7 +176,7 @@ static void help_fn(shell_t *shell, char *args)
 		return;
 	}
 
-	qprintf(shell->out, 1, " %s", cmd->name);
+	qprintf(shell->out, 1, "%s", cmd->name);
 	print_aliases(shell, cmd);
 	qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 
@@ -215,8 +215,7 @@ static void lp_fn(shell_t *shell, char *args)
 }
 
 static command_t lp = {
-	.name = "list-partitions",
-	.aliases = (const char *[]){ "lp", NULL },
+	.name = "lp",
 	.action = lp_fn,
 	.shorthelp = "List partitions",
 };
@@ -303,8 +302,7 @@ static void pi_fn(shell_t *shell, char *args)
 }
 
 static command_t pi = {
-	.name = "partition-info",
-	.aliases = (const char *[]){ "pi", NULL },
+	.name = "pi",
 	.action = pi_fn,
 	.shorthelp = "Display information about a partition",
 	.longhelp = "  Usage: partition-info <number>\n\n"
@@ -340,28 +338,27 @@ static void gdt_fn(shell_t *shell, char *args)
 }
 
 static command_t gdt = {
-	.name = "guest-device-tree",
-	.aliases = (const char *[]){ "gdt", NULL },
+	.name = "gdt",
 	.action = gdt_fn,
 	.shorthelp = "Guest device tree operation",
 	.longhelp = "  Usage: guest-device-tree <cmd> <partition number>\n\n"
-	            "  currently only print command is supported.",
+	            "  currently only 'print' command is supported.",
 };
 shell_cmd(gdt);
 
-static void mdt_fn(shell_t *shell, char *args)
+static void hdt_fn(shell_t *shell, char *args)
 {
 	dt_print_tree(hw_devtree, shell->out);
 }
 
-static command_t mdt = {
-	.name = "master-device-tree",
-	.aliases = (const char *[]){ "mdt", NULL },
-	.action = mdt_fn,
-	.shorthelp = "Display master device tree",
+static command_t hdt = {
+	.name = "hdt",
+	.action = hdt_fn,
+	.shorthelp = "Display hardware device tree",
+	.longhelp = "  Displays the hardware device passed to the hypervisor at boot time.",
 };
 
-shell_cmd(mdt);
+shell_cmd(hdt);
 
 #ifdef CONFIG_PAMU
 #define BUFF_SIZE 64
@@ -532,9 +529,9 @@ static void start_fn(shell_t *shell, char *args)
 static command_t startcmd = {
 	.name = "start",
 	.action = start_fn,
-	.shorthelp = "Start a partition",
-	.longhelp = "  Usage: start <number>\n\n"
-	            "  The partition number can be obtained with list-partitions.",
+	.shorthelp = "Start a stopped partition",
+	.longhelp = "  Usage: start <partition-number>\n\n"
+	            "  The partition number can be obtained with the 'lp' command.",
 };
 shell_cmd(startcmd);
 
@@ -568,9 +565,9 @@ static void restart_fn(shell_t *shell, char *args)
 static command_t restart = {
 	.name = "restart",
 	.action = restart_fn,
-	.shorthelp = "Start a partition",
-	.longhelp = "  Usage: restart <number>\n\n"
-	            "  The partition number can be obtained with list-partitions.",
+	.shorthelp = "Re-start a running partition",
+	.longhelp = "  Usage: restart <partition-number>\n\n"
+	            "  The partition number can be obtained with the 'lp' command.",
 };
 shell_cmd(restart);
 
@@ -606,8 +603,8 @@ static command_t stop = {
 	.name = "stop",
 	.action = stop_fn,
 	.shorthelp = "Stop a partition",
-	.longhelp = "  Usage: stop <number>\n\n"
-	            "  The partition number can be obtained with list-partitions.",
+	.longhelp = "  Usage: stop <partition-number>\n\n"
+	            "  The partition number can be obtained with the 'lp' command.",
 };
 shell_cmd(stop);
 
@@ -638,9 +635,10 @@ static void pause_fn(shell_t *shell, char *args)
 static command_t pause = {
 	.name = "pause",
 	.action = pause_fn,
-	.shorthelp = "Stop a partition",
-	.longhelp = "  Usage: pause <number>\n\n"
-	            "  The partition number can be obtained with list-partitions.",
+	.shorthelp = "Pause a running partition",
+	.longhelp = "  Usage: pause <partition-number>\n\n"
+	            "  Instruction execution is suspended on all CPUs of a paused partition."
+	            "  The partition number can be obtained with the 'lp' command.",
 };
 shell_cmd(pause);
 
@@ -671,9 +669,9 @@ static void resume_fn(shell_t *shell, char *args)
 static command_t resume = {
 	.name = "resume",
 	.action = resume_fn,
-	.shorthelp = "Stop a partition",
-	.longhelp = "  Usage: resume <number>\n\n"
-	            "  The partition number can be obtained with list-partitions.",
+	.shorthelp = "Resume a paused partition",
+	.longhelp = "  Usage: resume <partition-number>\n\n"
+	            "  The partition number can be obtained with the 'lp' command.",
 };
 shell_cmd(resume);
 
