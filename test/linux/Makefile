@@ -59,6 +59,24 @@ define unmount
 	$(V)gzip -f $(1).ext2
 endef
 
+define partman-start.sh
+	$(V)echo "partman load -h p2-linux -f vmlinux -a 0x0" > start.sh
+	$(V)echo "partman load -h p2-linux -f rootfs.ext2.gz -a 0x1300000" >> start.sh
+	$(V)echo "partman start -h p2-linux -e 0x0" >> start.sh
+	$(V)echo "partman load -h p3-linux -f vmlinux -a 0x0" >> start.sh
+	$(V)echo "partman load -h p3-linux -f rootfs.ext2.gz -a 0x1300000" >> start.sh
+	$(V)echo "partman start -h p3-linux -e 0x0" >> start.sh
+	$(V)chmod +x start.sh
+	$(V)sudo mv start.sh bin/linux/rootfs-partman/
+endef
+
+define hello-start.sh
+	$(V)echo "partman load -h hello -f hello -a 0x0" > start.sh
+	$(V)echo "partman start -h hello -e 0x0" >> start.sh
+	$(V)chmod +x start.sh
+	$(V)sudo mv start.sh bin/linux/rootfs-hello/
+endef
+
 # Add vmlinux and partman to the rootfs
 bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
 # We want partman on the managed partition, so that we can send and listen
@@ -70,12 +88,14 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(testdir)../../images/roo
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
+	$(call linux-start.sh)
 	$(call unmount,bin/linux/rootfs-partman)
 
 bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
 	$(call mount,rootfs-hello)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-hello/bin/
 	sudo cp -af bin/hello/hello bin/linux/rootfs-hello/
+	$(call hello-start.sh)
 	$(call unmount,bin/linux/rootfs-hello)
 
 $(test)-run-partman: bin/$(test)/rootfs-partman.ext2.gz
