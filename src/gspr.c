@@ -126,12 +126,28 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_GSPRG3);
 		break;
 
-	case SPR_SPRG4 ... SPR_SPRG7:
-		*val = gcpu->sprg[spr - SPR_SPRG4];
+	case SPR_SPRG4:
+		*val = mfspr(SPR_SPRG4);
 		break;
 
-	case SPR_SPRG8 ... SPR_SPRG9:
+	case SPR_SPRG5:
+		*val = mfspr(SPR_SPRG5);
+		break;
+
+	case SPR_SPRG6:
+		*val = mfspr(SPR_SPRG6);
+		break;
+
+	case SPR_SPRG7:
+		*val = mfspr(SPR_SPRG7);
+		break;
+
+	case SPR_SPRG8:
 		*val = gcpu->sprg[spr - SPR_SPRG8 + 4];
+		break;
+
+	case SPR_SPRG9:
+		*val = mfspr(SPR_SPRG9);
 		break;
 
 	case SPR_PIR:
@@ -528,12 +544,28 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		mtspr(SPR_GSPRG3, val);
 		break;
 
-	case SPR_SPRG4 ... SPR_SPRG7:
-		gcpu->sprg[spr - SPR_SPRG4] = val;
+	case SPR_SPRG4:
+		mtspr(SPR_SPRG4, val);
 		break;
 
-	case SPR_SPRG8 ... SPR_SPRG9:
+	case SPR_SPRG5:
+		mtspr(SPR_SPRG5, val);
+		break;
+
+	case SPR_SPRG6:
+		mtspr(SPR_SPRG6, val);
+		break;
+
+	case SPR_SPRG7:
+		mtspr(SPR_SPRG7, val);
+		break;
+
+	case SPR_SPRG8:
 		gcpu->sprg[spr - SPR_SPRG8 + 4] = val;
+		break;
+
+	case SPR_SPRG9:
+		mtspr(SPR_SPRG9, val);
 		break;
 
 	case SPR_PIR:
