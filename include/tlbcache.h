@@ -93,7 +93,7 @@ static inline tlbctag_t make_tag(uintptr_t vaddr, unsigned int pid, unsigned int
 void tlbcache_init(void);
 int find_gtlb_entry(uintptr_t vaddr, tlbctag_t tag, tlbcset_t **setp,
                     unsigned int *way);
-void gtlb0_to_mas(unsigned int index, unsigned int way);
+void gtlb0_to_mas(unsigned int index, unsigned int way, struct gcpu *gcpu);
 int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
                         unsigned int pid, unsigned int space);
 

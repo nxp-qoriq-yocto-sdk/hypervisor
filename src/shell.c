@@ -722,48 +722,79 @@ shell_cmd(resume);
 #define PADDR_WIDTH	"16"
 #endif
 
-static void gtlb_fn(shell_t *shell, char *args)
+static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 {
-	tlb_entry_t gmas = {0};
-	uint32_t flags = TLB_READ_FIRST;
+	tlb_entry_t gmas;
+	uint32_t flags;
 	int rc, tlb_num;
 	phys_addr_t paddr;
 	unsigned long vaddr, size;
-	char *numstr;
+
+	for (tlb_num = 0; tlb_num < 2; tlb_num++) {
+		memset(&gmas, 0, sizeof(tlb_entry_t));
+		flags = TLB_READ_FIRST;
+		qprintf(shell->out, 1, "tlb %d dump\n", tlb_num);
+		gmas.mas0 = MAS0_TLBSEL(tlb_num);
+		while (1) {
+			rc = guest_tlb_read(&gmas, &flags, gcpu);
+			if (rc < 0)
+				break;
+			if (!(gmas.mas1 & MAS1_VALID))
+				continue;
+
+			paddr = ((uint64_t) gmas.mas7 << 32) |
+				(gmas.mas3 & ~(PAGE_SIZE - 1));
+			vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
+			size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
+
+			qprintf(shell->out, 1, "%01u\t",
+				(!tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
+
+			qprintf(shell->out, 1,
+				"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx\t",
+				vaddr, vaddr + size - 1);
+
+			qprintf(shell->out, 1,
+				"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx\n",
+				paddr, paddr + size - 1 );
+		}
+	}
+}
+
+static void gtlb_fn(shell_t *shell, char *args)
+{
+	int guest_num, vcpu_num;
+	char *gueststr, *vcpustr;
+	cpu_t *old_cpu = NULL;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
-	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: gtlb <tlb-number>\n");
+	gueststr = nextword(&args);
+	vcpustr = nextword(&args);
+
+	if (!gueststr || !vcpustr) {
+		qprintf(shell->out, 1, "Usage: gtlb <guest#> <vcpu#>\n");
 		return;
 	}
-	tlb_num = get_number32(shell->out, numstr);
-	qprintf(shell->out, 1, "tlb %d dump\n", tlb_num);
 
-	gmas.mas0 |= MAS0_TLBSEL(tlb_num);
-	while (1) {
-		rc = guest_tlb_read(&gmas, &flags);
-		if (rc < 0)
-			break;
-		if (!(gmas.mas1 & MAS1_VALID))
-			continue;
-
-		paddr = ((uint64_t) gmas.mas7 << 32) |
-				(gmas.mas3 & ~(PAGE_SIZE - 1));
-		vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
-		size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
-
-		qprintf(shell->out, 1, "%01u\t",
-			(!tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
-
-		qprintf(shell->out, 1,
-			"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx\t",
-			vaddr, vaddr + size - 1);
-
-		qprintf(shell->out, 1,
-			"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx\n",
-			paddr, paddr + size - 1 );
+	guest_num = get_partition_num(shell, gueststr);
+	if (guest_num == -1 ) {
+		qprintf(shell->out, 1, "Invalid guest number\n");
+		return;
 	}
+
+	if (guests[guest_num].state != guest_paused) {
+		qprintf(shell->out, 1, "Can't dump tlb, guest not pasued\n");
+		return;
+	}
+
+	vcpu_num = get_number32(shell->out, vcpustr);
+
+	if (vcpu_num >= guests[guest_num].cpucnt) {
+		qprintf(shell->out, 1, "Invalid vcpu number\n");
+		return;
+	}
+
+	dump_tlb(shell, guests[guest_num].gcpus[vcpu_num]);
 }
 
 static command_t gtlb = {

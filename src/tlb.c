@@ -239,10 +239,10 @@ int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
 	return 0;
 }
 
-void gtlb0_to_mas(unsigned int index, unsigned int way)
+void gtlb0_to_mas(unsigned int index, unsigned int way, gcpu_t *gcpu)
 {
 	tlbcset_t *set = &cpu->client.tlbcache[index];
-	int bits = cpu->client.tlbcache_bits;
+	int bits = gcpu->cpu->client.tlbcache_bits;
 	register_t mas3;
 
 	if (!set->tag[way].valid) {
@@ -836,7 +836,7 @@ int guest_tlb_search_mas(uintptr_t va)
 	unsigned int way;
 
 	if (find_gtlb_entry(va, tag, &set, &way)) {
-		gtlb0_to_mas(set - cpu->client.tlbcache, way);
+		gtlb0_to_mas(set - cpu->client.tlbcache, way, gcpu);
 		return 0;
 	}
 #endif
@@ -1516,11 +1516,10 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
  *    caller should not use it after initializing it to TLB_READ_FIRST )
  * @return success or indication that there are no more tlbe's to be read
  */
-int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
+int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 {
 	uint32_t tlb_index, way, tlb0_nentries;
 	unsigned int tlb;
-	gcpu_t *gcpu = get_gcpu();
 
 #ifndef CONFIG_TLB_CACHE
 	tlb0_nentries = (mfspr(SPR_TLB0CFG) & 0xFFF) >> 2;
@@ -1558,7 +1557,7 @@ int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
 		asm volatile ("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
 #else
-		gtlb0_to_mas(tlb_index, way);
+		gtlb0_to_mas(tlb_index, way, gcpu);
 #endif
 		if (!(mfspr(SPR_MAS1) & MAS1_VALID)) {
 			gmas->mas0 = MAS0_ESEL(way);

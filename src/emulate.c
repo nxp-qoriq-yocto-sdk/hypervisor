@@ -338,7 +338,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 #ifdef CONFIG_TLB_CACHE
 		gtlb0_to_mas((mfspr(SPR_MAS2) >> MAS2_EPN_SHIFT) &
 		             (cpu->client.tlbcache_bits - 1),
-		             MAS0_GET_TLB0ESEL(mas0));
+		             MAS0_GET_TLB0ESEL(mas0), gcpu);
 #else
 		asm volatile("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
