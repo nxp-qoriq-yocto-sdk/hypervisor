@@ -714,7 +714,7 @@ static command_t resume = {
 };
 shell_cmd(resume);
 
-#if __WORDSIZE == 32
+#ifndef CONFIG_64BIT
 #define VADDR_WIDTH	"8"
 #define PADDR_WIDTH	"9"
 #else
