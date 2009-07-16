@@ -198,6 +198,12 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		return ERR_BADIMAGE;
 	}
 
+	/* If the image load address is set as -1 in the partition config
+	 * (config device tree), the load address is set as the  lowest
+	 *  segment physical address.
+	 */
+	if (~target == 0)
+		target = plowest;
 
 	/* Copy each PT_LOAD segment to memory */
 
