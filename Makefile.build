@@ -36,11 +36,12 @@ GENASSYM=$(libos)lib/genassym.sh
 export libos := $(src)libos/
 
 export CC=$(CROSS_COMPILE)gcc
-#CC_OPTS=-m32 -nostdinc -Wa,-me500
+
 export GCCINCDIR := $(shell $(CC) -print-file-name=include)
-CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
+CC_OPTS=-Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
         -I$(LIBOS)/include-libc -std=gnu99 -include $(LIBOS_CLIENT_H)
+
 
 export CC_OPTS_NODEP := -include include/config/autoconf.h
 
@@ -79,6 +80,12 @@ HOSTCC_OPTS_C := $(EXTRAWARNINGS) -Wall -O2 -I $(HEADERS_DIR) \
                  -I $(GEN_HEADERS_DIR) -I $(LIBOS_INC)
 
 include include/config/auto.conf
+
+ifeq ($(CONFIG_64BIT),y)
+CC_OPTS += -m64
+else
+CC_OPTS += -m32
+endif
 
 all: bin/hv.uImage bin/hv.map
 

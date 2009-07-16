@@ -66,6 +66,11 @@ config LIBOS_DEPS
 	select LIBOS_CRITICAL_INTS
 	select LIBOS_NO_BARE_SPINLOCKS
 
+config 64BIT
+	bool "64-bit Processor Support"
+	help
+		Provides support for a 64-bit processor
+
 config BYTE_CHAN
 	bool "Byte-channel support"
 	select LIBOS_QUEUE
