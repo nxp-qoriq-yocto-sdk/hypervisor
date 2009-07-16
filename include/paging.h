@@ -171,7 +171,8 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
                           phys_addr_t src, size_t len, int cache_sync);
 
 #define TLB_READ_FIRST 1
-int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags, struct gcpu *gcpu);
+int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags);
+int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, struct gcpu *gcpu);
 
 #define TLB_MISS_HANDLED 0
 #define TLB_MISS_REFLECT 1

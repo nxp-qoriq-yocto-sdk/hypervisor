@@ -714,6 +714,8 @@ static command_t resume = {
 };
 shell_cmd(resume);
 
+#ifdef CONFIG_TLB_CACHE
+
 #ifndef CONFIG_64BIT
 #define VADDR_WIDTH	"8"
 #define PADDR_WIDTH	"9"
@@ -733,10 +735,13 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 	for (tlb_num = 0; tlb_num < 2; tlb_num++) {
 		memset(&gmas, 0, sizeof(tlb_entry_t));
 		flags = TLB_READ_FIRST;
-		qprintf(shell->out, 1, "tlb %d dump\n", tlb_num);
+		qprintf(shell->out, 1, "TLB %d \n", tlb_num);
+		qprintf(shell->out, 1, "             Effective                Physical\n");
+		qprintf(shell->out, 1, "      ----------------------- -------------------------\n");
+
 		gmas.mas0 = MAS0_TLBSEL(tlb_num);
 		while (1) {
-			rc = guest_tlb_read(&gmas, &flags, gcpu);
+			rc = guest_tlb_read_vcpu(&gmas, &flags, gcpu);
 			if (rc < 0)
 				break;
 			if (!(gmas.mas1 & MAS1_VALID))
@@ -747,17 +752,18 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 			vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
 			size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
 
-			qprintf(shell->out, 1, "%01u\t",
-				(!tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
+			qprintf(shell->out, 1, "%01u    ",
+				(tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
 
 			qprintf(shell->out, 1,
-				"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx\t",
+				"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx ",
 				vaddr, vaddr + size - 1);
 
 			qprintf(shell->out, 1,
 				"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx\n",
 				paddr, paddr + size - 1 );
 		}
+		qprintf(shell->out, 1, "\n\n");
 	}
 }
 
@@ -804,3 +810,5 @@ static command_t gtlb = {
 	.longhelp = "  Usage: gtlb <tlb-number>\n\n"
 };
 shell_cmd(gtlb);
+
+#endif

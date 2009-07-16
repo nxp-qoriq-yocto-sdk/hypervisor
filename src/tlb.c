@@ -1515,8 +1515,30 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
  * @param[inout] flags pointer to flags  (self-clearing,
  *    caller should not use it after initializing it to TLB_READ_FIRST )
  * @return success or indication that there are no more tlbe's to be read
+ *
+ * NOTE: This is a debug stub API.  If it changes the API spec must
+ * be changed as well.
+ *
  */
-int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
+int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
+{
+	gcpu_t *gcpu = get_gcpu();
+	return guest_tlb_read_vcpu(gmas, flags, gcpu);
+}
+
+/** Dump the guest tlb entries
+ *
+ * @param[in] gmas pointer to guest tlb_entry
+ * @param[inout] flags pointer to flags  (self-clearing,
+ *    caller should not use it after initializing it to TLB_READ_FIRST )
+ * @param[in] gcpu pointer to target virtual cpu's gcpu struct
+ * @return success or indication that there are no more tlbe's to be read
+ *
+ * NOTE: This is a debug stub API.  If it changes the API spec must
+ * be changed as well.
+ *
+ */
+int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 {
 	uint32_t tlb_index, way, tlb0_nentries;
 	unsigned int tlb;
