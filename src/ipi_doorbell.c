@@ -130,11 +130,11 @@ static int create_doorbell(dt_node_t *node, void *arg)
 		static uint32_t ipi_fast_dbell = 0;
 		if (ipi_fast_dbell >=  4) {
 			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-				"%s: cannot create more then"
+				"%s: cannot create more than "
 				"4 fast doorbells\n", __func__);
 			free(dbell);
 
-			return ERR_INVALID;
+			return 0;
 		}
 
 		dbell->fast_dbell = alloc_type(ipi_fast_doorbell_t);
