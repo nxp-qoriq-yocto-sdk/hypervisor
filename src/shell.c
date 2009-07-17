@@ -236,7 +236,7 @@ static void guest_state_str(guest_t *guest, const char **str)
 	return;
 }
 
-static void status_fn(shell_t *shell, char *args)
+static void info_fn(shell_t *shell, char *args)
 {
 	unsigned int i;
 	const char *state_str = NULL;
@@ -253,12 +253,12 @@ static void status_fn(shell_t *shell, char *args)
 	}
 }
 
-static command_t status = {
-	.name = "status",
-	.action = status_fn,
+static command_t info = {
+	.name = "info",
+	.action = info_fn,
 	.shorthelp = "List partitions and show their status",
 };
-shell_cmd(status);
+shell_cmd(info);
 
 
 #ifdef CONFIG_STATISTICS
@@ -345,7 +345,7 @@ static command_t stats = {
 	.action = stats_fn,
 	.shorthelp = "Display partition statistics",
 	.longhelp = "  Usage: stats <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(stats);
 #endif
@@ -570,7 +570,7 @@ static command_t startcmd = {
 	.action = start_fn,
 	.shorthelp = "Start a stopped partition",
 	.longhelp = "  Usage: start <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(startcmd);
 
@@ -606,7 +606,7 @@ static command_t restart = {
 	.action = restart_fn,
 	.shorthelp = "Re-start a running partition",
 	.longhelp = "  Usage: restart <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(restart);
 
@@ -643,7 +643,7 @@ static command_t stop = {
 	.action = stop_fn,
 	.shorthelp = "Stop a partition",
 	.longhelp = "  Usage: stop <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(stop);
 
@@ -677,7 +677,7 @@ static command_t pause = {
 	.shorthelp = "Pause a running partition",
 	.longhelp = "  Usage: pause <partition-number>\n\n"
 	            "  Instruction execution is suspended on all CPUs of a paused partition."
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(pause);
 
@@ -710,7 +710,7 @@ static command_t resume = {
 	.action = resume_fn,
 	.shorthelp = "Resume a paused partition",
 	.longhelp = "  Usage: resume <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'status' command.",
+	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(resume);
 
