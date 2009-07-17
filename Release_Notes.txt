@@ -26,8 +26,8 @@
 Topaz Hypervisor Release Notes
 
 Topaz Version: 0.4
-Revsion: 008
-Date: 7/10/2009
+Revsion: 009
+Date: 7/17/2009
 
 -------------------------------------------------------
 Contents
@@ -58,6 +58,15 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.4-009 bug fixes and changes
+      -support for read-only GPMAs is removed
+      -some shell cleanup and minor command renaming
+      -added gtlb command to shell
+      -fixed debug stub to sprg4-7,9 (bug 3232)
+      -support the paddr field in ELF headers as per the
+       ePAPR (bug 3707)
+      -doorbell creation when more than 4 fast doorbells (bug 3654)
 
    -Topaz 0.4-008 bug fixes and changes
       -bug 3650: Always use interrupt-safe locks 
