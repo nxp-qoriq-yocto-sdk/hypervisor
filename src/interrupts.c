@@ -51,11 +51,13 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"Machine check %s address = %lx\n",
 			(mcsr & MCSR_MEA)? "effective" : "real",
 			 mfspr(SPR_MCAR));
-	} else if (mcsr & MCSR_MCP){
+		dump_regs(frameptr);
+	} else if (mcsr & MCSR_MCP) {
 		do_mpic_mcheck();
+	} else {
+		dump_regs(frameptr);
 	}
 
-	dump_regs(frameptr);
 
 	cpu->crashing--;
 
