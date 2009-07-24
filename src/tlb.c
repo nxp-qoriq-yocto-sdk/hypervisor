@@ -241,7 +241,7 @@ int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
 
 void gtlb0_to_mas(unsigned int index, unsigned int way, gcpu_t *gcpu)
 {
-	tlbcset_t *set = &cpu->client.tlbcache[index];
+	tlbcset_t *set = &gcpu->cpu->client.tlbcache[index];
 	int bits = gcpu->cpu->client.tlbcache_bits;
 	register_t mas3;
 
@@ -267,7 +267,7 @@ void gtlb0_to_mas(unsigned int index, unsigned int way, gcpu_t *gcpu)
 	unsigned long attr;
 	unsigned long grpn = (set->entry[way].mas7 << (32 - PAGE_SHIFT)) |
 	                     (set->entry[way].mas3 >> MAS3_RPN_SHIFT);
-	unsigned long rpn = vptbl_xlate(get_gcpu()->guest->gphys_rev,
+	unsigned long rpn = vptbl_xlate(gcpu->guest->gphys_rev,
 	                                grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 	/* Currently, we only use virtualization faults for bad mappings. */
