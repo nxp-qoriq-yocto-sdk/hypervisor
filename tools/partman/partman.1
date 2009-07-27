@@ -1,54 +1,61 @@
 .\" To view this man page, use "man ./partman.1"
-.TH PARTMAN "11" "September 2008" "partman" "User Commands"
+.TH PARTMAN "11" "August 2009" "partman" "User Commands"
 .SH NAME
 partman \- manage a Freescale Embedded Hypervisor partition
 .SH SYNOPSIS
-\fBpartman\fR [ \fB\-v\fR ]
-\fB\-s
+\fBpartman\fR [ \fB\-v\fR ] \fBstatus
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fB\-l\fR \fB\-h\fR handle \fB\-f\fR file [ \fB\-a\fR address ]
+\fBpartman\fR [ \fB\-v\fR ] \fBload\fR \fB\-h\fR handle \fB\-f\fR file [ \fB\-a\fR address ]
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fB\-g\fR \fB\-h\fR handle [ \fB\-f\fR file ] [ \fB\-e\fR address ] [ \fB\-a\fR address ]
+\fBpartman\fR [ \fB\-v\fR ] \fBstart\fR \fB\-h\fR handle [ \fB\-f\fR file ] [ \fB\-e\fR address ] [ \fB\-a\fR address ]
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fB\-x\fR \fB\-h\fR handle
+\fBpartman\fR [ \fB\-v\fR ] \fBstop\fR \fB\-h\fR handle
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fB\-d\fR \fB\-f\fR file
+\fBpartman\fR [ \fB\-v\fR ] \fBdoorbell\fR \fB\-f\fR file
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fB\-d\fR \fB\-h\fR handle
+\fBpartman\fR [ \fB\-v\fR ] \fBdoorbell\fR \fB\-h\fR handle
+.br
+\fBpartman\fR [ \fB\-v\fR ] \fBsetprop\fR \fB\-h\fR handle \fB\-p\fR dtpath \fB\-n\fR propname [\fB\-t\fR data [\fB\-t\fR data ]]
+.br
+\fBpartman\fR [ \fB\-v\fR ] \fBgetprop\fR \fB\-h\fR handle \fB\-p\fR dtpath \fB\-n\fR propname
 .br
 .SH DESCRIPTION
 .PP
-The Freescale Embedded Hypervisor provides a Linux utility called
-\fIpartman\fR that provides some partition management, doorbell,
-and byte channel services.  It relies on the hypervisor partition
+\fIpartman\fR is a Linux utility that interfaces to the Freescale Embedded Hypervisor to provide partition management services.  It relies on the hypervisor partition
 management Linux device driver, fsl_hypervisor.
 .SH OPTIONS
 .TP
-\fB\-s\fR
+\fBstatus\fR
 Display the full names and status of all managed partitions, doorbells, and
 byte channels.
 .TP
-\fB\-l\fR
-Load an image into a partition's memory
+\fBload\fR
+Load an image into a partition's memory.
 .TP
-\fB\-g\fR
+\fBstart\fR
 Start a partition.
 .TP
-\fB\-x\fR
+\fBstop\fR
 Stop a partition.
 .TP
-\fB\-d\fR
+\fBdoorbell\fR
 Listen for doorbells (if \fB\-f\fR specified), or ring a doorbell
 (if \fB\-h\fR specified).
 .TP
+\fBsetprop\fR
+Sets a guest device tree property for the specified partition.
+.TP
+\fBgetprop\fR
+Gets a guest device tree property for the specified partition.
+.TP
 \fB\-h\fR handle
-For the \fB\-d\fR command, this specifies the send handle of the doorbell
+For the \fBdoorbell\fR command, this specifies the send handle of the doorbell
 to ring.  For all other commands, this specifies the handle of the target
 partition.  In all cases, the doorbell or partition full name can be used
 instead of the handle number.
 .TP
-\fB\-f\fR filename
-For the \fB\-d\fR command, this specifies the program to run when a doorbell
+\fB\-f\fR file
+For the \fBdoorbel\fR command, this specifies the program to run when a doorbell
 is received.  This can be any program that can be executed by the shell.
 \fBpartman\fR passes the doorbell handle as a parameter to this script.
 
@@ -61,7 +68,7 @@ Otherwise, the file is treated as a single binary blob.
 .TP
 \fB\-a\fR address
 Optional guest physical address where the image should go.  For ELF images, this
-parameter defaults to the base phsyical address in the image.  For binary
+parameter defaults to the base physical address in the image.  For binary
 images, the default is 0.
 .TP
 \fB\-e\fR address
@@ -69,8 +76,23 @@ Optional guest physical address of execution entry point.  For ELF images, this
 parameter defaults to the entry point in the image.  For binary images,
 the default is 0.
 .TP
+\fB\-p\fR dtpath
+Device tree path.  A string that specifies the full path to the node for which
+the property is being accessed.
+.TP
+\fB\-n\fR propname
+Property name.  A string that specifies the name of the property which is being
+accessed.
+.TP
+\fB\-t\fR data
+A string that is that value to write to the specified property using the \fBsetprop\fR command.
+Integer and other binary values are not supported.
+.TP
 \fB\-v\fR
 Verbose output.  Useful for debugging.
+.TP
+\fB\-q\fR
+Quiet mode. Errors reported via return status only.
 .SH AUTHOR
 Written by Timur Tabi
 .SH COPYRIGHT
