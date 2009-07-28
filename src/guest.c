@@ -1264,6 +1264,16 @@ static int load_image(guest_t *guest, phys_addr_t image,
 	if (ret != ERR_UNHANDLED)
 		return ret;
 
+	/* if address is -1 and it wasn't handled by load_elf()
+	 * something is wrong.
+	 */
+	if (~guest_phys == 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "Image at %#llx-- auto-placement not supported for this image type\n",
+		         image);
+		return ERR_BADADDR;
+	}
+
 	ret = load_uimage(guest, image, length, guest_phys, entry);
 	if (ret != ERR_UNHANDLED)
 		return ret;
