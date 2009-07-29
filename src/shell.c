@@ -753,7 +753,8 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 			size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
 
 			qprintf(shell->out, 1, "%01u    ",
-				(tlb_num ? (int) MAS0_GET_TLB0ESEL(gmas.mas0) : 0));
+				(tlb_num ? (int) MAS0_GET_TLB1ESEL(gmas.mas0) :
+							(int) MAS0_GET_TLB0ESEL(gmas.mas0)));
 
 			qprintf(shell->out, 1,
 				"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx ",
