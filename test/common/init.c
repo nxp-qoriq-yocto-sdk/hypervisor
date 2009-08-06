@@ -362,6 +362,7 @@ int dt_get_reg(const void *tree, int node, int res,
 	return xlate_reg(tree, node, &reg[(naddr + nsize) * res], addr, size);
 }
 
+int uart_node;
 
 phys_addr_t get_uart_addr(void)
 {
@@ -384,6 +385,7 @@ phys_addr_t get_uart_addr(void)
 	if (dt_get_reg(fdt, node, 0, &addr, NULL) < 0)
 		return 0;
 
+	uart_node = node;
 	return addr;
 }
 
@@ -411,8 +413,22 @@ void init(unsigned long devtree_ptr)
 
 	core_init();
 
-	if (uart_addr)
-		console_init(ns16550_init(uart_virt, NULL, 0, 16));
+	if (uart_addr) {
+		uint64_t freq = 0;
+		int len;
+		const uint32_t *prop = fdt_getprop(fdt, uart_node, "clock-frequency", &len);
+		if (prop && len == 4) {
+			freq = *prop;
+		} else if (prop && len == 8) {
+			freq = *(const uint64_t *)prop;
+		} else {
+			printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
+			         "%s: bad/missing clock-frequency\n",
+			         __func__);
+		}
+
+		console_init(ns16550_init(uart_virt, NULL, freq, 16));
+	}
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (node >= 0)
