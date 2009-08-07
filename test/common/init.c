@@ -31,6 +31,7 @@
 #include <libos/io.h>
 #include <libos/ns16550.h>
 #include <libos/errors.h>
+#include <libos/byte-chan.h>
 #include <libos-client.h>
 #include <libfdt.h>
 #include <hvtest.h>
@@ -362,38 +363,72 @@ int dt_get_reg(const void *tree, int node, int res,
 	return xlate_reg(tree, node, &reg[(naddr + nsize) * res], addr, size);
 }
 
-int uart_node;
-
-phys_addr_t get_uart_addr(void)
+static int get_stdout(void)
 {
-	phys_addr_t addr;
 	const char *path;
 	int node, len;
 
 	node = fdt_subnode_offset(fdt, 0, "aliases");
 	if (node < 0)
-		return 0;
+		return node;
 
 	path = fdt_getprop(fdt, node, "stdout", &len);
 	if (!path)
-		return 0;
+		return ERR_NOTFOUND;
 
 	node = fdt_path_offset(fdt, path);
 	if (node < 0)
-		return 0;
+		return ERR_BADTREE;
 
-	if (dt_get_reg(fdt, node, 0, &addr, NULL) < 0)
-		return 0;
-
-	uart_node = node;
-	return addr;
+	return node;
 }
 
 phys_addr_t uart_addr;
 uint8_t *uart_virt;
 
+static chardev_t *test_init_uart(int node)
+{
+	if (dt_get_reg(fdt, node, 0, &uart_addr, NULL) < 0)
+		return NULL;
+
+	uart_virt = valloc(PAGE_SIZE, PAGE_SIZE);
+	uart_virt += uart_addr & (PAGE_SIZE - 1);
+
+	tlb1_init();
+
+	uint64_t freq = 0;
+	int len;
+	const uint32_t *prop = fdt_getprop(fdt, node, "clock-frequency", &len);
+	if (prop && len == 4) {
+		freq = *prop;
+	} else if (prop && len == 8) {
+		freq = *(const uint64_t *)prop;
+	} else {
+		printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
+		         "%s: bad/missing clock-frequency\n",
+		         __func__);
+	}
+
+	return ns16550_init(uart_virt, NULL, freq, 16);
+}
+
+static chardev_t *test_init_byte_chan(int node)
+{
+	const uint32_t *prop;
+	int len;
+
+	tlb1_init();
+	
+	prop = fdt_getprop(fdt, node, "reg", &len);
+	if (prop && len == 4)
+		return byte_chan_init(*prop, NULL, NULL);
+
+	return NULL;
+}
+
 void init(unsigned long devtree_ptr)
 {
+	chardev_t *stdout;
 	int node;
 
 	/* alloc the heap */
@@ -405,29 +440,25 @@ void init(unsigned long devtree_ptr)
 	simple_alloc_init((void *)heap, 0x100000); // FIXME: hardcoded 1MB heap
 	valloc_init(1024 * 1024, PHYSBASE);
 
-	uart_addr = get_uart_addr();
-	if (uart_addr) {
-		uart_virt = valloc(PAGE_SIZE, PAGE_SIZE);
-		uart_virt += uart_addr & (PAGE_SIZE - 1);
-	}
-
-	core_init();
-
-	if (uart_addr) {
-		uint64_t freq = 0;
-		int len;
-		const uint32_t *prop = fdt_getprop(fdt, uart_node, "clock-frequency", &len);
-		if (prop && len == 4) {
-			freq = *prop;
-		} else if (prop && len == 8) {
-			freq = *(const uint64_t *)prop;
-		} else {
-			printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
-			         "%s: bad/missing clock-frequency\n",
-			         __func__);
+	node = get_stdout();
+	if (node >= 0) {
+		if (!fdt_node_check_compatible(fdt, node, "ns16550"))
+			stdout = test_init_uart(node);
+		else if (!fdt_node_check_compatible(fdt, node,
+		         "fsl,hv-byte-channel-handle"))
+			stdout = test_init_byte_chan(node);
+		else {
+			printf("Unrecognized stdout compatible.\n");
+			stdout = NULL;
 		}
 
-		console_init(ns16550_init(uart_virt, NULL, freq, 16));
+		if (stdout)
+			console_init(stdout);
+		else
+			/* The message will at least go to the log buffer... */
+			printf("Failed to initialize stdout.\n");
+	} else {
+		printf("No stdout found.\n");
 	}
 
 	node = fdt_subnode_offset(fdt, 0, "hypervisor");
@@ -462,8 +493,9 @@ void secondary_init(void)
 
 static void tlb1_init(void)
 {
-	tlb1_set_entry(0, (uintptr_t)uart_virt, uart_addr, TLB_TSIZE_4K,
-	               TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
+	if (uart_virt)
+		tlb1_set_entry(0, (uintptr_t)uart_virt, uart_addr, TLB_TSIZE_4K,
+		               TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
 
 	cpu->console_ok = 1;
 }

@@ -46,7 +46,13 @@
 	// =====================================================
 	hv:hypervisor-config {
 		compatible = "hv-config";
-		stdout = <&serial0>;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		hv-memory {
 			compatible = "hv-memory";
@@ -78,6 +84,11 @@
 		};
 	};
 
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&serial0>;
+	};
+
 	// =====================================================
 	// Partition 1
 	// =====================================================
@@ -88,8 +99,10 @@
 		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
-		uart2: uart2 {
-			device = "serial2";
+		bc: bc {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
 		};
 
 		gpma0 {
@@ -99,7 +112,7 @@
 		};
 
 		aliases {
-			stdout = <&uart2>;
+			stdout = <&bc>;
 		};
 
 	};

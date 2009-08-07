@@ -59,6 +59,4 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);
 
-phys_addr_t get_uart_addr(void);
-
 #endif
