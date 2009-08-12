@@ -156,7 +156,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 	int ret, c, sent;
 
 	if (queue_empty(cbc->byte_chan->rx))
-		return 0;
+		return -1;
 
 	sent = mux_tx_switch(mux, cbc);
 	if (sent < 0)
