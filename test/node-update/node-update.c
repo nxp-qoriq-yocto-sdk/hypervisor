@@ -48,13 +48,13 @@ void mcheck_interrupt(trapframe_t *frameptr)
 	frameptr->srr0 += 4;
 }
 
-extern int dt_get_reg(const void *tree, int node, int res,
-                      phys_addr_t *addr, phys_addr_t *size);
+static int uart_node;
 
 static void check_dma1_node(int node)
 {
 	const uint32_t *prop;
 	const uint32_t *reg;
+	phys_addr_t uart_phys;
 	int len;
 
 	uint32_t *dma_virt;
@@ -72,7 +72,12 @@ static void check_dma1_node(int node)
 	printf("delete-property reg (property) --- %s\n",
 	       reg ? "FAILED" : "PASSED");
 
-	dma_phys = (uart_addr & ~0xffffffULL) + 0x101300;
+	if (dt_get_reg(fdt, uart_node, 0, &uart_phys, NULL) < 0) {
+		printf("Can't get uart reg -- FAILED\n");
+		return;
+	}
+
+	dma_phys = (uart_phys & ~0xffffffULL) + 0x101300;
 
 	dma_virt = valloc(4096, 4096);
 	if (!dma_virt) {
@@ -94,7 +99,7 @@ static void check_dma1_node(int node)
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	int node, ret, compat_found = 0;
-	int dma1, serial, bar;
+	int dma1, bar;
 	uint32_t dma1ph, serialph, barph, memph;
 	const uint32_t *prop;
 	int last_node = 0;
@@ -102,6 +107,12 @@ void libos_client_entry(unsigned long devtree_ptr)
 	init(devtree_ptr);
 
 	printf("node-update test\n");
+
+	uart_node = fdt_node_offset_by_compatible(fdt, -1, "ns16550");
+	if (uart_node < 0) {
+		printf("no serial node --- FAILED\n");
+		goto out;
+	}
 
 	node = fdt_path_offset(fdt, "/devices/dma0");
 	printf("delete-node --- %s\n",
@@ -149,17 +160,11 @@ void libos_client_entry(unsigned long devtree_ptr)
 		}
 	}
 
-	serial = fdt_node_offset_by_compatible(fdt, -1, "ns16550");
-	if (serial < 0) {
-		printf("no serial node --- FAILED\n");
-		goto out;
-	}
-
-	serialph = fdt_get_phandle(fdt, serial);
+	serialph = fdt_get_phandle(fdt, uart_node);
 	if (!serialph)
 		printf("serial no phandle --- FAILED\n");
 
-	prop = fdt_getprop(fdt, serial, "fooph", &ret);
+	prop = fdt_getprop(fdt, uart_node, "fooph", &ret);
 	if (!prop || ret != 4) {
 		printf("no fooph --- FAILED\n");
 		goto out;
@@ -168,13 +173,13 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (*prop != serialph)
 		printf("serialph %x serial/fooph %x --- FAILED\n", serialph, *prop);
 
-	prop = fdt_getprop(fdt, serial, "barph", &ret);
+	prop = fdt_getprop(fdt, uart_node, "barph", &ret);
 	if (!prop || ret != 4) {
 		printf("no barph --- FAILED\n");
 		goto out;
 	}
 
-	bar = fdt_subnode_offset(fdt, serial, "bar");
+	bar = fdt_subnode_offset(fdt, uart_node, "bar");
 	if (bar < 0) {
 		printf("no bar --- FAILED\n");
 		goto out;
@@ -184,7 +189,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (*prop != barph)
 		printf("bar phandle %x serial/barph %x --- FAILED\n", barph, *prop);
 
-	prop = fdt_getprop(fdt, serial, "dmaph", &ret);
+	prop = fdt_getprop(fdt, uart_node, "dmaph", &ret);
 	if (!prop || ret != 4) {
 		printf("no barph --- FAILED\n");
 		goto out;
