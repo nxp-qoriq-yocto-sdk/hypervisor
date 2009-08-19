@@ -60,7 +60,7 @@ int verbose = 0;
 int debug = 0;
 int nchannels;
 void target_write(char *buf, int len);
-int speed1 = B9600;
+int speed1 = B115200;
 
 // Assume on AIX that 'highbaud' has been enabled, meaning
 // the following apply:
@@ -661,9 +661,9 @@ static struct iochan* tcp_listen_channel(int port, int stream_id)
 	/* Allow rapid reuse of this port. */
 	set_socket_flag(fd, SOL_SOCKET, SO_REUSEADDR);
 #ifndef __linux__
-#ifndef PLATFORM_CYGWIN
+#ifndef __CYGWIN__
 	set_socket_flag(fd, SOL_SOCKET, SO_REUSEPORT);
-#endif /* #ifndef PLATFORM_CYGWIN */
+#endif /* #ifndef __CYGWIN__ */
 #endif /* #ifndef __linux__ */
 
 	sockaddr.sin_family = PF_INET;
@@ -817,6 +817,7 @@ void target_connect(char *target_name, int speed)
     struct protoent *protoent;
     struct termios serialstate;
     int target_fd;
+    int rc;
 
     /*
      * Anything with a ':' in it is interpreted as
@@ -846,7 +847,7 @@ void target_connect(char *target_name, int speed)
 	    /* Allow rapid reuse of this port. */
 	    set_socket_flag(target_fd, SOL_SOCKET, SO_REUSEADDR);
 #ifndef __linux__
-#ifndef PLATFORM_CYGWIN
+#ifndef __CYGWIN__
 	    set_socket_flag(target_fd, SOL_SOCKET, SO_REUSEPORT);
 #endif /* #ifndef PLATFORM_CYGWIN */
 #endif /* #ifndef __linux__ */
@@ -911,8 +912,10 @@ void target_connect(char *target_name, int speed)
 	fatal("open() failed for target (device \"%s\"): %d", target_name, errno);
     }
 
-    if (tcgetattr(target_fd, &serialstate) < 0) {
-	fatal("tcgetattr() failed for target");
+    rc = tcgetattr(target_fd, &serialstate);
+    if (rc < 0) {
+	perror("error: ");
+	fatal("tcgetattr() failed for target %d", rc);
     }
 
     /*
@@ -1143,8 +1146,8 @@ int main(int argc, char **argv)
 
 	parse_command_line(argc, argv);
 	
-	if(signal(SIGINT, sighandler) == SIG_ERR) {
-	        perror("signal");
+	if (signal(SIGINT, sighandler) == SIG_ERR) {
+	        perror("signal registration failed: ");
 		exit(1);
 	}
 
