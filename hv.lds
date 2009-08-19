@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  *
@@ -71,6 +70,7 @@ SECTIONS
 	.bss : {
 		*(.sbss)
 		*(.bss)
+		*(.stack)
 	}
 	bss_end = .;
 	_end = .;
