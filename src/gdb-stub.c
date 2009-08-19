@@ -1815,7 +1815,7 @@ return_to_guest:
 			cur_pos = content(stub->cmd);
 			pc = (uint32_t *)trap_frame->srr0;
 			/* If there is no address to resume at; we resume at pc. */
-			addr = cur_pos[1] ? (uint32_t *)scan_num(&cur_pos, '\0') : pc;
+			addr = cur_pos[1] ? (uint32_t *)(uintptr_t)scan_num(&cur_pos, '\0') : pc;
 			nia = next_insn_addr(trap_frame);
 			DEBUG("Single stepping to insn at nia: 0x%p or pc + 4: 0x%p", nia, pc + 1);
 			DEBUG("Setting internal breakpoint at nia: 0x%p.", nia);
@@ -1998,4 +1998,3 @@ return_to_guest:
 		transmit_response(stub);
 	}
 }
-
