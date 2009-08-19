@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  *
@@ -36,6 +35,7 @@
 #define MAX_CORES 8
 
 struct guest;
+struct queue;
 
 int start_guest(struct guest *guest);
 int stop_guest(struct guest *guest);
@@ -46,10 +46,10 @@ phys_addr_t find_lowest_guest_phys(void *fdt);
 
 char *stripspace(const char *str);
 char *nextword(char **str);
-uint64_t get_number64(queue_t *out, const char *numstr);
-int64_t get_snumber64(queue_t *out, const char *numstr);
-uint32_t get_number32(queue_t *out, const char *numstr);
-int32_t get_snumber32(queue_t *out, const char *numstr);
+uint64_t get_number64(struct queue *out, const char *numstr);
+int64_t get_snumber64(struct queue *out, const char *numstr);
+uint32_t get_number32(struct queue *out, const char *numstr);
+int32_t get_snumber32(struct queue *out, const char *numstr);
 int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, unsigned int vcpu);
 uint32_t *write_reg(uint32_t *reg, phys_addr_t start, phys_addr_t size);
 

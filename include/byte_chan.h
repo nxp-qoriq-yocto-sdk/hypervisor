@@ -29,6 +29,7 @@
 #define BYTE_CHAN_H
 
 #include <libos/queue.h>
+#include <libos/chardev.h>
 #include <stdint.h>
 #include <percpu.h>
 #include <devtree.h>

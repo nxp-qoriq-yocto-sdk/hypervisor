@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
  *
@@ -39,6 +38,7 @@
 #define CELL_SIZE 4
 
 struct guest;
+struct queue;
 
 extern list_t hv_devs;
 extern uint32_t dt_owner_lock;

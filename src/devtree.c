@@ -31,6 +31,7 @@
 #include <libos/interrupts.h>
 #include <libos/mpic.h>
 #include <libos/alloc.h>
+#include <libos/console.h>
 
 #include <devtree.h>
 #include <paging.h>

@@ -32,6 +32,8 @@
 #include <errors.h>
 #include <devtree.h>
 
+struct chardev;
+
 static int ns16550_probe(driver_t *drv, device_t *dev);
 
 static driver_t __driver ns16550 = {
@@ -41,7 +43,7 @@ static driver_t __driver ns16550 = {
 
 static int ns16550_probe(driver_t *drv, device_t *dev)
 {
-	chardev_t *cd;
+	struct chardev *cd;
 	interrupt_t *irq = NULL;
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);

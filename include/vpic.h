@@ -33,6 +33,7 @@
 #define MAX_VINT_INDEX ((MAX_VINT_CNT + LONG_BITS - 1) / LONG_BITS)
 
 struct guest;
+struct queue;
 
 typedef struct vpic_interrupt {
 	interrupt_t irq;
@@ -55,8 +56,8 @@ typedef struct vpic_cpu {
 vpic_interrupt_t *vpic_alloc_irq(struct guest *guest, int config);
 int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec);
 
-void vpic_assert_vint_rxq(queue_t *q);
-void vpic_assert_vint_txq(queue_t *q);
+void vpic_assert_vint_rxq(struct queue *q);
+void vpic_assert_vint_txq(struct queue *q);
 void vpic_assert_vint(vpic_interrupt_t *irq);
 void vpic_deassert_vint(vpic_interrupt_t *irq);
 

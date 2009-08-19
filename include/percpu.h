@@ -28,11 +28,11 @@
 #ifndef PERCPU_H
 #define PERCPU_H
 
-
 #ifndef _ASM
 #include <stdint.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/percpu.h>
+#include <libos/queue.h>
 #include <hv.h>
 #include <vpic.h>
 #include <tlbcache.h>
