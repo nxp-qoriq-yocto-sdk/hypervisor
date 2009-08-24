@@ -769,6 +769,11 @@ static int pamu_av_isr(void *arg)
 			/* De-assert access violation pin */
 			out32((uint32_t *)(reg + PAMU_PICS), pics);
 
+#ifdef CONFIG_P4080_ERRATUM_PAMU3
+			/* erratum -- do it twice */
+			out32((uint32_t *)(reg + PAMU_PICS), pics);
+#endif
+
 			ret = 0;
 		}
 	}

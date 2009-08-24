@@ -71,6 +71,10 @@ config 64BIT
 	help
 		Provides support for a 64-bit processor
 
+config P4080_ERRATUM_PAMU3
+	bool
+	default y
+
 config BYTE_CHAN
 	bool "Byte-channel support"
 	select LIBOS_QUEUE
