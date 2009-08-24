@@ -734,7 +734,7 @@ void parse_command_line(int argc, char **argv)
 
 	++argv;
 	--argc;
-	while (1) {
+	while (argc > 1) {
 		if (strcmp(argv[0], "-verbose") == 0) {
 			verbose = 1;
 		} else if (strcmp(argv[0], "-debug") == 0) {
@@ -759,6 +759,9 @@ void parse_command_line(int argc, char **argv)
 		argv++;
 		argc--;
 	}
+
+	if (argc < 1)
+		usage();
 
 	target_name = argv[0];
 	nchannels = 0;
@@ -805,6 +808,9 @@ void parse_command_line(int argc, char **argv)
 		fatal("%d stream maximum, %d specified", MAX_STREAMS,
 		      nchannels + argc);
 	}
+
+	if (nchannels == 0)
+		usage();
 }
 
 void target_connect(char *target_name, int speed)
