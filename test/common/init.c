@@ -33,6 +33,8 @@
 #include <libos/errors.h>
 #include <libos/byte-chan.h>
 #include <libos-client.h>
+#include <libos/chardev.h>
+#include <libos/console.h>
 #include <libfdt.h>
 #include <hvtest.h>
 
