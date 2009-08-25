@@ -53,6 +53,7 @@ extern int tcsetattr(int, int, const struct termios *);
 
 char *program_name;
 char *target_name = NULL;
+int ext_program;
 int hw_flowcontrol = 0;
 int verbose = 0;
 int debug = 0;
@@ -114,6 +115,7 @@ struct pollfd polled_fd[MAX_FD] = { {0,}, };
 
 struct iochan {
 	int fd;
+	int fdout; /* alternate output descriptor */
 	int poll_idx;
 	int stream_id;
 	int status;
@@ -253,6 +255,11 @@ static void default_detach(struct iochan *ic)
 	ic->state = NULL;
 	ic->status = 0;
 	streams[ic->stream_id] = NULL;
+
+	if (ic->fdout) {
+		close(ic->fdout);
+		ic->fdout = 0;
+	}
 }
 
 static struct iochan *get_channel(int fd)
@@ -430,6 +437,11 @@ static int default_write(struct iochan *ic, char *buf, int len, int block)
 	return write(ic->fd, buf, len);
 }
 
+static int alt_write(struct iochan *ic, char *buf, int len, int block)
+{
+	return write(ic->fdout, buf, len);
+}
+
 static int no_read(struct iochan *ic, char *buf, int len, int block)
 {
 	return 0;
@@ -448,6 +460,21 @@ static struct iochan *basic_channel(int fd, int out_only)
 		polled_fd[c->poll_idx].events = POLLIN | POLLERR | POLLHUP;
 		c->read = default_read;
 	}
+	return c;
+}
+
+static struct iochan *separate_fd_channel(int fdin, int fdout)
+{
+	struct iochan *c = get_channel(fdin);
+	if (verbose)
+		printf("separate_fd_channel");
+
+	c->fdout = fdout;
+	c->write = alt_write;
+
+	polled_fd[c->poll_idx].events = POLLIN | POLLERR | POLLHUP;
+	c->read = default_read;
+
 	return c;
 }
 
@@ -717,11 +744,11 @@ void usage(void)
 		program_name);
 #endif
 	fprintf(stderr,
-		"usage: %s [-verbose] [-debug] <target> <channel_port> ...\n",
+		"usage: %s [-exec] [-verbose] [-debug] <target> <channel_port> ...\n",
 		program_name);
 	fprintf(stderr,
-		"           where <target> is <target>:<port> or "
-		"<serial_device>\n");
+		"       where <target> is <target>:<port> or <serial_device>,\n"
+		"       or an external command to execute if -exec is specified.\n");
 	exit(-1);
 }
 
@@ -754,6 +781,8 @@ void parse_command_line(int argc, char **argv)
 			}
 			argc -= 2;
 			argv += 2;
+		} else if (strcmp(argv[0], "-exec") == 0) {
+			ext_program = 1;
 		} else {
 			break;
 		}
@@ -814,6 +843,51 @@ void parse_command_line(int argc, char **argv)
 		usage();
 }
 
+static void exec_ext_program(const char *target_name)
+{
+	int ret;
+	
+	/* in/out relative to the mux server, not the child */
+	int outpipe[2], inpipe[2];
+	
+	ret = pipe(outpipe);
+	if (ret < 0) {
+		perror("exec_ext_program: pipe");
+		exit(-1);
+	}
+
+	ret = pipe(inpipe);
+	if (ret < 0) {
+		perror("exec_ext_program: pipe");
+		exit(-1);
+	}
+
+	ret = fork();
+	if (ret < 0) {
+		perror("exec_ext_program: fork");
+		exit(-1);
+	}
+
+	if (ret > 0) {
+		target = separate_fd_channel(inpipe[0], outpipe[1]);
+		close(outpipe[0]);
+		close(inpipe[1]);
+		return;
+	}
+
+	/* Assume we already have a stdin/stdout/stderr. */
+	dup2(outpipe[0], 0);
+	dup2(inpipe[1], 1);
+
+	close(outpipe[0]);
+	close(outpipe[1]);
+	close(inpipe[0]);
+	close(inpipe[1]);
+
+	ret = execlp("sh", "sh", "-c", target_name, NULL);
+	perror("exec_ext_program: exec");
+}
+
 void target_connect(char *target_name, int speed)
 {
 	char *p, *host;
@@ -825,6 +899,11 @@ void target_connect(char *target_name, int speed)
 	struct termios serialstate;
 	int target_fd;
 	int rc;
+
+	if (ext_program) {
+		exec_ext_program(target_name);
+		return;
+	}
 
 	/*
 	 * Anything with a ':' in it is interpreted as
