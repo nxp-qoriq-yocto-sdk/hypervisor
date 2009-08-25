@@ -140,6 +140,7 @@ static struct iochan *target = NULL;
 #endif /* #ifndef MAX */
 
 #define CH_SWITCH_ESCAPE 0x7F
+#define CH_CHANNEL_BASE 0x10
 
 int getSpeed(const char *name)
 {
@@ -568,7 +569,7 @@ void handle_stream_input(struct iochan *c, char *str, int length)
 	}
 
 	if (tx_flag_state == TX_SEND_ESCAPE) {
-		str_escape[1] = c->stream_id + 0x10;
+		str_escape[1] = c->stream_id + CH_CHANNEL_BASE;
 		target_write((char *)str_escape, 2);
 		tx_flag_state = TX_SEND_DATA;
 #ifdef STATS
@@ -1078,7 +1079,7 @@ int process_mux_stream(char *buf, int length)
 #ifdef STATS
 				target_rx_ch_switch_cnt++;
 #endif
-				stream = stream_find(buf[i] - 0x10);
+				stream = stream_find(buf[i] - CH_CHANNEL_BASE);
 				if (debug)
 					message("Channel switch arrived %d %d",
 						buf[i], stream);
