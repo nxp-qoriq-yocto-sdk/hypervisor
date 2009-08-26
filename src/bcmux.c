@@ -156,7 +156,7 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 	int ret, c, sent;
 
 	if (queue_empty(cbc->byte_chan->rx))
-		return -1;
+		return 0;
 
 	sent = mux_tx_switch(mux, cbc);
 	if (sent < 0)
@@ -200,7 +200,7 @@ static void mux_send_data_pull(queue_t *q)
 
 	register_t saved = spin_lock_intsave(&mux->byte_chan->tx_lock);
 
-	connected_bc_t *first_cbc = mux->current_tx_bc;
+	connected_bc_t *first_cbc = mux->next_tx_pull_bc;
 	if (!first_cbc)
 		first_cbc = mux->first_bc;
 
@@ -208,9 +208,6 @@ static void mux_send_data_pull(queue_t *q)
 
 	do {
 		ret = __mux_send_data(mux, cbc);
-		if (ret < 0) /* no more room */
-			break;
-
 		if (ret > 0)
 			queue_notify_producer(cbc->byte_chan->rx);
 
@@ -218,14 +215,22 @@ static void mux_send_data_pull(queue_t *q)
 		if (!cbc)
 			cbc = mux->first_bc;
 
+		/* If we filled the output queue with this channel, start
+		 * with the next one on the next pull.  It's not perfectly
+		 * fair, but it avoids starvation.
+		 */
+		if (ret < 0) /* no more room */
+			break;
+
 		/* Limit total work per invocation to limit latency. */
 		total += ret;
 	} while (cbc != first_cbc && total < 64);
 
-	/* If we stopped due to a lack of data, remove the pull callback. */
-	if (ret >= 0 && total < 64)
+	/* If there was no data to be sent, remove the pull callback. */
+	if (ret == 0 && total == 0)
 		q->space_avail = NULL;
 
+	mux->next_tx_pull_bc = cbc;
 	spin_unlock_intsave(&mux->byte_chan->tx_lock, saved);
 }
 
@@ -235,6 +240,7 @@ static void mux_send_data_push(queue_t *q)
 	mux_complex_t *mux = cbc->mux_complex;
 	int lock = !unlikely(cpu->crashing);
 	register_t saved = disable_int_save();
+	int ret;
 
 	if (lock) {
 		if (spin_lock_held(&mux->byte_chan->tx_lock)) {
@@ -246,12 +252,23 @@ static void mux_send_data_push(queue_t *q)
 		spin_lock(&mux->byte_chan->tx_lock);
 	}
 
-	int ret = __mux_send_data(mux, cbc);
+again: 
+	ret = __mux_send_data(mux, cbc);
 	if (ret > 0)
 		queue_notify_consumer(mux->byte_chan->tx);
-	else if (ret < 0)
+
+	if (!queue_empty(cbc->byte_chan->rx)) {
 		/* If we ran out of space, arm the pull callback. */
 		mux->byte_chan->tx->space_avail = mux_send_data_pull;
+		smp_sync();
+
+		/* Check again to see if there was a race, and space was
+		 * alredy made available.  We assume the queue size is
+		 * larger than 16.
+		 */
+		if (queue_get_space(mux->byte_chan->tx) >= 16)
+			goto again;
+	}
 
 	if (lock)
 		spin_unlock(&mux->byte_chan->tx_lock);

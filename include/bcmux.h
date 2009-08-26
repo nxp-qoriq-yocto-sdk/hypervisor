@@ -48,6 +48,7 @@
 typedef struct mux_complex {
 	byte_chan_handle_t *byte_chan;
 	struct connected_bc *current_tx_bc;
+	struct connected_bc *next_tx_pull_bc;
 	struct connected_bc *current_rx_bc;
 	struct connected_bc *first_bc;
 	int current_tx;
