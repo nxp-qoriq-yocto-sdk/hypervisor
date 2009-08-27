@@ -1503,3 +1503,30 @@ void dt_lookup_intmap(dt_node_t *node)
 
 	spin_unlock_intsave(&dt_owner_lock, saved);
 }
+
+/* We assume the timebase is the same on all cores. */
+uint64_t dt_get_timebase_freq(void)
+{
+	uint64_t ret;
+	dt_prop_t *prop;
+	dt_node_t *node;
+
+	node = get_cpu_node(hw_devtree, 0);
+	if (!node) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Could not get device tree node for CPU0\n", __func__);
+		return 0;
+	}
+
+	prop = dt_get_prop(node, "timebase-frequency", 0);
+	if (!prop || (prop->len != 4 && prop->len != 8)) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: No timebase-frequency for CPU0\n", __func__);
+		return 0;
+	}
+
+	if (prop->len == 4)
+		return *(const uint32_t *)prop->data;
+
+	return *(const uint64_t *)prop->data;
+}

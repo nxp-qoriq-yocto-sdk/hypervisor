@@ -296,4 +296,6 @@ typedef struct pma {
 	phys_addr_t start, size;
 } pma_t;
 
+uint64_t dt_get_timebase_freq(void);
+
 #endif

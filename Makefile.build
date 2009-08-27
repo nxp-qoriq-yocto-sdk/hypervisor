@@ -118,6 +118,7 @@ hv-src-$(CONFIG_VIRTUAL_I2C) += i2c.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 hv-src-$(CONFIG_LIBOS_NS16550) += ns16550.c
 hv-src-nocheck-$(CONFIG_ZLIB) += zlib.c
+hv-src-$(CONFIG_BENCHMARKS) += benchmark.c
 
 LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
 

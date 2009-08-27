@@ -193,3 +193,11 @@ config DEBUG_STUB_PROGRAM_INTERRUPT
 		same time 'guest debug mode' has been granted to a guest.
 		NOTE: program interrupt debugging has limitations in an
 		SMP partition.
+
+config BENCHMARKS
+	bool "Microbenchmarks"
+	help
+		Enable benchmark code that measures the average, minimum,
+		and maximum amount of time it takes to run certain
+		pieces of hypervisor code.  This information can be
+		displayed by using the "benchmark" command.

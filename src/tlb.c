@@ -37,6 +37,7 @@
 #include <percpu.h>
 #include <paging.h>
 #include <errors.h>
+#include <benchmark.h>
 
 /* function to synchronize caches when modifying instructions
  * This follows the recommended sequence in the EREF for
@@ -287,24 +288,35 @@ void gtlb0_to_mas(unsigned int index, unsigned int way, gcpu_t *gcpu)
 
 static void guest_inv_tlb0_all(void)
 {
+	unsigned long bm_start = bench_start();
+
 	if (!get_gcpu()->clean_tlb) {
 		memset(cpu->client.tlbcache, 0,
 		       sizeof(tlbcset_t) << cpu->client.tlbcache_bits);
 
 		get_gcpu()->clean_tlb = 1;
 	}
+
+	bench_stop(bm_start, bm_tlb0_inv_all);
 }
 
 static void guest_inv_tlb0_pid(int pid)
 {
-	tlbcset_t *set = cpu->client.tlbcache;
-	unsigned int num_sets = 1 << cpu->client.tlbcache_bits;
+	unsigned long bm_start;
+	tlbcset_t *set;
+	unsigned int num_sets;
 	unsigned int i, j;
+
+	bm_start = bench_start();
+	set = cpu->client.tlbcache;
+	num_sets = 1 << cpu->client.tlbcache_bits;
 
 	for (i = 0; i < num_sets; i++)
 		for (j = 0; j < TLBC_WAYS; j++)
 			if (pid == set[i].tag[j].pid)
 				set[i].tag[j].valid = 0;
+
+	bench_stop(bm_start, bm_tlb0_inv_pid);
 }
 
 static void guest_inv_tlb0_va(register_t vaddr, int pid)
@@ -621,6 +633,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 static void guest_inv_tlb1(register_t va, int pid,
                            int flags, int global)
 {
+	unsigned long bm_start = bench_start();
 	gcpu_t *gcpu = get_gcpu();
 	unsigned int i;
 
@@ -647,6 +660,8 @@ static void guest_inv_tlb1(register_t va, int pid,
 			free_tlb1(i);
 		}
 	}
+
+	bench_stop(bm_start, bm_tlb1_inv);
 }
 
 void guest_inv_tlb(register_t ivax, int pid, int flags)
