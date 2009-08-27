@@ -23,11 +23,11 @@
 #
 
 -------------------------------------------------------
-Topaz Hypervisor Release Notes
+Freescale Hypervisor Release Notes
 
-Topaz Version: 0.4
-Revsion: 009
-Date: 7/17/2009
+Topaz Version: 0.5
+Revsion: 001
+Date: 8/26/2009
 
 -------------------------------------------------------
 Contents
@@ -46,111 +46,23 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -Topaz 0.4-008 has been tested with Simics 4.2.8 / pre7.
-    It is *not* compatible with simics 4.0, at least without
-    changing which simics script the test cases invoke.
+   -embedded-hv v0.5-001 has been tested with Simics 4.2.14 / pre14
+    and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.876
-
-   -Topaz no longer hardcodes the tlbilx opcode, so now you must
-    be running an up-to-date toolchain.
+    0.878
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -Topaz 0.4-009 bug fixes and changes
-      -support for read-only GPMAs is removed
-      -some shell cleanup and minor command renaming
-      -added gtlb command to shell
-      -fixed debug stub to sprg4-7,9 (bug 3232)
-      -support the paddr field in ELF headers as per the
-       ePAPR (bug 3707)
-      -doorbell creation when more than 4 fast doorbells (bug 3654)
-
-   -Topaz 0.4-008 bug fixes and changes
-      -bug 3650: Always use interrupt-safe locks 
-      -bug 3592: shell tlbread command 64-bit cleanup
-      -misc unit test cleanup
-
-   -Topaz 0.4-007 bug fixes and changes
-      -removed hardcoded tlbilx opcode; updated toolchain now required
-      -fixed MCSR[MCP] behavior
-      -now properly obeys missing map-ranges on directly assigned devices
-      -test cases converted to simics 4.2
-      -partman now accepts ELF segments that end at the address space
-       top.
-      -tests now have a consolebuf that can be dumped if something goes
-       wrong
-      -new PAMU access violation error queue component of DMA test
-      -various minor fixes
-
-   -Topaz 0.4-006 bug fixes and changes
-      -added support for system reset hcall
-      -support data breakpoints in gdb stub
-      -added error logging support
-      -added support for fast doorbells
-      -support reset status properties
-
-   -Topaz 0.4-005 bug fixes and changes
-      -MSIs are supported
-      -support for modifiying guest device trees from
-       partman is in place (e.g. /chosen node)
-      -gdb stub support reset and image loading
-
-   -Topaz 0.4-004 bug fixes and changes
-      -new partman command syntax is now used
-      -EOI with no hcall support is implemented
-      -cache flushing is implemented
-
-   -Topaz 0.4-003 bug fixes and changes
-      -bug 3527-- sim.git hv-1p scenario is not working
-        w/ 36-bit physical
-      -preliminary support for routing PAMU access
-       violation
-      -flexible IMA definition allowed (bug 3509)
-      -TLB read API for debug stubs
-      -migration of all unit tests to assume 36-bit
-       physical address map
-
-   -Topaz 0.4-002 bug fixes and changes
-      -36-bit physical addresses are supported
-      -compressed uImages are supported
-      -read-only GPMAs are supported
-      -support node-update-phandle referencing hypervisor
-       generated nodes
-      -support for fh_nmi_send hcall
-      -64-bit cleanup
-      -support device-ranges
-      -bug 3371: gdb stub is not 64-bit clean
-
--------------------------------------------------------
-4.  Limitations
-
- A. Open Bugs
-
- B. CPU Feature Limitations
-
-   -CPU core performance monitor support
-      -support for the CPU performance interrupt is not implemented
-
-   -Power management
-      -support for the MSR[WE] power management bit is not
-       implemented
-
- C. p4080 Platform Features
-
-   -platform error interrupts
-      -In the platform MPIC multiple error interrupts are multiplexed
-       to interrupt 0.  De-multiplexing and routing of platform
-       error interrupts to partitions is not implemented.
-
- D. Hypervisor Services
-
-   -gdb stub
-      -the gdb stub does not support hardware watchpoints 
-
- E. ePAPR Related Notes
-
-    -The hypervisor only supports ET_EXC as per the
-     ePAPR.  The ET_DYN flag is not supported. 
+   -Topaz 0.5-001 bug fixes and changes (from 0.4-011)
+      -mux_server now supports an -exec command that
+       allows connection to another program (such
+       as skermit)
+      -ns16550 initialization
+      -workaround for CPU errata PAMU3
+      -bug fix to optimized memset()
+      -unit test updates:
+         -support byte-channels as a console
+         -initialize hardware UART
+         -bcmux: Fix mismatched error code
