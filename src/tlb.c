@@ -307,6 +307,10 @@ static void guest_inv_tlb0_pid(int pid)
 	unsigned int num_sets;
 	unsigned int i, j;
 
+	/* Optimize away repeated invalidations to the same PID. */
+	if (get_gcpu()->clean_tlb_pid == pid)
+		return;
+
 	bm_start = bench_start();
 	set = cpu->client.tlbcache;
 	num_sets = 1 << cpu->client.tlbcache_bits;
@@ -315,6 +319,8 @@ static void guest_inv_tlb0_pid(int pid)
 		for (j = 0; j < TLBC_WAYS; j++)
 			if (pid == set[i].tag[j].pid)
 				set[i].tag[j].valid = 0;
+
+	get_gcpu()->clean_tlb_pid = pid;
 
 	bench_stop(bm_start, bm_tlb0_inv_pid);
 }
@@ -407,6 +413,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	entry->gmas3 = guest_mas3flags;
 
 	get_gcpu()->clean_tlb = 0;
+	get_gcpu()->clean_tlb_pid = -1;
 
 	set->tag[way] = tag;
 

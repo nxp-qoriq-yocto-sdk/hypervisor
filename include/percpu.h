@@ -270,7 +270,7 @@ typedef struct gcpu {
 	register_t sprg[6]; /* Guest SPRG4-9 */
 	register_t mas0, mas1, mas2, mas3, mas6, mas7;
 	uint32_t timer_flags;
-	int evict_tlb1, clean_tlb;
+	int evict_tlb1, clean_tlb, clean_tlb_pid;
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
 	
 	unsigned int stats[num_gcpu_stats];
