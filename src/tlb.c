@@ -315,10 +315,13 @@ static void guest_inv_tlb0_pid(int pid)
 	set = cpu->client.tlbcache;
 	num_sets = 1 << cpu->client.tlbcache_bits;
 
-	for (i = 0; i < num_sets; i++)
+	for (i = 0; i < num_sets; i++) {
+		prefetch_store(&set[i + 4]);
+
 		for (j = 0; j < TLBC_WAYS; j++)
 			if (pid == set[i].tag[j].pid)
 				set[i].tag[j].valid = 0;
+	}
 
 	get_gcpu()->clean_tlb_pid = pid;
 
