@@ -161,7 +161,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	err = inflateInit2(&d_stream, -MAX_WBITS);
 	if (err < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"load_uimage: inflateInit2 failed with zlib error"
+			"load_uimage: inflateInit2 failed with zlib error "
 			"code %d\n", err);
 		return;
 	}
@@ -202,7 +202,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 
 		if (err < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				"load_uimage: uImage decompression failed with"
+				"load_uimage: uImage decompression failed with "
 				"zlib error code %d\n", err);
 			return;
 		}
@@ -212,7 +212,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	err = inflateEnd(&d_stream);
 	if (err < 0)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			"load_uimage: inflateEnd failed with zlib error code"
+			"load_uimage: inflateEnd failed with zlib error code "
 			"%d\n", err);
 }
 #endif
