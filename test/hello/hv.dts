@@ -131,6 +131,7 @@
 		};
 
 		aliases {
+			stdout = <&bc0>;
 		};
 	};
 
