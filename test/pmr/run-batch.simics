@@ -28,5 +28,5 @@ add-directory "%script%/" -prepend
 
 run-command-file "run.simics"
 
-$test_con = ($con3:con) # uart 2
+$test_con = ($con2:con) # uart 2
 run-command-file "%script%/../common/test-done.simics"
