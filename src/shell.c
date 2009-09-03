@@ -36,6 +36,7 @@
 #include <devtree.h>
 #include <shell.h>
 #include <percpu.h>
+#include <guts.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -259,6 +260,18 @@ static command_t info = {
 	.shorthelp = "List partitions and show their status",
 };
 shell_cmd(info);
+
+static void reset_fn(shell_t *shell, char *args)
+{
+	system_reset();
+}
+
+static command_t reset = {
+	.name = "reset",
+	.action = reset_fn,
+	.shorthelp = "Perform a system reset",
+};
+shell_cmd(reset);
 
 
 #ifdef CONFIG_STATISTICS
