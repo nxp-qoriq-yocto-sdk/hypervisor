@@ -101,6 +101,13 @@ static inline void remove_pir0_ways(int cpc_index, uint32_t way_mask)
 
 static void init_cpc_dev(int cpc_index, void *vaddr)
 {
+	if (!(in32(vaddr) & CPCCSR0_CPCE)) {
+		printlog(LOGTYPE_CPC, LOGLEVEL_WARN,
+		         "%s: WARNING: CPCs are not enabled\n",
+		          __func__);
+		return;
+        }
+
 	cpcs[cpc_index].cpccsr0 = vaddr;
 	cpcs[cpc_index].cpc_part_base =
 		(cpc_part_reg_t *)((uintptr_t)vaddr + CPCPIR0);
