@@ -224,6 +224,12 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 	return *(const uint32_t *)prop->data;
 }
 
+#define PEXIWBAR 0xDA8
+#define PEXIWBEAR 0xDAC
+#define PEXIWAR 0xDB0
+#define PEXI_EN 0x80000000
+#define PEXI_IWS 0x3F
+
 static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
                              dt_node_t *node, uint64_t gaddr,
                              uint64_t *size)
@@ -238,6 +244,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint64_t msi_addr = 0;
 	dt_node_t *msi_gnode = NULL;
 	unsigned long rpn = ULONG_MAX;
+	uint8_t *pci_ctrl;
+	phys_addr_t pcie_addr, pcie_size;
 
 	/*
 	 * pcie controller hwnode properties would have been passed-thru
@@ -277,6 +285,51 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		if (ret < 0)
 			return ULONG_MAX;
 		dt_set_prop(node, "fsl,hv-msi", msi_gnode, sizeof(uint32_t));
+		ret = dt_get_reg(node, 0, &pcie_addr, &pcie_size);
+		if (ret < 0) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				"%s: no reg found\n", __func__);
+			return ULONG_MAX;
+		}
+
+		pci_ctrl = map(pcie_addr, pcie_size,
+				TLB_MAS2_IO, TLB_MAS3_KERN);
+		if (!pci_ctrl)
+			return ULONG_MAX;
+
+		for (int i=0; i <= 2; i++) {
+			uint32_t piwar, piwbear, piwbar;
+
+			piwar = in32((uint32_t *)
+				(pci_ctrl + PEXIWAR + i * 0x20));
+
+			if (piwar & PEXI_EN) {
+				piwbar = in32((uint32_t *)
+					(pci_ctrl + PEXIWBAR + i * 0x20));
+				piwbear = in32((uint32_t *) (pci_ctrl +
+						PEXIWBEAR + i * 0x20));
+
+				/* logic works for undefined PEXIWBEAR1 */
+				uint64_t inb_win_addr = ((uint64_t)
+					((piwbear & 0xFFFFF) << 12 |
+				          piwbar >> 20)  << 32) |
+					(piwbar & 0xFFFFF) << 12;
+
+				uint32_t inb_win_size = 1 <<
+					((piwar & PEXI_IWS) + 1);
+
+				if (msi_addr < inb_win_addr ||
+					msi_addr >
+					(inb_win_addr + inb_win_size)) {
+
+					printf("WARNING: msi-address 0x%llx outside %s inbound memory window range %llx - %llx\n", msi_addr,
+						node->name, inb_win_addr,
+						inb_win_addr +
+						inb_win_size);
+					break;
+				}
+			}
+		}
 	}
 
 	return rpn;

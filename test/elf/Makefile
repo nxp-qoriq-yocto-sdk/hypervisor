@@ -58,3 +58,9 @@ $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 
 $(test)-run: $(test)
 	$(SIMICS) $(testdir)$</run.simics
+
+$(test)-run-%: $(test)
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
+
+$(test)-check: $(test)-run-batch
+	$(testdir)common/check-results 2

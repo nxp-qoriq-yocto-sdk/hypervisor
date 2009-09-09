@@ -710,7 +710,7 @@ static int cmd_load_image(struct parameters *p)
 	if (verbose)
 		printf("(Entry address is 0x%lx)\n", entry_address);
 
-	return ret;
+	return ret ? 0 : 1;
 }
 
 static int cmd_start(struct parameters *p)

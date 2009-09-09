@@ -36,6 +36,7 @@
 #include <devtree.h>
 #include <shell.h>
 #include <percpu.h>
+#include <guts.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -259,6 +260,18 @@ static command_t info = {
 	.shorthelp = "List partitions and show their status",
 };
 shell_cmd(info);
+
+static void reset_fn(shell_t *shell, char *args)
+{
+	system_reset();
+}
+
+static command_t reset = {
+	.name = "reset",
+	.action = reset_fn,
+	.shorthelp = "Perform a system reset",
+};
+shell_cmd(reset);
 
 
 #ifdef CONFIG_STATISTICS
@@ -724,6 +737,24 @@ shell_cmd(resume);
 #define PADDR_WIDTH	"16"
 #endif
 
+enum mas3_perm {supervisor = 0, user};
+enum mas_regs {mas2_reg = 0, mas3_reg};
+
+static void extract_mas_flags(uint32_t val, const char *str, char *buf, int reg, int perm)
+{
+	int len, j;
+
+	len = strlen(str);
+	for (j = 0; j < len; j++) {
+		int shift = (reg == mas2_reg ? j : j * 2 + perm);
+		if (val & (1 << shift))
+			buf[(len - 1) - j] = str[(len - 1) - j];
+		else
+			buf[(len - 1) - j] = ' ';
+	}
+	buf[j] = 0;
+}
+
 static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 {
 	tlb_entry_t gmas;
@@ -731,13 +762,18 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 	int rc, tlb_num;
 	phys_addr_t paddr;
 	unsigned long vaddr, size;
+	char buf[16];
 
 	for (tlb_num = 0; tlb_num < 2; tlb_num++) {
 		memset(&gmas, 0, sizeof(tlb_entry_t));
 		flags = TLB_READ_FIRST;
 		qprintf(shell->out, 1, "TLB %d \n", tlb_num);
-		qprintf(shell->out, 1, "             Effective                Physical\n");
-		qprintf(shell->out, 1, "      ----------------------- -------------------------\n");
+		qprintf(shell->out, 1, "					             ");
+		qprintf(shell->out, 1, " T             SSS UUU I V\n");
+		qprintf(shell->out, 1, "          Effective                Physical           S  TID");
+		qprintf(shell->out, 1, "  WIMGE XWR XWR P F\n");
+		qprintf(shell->out, 1, "    ----------------------- ------------------------- - -----");
+		qprintf(shell->out, 1, " ----- --- --- - -\n");
 
 		gmas.mas0 = MAS0_TLBSEL(tlb_num);
 		while (1) {
@@ -752,7 +788,7 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 			vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
 			size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
 
-			qprintf(shell->out, 1, "%01u    ",
+			qprintf(shell->out, 1, "%02u  ",
 				(tlb_num ? (int) MAS0_GET_TLB1ESEL(gmas.mas0) :
 							(int) MAS0_GET_TLB0ESEL(gmas.mas0)));
 
@@ -761,9 +797,20 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 				vaddr, vaddr + size - 1);
 
 			qprintf(shell->out, 1,
-				"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx\n",
+				"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx",
 				paddr, paddr + size - 1 );
+			qprintf(shell->out, 1, " %1d", (int)((gmas.mas1 & MAS1_TS) >> MAS1_TS_SHIFT));
+			qprintf(shell->out, 1, "%6d", (int)((gmas.mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT));
+			extract_mas_flags(gmas.mas2, "WIMGE", buf, mas2_reg, 0);
+			qprintf(shell->out, 1, " %s", buf);
+			extract_mas_flags(gmas.mas3, "XWR", buf, mas3_reg, supervisor);
+			qprintf(shell->out, 1, " %s", buf);
+			extract_mas_flags(gmas.mas3, "XWR", buf, mas3_reg, user);
+			qprintf(shell->out, 1, " %s", buf);
+			qprintf(shell->out, 1, " %1d", (int)((gmas.mas1 & MAS1_IPROT) >> MAS1_IPROT_SHIFT));
+			qprintf(shell->out, 1, " %1d\n", (int)((gmas.mas8 & MAS8_VF) >> MAS8_VF_SHIFT));
 		}
+
 		qprintf(shell->out, 1, "\n\n");
 	}
 }

@@ -31,4 +31,4 @@ $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
 mmu-check: mmu-run-batch
-	$(testdir)common/check-results 2
+	$(testdir)common/check-results 0

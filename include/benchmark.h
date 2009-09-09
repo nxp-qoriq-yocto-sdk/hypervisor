@@ -47,7 +47,7 @@ static inline register_t bench_start(void)
 
 void bench_stop(register_t start, int bm);
 #else
-static inline register_t bench_start(int bm)
+static inline register_t bench_start(void)
 {
 	return 0;
 }

@@ -58,24 +58,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	init(devtree_ptr);
 
-	node = fdt_path_offset(fdt, "/hypervisor/handles/byte-channel0");
-	if (node < 0) {
-		printf("0 device tree error %d\n",node);
-		return;
-	}
-	const int *prop = fdt_getprop(fdt, node, "reg", &len);
-	if (prop) {
-		handle = *prop;	
-	} else {
-		printf("device tree error\n");
-		return;
-	}
-
-	str = "hello world: ";
-	status = fh_byte_channel_send(handle, strlen(str), str);
-	str = "PASSED\r\n";
-	status = fh_byte_channel_send(handle, strlen(str), str);
-	str = "Test Complete\r\n";
-	status = fh_byte_channel_send(handle, strlen(str), str);
-
+	printf("hello world\n");
+	printf("PASSED\n");
+	printf("Test Complete\n");
 }

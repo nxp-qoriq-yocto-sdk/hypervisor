@@ -1053,6 +1053,7 @@ static void clear_all_breakpoints(breakpoint_t *breakpoint_table)
 			DEBUG("Forcefully clearing breakpoint at addr: 0x%p.", breakpoint->addr);
 			DEBUG("Writing back original insn: 0x%x at address: 0x%p", breakpoint->orig_insn, breakpoint->addr);
 			guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
+			guestmem_icache_block_sync((char *)breakpoint->addr);
 			memset(breakpoint, 0, sizeof(breakpoint_table[0]));
 		}
 	}
@@ -1119,7 +1120,7 @@ static breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t 
 			DEBUG("Read orig_insn: 0x%x at addr: 0x%p", orig_insn, addr);
 			DEBUG("Write trap instruction.");
 			status = guestmem_out32(addr, trap_insn);
-			/* TODO: Need to flush [ID]-caches here. */
+			status += guestmem_icache_block_sync((char *)addr);
 			if (status != 0) {
 				DEBUG("Could not set breakpoint at addr: 0x%p", addr);
 				break;
@@ -1157,6 +1158,7 @@ static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *brea
 		DEBUG("Writing back original insn: 0x%x at address: 0x%p",
 		       breakpoint->orig_insn, breakpoint->addr);
 		guestmem_out32(breakpoint->addr, breakpoint->orig_insn);
+		guestmem_icache_block_sync((char *)breakpoint->addr);
 		memset(breakpoint, 0, sizeof(breakpoint_table[0]));
 		DEBUG("Cleared all data in entry with memset.");
 	}
@@ -1359,6 +1361,7 @@ static int handle_debug_event(trapframe_t *trap_frame)
 				      "breakpoint: 0x%p", breakpoint->associated->addr);
 				ret = guestmem_out32(breakpoint->associated->addr,
 				               breakpoint->associated->orig_insn);
+				ret += guestmem_icache_block_sync((char *)breakpoint->associated->addr);
 				DEBUG("Delete the associated internal breakpoint: 0x%p",
 				       breakpoint->associated->addr);
 				delete_breakpoint(stub->breakpoint_table,
@@ -1367,6 +1370,7 @@ static int handle_debug_event(trapframe_t *trap_frame)
 			DEBUG("Replace the original instruction back at the internal breakpoint: 0x%p", breakpoint->addr);
 			ret = guestmem_out32(breakpoint->addr,
 			                     breakpoint->orig_insn);
+			ret += guestmem_icache_block_sync((char *)breakpoint->addr);
 			delete_breakpoint(stub->breakpoint_table, breakpoint);
 			breakpoint = NULL;
 		} else {
@@ -1596,10 +1600,13 @@ return_to_guest:
 			DEBUG("addr: 0x%p, length: %d, data: %s", addr, length, data);
 			err_flag = 0;
 			for (i = 0; i < length; i++) {
+				int ret;
 				value[0] = data[2*i];
 				value[1] = data[2*i+1];
 				value[2] = 0;
-				if (guestmem_out8((uint8_t *)addr + i, htoi((uint8_t *)value)) != 0)
+				ret = guestmem_out8((uint8_t *)addr + i, htoi((uint8_t *)value));
+				ret += guestmem_icache_block_sync((char *)addr + i);
+				if (ret != 0)
 					err_flag = 1;
 			}
 			if (err_flag == 0) {
@@ -1624,6 +1631,7 @@ return_to_guest:
 			escape_flag = 0;
 			j = 0;
 			for (i = 0; i < length; i++) {
+				int ret;
 				DEBUG("X packet byte %d: 0x%2x", i, data[i]);
 				if (data[i] == '}') {
 					DEBUG("Skipping escape character in X packet at %d", i);
@@ -1632,12 +1640,16 @@ return_to_guest:
 				}
 				if (escape_flag == 0) {
 					DEBUG("Writing byte %d: 0x%2x in X packet to 0x%p[%d]", i, data[i], addr, j);
-					if (guestmem_out8((uint8_t *)addr + j, data[i]) != 0)
+					ret = guestmem_out8((uint8_t *)addr + j, data[i]);
+					ret += guestmem_icache_block_sync((char *)addr + j);
+					if (ret != 0)
 						err_flag = 1;
 				} else {
 					DEBUG("Writing (escaped) byte %d: 0x%2x in X packet to 0x%p[%d]", i, 0x20 ^ data[i], addr, j);
 					escape_flag = 0;
-					if (guestmem_out8((uint8_t *)addr + j, 0x20 ^ data[i]) != 0)
+					ret = guestmem_out8((uint8_t *)addr + j, 0x20 ^ data[i]);
+					ret += guestmem_icache_block_sync((char *)addr + j);
+					if (ret != 0)
 						err_flag = 1;
 				}
 				j++;

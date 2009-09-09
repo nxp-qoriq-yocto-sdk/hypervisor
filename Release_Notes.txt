@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.5
-Revsion: 001
-Date: 8/26/2009
+Revsion: 002
+Date: 9/4/2009
 
 -------------------------------------------------------
 Contents
@@ -40,13 +40,13 @@ Contents
 -------------------------------------------------------
 1.  Introduction
 
-   This document identifies changes between Topaz 
-   releases and a list of limitations.
+   This document identifies changes between Embedded
+   Hypervisor releases and a list of limitations.
 
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.5-001 has been tested with Simics 4.2.14 / pre14
+   -embedded-hv v0.5-002 has been tested with Simics 4.2.14 / pre14
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -54,6 +54,19 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.5-002 bug fixes and changes
+      -bug 4091: gdb is not flushing caches on breakpoint writes
+      -bug 3470: partman load returns zero for success
+      -bug 3739: check to verify that MSI subwindow lies within
+       PCI-E inbound ATMU window
+      -bug 4097: gtlb shell command improvements
+      -bug 4126: don't use the CPCs if they are turned off
+      -misc updates to byte-channel mux and queue infrastructure
+       to fix some race conditions
+      -added system 'reset' command to hypervisor shell
+      -optimization to remove redundant PID invalidates of the TLB
+      -misc unit test cleanup
 
    -Topaz 0.5-001 bug fixes and changes (from 0.4-011)
       -mux_server now supports an -exec command that
