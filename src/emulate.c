@@ -36,6 +36,7 @@
 #include <timers.h>
 #include <greg.h>
 #include <events.h>
+#include <benchmark.h>
 
 static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -369,6 +370,8 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	unsigned long grpn, mas0, mas1, mas2, mas3, mas7;
 	int ret;
 
+	unsigned long time = bench_start();
+
 	disable_int();
 	save_mas(gcpu);
 	
@@ -604,6 +607,8 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	restore_mas(gcpu);
 	enable_int();
+
+	bench_stop(time, bm_tlbwe);
 	return 0;
 }
 

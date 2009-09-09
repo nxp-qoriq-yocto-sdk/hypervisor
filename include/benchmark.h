@@ -36,6 +36,7 @@ typedef enum benchmark_num {
 	bm_tlb0_inv_pid,
 	bm_tlb0_inv_all,
 	bm_tlb1_inv,
+	bm_tlbwe,
 	num_benchmarks
 } benchmark_num_t;
 

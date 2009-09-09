@@ -54,6 +54,10 @@ static benchmark_t benchmarks[num_benchmarks] = {
 		.name = "TLB1 invalidate",
 		.min = ULONG_MAX
 	},
+	[bm_tlbwe] = {
+		.name = "TLB write",
+		.min = ULONG_MAX
+	},
 };
 
 void bench_stop(unsigned long start, int bmnum)
