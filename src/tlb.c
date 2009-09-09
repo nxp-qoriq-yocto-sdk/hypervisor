@@ -43,19 +43,30 @@
  * This follows the recommended sequence in the EREF for
  * self modifying code.
  */
-static int icache_range_sync(void *start, size_t len)
+static int icache_range_sync(void *ptr, size_t len)
 {
-	uintptr_t addr, end;
-	int blocks, i;
+	uintptr_t start, end, addr;
 
-	addr = (uintptr_t)start & ~(cache_block_size - 1);
-	end = (((uintptr_t)start + len - 1) & ~(cache_block_size - 1)) + cache_block_size;
-	blocks = (end - addr) / cache_block_size;
+	start = (uintptr_t)ptr & ~(cache_block_size - 1);
+	end = ((uintptr_t)ptr + len - 1) & ~(cache_block_size - 1);
 
-	for (i = 0; i < blocks; i++) {
-		icache_block_sync((char *)addr);
-		addr += cache_block_size;
-	}
+	for (addr = start; addr >= start && addr <= end;
+	     addr += cache_block_size)
+		icache_block_sync((char *)start);
+
+	return 0;
+}
+
+static int dcache_range_flush(void *ptr, size_t len)
+{
+	uintptr_t start, end, addr;
+
+	start = (uintptr_t)ptr & ~(cache_block_size - 1);
+	end = ((uintptr_t)ptr + len - 1) & ~(cache_block_size - 1);
+
+	for (addr = start; addr >= start && addr <= end;
+	     addr += cache_block_size)
+		dcache_block_flush((char *)addr);
 
 	return 0;
 }
@@ -1187,7 +1198,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
  * @return number of bytes successfully copied
  */
 size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len,
-                     int cache_sync )
+                     int cache_sync)
 {
 	size_t ret = 0;
 
@@ -1327,6 +1338,35 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 			chunk = len;
 
 		memcpy(vdest, vsrc, chunk);
+		
+		/* NOTE: the caller may not be in the coherence domain
+		 * for one or both of the partitions being accessed.
+		 *
+		 * This should not be a problem on the initial access, as
+		 * the data should not be in any cache that is outside
+		 * the coherence domain -- yet.  However, once we do the
+		 * access, the data will be in a cache that it should not
+		 * be in, so we flush it back out.  We'd need to do this
+		 * anyway on the destination to ensure coherency with
+		 * icache.
+		 *
+		 * For this to work, nothing else must access any of this
+		 * data between the memcpy and the flush, unless the
+		 * caller is part of that data's coherence domain.
+		 *
+		 * For the typical usage of copying data from a partition
+		 * manager into a stopped partition, the source data will
+		 * be in the caller's coherence domain (so it doesn't
+		 * matter if other cores in the manager partition read
+		 * the data simultaneously).  However, the destination
+		 * data is likely is a different partition.  That data
+		 * must not be touched (even loaded) while this is going
+		 * on.  One way of ensuring this is to only load into
+		 * PMAs which are either private to the destination
+		 * partition, or are shared with the manager partition.
+		 */
+		dcache_range_flush(vsrc, chunk);
+		icache_range_sync(vdest, chunk);
 
 		vsrc += chunk;
 		vdest += chunk;
