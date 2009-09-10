@@ -32,7 +32,7 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&uart0>;
+		stdout = <&hvbc>;
 		
 		memory {
 			compatible = "hv-memory";
@@ -66,6 +66,16 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 	};
 
 	// =====================================================
@@ -85,39 +95,44 @@
 		};
 	};
 
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
 	// =====================================================
 	// Partition 1
 	// =====================================================
-	partitions {
-		part1 {
-			compatible = "partition";
-			cpus = <0 1>;
-			guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
-			dtb-window = <0 0x01000000 0 0x10000>;
+	part1 {
+		compatible = "partition";
+		cpus = <0 1>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
 
-			gpma {
-				compatible = "guest-phys-mem-area";
-				phys-mem = <&pma1>;
-				guest-addr = <0 0>;
-			};
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
 
-			uart2: uart2 {
-				device = "serial2";
-			};
+		bca: byte-channelA {
+			compatible = "byte-channel";
+			endpoint = <&bcb>;
+		};
 
-			bca: byte-channelA {
-				compatible = "byte-channel";
-				endpoint = <&bcb>;
-			};
+		bcb: byte-channelB {
+			compatible = "byte-channel";
+			endpoint = <&bca>;
+		};
 
-			bcb: byte-channelB {
-				compatible = "byte-channel";
-				endpoint = <&bca>;
-			};
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
 
-			aliases {
-				stdout = <&uart2>;
-			};
+		aliases {
+			stdout = <&p1bc>;
 		};
 	};
 

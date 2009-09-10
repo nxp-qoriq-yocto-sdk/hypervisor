@@ -22,17 +22,12 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
-$use_uart2 = 1
-
 $guest_image[0] = "fast-doorbell"
-$guest_addr[0]  = 0x00200000
+$guest_addr[0]  = 0x00a00000
 
 
 $guest_image[1] = "hv-A.dtb"
-$guest_addr[1]  = 0x00100000
+$guest_addr[1]  = 0x00900000
 
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"

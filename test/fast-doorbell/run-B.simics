@@ -21,24 +21,15 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-#
-
-$console_capture = 1
-
-# UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
-$use_uart2 = 1
-$use_uart3 = 1
 
 $guest_image[0] = "fast-doorbell1"
-$guest_addr[0]  = 0x00200000
+$guest_addr[0]  = 0x00a00000
 
 $guest_image[1] = "fast-doorbell"
-$guest_addr[1]  = 0x00300000
+$guest_addr[1]  = 0x00b00000
 
 $guest_image[2] = "hv-B.dtb"
-$guest_addr[2]  = 0x00100000
+$guest_addr[2]  = 0x00900000
 
 
 add-directory "%script%/../common" -prepend

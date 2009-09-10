@@ -55,14 +55,6 @@
 			device = "/soc/iommu";
 		};
 
-		L3_0:L3_0 {
-			device ="/soc/l3-cache-controller@10000";
-		};
-
-		L3_1:L3_1 {
-			device ="/soc/l3-cache-controller@11000";
-		};
-
 		cpc-0 {
 			device = "/soc/l3-cache-controller@10000";
 		};
@@ -79,10 +71,20 @@
 			device = "/soc/corenet-cf";
 		};
 
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
 		hvbc: byte-channel {
 			compatible = "byte-channel";
-			endpoint = <&uart0>;
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
 		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
 	};
 
 	// =====================================================
@@ -104,18 +106,13 @@
 		};
 	};
 
-	uartmux: uartmux {
-		compatible = "byte-channel-mux";
-		endpoint = <&uart1>;
-	};
-
 	// =====================================================
 	// Partition 1
 	// =====================================================
 	part1 {
 		compatible = "partition";
 		cpus = <0 1>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -124,14 +121,14 @@
 			guest-addr = <0 0>;
 		};
 
-		bc0: byte-channel0 {
+		p1bc: byte-channel {
 			compatible = "byte-channel";
 			endpoint = <&uartmux>;
-			mux-channel = <0>;
+			mux-channel = <1>;
 		};
 
 		aliases {
-			stdout = <&bc0>;
+			stdout = <&p1bc>;
 		};
 	};
 
