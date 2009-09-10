@@ -40,7 +40,7 @@ static void do_schedule(sched_t *sched)
 {
 	libos_thread_t *thread = &sched->idle.libos_thread;
 
-	assert(cpu->traplevel == 0);
+	assert(cpu->traplevel <= TRAPLEVEL_NORMAL);
 
 	for (int i = 0; i < NUM_PRIOS; i++)
 		if (!list_empty(&sched->rq[i]))
@@ -63,7 +63,7 @@ void schedule(trapframe_t *regs)
 
 void prepare_to_block(void)
 {
-	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
+	thread_t *thread = cur_thread();
 
 	assert(!is_idle());
 	thread->state = sched_prep_block;
@@ -72,7 +72,7 @@ void prepare_to_block(void)
 
 void block(void)
 {
-	thread_t *thread = to_container(cpu->thread, thread_t, libos_thread);
+	thread_t *thread = cur_thread();
 	sched_t *sched = thread->sched;
 	register_t saved;
 
@@ -111,16 +111,19 @@ void unblock(thread_t *thread)
 
 void libos_unblock(libos_thread_t *lthread)
 {
-	thread_t *thread = to_container(lthread, thread_t, libos_thread);
-	unblock(thread);
+	unblock(thread_from_libos(lthread));
 }
 
 void new_thread_inplace(thread_t *thread, uint8_t *kstack,
                         void (*func)(trapframe_t *regs, void *arg),
                         void *arg, int prio)
 {
+	memset(thread, 0, sizeof(thread_t));
+
 	thread->libos_thread.kstack = &kstack[KSTACK_SIZE - FRAMELEN];
 	trapframe_t *regs = (trapframe_t *)thread->libos_thread.kstack;
+
+	memset(regs, 0, sizeof(trapframe_t));
 
 	thread->libos_thread.pc = ret_from_exception;
 	thread->libos_thread.stack = regs;

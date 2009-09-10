@@ -57,6 +57,9 @@ typedef struct thread {
 	list_t rq_node; /* Run queue node */
 	struct sched *sched; /* Scheduler of CPU to which this thread is bound */
 	int prio, state;
+
+	/* Can take gevents from hv-space -- set on the idle thread after init */
+	int can_take_gevent:1;
 } thread_t;
 
 typedef struct sched {
@@ -65,6 +68,16 @@ typedef struct sched {
 	thread_t idle;
 	uint32_t lock;
 } sched_t;
+
+static inline thread_t *thread_from_libos(libos_thread_t *libos_thread)
+{
+	return to_container(libos_thread, thread_t, libos_thread);
+}
+
+static inline thread_t *cur_thread(void)
+{
+	return thread_from_libos(cpu->thread);
+}
 
 static inline int is_idle(void)
 {

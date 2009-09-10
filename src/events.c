@@ -106,26 +106,25 @@ void setgevent(gcpu_t *gcpu, int event)
 	smp_mbar();
 	gcpu->cpu->ret_hook = 1;
 
-	if (gcpu->cpu != cpu || cpu->traplevel != 0)
+	if (gcpu->cpu != cpu || cpu->traplevel != TRAPLEVEL_NORMAL)
 		send_doorbell(gcpu->cpu->coreid);
 }
 
 void return_hook(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
-	int waiting = gcpu->waiting_for_gevent;
 
-	if (unlikely(!(regs->srr1 & MSR_GS)) && !waiting)
+	if (unlikely(!(regs->srr1 & MSR_GS)) &&
+	    (!cur_thread()->can_take_gevent ||
+	     regs->traplevel != TRAPLEVEL_THREAD))
 		return;
 
-	if (unlikely(cpu->traplevel != 0))
+	if (unlikely(cpu->traplevel != TRAPLEVEL_NORMAL))
 		return;
 
 	assert(cpu->ret_hook);
 	assert(!(mfmsr() & MSR_EE));
 
-	gcpu->waiting_for_gevent = 0;
-	
 	while (gcpu->gevent_pending) {
 		cpu->ret_hook = 0;
 		smp_sync();
@@ -147,8 +146,6 @@ void return_hook(trapframe_t *regs)
 		gevent_table[bit](regs);
 		disable_int();
 	}
-
-	gcpu->waiting_for_gevent = waiting;
 }
 
 void doorbell_int(trapframe_t *regs)

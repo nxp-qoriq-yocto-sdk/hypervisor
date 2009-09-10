@@ -1961,7 +1961,7 @@ static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
 	smp_mbar();
 	send_doorbells(guest->dbell_state_change);
 
-	assert(cpu->traplevel == 0);
+	assert(cpu->traplevel == TRAPLEVEL_THREAD);
 	assert(cpu->thread == &gcpu->thread.libos_thread);
 
 	// We only map 1GiB, so we don't support loading/booting an OS above
@@ -2060,7 +2060,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	entry = ((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
 	        guest->spintbl[gpir].addr_lo;
 
-	assert(cpu->traplevel == 0);
+	assert(cpu->traplevel == TRAPLEVEL_THREAD);
 	assert(cpu->thread == &gcpu->thread.libos_thread);
 
 	regs->gpregs[1] = 0xdeadbeef;
@@ -2814,7 +2814,7 @@ __attribute__((noreturn)) void init_guest(void)
 		}
 	}
 
-	gcpu->waiting_for_gevent = 1;
+	cur_thread()->can_take_gevent = 1;
 
 	if (cpu->ret_hook)
 		send_doorbell(cpu->coreid);

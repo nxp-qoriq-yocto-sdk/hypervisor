@@ -250,7 +250,6 @@ typedef struct gcpu {
 	unsigned long dbell_pending;
 	unsigned long gevent_pending;
 	unsigned int gcpu_num;
-	int waiting_for_gevent;
 	vpic_cpu_t vpic;
 	register_t tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
 #ifdef CONFIG_DEBUG_STUB
