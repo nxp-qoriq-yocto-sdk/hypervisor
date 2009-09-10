@@ -39,14 +39,6 @@
 
 #include <string.h>
 
-#define debug(X...)
-
-#define TX_THRESHOLD_QUEUE   8
-
-#define TX_SEND_ESCAPE 0x12
-#define TX_SEND_DATA 0x13
-#define RX_BUFF_SIZE 16
-
 static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 {
 	connected_bc_t *bc = mux->first_bc;
@@ -61,9 +53,16 @@ static connected_bc_t *channel_find(mux_complex_t *mux, char id)
 	return NULL;
 }
 
+/* Ctrl-X introduces a command, double Ctrl-X for a literal Ctrl-X */
+#define CH_SWITCH_ESCAPE 0x18 
 
-#define CHAN0_MUX_CHAR 0x10  /* ASCII 0x10 is switch to channel 0 */
-#define CH_SWITCH_ESCAPE 0x7F
+/* After Ctrl-X, '0' switches to channel 0, '1' to channel 1, etc */
+#define CHAN0_MUX_CHAR '0'
+
+/* After Ctrl-X, Ctrl-A tells the remote end to resend its TX channel
+ * switch the next time it sends data.
+ */
+#define TX_RESET 0x01
 
 /** Demultiplex incoming data
  *
@@ -90,8 +89,12 @@ static void mux_get_data(queue_t *q)
 
 		if (mux->rx_flag_state == 1) {
 			mux->rx_flag_state = 0;
-			/* If not an escape it means that it is an channel switch */
-			if (ch != CH_SWITCH_ESCAPE) {
+			if (ch == TX_RESET) {
+				mux->current_tx_bc = NULL;
+				continue;
+			}
+
+			if (ch >= CHAN0_MUX_CHAR) {
 				if (notify) {
 					queue_notify_consumer(notify);
 					notify = NULL;
@@ -99,10 +102,16 @@ static void mux_get_data(queue_t *q)
 
 				mux->current_rx_bc =
 					channel_find(mux, ch - CHAN0_MUX_CHAR);
-				printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
-					"mux_get_data: switched to channel '%d' (%p)\n",
-					ch-CHAN0_MUX_CHAR, mux->current_rx_bc);
 
+				printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
+				         "%s: switched to channel %d (%p)\n",
+				         __func__, ch - CHAN0_MUX_CHAR, mux->current_rx_bc);
+				continue;
+			}
+
+			if (ch != CH_SWITCH_ESCAPE) {
+				printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+				         "%s: bad command %d\n", __func__, ch);
 				continue;
 			}
 		} else if (ch == CH_SWITCH_ESCAPE) {
@@ -136,6 +145,8 @@ static void mux_get_data(queue_t *q)
 
 static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 {
+	int ret;
+
 	if (mux->current_tx_bc == cbc)
 		return 0;
 	if (queue_get_space(mux->byte_chan->tx) < 2)
@@ -145,10 +156,15 @@ static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 		"mux_tx_switch: switched to channel '%d' (%p)\n",
 		cbc->num, cbc);
 
-	assert(queue_writechar(mux->byte_chan->tx, CH_SWITCH_ESCAPE) == 0);
-	assert(queue_writechar(mux->byte_chan->tx, cbc->num+CHAN0_MUX_CHAR) == 0);
 	mux->current_tx_bc = cbc;
-	return 2;
+	smp_mbar();
+
+	ret = queue_writechar(mux->byte_chan->tx, CH_SWITCH_ESCAPE);
+	assert(ret == 0);
+	ret = queue_writechar(mux->byte_chan->tx, cbc->num+CHAN0_MUX_CHAR);
+	assert(ret == 0);
+
+	return 0;
 }
 
 static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
@@ -351,8 +367,16 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 
 	mux->num_of_channels++;
 
+	/* Not much we can easily do if these fail -- but it's init time,
+	 * so they shouldn't.
+	 */
+	queue_writechar(mux->byte_chan->tx, CH_SWITCH_ESCAPE);
+	queue_writechar(mux->byte_chan->tx, TX_RESET);
+
 	spin_unlock(&mux->byte_chan->tx_lock);
 	spin_unlock_intsave(&mux->byte_chan->rx_lock, saved);
+
+	queue_notify_consumer(mux->byte_chan->tx);
 	return 0;
 }
 

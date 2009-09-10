@@ -141,8 +141,11 @@ static struct iochan *target = NULL;
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #endif /* #ifndef MAX */
 
-#define CH_SWITCH_ESCAPE 0x7F
-#define CH_CHANNEL_BASE 0x10
+#define CH_SWITCH_ESCAPE 0x18 // Ctrl-X
+#define CH_CHANNEL_BASE '0' // '0' for channel 0, '1' for channel 1, etc
+
+// Tell remote end to resend its TX channel the next time it sends data
+#define CH_CHANNEL_RESET 1
 
 int getSpeed(const char *name)
 {
@@ -1067,7 +1070,7 @@ int target_read(char *buf, int len)
 
 void target_write(char *buf, int len)
 {
-	int ret;
+	int ret = 0;
 
 	if (!target)
 		return;		/* if we're not connected just ignore */
@@ -1080,11 +1083,22 @@ void target_write(char *buf, int len)
 	target_tx_char_cnt += len;
 #endif
 
-	while ((ret = target->write(target, buf, len, 1)) != len) ;
+	while (len > 0) {
+		ret = target->write(target, buf, len, 1);
+		if (ret < 0) {
+			/* Shouldn't happen with blocking I/O, but just in case... */
+			if (errno == EAGAIN)
+				continue;
 
-	if (ret != len) {
-		fatal("write() failed for target socket  %d %d", ret, len);
+			break;
+		}
+
+		len -= ret;
+		buf += ret;
 	}
+
+	if (ret < 0)
+		fatal("write() failed for target socket: %s", strerror(errno));
 }
 
 int stream_write(int id, char *buf, int len, int block_for_connect)
@@ -1153,11 +1167,24 @@ int process_mux_stream(char *buf, int length)
 	for (i = 0; i < length; i++) {
 		if (rx_flag_state == 1) {
 			rx_flag_state = 0;
-			/* If not B it means that it is an escape */
+
 			if (buf[i] != CH_SWITCH_ESCAPE) {
 #ifdef STATS
 				target_rx_ch_switch_cnt++;
 #endif
+
+				if (buf[i] == CH_CHANNEL_RESET) {
+					tx_flag_state = TX_SEND_ESCAPE;
+					continue;
+				}
+
+				if (buf[i] < CH_CHANNEL_BASE) {
+					message("%s: bad command %d after CH_SWITCH_ESCAPE\n",
+					        __func__, buf[i]);
+					rx_problem++;
+					continue;
+				}
+
 				stream = stream_find(buf[i] - CH_CHANNEL_BASE);
 				if (debug)
 					message("Channel switch arrived %d %d",
@@ -1165,8 +1192,12 @@ int process_mux_stream(char *buf, int length)
 
 				/* Can not find this one */
 				/* for now skip it       */
-				if (stream == -1)
+				if (stream == -1) {
+					message("%s: bad RX channel %d\n",
+					        __func__, buf[i] - CH_CHANNEL_BASE);
 					rx_problem++;
+					continue;
+				}
 				current_rx_stream = stream;
 				continue;
 			} else {
@@ -1221,6 +1252,7 @@ int main(int argc, char **argv)
 {
 	int len;
 	char buf[5 + (2 * MAX_PACKET_LEN)];
+	char txreset[] = { CH_SWITCH_ESCAPE, CH_CHANNEL_RESET };
 #ifdef STATS
 	int first_time = 1;
 #endif
@@ -1242,6 +1274,10 @@ int main(int argc, char **argv)
 	}
 
 	target_connect(target_name, speed1);
+
+	pthread_mutex_lock(&input_mutex);
+	target_write(txreset, 2);
+	pthread_mutex_unlock(&input_mutex);
 
 	message("using speeds: %d %d", speed1, speed2);
 
