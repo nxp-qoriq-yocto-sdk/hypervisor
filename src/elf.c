@@ -96,22 +96,16 @@ struct program_header {
  * Note: the destination address encoded in the ELF file is ignored.  This
  * will change when we support variable address (ET_DYN) ELF images.
  *
- * The "entry segment" is the phdr segment that contains the entry address
- * for the ELF image.  Usually, this is the first segment.  'entry_paddr'
- * contains the starting physical address of this segment.  'vbase' contains
- * the virtual address of this segment.
- *
  * 'plowest' contains the starting physical address of the segment that has
  * the lowest starting physical address.
  */
 int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
-             phys_addr_t target, register_t *entry)
+             phys_addr_t target, register_t *entryp)
 {
 	struct elf_header hdr;
 	struct program_header phdr;
 	unsigned long plowest = ULONG_MAX;
-	unsigned long entry_paddr = 0;
-	unsigned long vbase = ULONG_MAX;
+	unsigned long entry = ULONG_MAX;
 	unsigned int i, ret;
 
 	if (copy_from_phys(&hdr, image, sizeof(hdr)) != sizeof(hdr))
@@ -121,8 +115,7 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		return ERR_UNHANDLED;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-	         "loading ELF image from %#llx to %#llx\n",
-	         image, target);
+	         "loading ELF image from %#llx\n", image);
 
 	/* We only support 32-bit for now */
 	if (hdr.ident[EI_CLASS] != ELFCLASS32) {
@@ -172,29 +165,13 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 			return ERR_BADIMAGE;
 		}
 
-		if (phdr.type == PT_LOAD) {
-			if (phdr.paddr < plowest)
-				plowest = phdr.paddr;
-
-			// The virtual base address is the virtual address of
-			// the phdr that contains the ELF entry point.
-			if ((phdr.vaddr <= hdr.entry) &&
-			    (hdr.entry < (phdr.vaddr + phdr.memsz))) {
-				vbase = phdr.vaddr;
-				entry_paddr = phdr.paddr;
-			}
-		}
+		if (phdr.type == PT_LOAD && phdr.paddr < plowest)
+			plowest = phdr.paddr;
 	}
 
 	if (plowest == ULONG_MAX) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "load_elf: no PT_LOAD program headers in ELF image\n");
-		return ERR_BADIMAGE;
-	}
-
-	if (vbase == ULONG_MAX) {
-		printf("%s: ELF image has invalid entry address %x\n",
-		       __func__, hdr.entry);
 		return ERR_BADIMAGE;
 	}
 
@@ -204,6 +181,9 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 	 */
 	if (~target == 0)
 		target = plowest;
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+	         "loading ELF image to %#llx\n", target);
 
 	/* Copy each PT_LOAD segment to memory */
 
@@ -219,14 +199,41 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		if (phdr.type == PT_LOAD) {
 			phys_addr_t seg_target = target + phdr.paddr - plowest;
 
+			if (phdr.vaddr <= hdr.entry &&
+			    hdr.entry <= phdr.vaddr + phdr.memsz - 1) {
+				/* This segment contains the entry point.
+				 * Translate it into a physical address.
+				 *
+				 * If we're overriding the physical address,
+				 * translate the entry point to match.  We
+				 * assume the virtual-to-physical offset is
+				 * the same for all segments in this case.
+				 *
+				 * If we're not recolating, then seg_target =
+				 * phdr.paddr and this is a no-op.
+				 */
+				if (entry != ULONG_MAX) {
+					printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					         "%s: ELF entry point %#x is in "
+					         "multiple segments.\n",
+					         __func__, hdr.entry);
+
+					/* It's fatal if we actually need 
+					 * the entry.
+					 */
+					if (entryp)
+						return ERR_BADIMAGE;
+				}
+
+				entry = hdr.entry - phdr.vaddr + seg_target;
+			}
+
 			ret = copy_phys_to_gphys(guest->gphys, seg_target,
 			                         image + phdr.offset,
 			                         phdr.filesz, 1);
 			if (ret != phdr.filesz) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "load_elf: cannot copy segment %d\n", i);
-				printf("%d %d\n", ret, phdr.filesz);
-				printf("%llx %llx\n", seg_target, image + phdr.offset);
 				return ERR_BADADDR;
 			}
 
@@ -240,16 +247,18 @@ int load_elf(guest_t *guest, phys_addr_t image, size_t *length,
 		}
 	}
 
-	/* Return the entry point for the image if requested.  'target' is
-	 * where the lowest segment is written to.  'entry_paddr - plowest' is
-	 * the offset from that address to the entry segment. 'hdr.entry -
-	 * vbase' is the offset of the entry point within the entry segment.
-	 * Therefore, the entry address is equal to the target address plus the
-	 * offset to the entry segment plus the offset within the entry segment
-	 * of the original entry point.
-	 */
-	if (entry)
-		*entry = target + (entry_paddr - plowest) + (hdr.entry - vbase);
+	if (entryp) {
+		if (entry == ULONG_MAX) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: ELF image has invalid entry address %#x\n",
+			         __func__, hdr.entry);
+			return ERR_BADIMAGE;
+		}
+
+		*entryp = entry;
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "ELF physical entry point %#lx\n", entry);
+	}
 
 	return 0;
 }

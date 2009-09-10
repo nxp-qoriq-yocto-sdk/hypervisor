@@ -254,11 +254,6 @@ static int copy_to_partition(unsigned int partition, void *buffer,
  * @load_address: load address, or -1 to use ELF load address
  * @entry_address: pointer to returned entry address
  *
- * The "entry segment" is the phdr segment that contains the entry address
- * for the ELF image.  Usually, this is the first segment.  'entry_paddr'
- * contains the starting physical address of this segment.  'vbase' contains
- * the virtual address of this segment.
- *
  * 'plowest' contains the starting physical address of the segment that has
  * the lowest starting physical address.
  *
@@ -266,13 +261,12 @@ static int copy_to_partition(unsigned int partition, void *buffer,
  */
 static int parse_and_copy_elf(unsigned int partition, void *elf,
 			      size_t elf_length, unsigned long load_address,
-			      unsigned long *entry_address)
+			      unsigned long *entryp)
 {
 	struct elf_header *hdr = (struct elf_header *) elf;
 	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
-	unsigned long entry_paddr = 0;
-	unsigned long plowest = -1;
-	unsigned long vbase = -1;
+	unsigned long entry = ULONG_MAX;
+	unsigned long plowest = ULONG_MAX;
 	unsigned int i;
 
 	if (elf_length < sizeof(struct elf_header)) {
@@ -324,31 +318,14 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				printf("%s: invalid ELF program header file size\n", __func__);
 			return 0;
 		}
-		if (phdr[i].type == PT_LOAD) {
-			if (phdr[i].paddr < plowest)
-				plowest = phdr[i].paddr;
-
-			// The virtual base address is the virtual address of
-			// the phdr that contains the ELF entry point
-			if ((phdr[i].vaddr <= hdr->entry) &&
-			    (hdr->entry <= (phdr[i].vaddr + phdr[i].memsz - 1))) {
-				vbase = phdr[i].vaddr;
-				entry_paddr = phdr[i].paddr;
-			}
-		}
+		if (phdr[i].type == PT_LOAD && phdr[i].paddr < plowest)
+			plowest = phdr[i].paddr;
 	}
 
-	if (plowest == -1) {
+	if (plowest == ULONG_MAX) {
 		if (!quiet)
 			printf("%s: no PT_LOAD program headers in ELF image\n",
 			       __func__);
-		return 0;
-	}
-
-	if (vbase == -1) {
-		if (!quiet)
-			printf("%s: ELF image has invalid entry address %x\n",
-			       __func__, hdr->entry);
 		return 0;
 	}
 
@@ -362,13 +339,42 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 	for (i = 0; i < hdr->phnum; i++) {
 		if (phdr[i].type == PT_LOAD) {
-			unsigned long target_addr = load_address + (phdr[i].paddr - plowest);
+			unsigned long seg_target = load_address + (phdr[i].paddr - plowest);
 			int ret;
+
+			if (phdr[i].vaddr <= hdr->entry &&
+			    hdr->entry <= phdr[i].vaddr + phdr[i].memsz - 1) {
+				/* This segment contains the entry point.
+				 * Translate it into a physical address.
+				 *
+				 * If we're overriding the physical address,
+				 * translate the entry point to match.  We
+				 * assume the virtual-to-physical offset is
+				 * the same for all segments in this case.
+				 *
+				 * If we're not recolating, then seg_target =
+				 * phdr.paddr and this is a no-op.
+				 */
+				if (entry != ULONG_MAX) {
+					if (!quiet)
+						printf("%s: ELF entry point %#x "
+						       "is in multiple segments.\n",
+						       __func__, hdr->entry);
+
+					/* It's fatal if we actually need 
+					 * the entry.
+					 */
+					if (entryp)
+						return 0;
+				}
+
+				entry = hdr->entry - phdr[i].vaddr + seg_target;
+			}
 
 			if (verbose)
 				printf("%s: copying 0x%x bytes from ELF image offset 0x%x to guest physical address 0x%lx\n",
-				       __func__, phdr[i].filesz, phdr[i].offset, target_addr);
-			ret = copy_to_partition(partition, elf + phdr[i].offset, target_addr, phdr[i].filesz);
+				       __func__, phdr[i].filesz, phdr[i].offset, seg_target);
+			ret = copy_to_partition(partition, elf + phdr[i].offset, seg_target, phdr[i].filesz);
 			if (ret) {
 				if (!quiet)
 					printf("Copy failed, error=%i\n", ret);
@@ -380,7 +386,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 				if (verbose)
 					printf("%s: writing 0x%x null bytes to guest physical address 0x%lx\n",
-					       __func__, phdr[i].memsz - phdr[i].filesz, target_addr + phdr[i].filesz);
+					       __func__, phdr[i].memsz - phdr[i].filesz, seg_target + phdr[i].filesz);
 
 				buffer = malloc(phdr[i].memsz - phdr[i].filesz);
 				if (!buffer) {
@@ -391,8 +397,8 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				}
 				memset(buffer, 0, phdr[i].memsz - phdr[i].filesz);
 				ret = copy_to_partition(partition, buffer,
-                                                        target_addr + phdr[i].filesz,
-                                                        phdr[i].memsz - phdr[i].filesz);
+				                        seg_target + phdr[i].filesz,
+				                        phdr[i].memsz - phdr[i].filesz);
 				free(buffer);
 				if (ret) {
 					if (!quiet)
@@ -405,20 +411,18 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 	if (verbose) {
 		printf("%s: load address is 0x%lx\n", __func__, load_address);
-		printf("%s: entry address is 0x%lx\n", __func__,
-		       load_address + (entry_paddr - plowest) + (hdr->entry - vbase));
+		printf("%s: physical entry address is 0x%lx\n", __func__, entry);
 	}
 
-	/* Return the entry point for the image if requested.  'load_address'
-	 * is where the lowest segment is written to.  'entry_paddr - plowest'
-	 * is the offset from that address to the entry segment. 'hdr.entry -
-	 * vbase' is the offset of the entry point within the entry segment.
-	 * Therefore, the entry address is equal to the target address plus the
-	 * offset to the entry segment plus the offset within the entry segment
-	 * of the original entry point.
-	 */
-	if (entry_address)
-		*entry_address = load_address + (entry_paddr - plowest) + (hdr->entry - vbase);
+	if (entryp) {
+		if (entry == ULONG_MAX) {
+			printf("%s: ELF image has invalid entry address %x\n",
+			       __func__, hdr->entry);
+			return 0;
+		}
+
+		*entryp = entry;
+	}
 
 	return 1;
 }
