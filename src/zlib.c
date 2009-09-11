@@ -50,6 +50,7 @@
 
 #define _Z_UTIL_H
 
+#include <libos/bitops.h>
 #include "zlib.h"
 
 #ifndef local
@@ -1529,7 +1530,7 @@ z_stream *z;            /* for zfree function */
 
 
 /* build fixed tables only once--keep them here */
-local int fixed_lock = 0;
+local uint32_t fixed_lock;
 local int fixed_built = 0;
 #define FIXEDH 530      /* number of hufts used by fixed tables */
 local uInt fixed_left = FIXEDH;
@@ -1570,8 +1571,8 @@ inflate_huft * FAR *tl;  /* literal/length tree result */
 inflate_huft * FAR *td;  /* distance tree result */
 {
   /* build fixed tables if not built already--lock out other instances */
-  while (++fixed_lock > 1)
-    fixed_lock--;
+  spin_lock_int(&fixed_lock);
+
   if (!fixed_built)
   {
     int k;              /* temporary variable */
@@ -1604,7 +1605,9 @@ inflate_huft * FAR *td;  /* distance tree result */
     /* done */
     fixed_built = 1;
   }
-  fixed_lock--;
+
+  spin_unlock_int(&fixed_lock);
+
   *bl = fixed_bl;
   *bd = fixed_bd;
   *tl = fixed_tl;
