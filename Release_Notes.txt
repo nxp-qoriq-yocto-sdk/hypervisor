@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.5
-Revsion: 002
-Date: 9/4/2009
+Revsion: 003
+Date: 9/11/2009
 
 -------------------------------------------------------
 Contents
@@ -46,7 +46,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.5-002 has been tested with Simics 4.2.14 / pre14
+   -embedded-hv v0.5-003 has been tested with Simics 4.2.14 / pre14
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -54,6 +54,15 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -Topaz 0.5-003 bug fixes and changes
+      -ELF loaders: clean up and better error handling and
+       diagnostics
+      -bug 4233: start/restart combination caused partition to
+       hang
+      -bug 4202: copy_between_gphys: flush caches.  This will
+       provide proper cache synchronization for partman
+       based image loading.
 
    -Topaz 0.5-002 bug fixes and changes
       -bug 4091: gdb is not flushing caches on breakpoint writes
