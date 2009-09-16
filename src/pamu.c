@@ -242,26 +242,38 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint32_t reg[2];
 	dt_prop_t *regprop;
 	uint64_t msi_addr = 0;
-	dt_node_t *msi_gnode = NULL;
+	dt_node_t *msi_gnode, *msi_node;
 	unsigned long rpn = ULONG_MAX;
 	uint8_t *pci_ctrl;
 	phys_addr_t pcie_addr, pcie_size;
 
-	/*
-	 * pcie controller hwnode properties would have been passed-thru
-	 * to the guest devnode, hence look at pcie controller gnode directly.
-	 */
-
 	prop = dt_get_prop(node, "fsl,msi", 0);
 	if (prop) {
+		int i;
+
 		phandle = *(const uint32_t *)prop->data;
 		msi_gnode = dt_lookup_phandle(guest->devtree, phandle);
+		msi_node = dt_lookup_phandle(hw_devtree, phandle);
 
-		if (!msi_gnode ||
-			!dt_node_is_compatible(msi_gnode, "fsl,mpic-msi"))
+		if (!msi_gnode)
 			return ULONG_MAX;
+		
+		if (!msi_node ||
+		    !dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: Bad fsl,msi phandle in %s\n",
+			         __func__, node->name);
+			return ULONG_MAX;
+		}
 
-		dt_get_reg(msi_gnode, 0, &msi_addr, NULL);
+		ret = dt_get_reg(msi_node, 0, &msi_addr, NULL);
+		if (ret < 0) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: Could not get reg in %s\n",
+			         __func__, msi_node->name);
+			return ULONG_MAX;
+		}
+
 		msi_bank_addr = msi_addr & (PAGE_SIZE - 1);
 		rpn = msi_addr >> PAGE_SHIFT;
 		msi_addr = gaddr + msi_bank_addr;
@@ -283,21 +295,27 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 
 		ret = dt_set_prop(node, "msi-address-64", reg, rootnaddr * 4);
 		if (ret < 0)
-			return ULONG_MAX;
-		dt_set_prop(node, "fsl,hv-msi", msi_gnode, sizeof(uint32_t));
+			goto nomem;
+
 		ret = dt_get_reg(node, 0, &pcie_addr, &pcie_size);
-		if (ret < 0) {
+		if (ret < 0 || pcie_size < 0x1000) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"%s: no reg found\n", __func__);
+			         "%s: bad/missing reg\n", __func__);
 			return ULONG_MAX;
 		}
 
-		pci_ctrl = map(pcie_addr, pcie_size,
-				TLB_MAS2_IO, TLB_MAS3_KERN);
-		if (!pci_ctrl)
+		size_t len = 0x1000;
+		pci_ctrl = map_gphys(TEMPTLB1, guest->gphys, pcie_addr,
+		                     temp_mapping[0], &len, TLB_TSIZE_4K,
+		                     TLB_MAS2_IO, 0);
+		if (!pci_ctrl || len < 0x1000) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: Couldn't map reg %llx (guest phys) of %s\n",
+			         __func__, pcie_addr, msi_node->name);
 			return ULONG_MAX;
+		}
 
-		for (int i=0; i <= 2; i++) {
+		for (i = 0; i <= 2; i++) {
 			uint32_t piwar, piwbear, piwbar;
 
 			piwar = in32((uint32_t *)
@@ -318,21 +336,29 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 				uint32_t inb_win_size = 1 <<
 					((piwar & PEXI_IWS) + 1);
 
-				if (msi_addr < inb_win_addr ||
-					msi_addr >
-					(inb_win_addr + inb_win_size)) {
-
-					printf("WARNING: msi-address 0x%llx outside %s inbound memory window range %llx - %llx\n", msi_addr,
-						node->name, inb_win_addr,
-						inb_win_addr +
-						inb_win_size);
+				if (msi_addr >= inb_win_addr &&
+				    msi_addr <= inb_win_addr + inb_win_size - 1)
 					break;
-				}
 			}
+		}
+
+		tlb1_clear_entry(TEMPTLB1);
+
+		if (i > 2) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: %s: msi-address 0x%llx outside inbound memory windows\n",
+			         __func__, node->name, msi_addr);
+
+			return ULONG_MAX;
 		}
 	}
 
 	return rpn;
+
+nomem:
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+	return ULONG_MAX;
 }
 
 #define MAX_SUBWIN_CNT 16
