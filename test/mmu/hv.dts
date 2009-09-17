@@ -82,6 +82,10 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
 	};
 
 	uartmux: uartmux {
@@ -96,7 +100,7 @@
 		compatible = "partition";
 		label = "mmu-test";
 		cpus = <0 4>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		bc: bc {
