@@ -22,25 +22,18 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# UART0 is the hypervisor
-# UART1 is byte-channel UART MUX
-# UART2 is Linux partition 1
-$use_uart1 = 0
-$use_uart3 = 0
-$use_uart2 = 1
-$use_uart1_net = 1
+$use_uart0 = 0
+$use_uart0_net = 1
 
 $guest_image[0]  = "vmlinux.stripped"
-$guest_addr[0]   = 0x00100000
+$guest_addr[0]   = 0x00020000
 $guest_image[1]  = "hv-hello.dtb"
-$guest_addr[1]   = 0x00f00000
+$guest_addr[1]   = 0x00900000
 $guest_image[2]  = "rootfs-hello.ext2.gz"
-$guest_addr[2]   = 0x01000000
+$guest_addr[2]   = 0x01300000
 
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"
-
-$kernel_cmdline = "config-addr=0xfe8f00000"
 
 add-directory "%script%" -prepend
 add-directory "bin/linux" -prepend

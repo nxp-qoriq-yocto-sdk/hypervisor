@@ -86,11 +86,35 @@ bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(testdir)../../images/rootf
 $(test)-run-partman: bin/$(test)/rootfs-partman.ext2.gz
 
 $(test)-run-hello: $(test) bin/$(test)/rootfs-hello.ext2.gz
-	../../tools/mux_server/mux_server localhost:9124 9000 &
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
 	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9002" &
 	$(SIMICS) $(testdir)linux/run-hello.simics
 
-$(test)-run-demo: $(test) bin/$(test)/rootfs-partman.ext2.gz
-	../../../sim/xtel.sh 9000 2
-	$(SIMICS) $(testdir)linux/run-demo.simics
+$(test)-run-2p: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9002" &
+	$(SIMICS) $(testdir)linux/run-2p.simics
 
+$(test)-run-partman: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 9003 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9002" &
+	xterm -e "telnet localhost 9003" &
+	$(SIMICS) $(testdir)linux/run-partman.simics
+
+$(test)-run-1p: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	$(SIMICS) $(testdir)linux/run-1p.simics
+
+$(test)-run-1core: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	$(SIMICS) $(testdir)linux/run-1core.simics

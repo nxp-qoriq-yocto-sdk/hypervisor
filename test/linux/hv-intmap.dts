@@ -85,6 +85,10 @@
 			device = "/soc/corenet-cf";
 		};
 
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
 		nexus {
 			device = "/testintrnexus";
 		};

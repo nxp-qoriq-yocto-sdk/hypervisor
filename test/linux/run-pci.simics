@@ -34,7 +34,7 @@ $pcie0_device = "sym53c875"
 #$pcie0_device = "i82543gc"
 
 $guest_image[0]  = "uImage"
-$guest_addr[0]   = 0x00100000
+$guest_addr[0]   = 0x00900000
 $guest_image[1]  = "hv-pci.dtb"
 $guest_addr[1]   = 0x00f00000
 $guest_image[2]  = "rootfs.ext2.gz"

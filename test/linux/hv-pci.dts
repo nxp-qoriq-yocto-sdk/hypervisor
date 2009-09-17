@@ -110,6 +110,10 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
 	};
 
 	// =====================================================

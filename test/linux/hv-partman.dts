@@ -79,14 +79,20 @@
 	// =====================================================
 	hv:hypervisor-config {
 		compatible = "hv-config";
-		stdout = <&serial0>;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		hv-memory {
 			compatible = "hv-memory";
 			phys-mem = <&pma3>;
 		};
 
-		serial0:serial0 {
+		uart0:serial0 {
 			device = "serial0";
 		};
 
@@ -121,6 +127,15 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
 	};
 
 	doorbells {
@@ -129,12 +144,15 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 1
+	// =====================================================
 	part1 {
 		compatible = "partition";
 		label = "p1-linux";
 		cpus = <0 2>;
-		guest-image = <0xf 0xe8100000 0 0 0 0x00e00000>;
-		linux-rootfs = <0xf 0xe9000000 0 0x01300000 0 0x00800000>;
+		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
+		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x00800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 
 		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
@@ -148,7 +166,8 @@
 
 		console1: console {
 			compatible = "byte-channel";
-			endpoint = <&serial1>;
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
 		};
 
 		bc1: bc-p2 {
@@ -200,6 +219,164 @@
 			};
 		};
 
+		qman {
+			device = "qman";
+			dma-window = <&window0>;
+		};
+
+		bman {
+			device = "bman";
+			dma-window = <&window0>;
+		};
+
+		pme {
+			device = "pme";
+			dma-window = <&window0>;
+		};
+
+		bman-portalA {
+			device = "/bman-portals/bman-portal@0";
+			vcpu = <0>;
+		};
+
+		bman-portalB {
+			device = "/bman-portals/bman-portal@4000";
+			vcpu = <1>;
+		};
+
+		buffer-pool@0 {
+			device = "/bman-portals/buffer-pool@0";
+		};
+
+		qman-portalA {
+			device = "/qman-portals/qman-portal@0";
+			vcpu = <0>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+				snoop-cpu-only;
+			};
+
+		};
+
+		qman-portalB {
+			device = "/qman-portals/qman-portal@4000";
+			vcpu = <1>;
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+				snoop-cpu-only;
+			};
+		};
+
+		qman-pool@1 {
+			device = "/qman-portals/qman-pool@1";
+		};
+
+		qman-pool@2 {
+			device = "/qman-portals/qman-pool@2";
+		};
+
+		qman-pool@3 {
+			device = "/qman-portals/qman-pool@3";
+		};
+
+		qman-pool@4 {
+			device = "/qman-portals/qman-pool@4";
+		};
+
+		qman-pool@5 {
+			device = "/qman-portals/qman-pool@5";
+		};
+
+		qman-pool@6 {
+			device = "/qman-portals/qman-pool@6";
+		};
+
+		qman-pool@7 {
+			device = "/qman-portals/qman-pool@7";
+		};
+
+		qman-pool@8 {
+			device = "/qman-portals/qman-pool@8";
+		};
+
+		qman-pool@9 {
+			device = "/qman-portals/qman-pool@9";
+		};
+
+		qman-pool@10 {
+			device = "/qman-portals/qman-pool@10";
+		};
+
+		qman-pool@11 {
+			device = "/qman-portals/qman-pool@11";
+		};
+
+		qman-pool@12 {
+			device = "/qman-portals/qman-pool@12";
+		};
+
+		qman-pool@13 {
+			device = "/qman-portals/qman-pool@13";
+		};
+
+		qman-pool@14 {
+			device = "/qman-portals/qman-pool@14";
+		};
+
+		qman-pool@15 {
+			device = "/qman-portals/qman-pool@15";
+		};
+
 		partition@1 {
 			compatible = "managed-partition";
 			partition = <&part2>;
@@ -211,6 +388,9 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 2
+	// =====================================================
 	part2:part2 {
 		compatible = "partition";
 		label = "p2-linux";
@@ -228,7 +408,8 @@
 
 		console2: console {
 			compatible = "byte-channel";
-			endpoint = <&serial2>;
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
 		};
 
 		bcp2: bc {
@@ -289,6 +470,9 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 3
+	// =====================================================
 	part3:part3 {
 		compatible = "partition";
 		label = "p3-linux";
@@ -306,12 +490,14 @@
 
 		console3: console {
 			compatible = "byte-channel";
-			endpoint = <&serial3>;
+			endpoint = <&uartmux>;
+			mux-channel = <3>;
 		};
 
 		bcp3: bc {
 			compatible = "byte-channel";
-			endpoint = <&bc2>;
+			endpoint = <&uartmux>;
+			mux-channel = <3>;
 		};
 
 		doorbell-in {
