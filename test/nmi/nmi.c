@@ -34,6 +34,7 @@
 
 #define CPUCNT 5
 static int cpus_complete[CPUCNT];
+static int cpus_ready[CPUCNT];
 
 void init(unsigned long devtree_ptr);
 
@@ -55,6 +56,8 @@ extern void (*secondary_startp)(void);
 
 static void secondary_entry(void)
 {
+	uint32_t pir = mfspr(SPR_PIR);
+	cpus_ready[pir] = 1;
 	while (1);
 }
 
@@ -67,6 +70,18 @@ void libos_client_entry(unsigned long devtree_ptr)
 	init(devtree_ptr);
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
+
+	/* wait for secondary cores to be ready */
+	while (1) {
+		int i;
+		for (i = 1; i < CPUCNT; i++) {
+			if (!cpus_ready[i])
+				break;
+			barrier();
+		}
+		if (i == CPUCNT)
+			break;
+	}
 
 	printf("NMI test\n");
 	vcpu_mask = 0xf;
