@@ -24,98 +24,54 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#include <libos/queue.h>
 #include <libos/bitops.h>
+#include <libos/alloc.h>
 
 #include <benchmark.h>
-#include <shell.h>
+#include <percpu.h>
 #include <devtree.h>
 
 #include <limits.h>
 
-typedef struct benchmark {
-	const char *name;
-	uint64_t accum; /* Accumulated time */
-	unsigned long min, max; /* Record fast/slow */
-	unsigned long num; /* number of instances */
-	uint32_t lock;
-} benchmark_t;
-
-static benchmark_t benchmarks[num_benchmarks] = {
-	[bm_tlb0_inv_pid] = {
-		.name = "TLB0 cache invalidate by PID",
-		.min = ULONG_MAX
-	},
-	[bm_tlb0_inv_all] = {
-		.name = "TLB0 cache invalidate all",
-		.min = ULONG_MAX
-	},
-	[bm_tlb1_inv] = {
-		.name = "TLB1 invalidate",
-		.min = ULONG_MAX
-	},
-	[bm_tlbwe] = {
-		.name = "TLB write",
-		.min = ULONG_MAX
-	},
+const char *benchmark_names[num_benchmarks] = {
+						"Other",
+						"tlbre",
+						"tlbilx",
+						"tlbsx",
+						"tlbsync",
+						"msgsnd",
+						"msgclr",
+						"spr",
+						"dec",
+						"tlbwe(tlb0)",
+						"tlbwe(tlb1)",
+						"tlbivax(all tlb0)",
+						"tlbivax(tlb0)",
+						"tlbivax(all tlb1)",
+						"tlbivax(tlb1)",
+				#ifdef CONFIG_TLB_CACHE
+						"tlb miss reflected",
+						"tlb miss stats",
+				#endif
+						"tlbinv by PID",
+						"tlbcache inv all",
+						"tlb1 inv",
+						"tlb write",
 };
 
-void bench_stop(unsigned long start, int bmnum)
+void statistics_stop(unsigned long start, int bmnum)
 {
 	unsigned long end = mfspr(SPR_TBL);
-	benchmark_t *bm = &benchmarks[bmnum];
+	benchmark_t *bm = &get_gcpu()->benchmarks[bmnum];
 	unsigned long diff = end - start;
-	register_t saved;
-
-	saved = spin_lock_intsave(&bm->lock);
 
 	bm->accum += diff;
 	bm->num++;
 
-	if (bm->min > diff)
+	if (bm->min > diff || !bm->min)
 		bm->min = diff;
 
 	if (bm->max < diff)
 		bm->max = diff;
-
-	spin_unlock_intsave(&bm->lock, saved);
 }
-
-static unsigned long tb_to_nsec(uint64_t freq, unsigned long ticks)
-{
-	return ticks * 1000000000ULL / freq;
-}
-
-static void benchmark_fn(shell_t *shell, char *args)
-{
-	uint64_t freq = dt_get_timebase_freq();
-
-	if (num_benchmarks == 0) {
-		printf("No benchmarks defined.\n");
-		return;
-	}
-
-	for (benchmark_num_t i = 0; i < num_benchmarks; i++) {
-		benchmark_t *bm = &benchmarks[i];
-
-		spin_lock_int(&bm->lock);
-
-		if (bm->num == 0)
-			printf("%s: no data\n", bm->name);
-		else
-			printf("%s: %lu ns avg, %lu ns min, %lu ns max, %lu instances\n",
-			       bm->name,
-			       tb_to_nsec(freq, bm->accum / bm->num),
-			       tb_to_nsec(freq, bm->min),
-			       tb_to_nsec(freq, bm->max), bm->num);
-
-		spin_unlock_int(&bm->lock);
-	}
-}
-
-static command_t benchmark = {
-	.name = "benchmark",
-	.action = benchmark_fn,
-	.shorthelp = "Print microbenchmark information",
-};
-shell_cmd(benchmark);

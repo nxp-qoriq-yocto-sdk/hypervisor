@@ -61,7 +61,7 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	unsigned long lpid = guest->lpid;
 	unsigned int type = msg >> 27;
 
-	inc_stat(stat_emu_msgsnd);
+	set_stat(bm_stat_msgsnd, regs);
 
 	/*
 	 * Validate the message type, and convert it to the corresponding
@@ -134,7 +134,7 @@ static int emu_msgclr(trapframe_t *regs, uint32_t insn)
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int type = msg >> 27;
 
-	inc_stat(stat_emu_msgclr);
+	set_stat(bm_stat_msgclr, regs);
 
 	/*
 	 * Validate the message type, and convert it to the corresponding
@@ -211,14 +211,14 @@ static inline int get_tlb_ivax_stat(unsigned long va)
 {
 	if (va & TLBIVAX_TLB1) {
 		if (va & TLBIVAX_INV_ALL)
-			return stat_emu_tlbivax_tlb1_all;
+			return bm_stat_tlbivax_tlb1_all;
 		else
-			return stat_emu_tlbivax_tlb1;
+			return bm_stat_tlbivax_tlb1;
 	} else {
 		if (va & TLBIVAX_INV_ALL)
-			return stat_emu_tlbivax_tlb0_all;
+			return bm_stat_tlbivax_tlb0_all;
 		else
-			return stat_emu_tlbivax_tlb0;
+			return bm_stat_tlbivax_tlb0;
 	}
 }
 
@@ -229,8 +229,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	guest_t *guest = gcpu->guest;
 	unsigned int i;
 
-	inc_stat(stat_emu_tlbivax);
-	inc_stat(get_tlb_ivax_stat(va));
+	set_stat(get_tlb_ivax_stat(va), regs);
 	
 	if (va & TLBIVAX_RESERVED) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -267,7 +266,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	disable_int(); 
 	save_mas(gcpu);
 
-	inc_stat(stat_emu_tlbilx);
+	set_stat(bm_stat_tlbilx, regs);
 
 	pid = (gcpu->mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT;
 
@@ -302,7 +301,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 /* No-op, as we never actually execute a tlbivax */
 static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 {
-	inc_stat(stat_emu_tlbsync);
+	set_stat(bm_stat_tlbsync, regs);
 	return 0;
 }
 
@@ -310,7 +309,7 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
 	uint32_t va = get_ea_indexed(regs, insn);
 
-	inc_stat(stat_emu_tlbsx);
+	set_stat(bm_stat_tlbsx, regs);
 	disable_int();
 	guest_tlb_search_mas(va);
 	enable_int();
@@ -330,7 +329,7 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
-	inc_stat(stat_emu_tlbre);
+	set_stat(bm_stat_tlbre, regs);
 
 	tlb = MAS0_GET_TLBSEL(mas0);
 	if (tlb == 0) {
@@ -383,8 +382,6 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
 	       (mas3 >> MAS3_RPN_SHIFT);
-
-	inc_stat(stat_emu_tlbwe);
 
 	if (mas0 & (MAS0_RESERVED | 0x20000000)) {
 		restore_mas(gcpu);
@@ -560,7 +557,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			return 1;
 		}
 
-		inc_stat(stat_emu_tlbwe_tlb1);
+		set_stat(bm_stat_tlbwe_tlb1, regs);
 
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
@@ -587,7 +584,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 		}
 
-		inc_stat(stat_emu_tlbwe_tlb0);
+		set_stat(bm_stat_tlbwe_tlb0, regs);
 
 		ret = guest_set_tlb0(mas0, mas1, mas2, mas3, rpn, mas8, gmas3);
 		if (unlikely(ret == ERR_BUSY)) {
@@ -624,7 +621,7 @@ static int emu_mfspr(trapframe_t *regs, uint32_t insn)
 	int reg = (insn >> 21) & 31;
 	register_t ret;
 
-	inc_stat(stat_emu_spr);
+	set_stat(bm_stat_spr, regs);
 
 	if (read_gspr(regs, spr, &ret)) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -643,7 +640,7 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	int reg = (insn >> 21) & 31;
 	register_t val = regs->gpregs[reg];
 
-	inc_stat(stat_emu_spr);
+	set_stat(bm_stat_spr, regs);
 
 	if (write_gspr(regs, spr, val)) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
@@ -854,7 +851,7 @@ void hvpriv(trapframe_t *regs)
 
 	assert(mfmsr() & MSR_EE);
 
-	inc_stat(stat_emu_total);
+	set_stat(bm_stat_other, regs);
 
 	guestmem_set_insn(regs);
 	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,

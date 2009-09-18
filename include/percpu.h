@@ -38,6 +38,7 @@
 #include <tlbcache.h>
 #include <devtree.h>
 #include <thread.h>
+#include<benchmark.h>
 #endif
 
 #define TLB1_GSIZE 16 /* As seen by the guest */
@@ -214,31 +215,6 @@ extern unsigned long last_lpid;
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
-enum gcpu_stats {
-	stat_emu_total, /**< Total emulated instructions */
-	stat_emu_tlbwe, /**< Emulated tlbwe instructions */
-	stat_emu_tlbre, /**< Emulated tlbre instructions */
-	stat_emu_tlbilx, /**< Emulated tlbilx instructions */
-	stat_emu_tlbsx, /**< Emulated tlbsx instructions */
-	stat_emu_tlbsync, /**< Emulated tlbsync instructions */
-	stat_emu_msgsnd, /**< Emulated msgsnd instructions */
-	stat_emu_msgclr, /**< Emulated msgclr instructions */
-	stat_emu_spr,   /**< Emulated SPR accesses */
-	stat_decr,      /**< Decrementer interrupts */
-	stat_emu_tlbivax, /**< Emulated tlbivax instructions */
-	stat_emu_tlbwe_tlb0, /**< Emulated tlbwe instructions for tlb0 */
-	stat_emu_tlbwe_tlb1, /**< Emulated tlbwe instructions for tlb1 */
-	stat_emu_tlbivax_tlb0_all, /**< Emulated tlbivax all instructions for tlb0 */
-	stat_emu_tlbivax_tlb0, /**< Emulated tlbivax instructions for tlb0 */
-	stat_emu_tlbivax_tlb1_all, /**< Emulated tlbivax all instructions for tlb1 */
-	stat_emu_tlbivax_tlb1, /**< Emulated tlbivax instructions for tlb1 */
-#ifdef CONFIG_TLB_CACHE
-	stat_tlb_miss_reflect, /**< TLB misses reflected to guest in case of TLBCache */
-	stat_tlb_miss_count, /**< TLB miss exceptions */
-#endif
-	num_gcpu_stats
-};
-
 typedef struct gcpu {
 	kstack_t hvstack;
 	guest_t *guest;
@@ -271,22 +247,12 @@ typedef struct gcpu {
 	uint32_t timer_flags;
 	int evict_tlb1, clean_tlb, clean_tlb_pid;
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
-	
-	unsigned int stats[num_gcpu_stats];
+#ifdef CONFIG_STATISTICS
+	struct benchmark benchmarks[num_benchmarks];
+#endif
 } gcpu_t;
 
 #define get_gcpu() (cpu->client.gcpu)
-
-#ifdef CONFIG_STATISTICS
-static inline void inc_stat(int stat)
-{
-	get_gcpu()->stats[stat]++;
-}
-#else
-static inline void inc_stat(int stat)
-{
-}
-#endif
 
 struct dt_node;
 

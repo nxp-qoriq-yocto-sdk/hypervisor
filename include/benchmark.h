@@ -30,15 +30,59 @@
 
 #include <stdint.h>
 #include <libos/core-regs.h>
+#include <libos/trapframe.h>
 
 /* If you add a benchmark here, you must update the table in benchmark.c */
 typedef enum benchmark_num {
-	bm_tlb0_inv_pid,
+	bm_stat_other,  /**< untracked overhead */
+	bm_stat_tlbre, /**< Overhead of tlbre instructions */
+	bm_stat_tlbilx, /**< Overhead of tlbilx instructions */
+	bm_stat_tlbsx, /**< Overhead of tlbsx instructions */
+	bm_stat_tlbsync, /**< Overhead of tlbsync instructions */
+	bm_stat_msgsnd, /**< Overhead of msgsnd instructions */
+	bm_stat_msgclr, /**< Overhead of msgclr instructions */
+	bm_stat_spr,   /**< Overhead of SPR accesses */
+	bm_stat_decr,      /**< Decrementer interrupts */
+	bm_stat_tlbwe_tlb0, /**< Overhead of tlbwe instructions for tlb0 */
+	bm_stat_tlbwe_tlb1, /**< Overhead of tlbwe instructions for tlb1 */
+	bm_stat_tlbivax_tlb0_all, /**< Overhead of tlbivax all instructions for tlb0 */
+	bm_stat_tlbivax_tlb0, /**< Overhead of tlbivax instructions for tlb0 */
+	bm_stat_tlbivax_tlb1_all, /**< Overhead of tlbivax all instructions for tlb1 */
+	bm_stat_tlbivax_tlb1, /**< Overhead of tlbivax instructions for tlb1 */
+#ifdef CONFIG_TLB_CACHE
+	bm_stat_tlb_miss_reflect, /**< TLB misses reflected to guest in case of TLBCache */
+	bm_stat_tlb_miss_count, /**< TLB miss exceptions */
+#endif
+	bm_tlb0_inv_pid, /**< microbenchmarks */
 	bm_tlb0_inv_all,
 	bm_tlb1_inv,
 	bm_tlbwe,
 	num_benchmarks
 } benchmark_num_t;
+
+typedef struct benchmark {
+	uint64_t accum; /* Accumulated time */
+	unsigned long min, max; /* Record fast/slow */
+	unsigned long num; /* number of instances */
+} benchmark_t;
+
+#ifdef CONFIG_STATISTICS
+static inline void set_stat(int stat, struct trapframe *regs)
+{
+	regs->current_event = stat;
+
+}
+
+void statistics_stop(unsigned long start, int bmnum);
+#else
+static inline void set_stat(int stat, struct trapframe *regs)
+{
+}
+
+static inline void statistics_stop(unsigned long start, int bmnum)
+{
+}
+#endif
 
 #ifdef CONFIG_BENCHMARKS
 static inline register_t bench_start(void)
@@ -46,7 +90,10 @@ static inline register_t bench_start(void)
 	return mfspr(SPR_TBL);
 }
 
-void bench_stop(register_t start, int bm);
+static inline void bench_stop(register_t start, int bm)
+{
+	statistics_stop(start, bm);
+}
 #else
 static inline register_t bench_start(void)
 {

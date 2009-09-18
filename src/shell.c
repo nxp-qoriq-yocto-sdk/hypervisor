@@ -37,6 +37,7 @@
 #include <shell.h>
 #include <percpu.h>
 #include <guts.h>
+#include <benchmark.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -273,96 +274,6 @@ static command_t reset = {
 	.shorthelp = "Perform a system reset",
 };
 shell_cmd(reset);
-
-
-#ifdef CONFIG_STATISTICS
-static void print_stat(shell_t *shell, guest_t *guest,
-                       int stat, const char *str)
-{
-	unsigned int i;
-	unsigned int total = 0;
-
-	for (i = 0; i < guest->cpucnt; i++) {
-		gcpu_t *gcpu = guest->gcpus[i];
-
-		if (gcpu)
-			total += guest->gcpus[i]->stats[stat];
-	}
-
-	qprintf(shell->out, 1, "%s %-10u\n", str, total);
-}
-
-static void stats_fn(shell_t *shell, char *args)
-{
-	char *numstr;
-	int num;
-	guest_t *guest;
-
-	args = stripspace(args);
-	numstr = nextword(&args);
-
-	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: stats <partition-number>\n");
-		return;
-	}
-
-	num = get_partition_num(shell, numstr);
-	if (num == -1)
-		return;
-
-	guest = &guests[num];
-	qprintf(shell->out, 1, "Partition %u: %s\n", num, guest->name);
-	print_stat(shell, guest, stat_emu_total,
-	           "Total emulated instructions:          ");
-	print_stat(shell, guest, stat_emu_tlbwe,
-	           "Emulated TLB writes:                  ");
-	print_stat(shell, guest, stat_emu_spr,
-	           "Emulated SPR accesses:                ");
-	print_stat(shell, guest, stat_decr,
-	           "Decrementer interrupts:               ");
-	print_stat(shell, guest, stat_emu_tlbivax,
-	           "Emulated TLB invalidates:             ");
-	print_stat(shell, guest, stat_emu_msgsnd,
-	           "Emulated msgsnd instructions:         ");
-	print_stat(shell, guest, stat_emu_msgclr,
-	           "Emulated msgclr instructions:         ");
-	print_stat(shell, guest, stat_emu_tlbilx,
-	           "Emulated tlbilx instructions:         ");
-	print_stat(shell, guest, stat_emu_tlbre,
-	           "Emulated TLB reads:                   ");
-	print_stat(shell, guest, stat_emu_tlbsx,
-	           "Emulated TLB searches:                ");
-	print_stat(shell, guest, stat_emu_tlbsync,
-	           "Emulated TLB syncs:                   ");
-	print_stat(shell, guest, stat_emu_tlbivax_tlb0_all,
-	           "Emulated TLB invalidate all for tlb0: ");
-	print_stat(shell, guest, stat_emu_tlbivax_tlb0,
-	           "Emulated TLB invalidate for tlb0:     ");
-	print_stat(shell, guest, stat_emu_tlbivax_tlb1_all,
-	           "Emulated TLB invalidate all for tlb1: ");
-	print_stat(shell, guest, stat_emu_tlbivax_tlb1,
-	           "Emulated TLB invalidate for tlb1:     ");
-	print_stat(shell, guest, stat_emu_tlbwe_tlb0,
-	           "Emulated TLB writes for tlb0:         ");
-	print_stat(shell, guest, stat_emu_tlbwe_tlb1,
-	           "Emulated TLB writes for tlb1:         ");
-#ifdef CONFIG_TLB_CACHE
-	print_stat(shell, guest, stat_tlb_miss_count,
-	           "Total TLB miss interrupts handled:    ");
-	print_stat(shell, guest, stat_tlb_miss_reflect,
-	           "TLB miss interrupts reflected:        ");
-#endif
-}
-
-static command_t stats = {
-	.name = "stats",
-	.action = stats_fn,
-	.shorthelp = "Display partition statistics",
-	.longhelp = "  Usage: stats <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
-};
-shell_cmd(stats);
-#endif
 
 static void gdt_fn(shell_t *shell, char *args)
 {
@@ -869,4 +780,123 @@ static command_t gtlb = {
 };
 shell_cmd(gtlb);
 
+#endif
+
+#ifdef CONFIG_STATISTICS
+#define MAXLEN 24
+#define MICRO_BENCHMARK_START bm_tlb0_inv_pid
+extern const char *benchmark_names[];
+
+static unsigned long tb_to_nsec(uint64_t freq, unsigned long ticks)
+{
+	return ticks * 1000000000ULL / freq;
+}
+
+static void print_benchs(shell_t *shell, gcpu_t *gcpu, int start, int end, int total_flag)
+{
+	char *tmp;
+	int len, cplen;
+	unsigned long total = 0;
+	uint64_t freq = dt_get_timebase_freq();
+
+	qprintf(shell->out, 1, "Event                     Total(ns)     Avg(ns)    Min(ns)    Max(ns)    Count\n");
+	qprintf(shell->out, 1, "-------------------------------------------------------------------------------\n");
+	for (benchmark_num_t i = start; i < end; i++) {
+		benchmark_t *bm = &gcpu->benchmarks[i];
+		tmp = malloc(MAXLEN);
+		assert(tmp);
+		len = strlen(benchmark_names[i]);
+		cplen = MAXLEN - 2 - len;
+		memcpy(tmp, benchmark_names[i], len);
+		memset(&tmp[len], ' ', cplen);
+		tmp[MAXLEN - 1] = 0;
+
+		qprintf(shell->out, 1, "%s %10lu %10lu %10lu %10lu %10lu\n",
+			tmp,
+			tb_to_nsec(freq, bm->accum),
+			bm->num ? tb_to_nsec(freq, bm->accum / bm->num) : 0,
+			tb_to_nsec(freq, bm->min),
+			tb_to_nsec(freq, bm->max), bm->num);
+
+		free(tmp);
+		total += tb_to_nsec(freq, bm->accum);
+	}
+
+	if (total_flag) {
+		qprintf(shell->out, 1, "-------------------------------------------------------------------------------\n");
+		qprintf(shell->out, 1, "TOTAL                  %10lu\n", total);
+	}
+}
+
+static void print_stats(shell_t *shell, int num)
+{
+	guest_t *guest;
+	int i;
+
+	if (num_benchmarks == 0) {
+		qprintf(shell->out, 1, "No benchmarks defined.\n");
+		return;
+	}
+
+	guest = &guests[num];
+	qprintf(shell->out, 1, "Guest: %s\n", guest->name);
+	for (i = 0; i < guest->cpucnt; i++) {
+		gcpu_t *gcpu = guest->gcpus[i];
+		qprintf(shell->out, 1, "guest gcpu: %d\n", i);
+		print_benchs(shell, gcpu, 0, MICRO_BENCHMARK_START, 1);
+	#ifdef CONFIG_BENCHMARKS
+		qprintf(shell->out, 1, "\nMicro Benchmarks:\n");
+		print_benchs(shell, gcpu, MICRO_BENCHMARK_START, num_benchmarks, 0);
+	#endif
+	}
+	qprintf(shell->out, 1, "\n");
+}
+
+static void clear_stats(int num)
+{
+	guest_t *guest;
+	int i;
+
+	guest = &guests[num];
+	for (i = 0; i < guest->cpucnt; i++) {
+		gcpu_t *gcpu = guest->gcpus[i];
+		for (benchmark_num_t i = 0; i < num_benchmarks; i++) {
+			benchmark_t *bm = &gcpu->benchmarks[i];
+			memset(bm, 0, sizeof(benchmark_t));
+		}
+	}
+}
+
+static void benchmark_fn(shell_t *shell, char *args)
+{
+	char *numstr, *cmdstr;
+	int num;
+
+	args = stripspace(args);
+	cmdstr = nextword(&args);
+	numstr = nextword(&args);
+
+	if (!numstr || !cmdstr) {
+		qprintf(shell->out, 1, "Usage: benchmark <command> <partition-number>\n");
+		return;
+	}
+
+	num = get_partition_num(shell, numstr);
+	if (num == -1)
+		return;
+
+	if (!strcmp(cmdstr, "print"))
+		print_stats(shell, num);
+	else if (!strcmp(cmdstr, "clear"))
+		clear_stats(num);
+}
+
+static command_t benchmark = {
+	.name = "benchmark",
+	.action = benchmark_fn,
+	.shorthelp = "Print statistics/microbenchmark information",
+	.longhelp = "  Usage: benchmark <cmd> <partition number>\n\n"
+	            "  'print' & 'clear' commands are supported.",
+};
+shell_cmd(benchmark);
 #endif

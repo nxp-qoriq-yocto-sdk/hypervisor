@@ -40,12 +40,13 @@
 #include <events.h>
 #include <ipi_doorbell.h>
 #include <timers.h>
+#include <benchmark.h>
 
 void decrementer(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 
-	inc_stat(stat_decr);
+	set_stat(bm_stat_decr, regs);
 
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
 

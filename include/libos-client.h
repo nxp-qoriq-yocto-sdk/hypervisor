@@ -106,6 +106,7 @@ void decrementer(struct trapframe *regs);
 void fit(struct trapframe *regs);
 void watchdog_trap(struct trapframe *regs);
 void hcall(struct trapframe *regs);
+void statistics_stop(unsigned long start, int bmnum);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt
@@ -126,6 +127,10 @@ void hcall(struct trapframe *regs);
 #define EXC_DOORBELL_HANDLER doorbell_int
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
+
+#ifdef CONFIG_STATISTICS
+#define UPDATE_STATS statistics_stop
+#endif
 
 #define LIBOS_RET_HOOK return_hook
 

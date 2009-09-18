@@ -147,6 +147,7 @@ config VIRTUAL_I2C
 
 config STATISTICS
 	bool "Hypervisor statistics"
+	select LIBOS_STATISTICS
 	help
 		Detailed hypervisor emulated instruction statistics.
 		Gives a count of emulated instructions executed.
@@ -196,6 +197,7 @@ config DEBUG_STUB_PROGRAM_INTERRUPT
 
 config BENCHMARKS
 	bool "Microbenchmarks"
+	depends on STATISTICS
 	help
 		Enable benchmark code that measures the average, minimum,
 		and maximum amount of time it takes to run certain
