@@ -68,6 +68,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	int count = 100;
 
 	init(devtree_ptr);
+
+	printf("NMI test\n");
+
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
 
@@ -83,7 +86,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 			break;
 	}
 
-	printf("NMI test\n");
 	vcpu_mask = 0xf;
 	ret = fh_send_nmi(vcpu_mask);
 
