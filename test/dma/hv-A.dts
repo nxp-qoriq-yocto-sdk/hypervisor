@@ -32,7 +32,13 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&uart0>;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		memory {
 			compatible = "hv-memory";
@@ -70,6 +76,15 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
 	};
 
 	// =====================================================
@@ -109,7 +124,7 @@
 	part1 {
 		compatible = "partition";
 		cpus = <2 3>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 		error-manager = <0>;
 
@@ -117,10 +132,6 @@
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma0>;
 			guest-addr = <0 0>;
-		};
-
-		uart2: uart2 {
-			device = "serial2";
 		};
 
 		dma0: dma0 {
@@ -131,8 +142,14 @@
 			};
 		};
 
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
 		aliases {
-			stdout = <&uart2>;
+			stdout = <&p1bc>;
 		};
 	};
 
@@ -142,7 +159,7 @@
 	part2 {
 		compatible = "partition";
 		cpus = <0 2>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x300000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x100000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -151,22 +168,19 @@
 			guest-addr = <0 0>;
 		};
 
-		uart3: uart3 {
-			device = "serial3";
-			node-update {
-				delete-prop = "interrupts";
-			};
-		};
-
 		dma1: dma1 {
 			device = "dma1";
 			dma-window = <&window0>;
 		};
 
-		aliases {
-			stdout = <&uart3>;
+		p2bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
 		};
-	};
-	chosen {
+
+		aliases {
+			stdout = <&p2bc>;
+		};
 	};
 };
