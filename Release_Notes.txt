@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.5
-Revsion: 003
-Date: 9/11/2009
+Revsion: 004
+Date: 9/21/2009
 
 -------------------------------------------------------
 Contents
@@ -46,7 +46,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.5-003 has been tested with Simics 4.2.14 / pre14
+   -embedded-hv v0.5-004 has been tested with Simics 4.2.20 / pre21
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -55,7 +55,13 @@ Contents
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -Topaz 0.5-003 bug fixes and changes
+   -v0.5-004 bug fixes and changes
+      -fix bug 4265--  multiple Linux partitions booted
+       at same time hang
+      -MSI fixes and cleanup, including bug 4251
+      -fix bug 4264-- NMI unit test failure
+
+   -v0.5-003 bug fixes and changes
       -ELF loaders: clean up and better error handling and
        diagnostics
       -bug 4233: start/restart combination caused partition to
@@ -64,7 +70,7 @@ Contents
        provide proper cache synchronization for partman
        based image loading.
 
-   -Topaz 0.5-002 bug fixes and changes
+   -v0.5-002 bug fixes and changes
       -bug 4091: gdb is not flushing caches on breakpoint writes
       -bug 3470: partman load returns zero for success
       -bug 3739: check to verify that MSI subwindow lies within
@@ -77,7 +83,7 @@ Contents
       -optimization to remove redundant PID invalidates of the TLB
       -misc unit test cleanup
 
-   -Topaz 0.5-001 bug fixes and changes (from 0.4-011)
+   -v0.5-001 bug fixes and changes (from 0.4-011)
       -mux_server now supports an -exec command that
        allows connection to another program (such
        as skermit)
