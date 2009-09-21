@@ -390,6 +390,8 @@ uint8_t *uart_virt;
 
 static chardev_t *test_init_uart(int node)
 {
+	uint32_t baud = 115200;
+
 	if (dt_get_reg(fdt, node, 0, &uart_addr, NULL) < 0)
 		return NULL;
 
@@ -406,12 +408,20 @@ static chardev_t *test_init_uart(int node)
 	} else if (prop && len == 8) {
 		freq = *(const uint64_t *)prop;
 	} else {
-		printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
-		         "%s: bad/missing clock-frequency\n",
-		         __func__);
+		printlog(LOGTYPE_DEV, LOGLEVEL_ERROR,
+		         "%s: bad/missing clock-frequency\n", __func__);
 	}
 
-	return ns16550_init(uart_virt, NULL, freq, 16);
+	prop = fdt_getprop(fdt, node, "current-speed", &len);
+	if (prop) {
+		if (len == 4)
+			baud = *(const uint32_t *)prop;
+		else
+			printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
+			         "%s: bad current-speed property\n", __func__);
+	}
+
+	return ns16550_init(uart_virt, NULL, freq, 16, baud);
 }
 
 static chardev_t *test_init_byte_chan(int node)
