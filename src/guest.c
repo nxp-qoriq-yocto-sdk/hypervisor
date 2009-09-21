@@ -1891,7 +1891,7 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 	return 0;
 }
 
-static void start_guest_primary_nowait(trapframe_t *regs, void *arg)
+static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -2006,7 +2006,7 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 		BUG();
 	}
 
-	start_guest_primary_nowait(regs, arg);
+	start_guest_primary_noload(regs, arg);
 }
 
 static void start_guest_secondary(trapframe_t *regs, void *arg)
@@ -2088,7 +2088,7 @@ void start_core(trapframe_t *regs)
 	assert(guest->state == guest_starting);
 
 	if (gcpu == guest->gcpus[0])
-		fn = start_guest_primary_nowait;
+		fn = start_guest_primary_noload;
 	else
 		fn = start_guest_secondary;
 
@@ -2096,7 +2096,7 @@ void start_core(trapframe_t *regs)
 	unblock(&gcpu->thread);
 }
 
-void start_wait_core(trapframe_t *regs)
+void start_load_core(trapframe_t *regs)
 {
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
 	         "start wait core %lu\n", mfspr(SPR_PIR));
@@ -2141,7 +2141,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 		if (restart) {
 			guest->state = guest_starting;
-			setgevent(guest->gcpus[0], gev_start_wait);
+			setgevent(guest->gcpus[0], gev_start_load);
 		} else {
 			guest->state = guest_stopped;
 			send_doorbells(guest->dbell_state_change);
@@ -2226,7 +2226,7 @@ int stop_guest(guest_t *guest)
 	return ret;
 }
 
-int start_guest(guest_t *guest)
+int start_guest(guest_t *guest, int load)
 {
 	int ret = 0;
 	register_t saved = spin_lock_intsave(&guest->state_lock);
@@ -2241,7 +2241,7 @@ int start_guest(guest_t *guest)
 	if (ret)
 		return ret;
 
-	setgevent(guest->gcpus[0], gev_start);
+	setgevent(guest->gcpus[0], load ? gev_start_load : gev_start);
 	return ret;
 }
 
@@ -2795,7 +2795,7 @@ __attribute__((noreturn)) void init_guest(void)
 			/* Boot CPU */
 			if (init_guest_primary(guest) == 0) {
 				guest->state = guest_starting;
-				setgevent(gcpu, gev_start_wait);
+				setgevent(gcpu, gev_start_load);
 			}
 		} else {
 			register_gcpu_with_guest(guest);
