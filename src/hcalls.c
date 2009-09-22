@@ -648,7 +648,7 @@ static void fh_err_get_info(trapframe_t *regs)
 
 static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
-	fh_whoami,
+	unimplemented,
 	fh_err_get_info,
 	fh_partition_get_dtprop,
 	fh_partition_set_dtprop,           /* 4 */
