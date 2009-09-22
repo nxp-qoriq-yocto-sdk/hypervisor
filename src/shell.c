@@ -242,14 +242,15 @@ static void info_fn(shell_t *shell, char *args)
 	unsigned int i;
 	const char *state_str = NULL;
 
-	qprintf(shell->out, 1, "Partition   Name        State\n");
-	qprintf(shell->out, 1, "-------------------------------\n");
+	qprintf(shell->out, 1, "Partition   Name        State         Vcpus\n");
+	qprintf(shell->out, 1, "-------------------------------------------\n");
 
 	for (i = 0; i < last_lpid; i++) {
 		guest_state_str(&guests[i], &state_str);
 		qprintf(shell->out, 1, "%-11d %s", i, guests[i].name);
 		if (state_str)
 			qprintf(shell->out, 1, "\t%s", state_str);
+		qprintf(shell->out, 1, "%10d", guests[i].cpucnt);
 		qprintf(shell->out, 1, "\n");
 	}
 }
