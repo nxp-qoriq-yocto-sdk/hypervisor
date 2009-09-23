@@ -64,7 +64,7 @@ static void dump_dev_tree(void)
 }
 
 #define CPUCNT 4
-static int cpus_complete[CPUCNT];
+static volatile int cpus_complete[CPUCNT];
 
 static void dump(int *a, int n, int pir, int i) __attribute__ ((noinline));
 static void dump(int *a, int n, int pir, int i)
@@ -123,14 +123,8 @@ static void secondary_entry(void)
 	uint32_t cpu_index;
 	uint32_t pir = mfspr(SPR_PIR);
 
-	fh_cpu_whoami(&cpu_index);
-	printf(" > secondary cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
-	if (cpu_index == pir) {
-		cpus_complete[pir] = 1;
-		printf("PASSED\n");
-	} else {
-		printf("FAILED\n");
-	}
+	printf(" > secondary cpu start-- PIR=%d\n", pir);
+	cpus_complete[pir] = 1;
 
 	/* wait for debugger to set gdb_attached
 	 * and allow code to continue */
@@ -158,16 +152,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	enable_extint();
 
-	printf("whoami test\n");
+	printf("gdb-C test\n");
 	release_secondary_cores();
-	fh_cpu_whoami(&cpu_index);
-	printf(" > boot cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
-	if (cpu_index == pir) {
-		cpus_complete[pir] = 1;
-		printf("PASSED\n");
-	} else {
-		printf("FAILED\n");
-	}
+	printf(" > boot cpu start-- PIR=%d\n", pir);
+	cpus_complete[pir] = 1;
 
 	while (done != CPUCNT) {
 		done = 0;

@@ -46,14 +46,20 @@
 	// =====================================================
 	hv:hypervisor-config {
 		compatible = "hv-config";
-		stdout = <&serial0>;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		hv-memory {
 			compatible = "hv-memory";
 			phys-mem = <&pma0>;
 		};
 
-		serial0:serial0 {
+		uart0:serial0 {
 			device = "serial0";
 		};
 
@@ -77,6 +83,10 @@
 			device = "/soc/corenet-cf";
 		};
 
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
 		uart1:uart1 {
 			device = "serial1";
 		};
@@ -85,7 +95,7 @@
 
 	uartmux: uartmux {
 		compatible = "byte-channel-mux";
-		endpoint = <&uart1>;
+		endpoint = <&uart0>;
 	};
 
 	// =====================================================
@@ -95,11 +105,17 @@
 		compatible = "partition";
 		label = "pmr-test";
 		cpus = <0 4>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
-		uart2: uart2 {
-			device = "serial2";
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		aliases {
+			stdout = <&p1bc>;
 		};
 
 		gpma0 {
@@ -108,35 +124,31 @@
 			guest-addr = <0 0>;
 		};
 
-		aliases {
-			stdout = <&uart2>;
-		};
-
 		gdb-stub@0 {
 			compatible = "gdb-stub", "debug-stub";
 			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <0>;
+			mux-channel = <2>;
 			debug-cpus = <0 1>; //virtual cpu 0
 			// gdb-wait-at-start;
 		};
 		gdb-stub@1 {
 			compatible = "gdb-stub", "debug-stub";
 			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <1>;
+			mux-channel = <3>;
 			debug-cpus = <1 1>; //virtual cpu 1
 			// gdb-wait-at-start;
 		};
 		gdb-stub@2 {
 			compatible = "gdb-stub", "debug-stub";
 			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <2>;
+			mux-channel = <4>;
 			debug-cpus = <2 1>; //virtual cpu 2
 			// gdb-wait-at-start;
 		};
 		gdb-stub@3 {
 			compatible = "gdb-stub", "debug-stub";
 			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <3>;
+			mux-channel = <5>;
 			debug-cpus = <3 1>; //virtual cpu 3
 			// gdb-wait-at-start;
 		};
