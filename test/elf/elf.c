@@ -33,13 +33,27 @@
 
 extern uint32_t text_start;
 
+static inline uint32_t get_pc(void)
+{
+	register uint32_t retval asm("r3") = 0;
+
+	asm ("mflr %%r0;"
+	     "bl 1f;"
+	     "1: mflr %0;"
+	     "mtlr %%r0;" : "=r" (retval) : :"r0","memory" );
+
+	return retval;
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 
 	printf("elf non zero load address test\n");
-	printf("text start = %x\n", (uint32_t) &text_start);
-	if ((uint32_t) &text_start != PHYSBASE)
+#ifdef DEBUG
+	printf("pc = %x\n", get_pc());
+#endif
+	if (get_pc() > (uint32_t)&text_start)
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");
