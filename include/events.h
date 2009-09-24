@@ -38,7 +38,7 @@ void do_stop_core(trapframe_t *regs, int restart);
 void stop_core(trapframe_t *regs);
 void start_core(trapframe_t *regs);
 void restart_core(trapframe_t *regs);
-void start_wait_core(trapframe_t *regs);
+void start_load_core(trapframe_t *regs);
 void wait_for_gevent(trapframe_t *regs);
 int register_gevent(eventfp_t handler);
 void init_gevents(void);
@@ -58,10 +58,10 @@ void dbell_to_cgdbell_glue(trapframe_t *regs);
 
 extern int gev_stop; /**< Stop guest on this core */
 extern int gev_start; /**< Start guest on this core */
-/**< GEV_STOP, plus send GEV_START_WAIT to primary. */
+/**< gev_stop, plus send gev_start_load to primary. */
 extern int gev_restart;
-/**< GEV_START, but wait if no image; primary core only. */
-extern int gev_start_wait;
+/**< gev_start, but wait if no image; primary core only. */
+extern int gev_start_load;
 extern int gev_pause;
 extern int gev_resume;
 extern int gev_nmi;

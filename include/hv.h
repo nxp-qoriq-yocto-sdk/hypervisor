@@ -37,7 +37,7 @@
 struct guest;
 struct queue;
 
-int start_guest(struct guest *guest);
+int start_guest(struct guest *guest, int load);
 int stop_guest(struct guest *guest);
 int restart_guest(struct guest *guest);
 int pause_guest(struct guest *guest);

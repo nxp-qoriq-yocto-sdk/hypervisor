@@ -47,7 +47,9 @@ static int ns16550_probe(driver_t *drv, device_t *dev)
 	interrupt_t *irq = NULL;
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
+	dev_owner_t *owner = dt_owned_by(node, NULL);
 	uint64_t freq = 0;
+	uint32_t baud = 115200;
 
 	if (dev->num_regs < 1 || !dev->regs[0].virt)
 		return ERR_INVALID;
@@ -61,12 +63,38 @@ static int ns16550_probe(driver_t *drv, device_t *dev)
 	} else if (prop && prop->len == 8) {
 		freq = *(const uint64_t *)prop->data;
 	} else {
-		printlog(LOGTYPE_DEV, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_DEV, LOGLEVEL_ERROR,
 		         "%s: bad/missing clock-frequency in %s\n",
 		         __func__, node->name);
 	}
 
-	cd = ns16550_init(dev->regs[0].virt, irq, freq, 16);
+	prop = dt_get_prop(node, "current-speed", 0);
+	if (prop) {
+		if (prop->len == 4)
+			baud = *(const uint32_t *)prop->data;
+		else
+			printlog(LOGTYPE_DEV, LOGLEVEL_ERROR,
+			         "%s: bad current-speed property in %s\n",
+			         __func__, node->name);
+	}
+
+	if (owner) {
+		prop = dt_get_prop(owner->cfgnode, "baud", 0);
+		if (prop) {
+			if (prop->len == 4)
+				baud = *(const uint32_t *)prop->data;
+			else
+				printlog(LOGTYPE_DEV, LOGLEVEL_ERROR,
+				         "%s: bad baud property in %s\n",
+				         __func__, owner->cfgnode->name);
+		}
+	} else {
+		printlog(LOGTYPE_DEV, LOGLEVEL_ERROR,
+		         "%s: %s not owned by hypervisor?\n",
+		         __func__, node->name);
+	}
+
+	cd = ns16550_init(dev->regs[0].virt, irq, freq, 16, baud);
 
 	dev->driver = &ns16550;
 	dev->chardev = cd;

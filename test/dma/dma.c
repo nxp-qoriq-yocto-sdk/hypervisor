@@ -31,7 +31,8 @@
 #include <libfdt.h>
 #include <hvtest.h>
 
-#define DMA_CHAN_BSY 0x00000004
+#define DMA_CHAN_BUSY 0x00000004
+#define DMA_END_OF_SEGMENT 0x00000002
 #define PAGE_SIZE 4096
 
 void init(unsigned long devtree_ptr);
@@ -129,22 +130,37 @@ static int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst,
 {
 	int count = 0x100;
 	unsigned char *gva_src, *gva_dst;
+	uint32_t stat;
 
 	gva_src = (unsigned char *)(uintptr_t)(gpa_src + PHYSBASE);
-	if (do_memset)
-		memset(gva_src, 0x5A, count);
+	gva_dst = (unsigned char *)(uintptr_t)(gpa_dst + PHYSBASE);
+
+	if (do_memset) {
+		for (int i = 0; i < count; i++)
+			gva_src[i] = i;
+		memset(gva_dst, 0xeb, count);
+	}
 
 	/* basic DMA direct mode test */
-	out32(&dma_virt[0], 0x00000404);
+	out32(&dma_virt[1], in32(&dma_virt[1])); /* clear old status */
+	out32(&dma_virt[0], 0x00000644);
 	out32(&dma_virt[8], count); /* count */
 	out32(&dma_virt[4], 0x00050000); /* read,snoop */
 	out32(&dma_virt[6], 0x00050000); /* write,snoop */
 	out32(&dma_virt[5], gpa_src);
 	out32(&dma_virt[7], gpa_dst);
 
-	while (in32(&dma_virt[1]) & DMA_CHAN_BSY);
+	while (1) {
+		stat = in32(&dma_virt[1]);
+		stat &= ~DMA_CHAN_BUSY;
 
-	gva_dst = (unsigned char *)(uintptr_t)(gpa_dst + PHYSBASE);
+		if (stat & ~DMA_END_OF_SEGMENT) {
+			printf("stat %x\n", stat);
+			return 0;
+		}
+		if (stat & DMA_END_OF_SEGMENT)
+			break;
+	}
 
 	return (!memcmp(gva_src, gva_dst, count));
 }
@@ -173,15 +189,14 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("DMA access violation test#1 : FAILED\n");
 
-	const char *label = fdt_getprop(fdt, 0, "label", &len);
 
 	while (!mcheck_int);
 	for(i = 0; i < 8; i++)
 		printf("%x, ", mcheck_err[i]);
 	printf("\n");
-
 	printf("Access violation test : PASSED\n");
 
+	const char *label = fdt_getprop(fdt, 0, "label", &len);
 	if(!strcmp("/part1", label)) {
 		while (crit_int < 2 );
 		for(i = 0 ; i < 16 ; i++)
@@ -207,15 +222,15 @@ void libos_client_entry(unsigned long devtree_ptr)
 			(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
 			TLB_MAS3_KERN, 0, 0, 0);
 		if (window_test) {
-			if (test_dma_memcpy(0x04000100, 0x05000100, 1))
+			if (test_dma_memcpy(0x04000115, 0x05000127, 1))
 				printf("DMA access test : PASSED\n");
 			else
 				printf("DMA access test : FAILED\n");
 		}
 
 		if (sub_window_test) {
-			if (test_dma_memcpy(0x04000100, 0x0c000100, 1) &&
-				test_dma_memcpy(0x04000100, 0x20000100, 1))
+			if (test_dma_memcpy(0x04000115, 0x0c00012e, 1) &&
+				test_dma_memcpy(0x04000130, 0x20000111, 1))
 				printf("DMA access test : PASSED\n");
 			else
 				printf("DMA access test : FAILED\n");

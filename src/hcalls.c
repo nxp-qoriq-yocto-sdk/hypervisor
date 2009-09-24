@@ -578,7 +578,7 @@ static void fh_partition_start(trapframe_t *regs)
 	}
 
 	guest->entry = regs->gpregs[4];
-	regs->gpregs[3] = start_guest(guest) ? FH_ERR_INVALID_STATE : 0;
+	regs->gpregs[3] = start_guest(guest, 0) ? FH_ERR_INVALID_STATE : 0;
 }
 
 

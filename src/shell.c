@@ -557,24 +557,29 @@ shell_cmd(paact);
 
 static void start_fn(shell_t *shell, char *args)
 {
-	char *numstr;
-	int num;
+	char *str;
+	int num, load = 0;
 	guest_t *guest;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
+	str = nextword(&args);
 
-	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: start <partition-number>\n");
+	if (str && !strcmp(str, "load")) {
+		load = 1;
+		str = nextword(&args);
+	}
+
+	if (!str) {
+		qprintf(shell->out, 1, "Usage: start [load] <partition-number>\n");
 		return;
 	}
 
-	num = get_partition_num(shell, numstr);
+	num = get_partition_num(shell, str);
 	if (num == -1)
 		return;
 
 	guest = &guests[num];
-	if (start_guest(guest))
+	if (start_guest(guest, load))
 		qprintf(shell->out, 1, "Couldn't start partition.\n");
 }
 
