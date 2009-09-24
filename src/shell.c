@@ -163,7 +163,7 @@ static void help_fn(shell_t *shell, char *args)
 
 		for (i = &shellcmd_begin; i < &shellcmd_end; i++) {
 			cmd = *i;
-			qprintf(shell->out, 1, "%s", cmd->name);
+			qprintf(shell->out, 1, "  %s", cmd->name);
 			print_aliases(shell, cmd);
 			qprintf(shell->out, 1, " - %s\n",cmd->shorthelp);
 		}
@@ -551,7 +551,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 static command_t paact = {
 	.name = "paact",
 	.action = paact_dump_fn,
-	.shorthelp = "Dump PAMU's PAACT table entries",
+	.shorthelp = "Display PAMU's PAACT table entries",
 };
 shell_cmd(paact);
 #endif
@@ -588,7 +588,9 @@ static command_t startcmd = {
 	.name = "start",
 	.action = start_fn,
 	.shorthelp = "Start a stopped partition",
-	.longhelp = "  Usage: start <partition-number>\n\n"
+	.longhelp = "  Usage: start [load] <partition-number>\n\n"
+	            "  The optional 'load' argument specifies that any images defined\n"
+	            "  by the partition are to be loaded.\n\n"
 	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(startcmd);
@@ -695,7 +697,7 @@ static command_t pause = {
 	.action = pause_fn,
 	.shorthelp = "Pause a running partition",
 	.longhelp = "  Usage: pause <partition-number>\n\n"
-	            "  Instruction execution is suspended on all CPUs of a paused partition."
+	            "  Instruction execution is suspended on all CPUs of a paused partition.\n\n"
 	            "  The partition number can be obtained with the 'info' command.",
 };
 shell_cmd(pause);
@@ -843,7 +845,7 @@ static void gtlb_fn(shell_t *shell, char *args)
 	}
 
 	if (guests[guest_num].state != guest_paused) {
-		qprintf(shell->out, 1, "Can't dump tlb, guest not pasued\n");
+		qprintf(shell->out, 1, "Can't display tlb, guest not pasued\n");
 		return;
 	}
 
@@ -860,8 +862,10 @@ static void gtlb_fn(shell_t *shell, char *args)
 static command_t gtlb = {
 	.name = "gtlb",
 	.action = gtlb_fn,
-	.shorthelp = "Dump guest tlb entries",
-	.longhelp = "  Usage: gtlb <tlb-number>\n\n"
+	.shorthelp = "Display guest tlb entries",
+	.longhelp = "  Usage: gtlb <partition-number> <vcpu-number>\n\n"
+	            "  The partition number and number of vcpus in a partition\n"
+	            "  can be obtained with the 'info' command.",
 };
 shell_cmd(gtlb);
 
