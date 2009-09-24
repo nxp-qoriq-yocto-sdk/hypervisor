@@ -532,7 +532,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
 		entry = pamu_get_ppaace(liodn);
-		if (entry && entry->v) {
+		if (entry && entry->wse) {
 			memset(str, 0, BUFF_SIZE);
 			decode_wse(entry->wse, str);
 			qprintf(shell->out, 1, "liodn#: %d(0x%x)"
