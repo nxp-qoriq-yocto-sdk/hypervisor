@@ -42,6 +42,7 @@
 #include <paging.h>
 #include <events.h>
 #include <ccm.h>
+#include <cpc.h>
 #include <limits.h>
 #include <error_log.h>
 
@@ -147,6 +148,29 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 {
 	dt_prop_t *prop;
 	dt_node_t *node;
+
+	/* Fastpath, exit early if L3/CPC cache is target for stashing */
+	if (stash_dest == L3) {
+		node = dt_get_first_compatible(hw_devtree,
+				"fsl,p4080-l3-cache-controller");
+		if (node) {
+			prop = dt_get_prop(node, "cache-stash-id", 0);
+			if (!prop) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+					"%s: missing cache-stash-id in %s\n",
+					__func__, node->name);
+				return ~(uint32_t)0;
+			}
+			if (!cpcs_enabled()) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+					"%s: %s not enabled\n",
+					__func__, node->name);
+				return ~(uint32_t)0;
+			}
+			return *(const uint32_t *)prop->data;
+		}
+		return ~(uint32_t)0;
+	}
 
 	prop = dt_get_prop(hwnode, "cpu-handle", 0);
 	if (!prop || prop->len != 4)

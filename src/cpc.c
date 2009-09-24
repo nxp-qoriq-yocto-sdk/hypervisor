@@ -36,6 +36,17 @@
 
 static cpc_dev_t cpcs[NUMCPCS];
 
+int cpcs_enabled(void)
+{
+	for (int i = 0; i < NUMCPCS; i++){
+		if (!cpcs[i].cpccsr0 ||
+			!(in32(cpcs[i].cpccsr0) & CPCCSR0_CPCE))
+				return 0;
+	}
+
+	return 1;
+}
+
 void enable_cpcs(void)
 {
 	uint32_t val;

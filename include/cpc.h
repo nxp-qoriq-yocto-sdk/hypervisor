@@ -30,5 +30,6 @@ struct dt_prop;
 
 void allocate_cpc_ways(struct dt_prop *prop, uint32_t tgt, uint32_t csdid, struct dt_node *node);
 void enable_cpcs(void);
+int cpcs_enabled(void);
 
 #endif
