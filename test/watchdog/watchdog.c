@@ -181,9 +181,8 @@ static void secondary_entry(void)
 	// a watchdog timeout.  If we re-run test6(), then we'll just reboot
 	// again.  So instead, we stop.
 	if (!(mfspr(SPR_TSR) & TSR_WRS)) {
-		unsigned int cpu_index;
+		unsigned int cpu_index = mfspr(SPR_PIR);
 
-		fh_cpu_whoami(&cpu_index);
 		printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
 
 		test6();
@@ -198,13 +197,12 @@ static void secondary_entry(void)
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
-	unsigned int cpu_index;
+	unsigned int cpu_index = mfspr(SPR_PIR);
 
 	init(devtree_ptr);
 
 	printf("\n\nWatchdog test\n");
 
-	fh_cpu_whoami(&cpu_index);
 	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
 
 	mtspr(SPR_TCR, TCR_WRC_NOP);
