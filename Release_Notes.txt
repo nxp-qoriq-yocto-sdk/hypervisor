@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.5
-Revsion: 004
-Date: 9/21/2009
+Revsion: 005
+Date: 9/25/2009
 
 -------------------------------------------------------
 Contents
@@ -54,6 +54,17 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.5-005 bug fixes and changes
+      -bug 4099-- support "baud" property in config spec
+       for HV console
+      -bug 3072-- add support for start with 'load' in shell
+      -bug 4017-- remove whoami hcall
+      -bug 4118-- display number of cpus in partitions w/ info command
+      -bug 4194-- fix elf unit test
+      -bug 4137-- display paact entries that have valid bit cleared
+      -bug 4025-- fix setup stashing for devices targeting CPC 
+      -misc unit test cleanup
 
    -v0.5-004 bug fixes and changes
       -fix bug 4265--  multiple Linux partitions booted
