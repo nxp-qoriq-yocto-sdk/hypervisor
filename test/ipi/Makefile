@@ -92,6 +92,20 @@ $(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb)
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
+$(test)-run-B: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9002" &
+	$(SIMICS) $(testdir)$</run-B.simics
+
+$(test)-run-C: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9002" &
+	$(SIMICS) $(testdir)$</run-C.simics
+
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2
 

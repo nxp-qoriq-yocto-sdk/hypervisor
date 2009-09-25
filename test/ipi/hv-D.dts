@@ -55,16 +55,21 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&serial0>;
 		legacy-interrupts;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		memory {
 			compatible = "hv-memory";
 			phys-mem = <&pma1>;
 		};
 
-		serial0: serial0 {
-			// Hypervisor console
+		uart0: serial0 {
 			device = "serial0";
 		};
 
@@ -91,7 +96,15 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
 	};
+
+	// =====================================================
+	// Global objects
+	// =====================================================
 
 	doorbells {
 		dbell0: doorbell0 {
@@ -195,13 +208,18 @@
 		};
 	};
 
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
 	// =====================================================
 	// Partition 1
 	// =====================================================
 	part1 {
 		compatible = "partition";
 		cpus = <0 2>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma0 {
@@ -217,10 +235,6 @@
 			node-update {
 				prepend-stringlist = "compatible", "fsl,share-mem-test";
 			};
-		};
-
-		serial2: serial2 {
-			device = "serial2";
 		};
 
 		doorbell0 {
@@ -359,8 +373,15 @@
 			compatible = "send-doorbell";
 			global-doorbell = <&dbell32>;
 		};
+
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
 		aliases {
-			stdout = <&serial2>;
+			stdout = <&p1bc>;
 		};
 	};
 };

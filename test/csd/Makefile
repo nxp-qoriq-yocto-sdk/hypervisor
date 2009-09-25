@@ -27,8 +27,11 @@ dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
 
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+$(test)-run: $(test)
+	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
+	xterm -e "telnet localhost 9000" &
+	xterm -e "telnet localhost 9001" &
+	$(SIMICS) $(testdir)$</run.simics
 
 $(test)-check: $(test)-run-batch
 	$(testdir)common/check-results 2

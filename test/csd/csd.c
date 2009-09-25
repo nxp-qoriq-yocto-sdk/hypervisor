@@ -79,14 +79,8 @@ static void secondary_entry(void)
 	uint32_t cpu_index;
 	uint32_t pir = mfspr(SPR_PIR);
 
-	fh_cpu_whoami(&cpu_index);
-	printf(" > secondary cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
-	if (cpu_index == pir) {
-		cpus_complete[pir] = 1;
-		printf("PASSED\n");
-	} else {
-		printf("FAILED\n");
-	}
+	printf(" > secondary cpu start-- PIR=%d\n", pir);
+	cpus_complete[pir] = 1;
 }
 
 extern void (*secondary_startp)(void);
@@ -110,14 +104,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("csd test\n");
 	release_secondary_cores();
-	fh_cpu_whoami(&cpu_index);
-	printf(" > boot cpu start-- PIR=%d, fh_whoami=%d: ", pir, cpu_index);
-	if (cpu_index == pir) {
-		cpus_complete[pir] = 1;
-		printf("PASSED\n");
-	} else {
-		printf("FAILED\n");
-	}
+	printf(" > boot cpu start-- PIR=%d\n", pir);
+	cpus_complete[pir] = 1;
 
 	while (done != CPUCNT) {
 		done = 0;

@@ -22,21 +22,17 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# UART0 is the hypervisor
-# UART2 is guest serial console
-$use_uart2 = 1
-#$use_uart3 = 1
-$use_uart1 = 1
+$use_uart0 = 0
+$use_uart0_net = 1
 
 $guest_image[0] = "csd"
-$guest_addr[0]  = 0x00200000
+$guest_addr[0]  = 0x00a00000
 
 $guest_image[1] = "csd"
-$guest_addr[1]  = 0x00200000
-
+$guest_addr[1]  = 0x00a00000
 
 $guest_image[2] = "hv.dtb"
-$guest_addr[2]  = 0x00100000
+$guest_addr[2]  = 0x00900000
 
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"

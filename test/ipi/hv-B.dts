@@ -62,16 +62,21 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&serial0>;
 		legacy-interrupts;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		memory {
 			compatible = "hv-memory";
 			phys-mem = <&pma2>;
 		};
 
-		serial0: serial0 {
-			// Hypervisor console
+		uart0: serial0 {
 			device = "serial0";
 		};
 
@@ -103,11 +108,18 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
 	};
 
+	// =====================================================
+	// Global objects
+	// =====================================================
 	uartmux: uartmux {
 		compatible = "byte-channel-mux";
-		endpoint = <&serial1>;
+		endpoint = <&uart0>;
 	};
 
 	doorbells {
@@ -122,7 +134,7 @@
 	part1 {
 		compatible = "partition";
 		cpus = <0 2>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -140,10 +152,6 @@
 			};
 		};
 
-		serial2: serial2 {
-			device = "serial2";
-		};
-
 		doorbell0 {
 			compatible = "receive-doorbell";
 			global-doorbell = <&dbell0>;
@@ -154,8 +162,14 @@
 			global-doorbell = <&dbell0>;
 		};
 
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
 		aliases {
-			stdout = <&serial2>;
+			stdout = <&p1bc>;
 		};
 	};
 
@@ -165,7 +179,7 @@
 	part2 {
 		compatible = "partition";
 		cpus = <2 2>;
-		guest-image = <0xf 0xe8300000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8b00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		gpma {
@@ -188,12 +202,14 @@
 			global-doorbell = <&dbell0>;
 		};
 
-		serial3: serial3 {
-			device = "serial3";
+		p2bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
 		};
 
 		aliases {
-			stdout = <&serial3>;
+			stdout = <&p2bc>;
 		};
 	};
 };
