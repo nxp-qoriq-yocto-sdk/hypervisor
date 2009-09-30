@@ -68,7 +68,6 @@ int speed1 = B115200;
 #define B115200 B110
 #endif
 
-int speed2 = B115200;
 struct speed {
 	int val;
 	const char *name;
@@ -157,6 +156,18 @@ int getSpeed(const char *name)
 		++i;
 	}
 	return -1;
+}
+
+const char *getSpeedName(int val)
+{
+	int i = 0;
+	while (speeds[i].name) {
+		if (speeds[i].val == val) {
+			return speeds[i].name;
+		}
+		++i;
+	}
+	return NULL;
 }
 
 void message(char *msg, ...)
@@ -739,20 +750,15 @@ static int check_channel(struct iochan *c, int timeout)
 
 void usage(void)
 {
-	fprintf(stderr, "Mux server version 1.0\n");
-
-// When we support serial need to support speed options
-#if 0
-	fprintf(stderr,
-		"usage: %s [-s x y ] [-verbose] [-debug] <target> <channel_port> ...\n",
-		program_name);
-#endif
-	fprintf(stderr,
-		"usage: %s [-exec] [-verbose] [-debug] <target> <channel_port> ...\n",
-		program_name);
-	fprintf(stderr,
-		"       where <target> is <target>:<port> or <serial_device>,\n"
-		"       or an external command to execute if -exec is specified.\n");
+	fprintf(stderr, "Mux server version 1.01\n");
+	fprintf(stderr, "usage: mux_server [-s <baud-rate>] [-exec] [-verbose] [-debug] \n");
+	fprintf(stderr, "                  <target> <channel_port> ...\n");
+	fprintf(stderr, "\n"
+		"           <baud-rate> is the baud rate (e.g. 115200)\n\n"
+		"           <target> is in the form <target>:<port> or <serial_device>,\n"
+		"           or an external command to execute if -exec is specified.\n\n"
+		"           <channel_port> is a list of network ports corresponding\n"
+		"           mux channel numbers.\n");
 	exit(-1);
 }
 
@@ -778,13 +784,11 @@ void parse_command_line(int argc, char **argv)
 				fatal("bad speed specification");
 			}
 			speed1 = getSpeed(argv[1]);
-			speed2 = getSpeed(argv[2]);
-			if (speed1 == -1 || speed2 == -1) {
-				fatal("bad speed specification: %d %d", argv[1],
-				      argv[2]);
+			if (speed1 == -1) {
+				fatal("bad speed specification: %s", argv[1]);
 			}
-			argc -= 2;
-			argv += 2;
+			argc -= 1;
+			argv += 1;
 		} else if (strcmp(argv[0], "-exec") == 0) {
 			ext_program = 1;
 		} else {
@@ -1254,6 +1258,7 @@ int main(int argc, char **argv)
 	int len;
 	char buf[5 + (2 * MAX_PACKET_LEN)];
 	char txreset[] = { CH_SWITCH_ESCAPE, CH_CHANNEL_RESET };
+	const char *speedstr;
 #ifdef STATS
 	int first_time = 1;
 #endif
@@ -1280,7 +1285,9 @@ int main(int argc, char **argv)
 	target_write(txreset, 2);
 	pthread_mutex_unlock(&input_mutex);
 
-	message("using speeds: %d %d", speed1, speed2);
+	speedstr = getSpeedName(speed1);
+	if (speedstr)
+		message("using speed: %s", speedstr);
 
 	check_channel(target, 0);
 	if (!(streams[0]->status & STREAM_READY)) {
