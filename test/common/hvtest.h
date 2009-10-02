@@ -59,4 +59,6 @@ int xlate_reg(const void *tree, int node, const uint32_t *reg,
 int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);
 
+struct chardev *test_init_uart(int node);
+
 #endif
