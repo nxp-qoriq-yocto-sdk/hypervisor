@@ -37,10 +37,10 @@ simtst-run-1p: simtst tunctl
 
 simtst-run-2p: simtst tunctl
 	$(MAKE) -C $(testdir)../../sim/hv-2p-lnx-lwe
-	$(testdir)../../sim/xtel.sh 9000 1
+	$(testdir)../../sim/xtel.sh 9000 4
 	$(SIMICS) $(testdir)$</run-2p.simics
 
 simtst-run-4p: simtst tunctl
 	$(MAKE) -C $(testdir)../../sim/hv-4p-lnx-lnx-lwe-lwe
-	$(testdir)../../sim/xtel.sh 9000 3
+	$(testdir)../../sim/xtel.sh 9000 5
 	$(SIMICS) $(testdir)$</run-4p.simics
