@@ -388,7 +388,7 @@ static int get_stdout(void)
 phys_addr_t uart_addr;
 uint8_t *uart_virt;
 
-static chardev_t *test_init_uart(int node)
+chardev_t *test_init_uart(int node)
 {
 	uint32_t baud = 115200;
 
