@@ -74,22 +74,6 @@ void ext_int_handler(trapframe_t *frameptr)
 		printf("Unexpected behavior : Interrupt in-service @eoi\n");
 }
 
-static void dump_dev_tree(void)
-{
-#ifdef DEBUG
-	int node = -1;
-	const char *s;
-	int len;
-
-	printf("dev tree ------\n");
-	while ((node = fdt_next_node(fdt, node, NULL)) >= 0) {
-		s = fdt_get_name(fdt, node, &len);
-		printf("   node = %s\n",s);
-	}
-	printf("------\n");
-#endif
-}
-
 extern uint8_t *uart_virt;
 
 void libos_client_entry(unsigned long devtree_ptr)
@@ -107,18 +91,18 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("\n");
 
-	dump_dev_tree();
+	node = fdt_path_offset(fdt, "/devices/uart2");
+	if (node < 0) {
+		printf("no /devices/uart2: BROKEN\n");
+		return;
+	}
 
-	/* look up the stdout alias */
-	ret = fdt_subnode_offset(fdt, 0, "aliases");
-	if (ret < 0)
-	        printf("no aliases node: FAILED\n");
-	path = fdt_getprop(fdt, ret, "stdout", &ret);
-	if (!path)
-	        printf("no stdout alias: FAILED\n");
+	if (!test_init_uart(node)) {
+		printf("Can't init /devices/uart2: BROKEN\n");
+		return;
+	}
 
 	/* get the interrupt handle for the serial device */
-	node = fdt_path_offset(fdt, path);
 	handle_p = fdt_getprop(fdt, node, "interrupts", &len);
 
 	fh_vmpic_set_mask(*handle_p, 0);
@@ -137,7 +121,4 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf(" > got external interrupt: PASSED\n");
 
 	printf("Test Complete\n");
-
 }
-
-

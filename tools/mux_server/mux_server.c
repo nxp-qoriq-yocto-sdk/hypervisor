@@ -739,6 +739,7 @@ static int check_channel(struct iochan *c, int timeout)
 
 void usage(void)
 {
+	fprintf(stderr, "Mux server version 1.0\n");
 
 // When we support serial need to support speed options
 #if 0
