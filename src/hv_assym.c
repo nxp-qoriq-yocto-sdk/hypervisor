@@ -30,6 +30,6 @@
 #include <libos-client.h>
 
 ASSYM(CLIENT_GCPU, offsetof(client_cpu_t, gcpu));
-#ifdef CONFIG_TLB_CACHE
+#if defined(CONFIG_TLB_CACHE) && defined(CONFIG_STATISTICS)
 ASSYM(TLB_MISS_COUNT, offsetof(gcpu_t, benchmarks[bm_stat_tlb_miss_count].num));
 #endif
