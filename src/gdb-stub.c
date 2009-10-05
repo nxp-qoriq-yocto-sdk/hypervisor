@@ -1287,8 +1287,8 @@ static int handle_debug_event(trapframe_t *trap_frame)
 #ifdef USE_DEBUG_INTERRUPT
 	if (stub->dbsr) {
 
-		if (stub->dbsr & ~(DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 | DBSR_IAC2 |
-             	    DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W))
+		if (stub->dbsr & ~(DBSR_MRR | DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 |
+		    DBSR_IAC2 | DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W))
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, "%s: unknown debug event (%08lx)\n",
 			         __func__, stub->dbsr);
 
