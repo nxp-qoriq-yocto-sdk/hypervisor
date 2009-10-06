@@ -21,5 +21,19 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-partman load -h reset-status -f reset-status -a 0x0
-partman start -h reset-status -e 0x0
+
+# UART0 is the hypervisor
+
+$guest_image[0] = "reset-status"
+$guest_addr[0]  = 0x00a00000
+
+
+$guest_image[1] = "hv.dtb"
+$guest_addr[1]  = 0x00900000
+
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
+add-directory "bin/reset-status" -prepend
+
+run-command-file "boot_4_2.simics"

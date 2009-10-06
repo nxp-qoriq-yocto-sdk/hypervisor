@@ -21,5 +21,15 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-partman load -h reset-status -f reset-status -a 0x0
-partman start -h reset-status -e 0x0
+
+test := reset-status
+dir := $(testdir)$(test)/
+
+include $(testdir)common/Makefile.inc
+
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics
+
+$(test)-check: $(test)-run-batch
+	$(testdir)common/check-results 1
+
