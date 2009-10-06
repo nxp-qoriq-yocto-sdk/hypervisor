@@ -154,16 +154,16 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 		node = dt_get_first_compatible(hw_devtree,
 				"fsl,p4080-l3-cache-controller");
 		if (node) {
+			if (!cpcs_enabled()) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+					"%s: %s not enabled\n",
+					__func__, node->name);
+				return ~(uint32_t)0;
+			}
 			prop = dt_get_prop(node, "cache-stash-id", 0);
 			if (!prop) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
 					"%s: missing cache-stash-id in %s\n",
-					__func__, node->name);
-				return ~(uint32_t)0;
-			}
-			if (!cpcs_enabled()) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
-					"%s: %s not enabled\n",
 					__func__, node->name);
 				return ~(uint32_t)0;
 			}
