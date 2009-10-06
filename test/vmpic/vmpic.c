@@ -89,7 +89,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (coreint)
 		printf("- coreint mode\n");
 	else
-		printf("\n");
+		printf("- legacy mode\n");
 
 	node = fdt_path_offset(fdt, "/devices/uart2");
 	if (node < 0) {

@@ -77,6 +77,10 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
 	};
 
 	uartmux: uartmux {
@@ -101,6 +105,9 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 1
+	// =====================================================
 	part1 {
 		compatible = "partition";
 		cpus = <0 2>;

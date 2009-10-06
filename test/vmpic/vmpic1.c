@@ -111,21 +111,21 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (coreint)
 		printf("- coreint mode\n");
 	else
-		printf("\n");
+		printf("- legacy mode\n");
 
 	dump_dev_tree();
 
-	/* look up the stdout alias */
-	ret = fdt_subnode_offset(fdt, 0, "aliases");
-	if (ret < 0)
-		printf("no aliases node: FAILED\n");
+	node = fdt_path_offset(fdt, "/devices/uart2");
+	if (node < 0) {
+		printf("no /devices/uart2: BROKEN\n");
+		return;
+	}
 
-	path = fdt_getprop(fdt, ret, "stdout", &ret);
-	if (!path)
-		printf("no stdout alias: FAILED\n");
+	if (!test_init_uart(node)) {
+		printf("Can't init /devices/uart2: BROKEN\n");
+		return;
+	}
 
-	/* get the interrupt handle for the serial device */
-	node = fdt_path_offset(fdt, path);
 	handle_p = fdt_getprop(fdt, node, "interrupts", &len);
 
 	if (handle_p[1] & IRQ_TYPE_MPIC_DIRECT) {
