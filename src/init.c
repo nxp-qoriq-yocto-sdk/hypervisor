@@ -406,6 +406,27 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 	return 0;
 }
 
+static void early_bind_ccm_law_devices(void)
+{
+	dt_prop_t *prop;
+	dt_node_t *node;
+	const char *compat_srch_str[] = {"fsl,corenet-cf", "fsl,corenet-law"};
+
+	list_for_each(&hv_devs, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+		prop = dt_get_prop(owner->hwnode, "compatible", 0);
+		if (!prop)
+			continue;
+		if (!strcmp((const char *)prop->data, compat_srch_str[0]) ||
+			!strcmp((const char *)prop->data, compat_srch_str[1])) {
+
+				dt_lookup_regs(owner->hwnode);
+				dt_lookup_irqs(owner->hwnode);
+				dt_bind_driver(owner->hwnode);
+		}
+	}
+}
+
 static dt_node_t *stdout_node;
 static int stdout_is_device;
 
@@ -472,6 +493,7 @@ static void assign_hv_devs(void)
 	dt_read_aliases();
 	dt_assign_devices(hvconfig, NULL);
 	find_hv_console(hvconfig);
+	early_bind_ccm_law_devices();
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
@@ -632,14 +654,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	assign_hv_devs();
-#ifdef CONFIG_PAMU
-	/* PAMU hardware initialization should happen before ccm init as we need
-	 * a higher priority LAW for PAMU CSD. PAMU LAW would point to memory
-	 * corresponding to all PAMU tables and CSD would contain all PAMUS
-	 * and cores
-	 */
-	pamu_global_init();
-#endif
 	enable_int();
 	enable_mcheck();
 
