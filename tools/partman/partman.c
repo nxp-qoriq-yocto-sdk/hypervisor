@@ -188,6 +188,8 @@ static void usage(void)
 	       "full handle name as displayed by the -s command.\n");
 }
 
+#define FH_ERR_INVALID_STATE 1026
+
 /**
  * Call the hypervisor management driver.
  *
@@ -214,8 +216,23 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 			perror(__func__);
 	} else {
 		ret = p->ret;
-		if (!quiet && ret)
-			printf("Hypervisor returned error %u\n", ret);
+		if (ret) {
+			char err_str[256];
+			switch (ret) {
+			case EINVAL:
+				strcpy(err_str, "invalid handle");
+				break;
+			case EFAULT:
+				strcpy(err_str, "bad address");
+				break;
+			case FH_ERR_INVALID_STATE:
+				strcpy(err_str, "target partition state invalid");
+				break;
+			default:
+				strcpy(err_str, "unknown error");
+			}
+			printf("Error : (%u) %s\n", ret, err_str);
+		}
 	}
 
 	close(f);
