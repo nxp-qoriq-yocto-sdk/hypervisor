@@ -837,35 +837,37 @@ static int pamu_av_isr(void *arg)
 
 		uint32_t pics = in32((uint32_t *)(reg + PAMU_PICS));
 		if (pics & PAMU_ACCESS_VIOLATION_STAT) {
-			memset(&err, 0, sizeof(error_info_t));
-			err.error_code = ERROR_PAMU_AV;
-			av = &err.regs.av_err;
-			av->avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
-			av->aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
 			avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
-			av->avs1 = avs1;
-			av->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
 			av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
-			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-					"PAMU access violation on PAMU#%ld, liodn = %x\n",
-					 reg_off / PAMU_OFFSET, av_liodn);
-			printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-					"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
-					 av->avs1, av->avs2, av->avah, av->aval);
-
-			/*FIXME : LIODN index not in PPAACT table*/
-			assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
-
-			guest_t *guest = liodn_to_guest[av_liodn];
-			if (guest) {
-				av->lpid = guest->lpid;
-				av->handle = liodn_to_handle[av_liodn];
-			}
-
-			pamu_error_log(&err, guest);
-
 			ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
-			ppaace->v = 0;
+			/* We may get access violations for invalid LIODNs, just ignore them */
+			if (ppaace->v) {
+				memset(&err, 0, sizeof(error_info_t));
+				err.error_code = ERROR_PAMU_AV;
+				av = &err.regs.av_err;
+				av->avs1 = avs1;
+				av->avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
+				av->aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
+				av->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
+						"PAMU access violation on PAMU#%ld, liodn = %x\n",
+						 reg_off / PAMU_OFFSET, av_liodn);
+				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
+						"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
+						 av->avs1, av->avs2, av->avah, av->aval);
+
+				/*FIXME : LIODN index not in PPAACT table*/
+				assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
+
+				guest_t *guest = liodn_to_guest[av_liodn];
+				if (guest) {
+					av->lpid = guest->lpid;
+					av->handle = liodn_to_handle[av_liodn];
+				}
+
+				pamu_error_log(&err, guest);
+				ppaace->v = 0;
+			}
 
 			/* Clear the write one to clear bits in AVS1, mask out the LIODN */
 			out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
