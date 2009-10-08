@@ -490,7 +490,8 @@ static int load_and_copy_image_file(unsigned int partition,
 		ret = parse_and_copy_elf(partition, mapped, off, load_address, entry_address);
 		if (!ret) {
 			if (!quiet)
-				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
+				printf("Could not load file %s,  partition handle %i, "
+				       "load address %lx, error=%i\n",
 				       filename, partition, load_address, ret);
 			goto fail;
 		}
@@ -503,7 +504,7 @@ static int load_and_copy_image_file(unsigned int partition,
 					&hdr->data,
 					load_address, ntohl(hdr->size));
 		if (ret && !quiet) {
-			printf("Could not load file %s to partition %i "
+			printf("Could not load file %s, partition handle %i, "
 			       "at address %lx, error=%i\n",
 				filename, partition, load_address, ret);
 			goto fail;
@@ -519,7 +520,8 @@ static int load_and_copy_image_file(unsigned int partition,
 		ret = copy_to_partition(partition, mapped, load_address, off);
 		if (ret) {
 			if (!quiet)
-				printf("Could not load file %s to partition %i at address %lx, error=%i\n",
+				printf("Could not load file %s, partition handle %i "
+				       "at address %lx, error=%i\n",
 				       filename, partition, load_address, ret);
 			goto fail;
 		}
@@ -1138,10 +1140,16 @@ int main(int argc, char *argv[])
 
 	if (handlestr) {
 		int ret = get_handle(handlestr);
-		if (ret < 0)
-			p.h = strtol(handlestr, NULL, 0);
-		else
+		if (ret < 0) {
+			char *endptr;
+			p.h = strtol(handlestr, &endptr, 0);
+			if (!strlen(handlestr) || *endptr != '\0') {
+				printf("Invalid handle\n");
+				return 1;
+			}
+		} else {
 			p.h = ret;
+		}	
 		p.h_specified = 1;
 	}
 
