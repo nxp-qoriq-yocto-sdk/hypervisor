@@ -705,7 +705,7 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 			paddr = ((uint64_t) gmas.mas7 << 32) |
 				(gmas.mas3 & ~(PAGE_SIZE - 1));
 			vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
-			size = tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT;
+			size = (tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT) - 1;
 
 			qprintf(shell->out, 1, "%02u  ",
 				(tlb_num ? (int) MAS0_GET_TLB1ESEL(gmas.mas0) :
@@ -713,11 +713,11 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 
 			qprintf(shell->out, 1,
 				"0x%0" VADDR_WIDTH "lx - 0x%0" VADDR_WIDTH "lx ",
-				vaddr, vaddr + size - 1);
+				vaddr, vaddr + size);
 
 			qprintf(shell->out, 1,
 				"0x%0" PADDR_WIDTH "llx - 0x%0" PADDR_WIDTH "llx",
-				paddr, paddr + size - 1 );
+				paddr, paddr + size);
 			qprintf(shell->out, 1, " %1d", (int)((gmas.mas1 & MAS1_TS) >> MAS1_TS_SHIFT));
 			qprintf(shell->out, 1, "%6d", (int)((gmas.mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT));
 			extract_mas_flags(gmas.mas2, "WIMGE", buf, mas2_reg, 0);
