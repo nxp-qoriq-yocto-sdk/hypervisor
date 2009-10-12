@@ -52,7 +52,7 @@ static int icache_range_sync(void *ptr, size_t len)
 
 	for (addr = start; addr >= start && addr <= end;
 	     addr += cache_block_size)
-		icache_block_sync((char *)start);
+		icache_block_sync((char *)addr);
 
 	return 0;
 }
