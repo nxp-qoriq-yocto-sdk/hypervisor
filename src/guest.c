@@ -2667,11 +2667,10 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
-	map_guest_mem(guest);
-
 	list_init(&guest->dev_list);
 	list_init(&guest->phandle_update_list);
 
+	map_guest_mem(guest);
  	read_phandle_aliases(guest);
 
 	ret = init_guest_devs(guest);
