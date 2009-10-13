@@ -99,7 +99,7 @@ typedef struct guest {
 	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
 	const char *name;
 	struct dt_node *devtree;
-	struct dt_node *partition; /**< Partition node in main device tree. */
+	struct dt_node *partition; /**< Partition node in config tree. */
 
 	/** Container for devices in guest tree.  This is normally the root
 	 * node, however an explicit container node will be created if

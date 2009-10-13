@@ -525,6 +525,7 @@ int dt_set_prop_string(dt_node_t *node, const char *name, const char *str)
 
 typedef struct merge_ctx {
 	dt_node_t *dest;
+	dt_node_t *top; /* Top of tree to consider -- used for phandle merge only */
 	dt_merge_flags_t flags;
 } merge_ctx_t;
 
@@ -831,12 +832,12 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 			return ERR_NOMEM;
 
 		// Iterate over all the phandles in this property
-		for (i = 0; i < count; i++) {
+		for (ret = 0, i = 0; i < count; i++) {
 			// Get the phandle from the src node
 			phandle = ((uint32_t *) prop->data)[i];
 
 			// Find the other config-tree node the phandle points to
-			node = dt_lookup_phandle(config_tree, phandle);
+			node = dt_lookup_phandle(ctx->top, phandle);
 			if (!node) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 				         "%s: node %s/%s: prop %s: invalid phandle 0x%x\n",
@@ -863,8 +864,6 @@ static int do_merge_phandle(dt_node_t *src, void *arg)
 					  count * sizeof(uint32_t));
 
 		free(phandles);
-		if (ret)
-			return ret;
 	}
 
 	return 0;
@@ -917,7 +916,7 @@ int dt_process_node_update(guest_t *guest, dt_node_t *target, dt_node_t *config)
 
 			up->src = subnode;
 			up->dest = target;
-			up->tree = config_tree;
+			up->tree = guest->partition;
 			list_add(&guest->phandle_update_list, &up->node);
 		}
 	}
@@ -934,6 +933,7 @@ void dt_run_deferred_phandle_updates(guest_t *guest)
 		/* Merge the phandles into the target  */
 		merge_ctx_t ctx = {
 			.dest = up->dest,
+			.top = up->tree,
 		};
 
 		ret = dt_for_each_node(up->src, &ctx,
