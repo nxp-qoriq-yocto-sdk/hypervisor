@@ -318,7 +318,7 @@
 	// =====================================================
 	part2:part2 {
 		compatible = "partition";
-		label = "hello";
+		label = "reset-status";
 		cpus = <3 1>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 

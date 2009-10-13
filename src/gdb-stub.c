@@ -1246,49 +1246,21 @@ static int debug_exception(trapframe_t *trap_frame)
 {
 	gcpu_t *gcpu = get_gcpu();
  	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
-	register_t dbsr = mfspr(SPR_DBSR);
+	stub->dbsr = mfspr(SPR_DBSR);
 
-	mtspr(SPR_DBSR, dbsr); /* clear all hw events */
+	mtspr(SPR_DBSR, stub->dbsr); /* clear all hw debug events */
 
-	stub->dbsr = 0;
-
-	DEBUG("DBSR=%08lx, srr0=%08lx, srr1=%08lx\n",dbsr,trap_frame->srr0,trap_frame->srr1);
-
-	if (dbsr & DBSR_TRAP)
- 		stub->dbsr |= DBSR_TRAP;
-
-	if (dbsr & DBSR_ICMP) {
- 		stub->dbsr |= DBSR_ICMP;
-		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP); /* clear ICMP */
+	 /* clear ICMP */
+	if (stub->dbsr & DBSR_ICMP) {
+		mtspr(SPR_DBCR0, mfspr(SPR_DBCR0) & ~DBCR0_ICMP);
 	}
 
-	if (dbsr & DBSR_IAC1)
- 		stub->dbsr |= DBSR_IAC1;
-
-	if (dbsr & DBSR_IAC2) {
- 		stub->dbsr |= DBSR_IAC2;
-	}
-
-	if (dbsr & DBSR_DAC1R)
-		stub->dbsr |= DBSR_DAC1R;
-
-	if (dbsr & DBSR_DAC1W)
-		stub->dbsr |= DBSR_DAC1W;
-
-	if (dbsr & DBSR_DAC2R)
-		stub->dbsr |= DBSR_DAC2R;
-
-	if (dbsr & DBSR_DAC2W)
-		stub->dbsr |= DBSR_DAC2W;
-
-	if (dbsr & ~(DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 | DBSR_IAC2 |
-	             DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W))
-		printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, "%s: unknown debug event\n",
-		         __func__);
-
+	/* send event to trigger the handling at normal 
+	 * interrupt context
+	 */
  	setgevent(gcpu, stub->gev_dbg);
 
-	return 0;   /* handled event */
+	return 0;   /* isr handled event */
 }
 
 static void debug_gevent_handler(trapframe_t *trap_frame)
@@ -1307,21 +1279,28 @@ static int handle_debug_event(trapframe_t *trap_frame)
 	breakpoint_type_t bptype = breakpoint->type;
 	int trap = 0;
 
-	DEBUG();
-
-	printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "gdb: -------> debug event <--------- \n");
+	DEBUG("DBSR=%08lx, srr0=%08lx, srr1=%08lx\n",stub->dbsr,trap_frame->srr0,trap_frame->srr1);
 
 	/* enable interrupts, so UART keeps working */
 	enable_int();
 
 #ifdef USE_DEBUG_INTERRUPT
 	if (stub->dbsr) {
+
+		if (stub->dbsr & ~(DBSR_MRR | DBSR_TRAP | DBSR_ICMP | DBSR_IAC1 |
+		    DBSR_IAC2 | DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W))
+			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_ERROR, "%s: unknown debug event (%08lx)\n",
+			         __func__, stub->dbsr);
+
 		if (stub->dbsr & DBSR_TRAP) {
 			trap = 1;
-		} else {  /* ICMP and IACx */
+		} else if (stub->dbsr & (DBSR_ICMP| DBSR_IAC1 | DBSR_IAC2 | DBSR_DAC1R |
+			   DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W)) {
 			transmit_stop_reply_pkt_T(trap_frame, stub);
 		}
+
 		stub->dbsr = 0;  /* clear all pending events */
+
 	}
 #else
 	trap = 1;

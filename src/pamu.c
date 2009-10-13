@@ -154,16 +154,16 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 		node = dt_get_first_compatible(hw_devtree,
 				"fsl,p4080-l3-cache-controller");
 		if (node) {
+			if (!cpcs_enabled()) {
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+					"%s: %s not enabled\n",
+					__func__, node->name);
+				return ~(uint32_t)0;
+			}
 			prop = dt_get_prop(node, "cache-stash-id", 0);
 			if (!prop) {
 				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
 					"%s: missing cache-stash-id in %s\n",
-					__func__, node->name);
-				return ~(uint32_t)0;
-			}
-			if (!cpcs_enabled()) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
-					"%s: %s not enabled\n",
 					__func__, node->name);
 				return ~(uint32_t)0;
 			}
@@ -884,8 +884,15 @@ static int pamu_av_isr(void *arg)
 	return ret;
 }
 
+static int pamu_probe(driver_t *drv, device_t *dev);
+
+static driver_t __driver pamu = {
+	.compatible = "fsl,p4080-pamu",
+	.probe = pamu_probe
+};
+
 #define PAMUBYPENR 0x604
-void pamu_global_init(void)
+static int pamu_probe(driver_t *drv, device_t *dev)
 {
 	int ret;
 	phys_addr_t addr, size;
@@ -895,42 +902,33 @@ void pamu_global_init(void)
 	dt_node_t *guts_node, *pamu_node;
 	phys_addr_t guts_addr, guts_size;
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
-	device_t *dev;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
 	 * for each of them.
 	 */
 
-	/* find the pamu node */
-	pamu_node = dt_get_first_compatible(hw_devtree, "fsl,p4080-pamu");
-	if (!pamu_node) {
-		printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-		         "%s: warning: no pamu node found\n", __func__);
-		return;
-	}
-
-	dev = &pamu_node->dev;
-
-	ret = dt_get_reg(pamu_node, 0, &addr, &size);
-	if (ret < 0) {
+	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-		         "%s: no pamu reg found\n", __func__);
-		return;
+			"%s: PAMU reg initialization failed\n", __func__);
+		return ERR_INVALID;
 	}
+	pamu_node = to_container(dev, dt_node_t, dev);
+	addr = dev->regs[0].start;
+	size = dev->regs[0].size;
 
 	guts_node = dt_get_first_compatible(hw_devtree, "fsl,qoriq-device-config-1.0");
 	if (!guts_node) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: pamu present, but no guts node found\n", __func__);
-		return;
+		return ERR_UNHANDLED;
 	}
 
 	ret = dt_get_reg(guts_node, 0, &guts_addr, &guts_size);
 	if (ret < 0) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: no guts reg found\n", __func__);
-		return;
+		return ERR_UNHANDLED;
 	}
 
 	pamumem_size = align(PAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) +
@@ -941,7 +939,7 @@ void pamu_global_init(void)
 	if (!pamumem) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: Unable to allocate space for PAMU tables.\n",
 				__func__);
-		return;
+		return ERR_NOMEM;
 	}
 
 	pamu_node->pma = alloc_type(pma_t);
@@ -994,11 +992,12 @@ void pamu_global_init(void)
 	for (int i = 0; i < PAACE_NUMBER_ENTRIES; i++)
 		liodn_to_handle[i] = -1;
 
-	return;
+	return 0;
 
 fail_pma:
 	free(pamu_node->pma);
 
 fail_mem:
 	free(pamumem);
+	return ERR_NOMEM;
 }

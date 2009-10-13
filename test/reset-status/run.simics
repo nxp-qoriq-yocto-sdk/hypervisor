@@ -22,15 +22,18 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$guest_image[0] = "vmpic1"
+# UART0 is the hypervisor
+
+$guest_image[0] = "reset-status"
 $guest_addr[0]  = 0x00a00000
 
-$guest_image[1] = "hv-C.dtb"
+
+$guest_image[1] = "hv.dtb"
 $guest_addr[1]  = 0x00900000
 
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"
 
-add-directory "bin/vmpic" -prepend
+add-directory "bin/reset-status" -prepend
 
 run-command-file "boot_4_2.simics"

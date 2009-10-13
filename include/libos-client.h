@@ -106,7 +106,6 @@ void decrementer(struct trapframe *regs);
 void fit(struct trapframe *regs);
 void watchdog_trap(struct trapframe *regs);
 void hcall(struct trapframe *regs);
-void statistics_stop(unsigned long start, int bmnum);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt

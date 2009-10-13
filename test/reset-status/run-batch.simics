@@ -22,15 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$guest_image[0] = "vmpic1"
-$guest_addr[0]  = 0x00a00000
+$console_capture = 1
 
-$guest_image[1] = "hv-C.dtb"
-$guest_addr[1]  = 0x00900000
+add-directory "%script%/" -prepend
 
-add-directory "%script%/../common" -prepend
-run-command-file "common.simics"
+run-command-file "run.simics"
 
-add-directory "bin/vmpic" -prepend
-
-run-command-file "boot_4_2.simics"
+$test_con = ($con1:con) # uart 1
+run-command-file "%script%/../common/test-done.simics"

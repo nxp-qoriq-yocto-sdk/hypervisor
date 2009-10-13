@@ -21,5 +21,5 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-partman load -h hello -f hello -a 0x0
-partman start -h hello -e 0x0
+partman load -h reset-status -f reset-status -a 0x0
+partman start -h reset-status -e 0x0

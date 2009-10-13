@@ -32,8 +32,14 @@
 	// =====================================================
 	hv: hv-config {
 		compatible = "hv-config";
-		stdout = <&uart0>;
 		legacy-interrupts;
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
 
 		memory {
 			compatible = "hv-memory";
@@ -71,6 +77,15 @@
 		corenet-cf {
 			device = "/soc/corenet-cf";
 		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
 	};
 
 	// =====================================================
@@ -90,10 +105,13 @@
 		};
 	};
 
+	// =====================================================
+	// Partition 1
+	// =====================================================
 	part1 {
 		compatible = "partition";
 		cpus = <0 2>;
-		guest-image = <0xf 0xe8200000 0 0 0 0x200000>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 		mpic-direct-eoi;
 
@@ -107,8 +125,14 @@
 			device = "serial2";
 		};
 
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
 		aliases {
-			stdout = <&uart2>;
+			stdout = <&p1bc>;
 		};
 	};
 };

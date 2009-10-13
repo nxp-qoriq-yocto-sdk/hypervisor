@@ -22,14 +22,8 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
-$use_uart2 = 1
-
 $guest_image[0] = "vmpic"
 $guest_addr[0]  = 0x00a00000
-
 
 $guest_image[1] = "hv-A.dtb"
 $guest_addr[1]  = 0x00900000

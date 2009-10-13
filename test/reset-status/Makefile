@@ -22,15 +22,14 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$guest_image[0] = "vmpic1"
-$guest_addr[0]  = 0x00a00000
+test := reset-status
+dir := $(testdir)$(test)/
 
-$guest_image[1] = "hv-C.dtb"
-$guest_addr[1]  = 0x00900000
+include $(testdir)common/Makefile.inc
 
-add-directory "%script%/../common" -prepend
-run-command-file "common.simics"
+$(test)-run-%: $(test)
+	$(SIMICS) $(testdir)$</run-$*.simics
 
-add-directory "bin/vmpic" -prepend
+$(test)-check: $(test)-run-batch
+	$(testdir)common/check-results 1
 
-run-command-file "boot_4_2.simics"

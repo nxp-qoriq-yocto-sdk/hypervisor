@@ -79,7 +79,7 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)
 bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.tiny.ext2.gz
 	$(call mount,rootfs-hello)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-hello/bin/
-	sudo cp -af bin/hello/hello bin/linux/rootfs-hello/
+	sudo cp -af bin/reset-status/reset-status bin/linux/rootfs-hello/
 	sudo cp -af $(testdir)linux/hello-start.sh bin/linux/rootfs-hello/start.sh
 	$(call unmount,bin/linux/rootfs-hello)
 

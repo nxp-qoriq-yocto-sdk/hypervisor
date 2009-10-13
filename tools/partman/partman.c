@@ -147,46 +147,40 @@ struct image_header {
  */
 static void usage(void)
 {
-	printf("partman usage:\n\n");
+	printf("Freescale Hypervisor Partition Manager %s\n", VERSION);
+	printf("Usage:\n");
 
-	printf("Show partition status:\n\tpartman status\n");
+	printf("   partman status\n");
 
-	printf("Load image:\n\tpartman load -h <handle> -f <file> [-a <address>]\n"
-	       "\tDefault value for -a is 0, or the base physical address "
-	       "for ELF images.\n");
+	printf("   partman load -h <handle> -f <file> [-a <address>]\n"
+	       "      Load an image.\n");
 
-	printf("Start partition:\n\tpartman start -h <handle> [-f <file>] "
-	       "[-e <addr>] [-a <addr>]\n"
-	       "\tDefault value for -a is 0, or the base physical address "
-	       "for ELF images.\n"
-	       "\tDefault value for -e is 0, or the entry "
-	       "point for ELF images.\n");
+	printf("   partman start -h <handle> [-f <file>] [-e <addr>] [-a <addr>]\n"
+	       "     Start a partition.\n");
 
-	printf("Stop partition:\n\tpartman stop -h <handle>\n");
-	printf("Restart partition:\n\tpartman restart -h <handle>\n");
+	printf("   partman stop -h <handle>\n");
+	printf("      Stop a partition.\n");
 
-	printf("Monitor doorbells:\n\tpartman doorbell -f <file>\n"
-	       "\t<file> is a shell script or program to run on every doorbell.\n"
-	       "\tThe first parameter to the script is the doorbell handle.\n");
+	printf("   partman restart -h <handle>\n");
+	printf("      Restart a partition.\n");
 
-	printf("Ring a doorbell:\n\tpartman doorbell -h <handle>\n"
-	       "\t<handle> is the doorbell send handle for the "
-	       "doorbell to ring.\n");
+	printf("   partman doorbell -f <file>\n");
+	printf("      Monitor doorbells.\n");
 
-	printf("Set a guest device tree property:\n"
-	       "\tpartman setprop -h <handle> -p <path> -n <propname> "
-	       "[-t <data> [-t <data>]]\n");
+	printf("   partman doorbell -h <handle>\n");
+	printf("      Ring a doorbell.\n");
 
-	printf("Get a guest device tree property:\n"
-	       "\tpartman getprop -h <handle> -p <path> -n <propname>\n");
+	printf("   partman setprop -h <handle> -p <path> -n <propname> [-t <data> [-t <data>]]\n");
+	printf("      Set a guest device tree property.\n");
 
-	printf("\nSpecify -v for verbose output\n");
-	printf("Specify -q for quiet mode (errors reported via "
-	       "return status only)\n");
+	printf("   partman getprop -h <handle> -p <path> -n <propname>\n"
+	       "      Get a guest device tree property.\n");
 
-	printf("\nFor all commands, <handle> can be either the handle number or the\n"
-	       "full handle name as displayed by the -s command.\n");
+	printf("   -v for verbose output\n");
+	printf("   -q for quiet mode (errors reported via return status only)\n");
 }
+
+#define FH_ERR_INVALID_STATE 1026
 
 /**
  * Call the hypervisor management driver.
@@ -214,8 +208,24 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 			perror(__func__);
 	} else {
 		ret = p->ret;
-		if (!quiet && ret)
-			printf("Hypervisor returned error %u\n", ret);
+		if (ret) {
+			const char *err_str;
+			switch (ret) {
+			case EINVAL:
+				err_str = "invalid handle";
+				break;
+			case EFAULT:
+				err_str = "bad address";
+				break;
+			case FH_ERR_INVALID_STATE:
+				err_str = "target partition state invalid";
+				break;
+			default:
+				err_str = "unknown error";
+			}
+			if (!quiet)
+				printf("Error : (%u) %s\n", ret, err_str);
+		}
 	}
 
 	close(f);
