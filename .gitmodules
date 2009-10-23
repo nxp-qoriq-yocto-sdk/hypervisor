@@ -4,3 +4,6 @@
 [submodule "kconfig"]
 	path = kconfig
 	url = ../kconfig.git
+[submodule "tools/mux_server"]
+	path = tools/mux_server
+	url = ../mux_server.git
