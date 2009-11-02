@@ -1475,7 +1475,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 
 	tlb1_set_entry(tlbentry, (unsigned long)vpage,
 	               paddr & ~((phys_addr_t)bytesize - 1),
-	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	               tsize, mas2flags, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 	*len = min(bytesize - offset, *len);
 	return vpage + offset;
