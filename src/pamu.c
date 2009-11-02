@@ -976,10 +976,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 		pamubypenr &= ~pamu_counter;
 	}
 
-	ret = setup_pamu_law(pamu_node);
-	if (ret < 0)
-		goto fail_pma;
-
+	setup_pamu_law(pamu_node);
 	setup_omt();
 
 	if (dev->num_irqs >= 1) {
