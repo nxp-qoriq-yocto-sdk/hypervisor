@@ -750,7 +750,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 
 	size_t len = sizeof(struct boot_spin_table);
 	void *table_va = map_phys(TEMPTLB1, table, temp_mapping[0],
-	                          &len, TLB_MAS2_MEM);
+	                          &len, TLB_MAS2_IO);
 
 	if (len != sizeof(struct boot_spin_table)) {
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
