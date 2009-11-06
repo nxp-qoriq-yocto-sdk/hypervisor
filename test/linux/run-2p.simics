@@ -40,4 +40,4 @@ $kernel_cmdline = "config-addr=0xfe8900000"
 add-directory "%script%" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "boot_4_2.simics"
+run-command-file "boot.simics"

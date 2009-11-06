@@ -53,5 +53,5 @@ $dev_tree_blob = "p4080sim.dtb"
 add-directory "%script%" -prepend
 add-directory "bin/linux" -prepend
 
-run-command-file "boot_4_2.simics"
+run-command-file "boot.simics"
 

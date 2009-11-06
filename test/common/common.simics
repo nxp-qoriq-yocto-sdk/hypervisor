@@ -24,7 +24,7 @@
 
 $kernel_image  = "hv.uImage"
 $kernel_cmdline = "config-addr=0xfe8900000"
-$dev_tree_blob = "p4080sim_36b.dtb"
+$dev_tree_blob = "p4080ds_36b.dtb"
 
 add-directory "%script%/../../../sim" -prepend
 add-directory "%script%/../../../images" -prepend

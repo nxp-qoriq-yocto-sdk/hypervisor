@@ -42,7 +42,7 @@ add-directory "bin/csd" -prepend
 
 @os.system('rm -rf csd.ckpt*')
 
-run-command-file "boot_4_2.simics"
+run-command-file "boot.simics"
 break 0
 continue
 continue

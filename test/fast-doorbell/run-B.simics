@@ -37,4 +37,4 @@ run-command-file "common.simics"
 
 add-directory "bin/fast-doorbell" -prepend
 
-run-command-file "boot_4_2.simics"
+run-command-file "boot.simics"
