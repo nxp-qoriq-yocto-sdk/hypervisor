@@ -454,7 +454,7 @@ ssize_t byte_chan_send(byte_chan_handle_t *bc, const uint8_t *buf, size_t len)
 	int ret = queue_write(bc->tx, buf, len);
 
 	if (ret > 0)
-		queue_notify_consumer(bc->tx);
+		queue_notify_consumer(bc->tx, 0);
 
 	return ret;
 }

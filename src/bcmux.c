@@ -69,7 +69,7 @@ static connected_bc_t *channel_find(mux_complex_t *mux, char id)
  * This function reads data from multiplexed channel and writes it
  * to the appropriate connected channel(s).
  */
-static void mux_get_data(queue_t *q)
+static void mux_get_data(queue_t *q, int blocking)
 {
 	mux_complex_t *mux = q->consumer;
 	queue_t *notify = NULL;
@@ -96,7 +96,7 @@ static void mux_get_data(queue_t *q)
 
 			if (ch >= CHAN0_MUX_CHAR) {
 				if (notify) {
-					queue_notify_consumer(notify);
+					queue_notify_consumer(notify, blocking);
 					notify = NULL;
 				}
 
@@ -140,7 +140,7 @@ static void mux_get_data(queue_t *q)
 	spin_unlock_intsave(&mux->byte_chan->rx_lock, saved);
 
 	if (notify)
-		queue_notify_consumer(notify);
+		queue_notify_consumer(notify, blocking);
 };
 
 static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
@@ -250,7 +250,7 @@ static void mux_send_data_pull(queue_t *q)
 	spin_unlock_intsave(&mux->byte_chan->tx_lock, saved);
 }
 
-static void mux_send_data_push(queue_t *q)
+static void mux_send_data_push(queue_t *q, int blocking)
 {
 	connected_bc_t *cbc = q->consumer;
 	mux_complex_t *mux = cbc->mux_complex;
@@ -271,7 +271,7 @@ static void mux_send_data_push(queue_t *q)
 again: 
 	ret = __mux_send_data(mux, cbc);
 	if (ret > 0)
-		queue_notify_consumer(mux->byte_chan->tx);
+		queue_notify_consumer(mux->byte_chan->tx, blocking);
 
 	if (!queue_empty(cbc->byte_chan->rx)) {
 		/* If we ran out of space, arm the pull callback. */
@@ -376,7 +376,7 @@ int mux_complex_add(mux_complex_t *mux, byte_chan_t *bc,
 	spin_unlock(&mux->byte_chan->tx_lock);
 	spin_unlock_intsave(&mux->byte_chan->rx_lock, saved);
 
-	queue_notify_consumer(mux->byte_chan->tx);
+	queue_notify_consumer(mux->byte_chan->tx, 0);
 	return 0;
 }
 

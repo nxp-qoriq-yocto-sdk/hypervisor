@@ -41,7 +41,7 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 {
 	register_t mcsr;
 
-	cpu->crashing++;
+	set_crashing(1);
 
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,"powerpc_mchk_interrupt: machine check interrupt!\n");
 	mcsr = mfspr(SPR_MCSR);
@@ -59,7 +59,7 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	}
 
 
-	cpu->crashing--;
+	set_crashing(0);
 
 	mtspr(SPR_MCSR, mfspr(SPR_MCSR));
 }

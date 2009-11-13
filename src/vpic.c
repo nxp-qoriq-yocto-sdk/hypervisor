@@ -296,7 +296,7 @@ interrupt_t *vpic_iack(void)
 	return virq ? &virq->irq : NULL;
 }
 
-void vpic_assert_vint_rxq(queue_t *q)
+void vpic_assert_vint_rxq(queue_t *q, int blocking)
 {
 	vpic_assert_vint(q->consumer);
 }

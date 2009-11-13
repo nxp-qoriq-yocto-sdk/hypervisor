@@ -71,7 +71,7 @@ static int handle_debug_event(trapframe_t *trap_frame);
 static int debug_exception(trapframe_t *trap_frame);
 static void debug_gevent_handler(trapframe_t *trap_frame);
 #endif
-static void rx(queue_t *q);
+static void rx(queue_t *q, int blocking);
 static breakpoint_t *set_breakpoint(breakpoint_t *breakpoint_table, trapframe_t *trap_frame, uint32_t *addr, breakpoint_type_t type);
 static void gdb_stub_main_loop(trapframe_t *trap_frame, int event_type);
 
@@ -224,7 +224,7 @@ void gdb_stub_stop(void)
 /** Callback for RX interrupt.
  *
  */
-static void rx(queue_t *q)
+static void rx(queue_t *q, int blocking)
 {
  	gcpu_t *gcpu = (gcpu_t*)q->consumer;
  	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
