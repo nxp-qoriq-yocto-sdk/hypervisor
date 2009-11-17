@@ -47,33 +47,6 @@ int cpcs_enabled(void)
 	return 1;
 }
 
-void enable_cpcs(void)
-{
-	uint32_t val;
-
-	for (int i = 0; i < NUMCPCS; i++){
-		if (!cpcs[i].cpccsr0) {
-			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
-			         "%s: ERROR: CPCs do not appear to be assigned to the hypervisor\n",
-			          __func__);
-			return;
-		}
-		val = in32(cpcs[i].cpccsr0);
-		val |= CPCCSR0_CPCE;
-		out32(cpcs[i].cpccsr0, val);
-	}
-
-}
-
-static inline void disable_cpc(int cpc_index)
-{
-	uint32_t val;
-
-	val = in32(cpcs[cpc_index].cpccsr0);
-	val &= ~CPCCSR0_CPCE;
-	out32(cpcs[cpc_index].cpccsr0, val);
-}
-
 static inline void poll_reg_bit_clear(void *reg, uint32_t reg_val)
 {
 	out32(reg, in32(reg) | reg_val);
@@ -90,10 +63,6 @@ static inline void reconfigure_cpc(int cpc_index)
 	poll_reg_bit_clear(cpcs[cpc_index].cpccsr0, CPCCSR0_CPCFL);
 	poll_reg_bit_clear(cpcs[cpc_index].cpccsr0, CPCCSR0_CPCLFC);
 
-	/* We disable CPC hear for reconfiguration purpose.
-	 * CPCs should be enabled once ccm init is through.
-	 */
-	disable_cpc(cpc_index);
 }
 
 static inline void reserve_partition_reg(int cpc_index, int pir_num)
