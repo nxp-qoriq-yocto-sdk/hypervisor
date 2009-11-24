@@ -51,6 +51,11 @@
 #include <doorbell.h>
 #include <events.h>
 #include <thread.h>
+#include <error_log.h>
+
+queue_t hv_global_event_queue;
+uint32_t hv_queue_prod_lock;
+uint32_t hv_queue_cons_lock;
 
 static gcpu_t noguest[MAX_CORES] = {
 	{
@@ -654,6 +659,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
 	assign_hv_devs();
+
+	error_log_init(&hv_global_event_queue);
+
 	enable_int();
 	enable_mcheck();
 

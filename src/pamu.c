@@ -819,6 +819,8 @@ static void pamu_error_log(error_info_t *err, guest_t *guest)
 
 	if (error_manager_guest)
 		error_log(&global_event_queue, err, &global_event_prod_lock);
+
+	error_log(&hv_global_event_queue, err, &hv_queue_prod_lock);
 }
 
 static int pamu_av_isr(void *arg)

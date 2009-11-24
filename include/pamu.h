@@ -34,16 +34,6 @@ typedef struct pamu_handle {
 	handle_t user;
 } pamu_handle_t;
 
-typedef struct pamu_av_error {
-	uint32_t lpid;
-	uint32_t avah;
-	uint32_t aval;
-	uint32_t avs1;
-	uint32_t avs2;
-	uint32_t handle;
-	uint32_t pad;
-} pamu_av_error_t;
-
 /* define indexes for each operation mapping scenario */
 #define OMI_QMAN        0x00
 #define OMI_FMAN        0x01

@@ -32,7 +32,6 @@
 #include <libos/errors.h>
 
 #include <percpu.h>
-#include <pamu.h>
 #include <events.h>
 #include <error_log.h>
 
@@ -45,7 +44,8 @@ void error_log_init(queue_t *q)
 	if (ret)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s error event queue init failed error = %d\n",
-			(q == &global_event_queue) ? "Global" : "Guest",
+			(q == &hv_global_event_queue) ? "HV global" :
+			((q == &global_event_queue) ? "Global" : "Guest"),
 			ret);
 }
 
@@ -81,7 +81,9 @@ void error_log(queue_t *q, error_info_t *err, uint32_t *lock)
 	}
 	spin_unlock(lock);
 
-	if (q == &global_event_queue) {
+	if (q == &hv_global_event_queue) {
+		setevent(get_gcpu(), EV_DUMP_HV_QUEUE);
+	} else if (q == &global_event_queue) {
 		atomic_or(&error_manager_guest->gcpus[error_manager_gcpu]->crit_gdbell_pending,
 				 GCPU_PEND_CRIT_INT);
 		setevent(error_manager_guest->gcpus[error_manager_gcpu], EV_GUEST_CRIT_INT);

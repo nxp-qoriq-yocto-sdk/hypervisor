@@ -101,6 +101,7 @@ void debug_trap(struct trapframe *regs);
 void data_storage(struct trapframe *regs);
 void tlb_miss(struct trapframe *regs);
 void doorbell_int(struct trapframe *regs);
+void crit_dbell_int(struct trapframe *regs);
 void hvpriv(struct trapframe *regs);
 void decrementer(struct trapframe *regs);
 void fit(struct trapframe *regs);
@@ -124,6 +125,7 @@ void hcall(struct trapframe *regs);
 #define EXC_HCALL_HANDLER hcall
 #define EXC_EHPRIV_HANDLER hvpriv
 #define EXC_DOORBELL_HANDLER doorbell_int
+#define EXC_DOORBELLC_HANDLER crit_dbell_int
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
 

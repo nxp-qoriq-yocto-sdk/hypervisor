@@ -29,6 +29,7 @@
 #include <libos/console.h>
 #include <libos/printlog.h>
 #include <libos/errors.h>
+#include <libos/platform_error.h>
 
 #include <events.h>
 #include <vpic.h>
@@ -36,6 +37,7 @@
 #include <gdb-stub.h>
 #include <percpu.h>
 #include <thread.h>
+#include <error_log.h>
 
 static eventfp_t event_table[] = {
 	&dbell_to_gdbell_glue,           /* EV_ASSERT_VINT */
@@ -43,6 +45,7 @@ static eventfp_t event_table[] = {
 	&schedule,                       /* EV_RESCHED */
 	&dbell_to_mcgdbell_glue,         /* EV_MCP */
 	&dbell_to_cgdbell_glue,         /* EV_GUEST_CRIT_INT */
+	&dump_hv_queue,                 /* EV_DUMP_HV_QUEUE */
 };
 
 /* Guest events are processed when returning to the guest, but
@@ -148,6 +151,13 @@ void return_hook(trapframe_t *regs)
 	}
 }
 
+void crit_dbell_int(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	assert(!(mfmsr() & (MSR_CE | MSR_EE)));
+	halt_core(regs);
+}
+
 void doorbell_int(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -176,6 +186,54 @@ void dbell_to_mcgdbell_glue(trapframe_t *regs)
 void dbell_to_cgdbell_glue(trapframe_t *regs)
 {
 	send_local_crit_guest_doorbell();
+}
+
+void halt_core(trapframe_t *regs)
+{
+	cpu->crashing++;
+	dump_regs(regs);
+	cpu->crashing--;
+
+	asm volatile("1: wait;" "b 1b;");
+}
+
+void dump_hv_queue(trapframe_t *regs)
+{
+	error_info_t err;
+
+	spin_lock(&hv_queue_cons_lock);
+
+	while (!error_get(&hv_global_event_queue, &err, NULL, 0)) {
+		switch(err.error_code) {
+		case ERROR_MACHINE_CHECK: {
+			mcheck_error_t *mc = &err.regs.mc_err;
+
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Machine check interrupt\n");
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"mcsr = %x, mcar = %x, mcssr0 = %x, mcsrr1 = %x\n",
+				mc->mcsr, mc->mcar, mc->mcsrr0, mc->mcsrr1);
+			break;
+		}
+
+		case ERROR_PAMU_AV: {
+			pamu_av_error_t *av = &err.regs.av_err;
+
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
+				 av->avs1, av->avs2, av->avah, av->aval);
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				"PAMU access violation lpid = %x, handle = %x\n",
+				av->lpid, av->handle);
+			break;
+		}
+
+		default:
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Unknown error condition\n");
+		}
+	}
+
+	spin_unlock(&hv_queue_cons_lock);
 }
 
 /* Initialize the global gevents

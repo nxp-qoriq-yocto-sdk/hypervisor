@@ -33,11 +33,12 @@
 #include <libos/percpu.h>
 #include <libos/core-regs.h>
 
-#define MSG_DBELL      0x00000000
-#define MSG_DBELL_CRIT 0x08000000
-#define MSG_GBELL      0x10000000
-#define MSG_GBELL_CRIT 0x18000000
-#define MSG_GBELL_MCHK 0x20000000
+#define MSG_DBELL         0x00000000
+#define MSG_DBELL_CRIT    0x08000000
+#define MSG_DBELL_BRDCAST 0x04000000
+#define MSG_GBELL         0x10000000
+#define MSG_GBELL_CRIT    0x18000000
+#define MSG_GBELL_MCHK    0x20000000
 
 static inline void send_doorbell_msg(unsigned long msg)
 {
@@ -84,6 +85,15 @@ static inline void send_local_mchk_guest_doorbell(void)
 static inline void send_crit_doorbell(int cpunum)
 {
 	send_doorbell_msg(MSG_DBELL_CRIT | cpunum);
+}
+
+/** Send critical doorbell broadcast.
+ *
+ *  Always for hypervisor internal use
+ */
+static inline void send_crit_doorbell_brdcast(void)
+{
+	send_doorbell_msg(MSG_DBELL_CRIT | MSG_DBELL_BRDCAST);
 }
 
 /** Send doorbell.
