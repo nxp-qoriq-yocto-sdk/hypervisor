@@ -802,6 +802,36 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 			*store = 1;
 			break;
 
+		case 0x0b7:	// stwux
+			if (unlikely(rA == 0))
+				return 1;
+			regs->gpregs[rA] = (register_t) vaddr;
+			// fall-through ...
+		case 0x097:	// stwx
+			out32(vaddr, regs->gpregs[rSD]);
+			*store = 1;
+			break;
+
+		case 0x216:	// lwbrx
+			regs->gpregs[rSD] = in32_le(vaddr);
+			*store = 0;
+			break;
+
+		case 0x296:	// stwbrx
+			out32_le(vaddr, regs->gpregs[rSD]);
+			*store = 1;
+			break;
+
+		case 0x316:	// lhbrx
+			regs->gpregs[rSD] = in16_le(vaddr);
+			*store = 0;
+			break;
+
+		case 0x396:	// sthbrx
+			out16_le(vaddr, regs->gpregs[rSD]);
+			*store = 1;
+			break;
+
 		default:
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 				 "%s: unimplemented instruction %08x (major=0x%x minor=0x%x rSD=0x%x)\n",
@@ -817,6 +847,11 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 	case 0x22:	// lbz
 		regs->gpregs[rSD] = in8(vaddr);
 		*store = 0;
+		break;
+
+	case 0x24:	// stw
+		out32(vaddr, regs->gpregs[rSD]);
+		*store = 1;
 		break;
 
 	case 0x27:	// stbu

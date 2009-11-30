@@ -321,6 +321,7 @@ static int count_devices_in_page(dt_node_t *tree, phys_addr_t paddr)
  * virtualize it
  * 3) 1 if it's an I2C node and it was virtualized.
  */
+#if 0
 int virtualize_i2c_node(guest_t *guest, dt_node_t *node, phys_addr_t paddr,
 			phys_addr_t size)
 {
@@ -348,4 +349,5 @@ int virtualize_i2c_node(guest_t *guest, dt_node_t *node, phys_addr_t paddr,
 	// We virtualized it
 	return 1;
 }
+#endif
 

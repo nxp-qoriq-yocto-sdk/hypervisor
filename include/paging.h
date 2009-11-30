@@ -209,8 +209,8 @@ typedef struct vf_range {
 	void *data;		// client-specific data
 } vf_range_t;
 
-vf_range_t *register_vf_handler(struct guest *guest, phys_addr_t start,
-				phys_addr_t end, vf_callback_t callback);
+vf_range_t *register_vf_handler(struct guest *guest, phys_addr_t phys_start,
+	size_t size, phys_addr_t gphys_start, vf_callback_t callback);
 
 int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr,
 		   int *store, unsigned int *reg);
@@ -221,6 +221,8 @@ int virtualize_device_interrupt(struct guest *guest, struct dt_node *node,
 				vf_range_t *vf, int_handler_t handler);
 
 int virtualize_i2c_node(struct guest *guest, struct dt_node *node,
+			phys_addr_t paddr, phys_addr_t size);
+int virtualize_pcie_node(struct guest *guest, struct dt_node *node,
 			phys_addr_t paddr, phys_addr_t size);
 
 void fixup_tlb_sx_re(void);

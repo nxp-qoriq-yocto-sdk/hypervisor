@@ -547,8 +547,12 @@ static int map_guest_reg(dev_owner_t *owner)
 	if (num == 0)
 		return 0;
 
-	for (int i = 0; i < num; i++)
-		map_dev_range(owner->guest, regs[i].start, regs[i].size);
+#ifdef CONFIG_VIRTUAL_PCIE
+	if (!virtualize_pcie_node(owner->guest, hwnode, regs[0].start,
+		regs[0].size))
+#endif
+		for (int i = 0; i < num; i++)
+			map_dev_range(owner->guest, regs[i].start, regs[i].size);
 
 	/* Only change reg if this is a top-level guest node */
  	if (owner->gnode->parent == owner->guest->devices) {
@@ -2673,6 +2677,10 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	map_guest_mem(guest);
  	read_phandle_aliases(guest);
 
+#ifdef CONFIG_DEVICE_VIRT
+	list_init(&guest->vf_list);
+#endif
+
 	ret = init_guest_devs(guest);
 	if (ret < 0)
 		goto fail;
@@ -2696,10 +2704,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 
 #ifdef CONFIG_BYTE_CHAN
 	byte_chan_partition_init(guest);
-#endif
-
-#ifdef CONFIG_DEVICE_VIRT
-	list_init(&guest->vf_list);
 #endif
 
 #ifdef CONFIG_DEBUG_STUB

@@ -115,6 +115,7 @@ hv-src-$(CONFIG_GDB_STUB) += gdb-stub.c
 hv-src-$(CONFIG_SHELL) += shell.c
 hv-src-$(CONFIG_PAMU) += pamu.c
 hv-src-$(CONFIG_VIRTUAL_I2C) += i2c.c
+hv-src-$(CONFIG_VIRTUAL_PCIE) += pcie.c
 hv-src-early-$(CONFIG_TLB_CACHE) += tlbmiss.S
 hv-src-$(CONFIG_LIBOS_NS16550) += ns16550.c
 hv-src-nocheck-$(CONFIG_ZLIB) += zlib.c
