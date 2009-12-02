@@ -1462,13 +1462,14 @@ ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
  * @return the virtual address that corresponds to paddr.
  */
 void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
-               size_t *len, register_t mas2flags)
+               size_t *len, int maxtsize, register_t mas2flags)
 {
 	size_t offset, bytesize;
 	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
 
 	tsize = min(max_page_tsize((uintptr_t)vpage >> PAGE_SHIFT, tsize),
 	            natural_alignment(paddr >> PAGE_SHIFT));
+	tsize = min(tsize, maxtsize);
 
 	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
 	offset = paddr & (bytesize - 1);
@@ -1497,7 +1498,7 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
 		void *vsrc;
 
 		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-		                &chunk, TLB_MAS2_MEM);
+		                &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
 		if (!vsrc)
 			break;
 
@@ -1534,7 +1535,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 		if (!schunk) {
 			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
 			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-			                &schunk, TLB_MAS2_MEM);
+			                &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
 			if (!vsrc) {
 				printf("%s: cannot map src %llx, %zu bytes\n",
 				       __func__, src, schunk);

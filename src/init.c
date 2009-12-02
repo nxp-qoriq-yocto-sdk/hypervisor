@@ -175,7 +175,8 @@ static void *map_fdt(phys_addr_t devtree_ptr)
 
 	/* Map guarded, as we don't know where the end of memory is yet. */
 	vaddr = map_phys(TEMPTLB1, devtree_ptr & ~((phys_addr_t)mapsize - 1),
-	                 temp_mapping[0], &len, TLB_MAS2_MEM | MAS2_G);
+	                 temp_mapping[0], &len, TLB_TSIZE_16M,
+	                 TLB_MAS2_MEM | MAS2_G);
 
 	vaddr += devtree_ptr & (mapsize - 1);
 
@@ -188,7 +189,7 @@ static void *map_fdt(phys_addr_t devtree_ptr)
 		len = mapsize;
 
 		map_phys(TEMPTLB2, devtree_ptr, temp_mapping[0] + mapsize,
-		         &len, TLB_MAS2_MEM | MAS2_G);
+		         &len, TLB_TSIZE_16M, TLB_MAS2_MEM | MAS2_G);
 
 		/* We don't handle flat trees larger than 4MiB. */
 		assert (len >= sizeof(struct fdt_header));
@@ -747,7 +748,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 
 	size_t len = sizeof(struct boot_spin_table);
 	void *table_va = map_phys(TEMPTLB1, table, temp_mapping[0],
-	                          &len, TLB_MAS2_IO);
+	                          &len, TLB_TSIZE_16M, TLB_MAS2_IO);
 
 	if (len != sizeof(struct boot_spin_table)) {
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
