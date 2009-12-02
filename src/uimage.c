@@ -143,7 +143,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	uncompr = map_gphys(TEMPTLB1, guest_gphys, target, temp_mapping[0],
 			    &uncomprlen, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 	compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1], &comprlen,
-			TLB_MAS2_MEM);
+	                 TLB_TSIZE_16M, TLB_MAS2_MEM);
 	size -= comprlen;
 	index = parse_gzip_header(compr);
 	compr += index;
@@ -190,7 +190,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 			tsize = tsize > 16*1024*1024 ? 16*1024*1024 : tsize;
 			image_phys += comprlen;
 			compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1],
-					&tsize, TLB_MAS2_MEM);
+			                 &tsize, TLB_TSIZE_16M, TLB_MAS2_MEM);
 			size -= tsize;
 			d_stream.next_in  = compr;
 			d_stream.avail_in = tsize;
