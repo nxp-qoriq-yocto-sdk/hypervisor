@@ -81,15 +81,10 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 		do_mpic_mcheck();
 	}
 
+	/* In case of I-cache errors (data or tag array) the cache
+	 * is automatically invalidated by the hardware.
+	 */
 	if (reason & MCSR_ICPERR) {
-		/*
-		 * This is recoverable by invalidating the i-cache.
-		 * This is especially important on p4080 rev 1, where
-		 * erratum CPU11 can sometimes cause spurious i-cache
-		 * parity errors.
-		 */
-		mtspr(SPR_L1CSR1, mfspr(SPR_L1CSR1) | L1CSR1_ICFI);
-		while (mfspr(SPR_L1CSR1) & L1CSR1_ICFI);
 		/*
 		 * This will generally be accompanied by an instruction
 		 * fetch error report -- only treat MCSR_IF as fatal
@@ -98,7 +93,11 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 		reason &= ~MCSR_IF;
 	}
 
-	if ((reason & MCSR_DCPERR) && !guest_state) {
+	/* In case of D-cache errors, the cache is only invalidated
+	 * if the write shadow mode is enabled.
+	 */
+	if ((reason & MCSR_DCPERR) && !guest_state &&
+		!(mfspr(SPR_L1CSR2) & L1CSR2_DCWS)) {
 			goto non_recoverable;
 	}
 
@@ -134,8 +133,9 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	mc->mcsrr0 = mfspr(SPR_MCSRR0);
 	mc->mcsrr1 = mfspr(SPR_MCSRR1);
 	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
-	if (guest_state)
-		reflect_mcheck(frameptr, mc->mcsr, mc->mcar);
+	/* MCP machine checks would have been already reflected */
+	if (guest_state && (mcsr & ~MCSR_MCP))
+		reflect_mcheck(frameptr, (mc->mcsr & ~MCSR_MCP), mc->mcar);
 
 	mtspr(SPR_MCSR, mcsr);
 
