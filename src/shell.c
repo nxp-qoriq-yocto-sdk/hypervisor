@@ -2,7 +2,7 @@
  * Command line shell
  */
 
-/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -867,3 +867,88 @@ static command_t benchmark = {
 };
 shell_cmd(benchmark);
 #endif
+
+static void guestmem_fn(shell_t *shell, char *args)
+{
+	int guest;
+	char *gueststr, *addrstr, *lenstr;
+	char buf[16];
+	phys_addr_t address, length;
+
+	args = stripspace(args);
+	gueststr = nextword(&args);
+	addrstr = nextword(&args);
+	lenstr = nextword(&args);
+
+	if (!gueststr || !addrstr) {
+		qprintf(shell->out, 1, "Usage: guestmem <partition> <address> [<length>]\n");
+		return;
+	}
+
+	guest = get_partition_num(shell, gueststr);
+	if (guest < 0) {
+		qprintf(shell->out, 1, "Invalid guest number\n");
+		return;
+	}
+
+	address = get_number64(shell->out, addrstr);
+
+	if (lenstr) {
+		length = get_number64(shell->out, lenstr);
+		if (length > 1024*1024) {
+			qprintf(shell->out, 1, "Invalid length\n");
+			return;
+		}
+	} else {
+		length = 256;
+	}
+
+	while (length > 0) {
+		int chunk = 16;
+		int good;
+	
+		if (address & 15)
+			chunk -= address & 15;
+		if (chunk > length)
+			chunk = length;
+	
+		good = copy_from_gphys(guests[guest].gphys, buf + (address & 15),
+		                       address, chunk);
+		if (good == 0)
+			goto bad;
+
+		qprintf(shell->out, 1, "%08llx: ", address & ~15ULL);
+		
+		for (int i = 0; i < 16; i++) {
+			if (i < (address & 15) || i >= (address & 15) + good)
+				qprintf(shell->out, 1, "   ");
+			else
+				qprintf(shell->out, 1, "%02x ", buf[i]);
+		}
+		
+		qprintf(shell->out, 1, " |  ");
+
+		for (int i = 0; i < 16; i++) {
+			if (i < (address & 15) || i >= (address & 15) + good ||
+			    buf[i] < 0x20 || buf[i] > 0x7f)
+				qprintf(shell->out, 1, ".");
+			else
+				qprintf(shell->out, 1, "%c", buf[i]);
+		}
+		
+		qprintf(shell->out, 1, "\n");
+		
+bad:
+		address = (address + 16) & ~15ULL;
+		length -= chunk;
+	}
+}
+
+static command_t guestmem = {
+	.name = "guestmem",
+	.action = guestmem_fn,
+	.aliases = (const char *[]){ "gm", NULL },
+	.shorthelp = "Dump guest memory",
+	.longhelp = "  Usage: guestmem <partition-number> <address> [<length>]\n\n",
+};
+shell_cmd(guestmem);
