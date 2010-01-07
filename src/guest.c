@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1987,14 +1987,20 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 static void start_guest_primary(trapframe_t *regs, void *arg)
 {
 	guest_t *guest = get_gcpu()->guest;
+	int load_only = (int)(uintptr_t)arg;
 	int ret = 1;
 
 	assert(guest->state == guest_starting);
 
-	if (!guest->no_auto_load)
+	if (!guest->no_auto_load) {
 		ret = load_images(guest);
+		
+		if (ret > 0 && load_only)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			         "Guest %s finished loading\n", guest->name);
+	}
 
-	if (ret <= 0 || dt_get_prop(guest->partition, "no-auto-start", 0)) {
+	if (ret <= 0 || load_only) {
 		guest->state = guest_stopped;
 
 		/* No hypervisor-loadable image; wait for a manager to start us. */
@@ -2083,7 +2089,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 
 void start_core(trapframe_t *regs)
 {
-	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "start core %lu\n", mfspr(SPR_PIR));
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "start core\n");
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -2100,10 +2106,9 @@ void start_core(trapframe_t *regs)
 	unblock(&gcpu->thread);
 }
 
-void start_load_core(trapframe_t *regs)
+void load_guest(trapframe_t *regs)
 {
-	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-	         "start wait core %lu\n", mfspr(SPR_PIR));
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "load images\n");
 
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
@@ -2111,7 +2116,21 @@ void start_load_core(trapframe_t *regs)
 	assert(guest->state == guest_starting);
 
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
-	                   start_guest_primary, NULL, 0);
+	                   start_guest_primary, (void *)1, 0);
+	unblock(&gcpu->thread);
+}
+
+void start_load_guest(trapframe_t *regs)
+{
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG, "load and start guest\n");
+
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	assert(gcpu == guest->gcpus[0]);
+	assert(guest->state == guest_starting);
+
+	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
+	                   start_guest_primary, (void *)0, 0);
 	unblock(&gcpu->thread);
 }
 
@@ -2796,9 +2815,18 @@ __attribute__((noreturn)) void init_guest(void)
 
 		if (pir == guest->cpulist[0]) {
 			/* Boot CPU */
+			int load_only = 0;
+
+			if (dt_get_prop(guest->partition, "no-auto-start", 0))
+				load_only = 1;
+
 			if (init_guest_primary(guest) == 0) {
 				guest->state = guest_starting;
-				setgevent(gcpu, gev_start_load);
+				
+				if (load_only)
+					setgevent(gcpu, gev_load);
+				else
+					setgevent(gcpu, gev_start_load);
 			}
 		} else {
 			register_gcpu_with_guest(guest);

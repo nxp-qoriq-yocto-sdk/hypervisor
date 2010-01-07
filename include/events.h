@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +38,8 @@ void do_stop_core(trapframe_t *regs, int restart);
 void stop_core(trapframe_t *regs);
 void start_core(trapframe_t *regs);
 void restart_core(trapframe_t *regs);
-void start_load_core(trapframe_t *regs);
+void load_guest(trapframe_t *regs);
+void start_load_guest(trapframe_t *regs);
 void wait_for_gevent(trapframe_t *regs);
 int register_gevent(eventfp_t handler);
 void init_gevents(void);
@@ -61,12 +62,18 @@ void dump_hv_queue(trapframe_t *regs);
 
 extern int gev_stop; /**< Stop guest on this core */
 extern int gev_start; /**< Start guest on this core */
-/**< gev_stop, plus send gev_start_load to primary. */
+/*** gev_stop, plus send gev_start_load to primary. */
 extern int gev_restart;
-/**< gev_start, but wait if no image; primary core only. */
-extern int gev_start_load;
+/*** gev_start, but wait if no image; primary core only. */
+/*** Load the guest's images, but don't start -- partition boot core only */
+extern int gev_load;
+/*** Load and start the guest -- partition boot core only */
+extern int gev_start_load; 
+/*** Pause the guest on this core */
 extern int gev_pause;
+/*** Unpause the guest on this core */
 extern int gev_resume;
+/*** Deliver a non-maskable interrupt on this gcpu */
 extern int gev_nmi;
 
 #endif 
