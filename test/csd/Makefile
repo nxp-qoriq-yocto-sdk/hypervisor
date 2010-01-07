@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,9 +28,7 @@ dir := $(testdir)$(test)/
 include $(testdir)common/Makefile.inc
 
 $(test)-run: $(test)
-	../../tools/mux_server/mux_server localhost:9124 9000 9001 &
-	xterm -e "telnet localhost 9000" &
-	xterm -e "telnet localhost 9001" &
+	setsid $(testdir)../tools/xtel.sh 9000 2
 	$(SIMICS) $(testdir)$</run.simics
 
 $(test)-check: $(test)-run-batch

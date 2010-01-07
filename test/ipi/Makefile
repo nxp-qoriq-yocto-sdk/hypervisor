@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -93,17 +93,11 @@ $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
 
 $(test)-run-B: $(test)
-	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
-	xterm -e "telnet localhost 9000" &
-	xterm -e "telnet localhost 9001" &
-	xterm -e "telnet localhost 9002" &
+	setsid $(testdir)../tools/xtel.sh 9000 3
 	$(SIMICS) $(testdir)$</run-B.simics
 
 $(test)-run-C: $(test)
-	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 &
-	xterm -e "telnet localhost 9000" &
-	xterm -e "telnet localhost 9001" &
-	xterm -e "telnet localhost 9002" &
+	setsid $(testdir)../tools/xtel.sh 9000 3
 	$(SIMICS) $(testdir)$</run-C.simics
 
 $(test)-check-A: $(test)-run-A-batch
