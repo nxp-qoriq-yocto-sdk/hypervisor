@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@ static volatile int count = 0;
 
 void fit_handler(trapframe_t *frameptr)
 {
-	printf(" > got FIT interrupt...PASSED\n");
+	printf("got FIT interrupt\n");
 	mtspr(SPR_TSR, TSR_FIS);
 	count++;
 }
@@ -47,11 +47,19 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Fixed Interval Timer test\n");
 
 	enable_extint();
-	mtspr(SPR_TCR, 0x00816000);
+	mtspr(SPR_TCR, 0x00812000);
 	
-	while (count < 3);
+	while (count < 3) {
+		fh_idle();
+
+		/* Should not see more than one of these in a row,
+		 * without an intervening interrupt message --
+		 * eventually put this in check-results.
+		 */
+		printf("woke from idle\n");
+	}
 	
 	disable_extint();
 
-	printf("Test Complete\n");
+	printf("Test Complete, PASSED\n");
 }

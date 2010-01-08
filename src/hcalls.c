@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -646,6 +646,12 @@ static void fh_err_get_info(trapframe_t *regs)
 	regs->gpregs[3] = error_get(q, (error_info_t *)&regs->gpregs[4], flag, mask);
 }
 
+static void fh_idle(trapframe_t *regs)
+{
+	asm volatile("wait");
+	regs->gpregs[3] = 0;
+}
+
 static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	unimplemented,
@@ -672,7 +678,7 @@ static hcallfp_t hcall_table[] = {
 	fh_send_nmi,
 	fh_vmpic_get_msir,
 	fh_system_reset,                   /* 24 */
-	unimplemented,
+	fh_idle,
 	unimplemented,
 	unimplemented,
 	unimplemented,                     /* 28 */
