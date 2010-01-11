@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -91,7 +91,7 @@ $(test): bin/$(test)/gdb bin/$(test)/gdb-hello bin/$(test)/gdb-whoami $($(test)-
 
 $(test)-run-%: $(test)
 	../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 9003 9004 &
-	xterm -e "telnet localhost 9001" &
+	xterm -e "telnet localhost 9000" &
 	$(SIMICS) $(testdir)$</run-$*.simics
 
 $(test)-run-C: $(test)

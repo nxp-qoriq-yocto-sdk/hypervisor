@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,7 +23,6 @@
 #
 #!/bin/sh
 
-../../tools/mux_server/mux_server localhost:9124 9000 9001 9002 9003 9004 9005 9006 9007 &
 xterm -e "${CROSS_COMPILE}gdb -x gdb0" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb1" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb2" &
