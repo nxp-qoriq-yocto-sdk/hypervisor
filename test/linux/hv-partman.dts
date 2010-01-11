@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -112,6 +112,10 @@
 			device = "/soc/pic";
 		};
 
+		iommu {
+			device = "/soc/iommu";
+		};
+
 		cpc-0 {
 			device = "/soc/l3-cache-controller@10000";
 		};
@@ -152,7 +156,7 @@
 		label = "p1-linux";
 		cpus = <0 2>;
 		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
-		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x00800000>;
+		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 
 		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
@@ -496,8 +500,6 @@
 
 		bcp3: bc {
 			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <3>;
 		};
 
 		doorbell-in {

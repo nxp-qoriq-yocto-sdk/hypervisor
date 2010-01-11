@@ -49,7 +49,7 @@ define mount
 	$(V)mkdir -p bin/linux/$(1)
 	$(V)gunzip < $(testdir)../../images/rootfs.ext2.gz > bin/linux/$(1).ext2
         $(V)/sbin/e2fsck bin/linux/$(1).ext2
-        $(V)/sbin/resize2fs bin/linux/$(1).ext2 16384
+        $(V)/sbin/resize2fs bin/linux/$(1).ext2 131072
 	$(V)sudo mount -t ext2 -o rw,loop bin/linux/$(1).ext2 bin/linux/$(1)
 endef
 
