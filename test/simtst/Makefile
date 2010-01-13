@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,15 +32,16 @@ tunctl:
 		$(testdir)../../sim/fm.sh -s -a up
 
 simtst-run-1p: simtst tunctl
-	$(MAKE) -C $(testdir)../../sim/hv-1p-lnx 
+	$(MAKE) -C $(testdir)../../sim
+	$(testdir)../../sim/xtel.sh 9000 2
 	$(SIMICS) $(testdir)$</run-1p.simics
 
 simtst-run-2p: simtst tunctl
-	$(MAKE) -C $(testdir)../../sim/hv-2p-lnx-lwe
-	$(testdir)../../sim/xtel.sh 9000 4
+	$(MAKE) -C $(testdir)../../sim
+	$(testdir)../../sim/xtel.sh 9000 3
 	$(SIMICS) $(testdir)$</run-2p.simics
 
 simtst-run-4p: simtst tunctl
-	$(MAKE) -C $(testdir)../../sim/hv-4p-lnx-lnx-lwe-lwe
+	$(MAKE) -C $(testdir)../../sim
 	$(testdir)../../sim/xtel.sh 9000 5
 	$(SIMICS) $(testdir)$</run-4p.simics
