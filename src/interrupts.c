@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,10 +71,11 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	int guest_state = 0;
 	error_info_t err = { };
 	mcheck_error_t *mc;
+	int recoverable = 1;
 
 	reason = mcsr = mfspr(SPR_MCSR);
 
-	if (mfspr(SPR_MCSRR1) & MSR_GS)
+	if (frameptr->srr1 & MSR_GS)
 		guest_state = 1;
 
 	if (reason & MCSR_MCP) {
@@ -98,33 +99,71 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	 */
 	if ((reason & MCSR_DCPERR) && !guest_state &&
 		!(mfspr(SPR_L1CSR2) & L1CSR2_DCWS)) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Data cache parity error\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_L2MMU_MHIT) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Hit on multiple tlb entries\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_IF) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Instruction fetch error report\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_LD) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Load error report\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_ST) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Store error report\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_LDG) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Guarded load error report\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
 	if ((reason & MCSR_BSL2_ERR) && !guest_state) {
-			goto non_recoverable;
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Level 2 cache error\n");
+		set_crashing(0);
+		recoverable = 0;
 	}
 
+	if (!(frameptr->srr1 & MSR_RI) && !guest_state) {
+		set_crashing(1);
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Recursive machine check\n");
+		set_crashing(0);
+		recoverable = 0;
+	}
+
+	if (!recoverable)
+		dump_and_halt(mcsr, frameptr);
 
 	err.error_code = ERROR_MACHINE_CHECK;
 	mc = &err.regs.mc_err;
@@ -140,7 +179,4 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	mtspr(SPR_MCSR, mcsr);
 
 	return;
-
-non_recoverable:
-	dump_and_halt(mcsr, frameptr);
 }

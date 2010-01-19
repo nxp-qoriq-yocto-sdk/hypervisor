@@ -2,7 +2,7 @@
  * Trap handling
  */
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,7 +84,7 @@ void reflect_trap(trapframe_t *regs)
 	mtspr(SPR_GDEAR, mfspr(SPR_DEAR));
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
-	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE;
+	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI;
 }
 
 void debug_trap(trapframe_t *regs)
@@ -108,7 +108,7 @@ void debug_trap(trapframe_t *regs)
 	gcpu->dsrr1 = regs->srr1;
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DEBUG];
-	regs->srr1 &= MSR_GS | MSR_UCLE;
+	regs->srr1 &= MSR_GS | MSR_UCLE | MSR_RI;
 }
 
 void guest_doorbell(trapframe_t *regs)
@@ -136,7 +136,7 @@ void guest_doorbell(trapframe_t *regs)
 		}
 		
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_EXT_INT];
-		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 		goto check_flags;
 	}
 no_virq:
@@ -146,7 +146,7 @@ no_virq:
 		run_deferred_fit();
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_FIT];
-		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 		goto check_flags;
 	}
 
@@ -155,14 +155,14 @@ no_virq:
 		run_deferred_decrementer();
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
-		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 		goto check_flags;
 	}
 
 	if (gcpu->gdbell_pending & GCPU_PEND_MSGSND) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSND);
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELL];
-		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 		goto check_flags;
 	}
 
@@ -221,7 +221,7 @@ void reflect_crit_int(trapframe_t *regs, int trap_type)
 	gcpu->csrr1 = regs->srr1;
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[trap_type];
-	regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE);
+	regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 }
 
 static int check_crit_int_event(gcpu_t *gcpu, trapframe_t *regs)

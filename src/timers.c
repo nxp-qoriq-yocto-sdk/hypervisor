@@ -1,7 +1,7 @@
 /*
  * Timer support
  *
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -141,7 +141,7 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
 	gcpu->csrr1 = regs->srr1;
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_WDOG];
-	regs->srr1 &= MSR_ME | MSR_DE | MSR_GS | MSR_UCLE;
+	regs->srr1 &= MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI;
 }
 
 /**

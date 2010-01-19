@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -138,7 +138,7 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 	regs->gpregs[4] = (register_t)arg;
 
 	regs->srr0 = (register_t)func;
-	regs->srr1 = MSR_ME | MSR_CE | MSR_EE;
+	regs->srr1 = MSR_ME | MSR_CE | MSR_EE | MSR_RI;
 
 	regs->lr = (register_t)ret_from_exception;
 }
