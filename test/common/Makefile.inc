@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,8 +46,8 @@ bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 
 # We cannot use $(dir) here because rule evaluation is defered.
-$(test)-run: $(test)
+$(test)-run:: $(test)
 	$(SIMICS) $(testdir)$</run.simics
 
-$(test)-run-%: $(test)
+$(test)-run-%:: $(test)
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics

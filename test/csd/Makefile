@@ -25,11 +25,10 @@
 test := csd
 dir := $(testdir)$(test)/
 
-include $(testdir)common/Makefile.inc
-
-$(test)-run: $(test)
+$(test)-run:: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
-	$(SIMICS) $(testdir)$</run.simics
 
 $(test)-check: $(test)-run-batch
 	$(testdir)common/check-results 2
+
+include $(testdir)common/Makefile.inc
