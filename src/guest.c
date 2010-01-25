@@ -648,13 +648,14 @@ bad:
 			continue;
 		}
 
-		intspec[i * 2 + 0] = handle;
-		intspec[i * 2 + 1] = hwnode->dev.irqs[i]->config;
-		if (owner->guest->mpic_direct_eoi) {
-			intspec[i * 2 + 1] |= IRQ_TYPE_MPIC_DIRECT;
-			((vmpic_interrupt_t *)irq->priv)->config |=
-						IRQ_TYPE_MPIC_DIRECT;
+		if (!owner->guest->mpic_direct_eoi) {
+			irq->config &= ~(IRQ_TYPE_MPIC_DIRECT);
+			((vmpic_interrupt_t *)irq->priv)->config &=
+						~(IRQ_TYPE_MPIC_DIRECT);
 		}
+
+		intspec[i * 2 + 0] = handle;
+		intspec[i * 2 + 1] = irq->config;
 	}
 
 	ret = dt_set_prop(owner->gnode, "interrupts", intspec,
