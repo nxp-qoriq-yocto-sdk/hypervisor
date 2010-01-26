@@ -2,7 +2,7 @@
  * Microbenchmarks.
  */
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,29 +35,29 @@
 #include <limits.h>
 
 const char *benchmark_names[num_benchmarks] = {
-						"Other",
-						"tlbre",
-						"tlbilx",
-						"tlbsx",
-						"tlbsync",
-						"msgsnd",
-						"msgclr",
-						"spr",
-						"dec",
-						"tlbwe(tlb0)",
-						"tlbwe(tlb1)",
-						"tlbivax(all tlb0)",
-						"tlbivax(tlb0)",
-						"tlbivax(all tlb1)",
-						"tlbivax(tlb1)",
-				#ifdef CONFIG_TLB_CACHE
-						"tlb miss reflected",
-						"tlb miss stats",
-				#endif
-						"tlbinv by PID",
-						"tlbcache inv all",
-						"tlb1 inv",
-						"tlb write",
+	"Other",
+	"tlbre",
+	"tlbilx",
+	"tlbsx",
+	"tlbsync",
+	"msgsnd",
+	"msgclr",
+	"spr",
+	"dec",
+	"tlbwe(tlb0)",
+	"tlbwe(tlb1)",
+	"tlbivax(all tlb0)",
+	"tlbivax(tlb0)",
+	"tlbivax(all tlb1)",
+	"tlbivax(tlb1)",
+#ifdef CONFIG_TLB_CACHE
+	"tlb miss reflected",
+	"tlb miss stats",
+#endif
+	"tlbinv by PID",
+	"tlbcache inv all",
+	"tlb1 inv",
+	"tlb write",
 };
 
 void statistics_stop(unsigned long start, int bmnum)
