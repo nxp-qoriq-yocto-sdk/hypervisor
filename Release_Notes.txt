@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,9 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 0.5
-Revsion: 005
-Date: 9/25/2009
+Topaz Version: 0.6
+Revsion: 001
+Date: 1/28/2010
 
 -------------------------------------------------------
 Contents
@@ -46,62 +46,22 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.5-004 has been tested with Simics 4.2.20 / pre21
+   -embedded-hv v0.6-001 has been tested with Simics 4.2.34 / pre38
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.878
+    0.880
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -v0.5-005 bug fixes and changes
-      -bug 4099-- support "baud" property in config spec
-       for HV console
-      -bug 3072-- add support for start with 'load' in shell
-      -bug 4017-- remove whoami hcall
-      -bug 4118-- display number of cpus in partitions w/ info command
-      -bug 4194-- fix elf unit test
-      -bug 4137-- display paact entries that have valid bit cleared
-      -bug 4025-- fix setup stashing for devices targeting CPC 
-      -misc unit test cleanup
-
-   -v0.5-004 bug fixes and changes
-      -fix bug 4265--  multiple Linux partitions booted
-       at same time hang
-      -MSI fixes and cleanup, including bug 4251
-      -fix bug 4264-- NMI unit test failure
-
-   -v0.5-003 bug fixes and changes
-      -ELF loaders: clean up and better error handling and
-       diagnostics
-      -bug 4233: start/restart combination caused partition to
-       hang
-      -bug 4202: copy_between_gphys: flush caches.  This will
-       provide proper cache synchronization for partman
-       based image loading.
-
-   -v0.5-002 bug fixes and changes
-      -bug 4091: gdb is not flushing caches on breakpoint writes
-      -bug 3470: partman load returns zero for success
-      -bug 3739: check to verify that MSI subwindow lies within
-       PCI-E inbound ATMU window
-      -bug 4097: gtlb shell command improvements
-      -bug 4126: don't use the CPCs if they are turned off
-      -misc updates to byte-channel mux and queue infrastructure
-       to fix some race conditions
-      -added system 'reset' command to hypervisor shell
-      -optimization to remove redundant PID invalidates of the TLB
-      -misc unit test cleanup
-
-   -v0.5-001 bug fixes and changes (from 0.4-011)
-      -mux_server now supports an -exec command that
-       allows connection to another program (such
-       as skermit)
-      -ns16550 initialization
-      -workaround for CPU errata PAMU3
-      -bug fix to optimized memset()
-      -unit test updates:
-         -support byte-channels as a console
-         -initialize hardware UART
-         -bcmux: Fix mismatched error code
+   -v0.6-001 bug fixes and changes (since 0.5-008)
+      -initial hypervisor statistics support in command shell
+      -bug 4284-- improve robustness of getting crash dumps
+       out of the hypervisor when the console is on a mux
+      -added mechanism to get machine check info out to
+       console
+      -machine check handler improvements
+      -support for shell command to dump guest physical memory
+      -add FH_IDLE hcall
+      -unit test cleanup to sync with sim.git
