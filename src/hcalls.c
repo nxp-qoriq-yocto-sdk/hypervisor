@@ -467,14 +467,13 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 
 	register_t saved = spin_lock_intsave(&bc->tx_lock);
 
-	if (len > queue_get_space(bc->tx))
+	ssize_t ret = byte_chan_send(bc, buf, len);
+	if (ret == 0 && len != 0)
 		regs->gpregs[3] = EAGAIN;
-	else {
-		/* put chars into bytechannel queue here */
-		ssize_t ret = byte_chan_send(bc, buf, len);
-		assert(ret == (ssize_t)len);
-		regs->gpregs[3] = 0;  /* success */
-	}
+	else
+		regs->gpregs[3] = 0;
+
+	regs->gpregs[4] = ret;
 
 	spin_unlock_intsave(&bc->tx_lock, saved);
 }

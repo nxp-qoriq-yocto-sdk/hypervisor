@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -122,11 +122,11 @@ void ext_int_handler(trapframe_t *frameptr)
 
 	debug("external interrupt ... vector  %d\n", vector);
 	if (vector == irq1[0]) {
-		debug("byte channel 1 rx interrupt\n");
+		debug("byte channel A rx interrupt\n");
 		process_rx_intr(handle[0]);
 		debug("\n");
 	} else if (vector == irq1[2]) {
-		debug("byte channel 1 tx interrupt\n");
+		debug("byte channel A tx interrupt\n");
 		status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
 		ret = process_status(status);
 		if (ret < 0)
@@ -134,17 +134,16 @@ void ext_int_handler(trapframe_t *frameptr)
 		debug("tx avail =%d\n", txavail);
 		debug("\n");
 	} else if (vector == irq2[0]) {
-		debug("byte channel 2 rx interrupt\n");
+		debug("byte channel B rx interrupt\n");
 		process_rx_intr(handle[1]);
 		debug("\n");
 	} else if (vector == irq2[2]) {
-		debug("byte channel 2 tx interrupt\n");
+		debug("byte channel B tx interrupt\n");
 		status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
 		ret = process_status(status);
 		if (ret < 0)
 			return;
 		debug("tx avail =%d\n", txavail);
-		printf("\n");
 	}
 	fh_vmpic_eoi(vector);
 
@@ -165,6 +164,27 @@ static int get_prop(const char *byte_channel,
 
 	*ptr = fdt_getprop(fdt, ret, prop, &len);
 
+	return 0;
+}
+
+static int test_partial_write(uint32_t rhandle, uint32_t shandle,
+                              unsigned int to_send, unsigned int expected_to_send)
+{
+	uint32_t status;
+	char buf[16];
+	const char *str = "byte-channel:-A!";	/* 16 chars*/
+
+	status = fh_byte_channel_receive(rhandle, &expected_to_send, buf);
+
+	status = fh_byte_channel_send(shandle, &to_send, str);
+
+	if (status || to_send != expected_to_send) {
+		printf("ERROR: expected to send %d char, actual "
+		       "sent was %d \n", expected_to_send, to_send);
+		return 1;
+	}
+
+	printf(" > Partial write (%d char): PASSED\n", to_send);
 	return 0;
 }
 
@@ -192,7 +212,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 	uint32_t txavail;
 	int ret;
 	const uint32_t *prop;
-	int avail, bal;
+	unsigned int avail, bal, to_send, cnt, total_sent;
+	char buf[16];
 
 	init(devtree_ptr);
 
@@ -254,25 +275,25 @@ void libos_client_entry(unsigned long devtree_ptr)
 		return;
 	}
 
-	debug("byte-channel 1 irqs = %d %d\n", irq1[0], irq1[2]);
-	debug("byte-channel 2 irqs = %d %d\n", irq2[0], irq2[2]);
+	debug("byte-channel A irqs = %d %d\n", irq1[0], irq1[2]);
+	debug("byte-channel B irqs = %d %d\n", irq2[0], irq2[2]);
 
-	/* set int config for byte channel 1 */
+	/* set int config for byte channel A */
 	if ((status = fh_vmpic_set_int_config(irq1[0], 0, 0, 0x00000001))) {/* set int to cpu 0 */
-		printf("fh_vmpic_set_int_config failed for byte channel 1 rxint\n");
+		printf("fh_vmpic_set_int_config failed for byte channel A rxint\n");
 		goto bad;
 	}
 	if ((status = fh_vmpic_set_int_config(irq1[2], 0, 0, 0x00000001))) {/* set int to cpu 0 */
-		printf("fh_vmpic_set_int_config failed for byte channel 1 txint\n");
+		printf("fh_vmpic_set_int_config failed for byte channel A txint\n");
 		goto bad;
 	}
-	/* set int config for byte channel 2 */
+	/* set int config for byte channel B */
 	if ((status = fh_vmpic_set_int_config(irq2[0], 0, 0, 0x00000001))) {/* set int to cpu 0 */
-		printf("fh_vmpic_set_int_config failed for byte channel 2 rxint\n");
+		printf("fh_vmpic_set_int_config failed for byte channel B rxint\n");
 		goto bad;
 	}
 	if ((status = fh_vmpic_set_int_config(irq2[2], 0, 0, 0x00000001)))	{/* set int to cpu 0 */
-		printf("fh_vmpic_set_int_config failed for byte channel 2 txint\n");
+		printf("fh_vmpic_set_int_config failed for byte channel B txint\n");
 		goto bad;
 	}
 
@@ -284,23 +305,21 @@ void libos_client_entry(unsigned long devtree_ptr)
 		printf("Byte channel A txavail not empty before send start ---> FAILED\n");
 		goto bad;
 	}
-	avail = txavail / 16;
-	bal = txavail % 16;
-	while (1) {
-		if (avail > 0) {
-			status = fh_byte_channel_send(handle[0], 16, str);
-			--avail;
-		} else
-			status = fh_byte_channel_send(handle[0], bal, str);
 
-		if (status == EAGAIN) 
+	total_sent = 0;
+	while (1) {
+		to_send = 16;
+		status = fh_byte_channel_send(handle[0], &to_send, str);
+		total_sent += to_send;
+
+		if (status != 0)
 			break;
 	}
 
-	if (avail == 0)
+	if (total_sent == txavail)
 		printf(" > Completed send: PASSED\n");
 	else
-		printf(" > Error avail != 0: FAILED\n");
+		printf(" > Error: only sent %d bytes: FAILED\n", total_sent);
 
 	status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
 
@@ -309,16 +328,16 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("Txavail = %d != 0 but rc = EAGAIN incorrect --->FAILED\n", txavail);
 
-	debug("enabling byte channel 1 tx intr and byte channel 2 rx intr\n");
+	debug("enabling byte channel A tx intr and byte channel B rx intr\n");
 
 	if ((status = fh_vmpic_set_mask(irq1[2], 0))) {/* enable byte channel A txintr */
-		printf("fh_vmpic_set_mask failed for byte channel 1 txint\n");
+		printf("fh_vmpic_set_mask failed for byte channel A txint\n");
 		disable_extint();
 		goto bad;
 	}
 
 	if ((status = fh_vmpic_set_mask(irq2[0], 0))) {/* enable byte channel B rxintr */
-		printf("fh_vmpic_set_mask failed for byte channel 2 rxint\n");
+		printf("fh_vmpic_set_mask failed for byte channel B rxint\n");
 		disable_extint();
 		goto bad;
 	}
@@ -333,24 +352,21 @@ void libos_client_entry(unsigned long devtree_ptr)
 		goto bad;
 	}
 
-
-	avail = txavail / 16;
-	bal = txavail % 16;
+	total_sent = 0;
 	while (1) {
-		if (avail > 0) {
-			status = fh_byte_channel_send(handle[1], 16, str);
-			--avail;
-		} else
-			status = fh_byte_channel_send(handle[1], bal, str);
+		to_send = 16;
+		status = fh_byte_channel_send(handle[1], &to_send, str);
+		total_sent += to_send;
 
-		if (status == EAGAIN) 
+		if (status != 0)
 			break;
 	}
 
-	if (avail == 0)
+	if (total_sent == txavail)
 		printf(" > Completed send: PASSED\n");
 	else
-		printf(" > Error avail != 0: FAILED\n");
+		printf(" > Error: only sent %d bytes: FAILED\n", total_sent);
+
 
 	status = fh_byte_channel_poll(handle[1], &rxavail, &txavail);
 
@@ -359,20 +375,59 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("Txavail = %d != 0 but rc = EAGAIN incorrect --->FAILED\n", txavail);
 
-	debug("enabling byte channel 2 tx intr and byte channel 1 rx intr\n");
-	if ((status = fh_vmpic_set_mask(irq2[2], 0))) {/* enable byte channel 2 txintr */
-		printf("fh_vmpic_set_mask failed for byte channel 2 txint\n");
+	debug("enabling byte channel B tx intr and byte channel A rx intr\n");
+	if ((status = fh_vmpic_set_mask(irq2[2], 0))) {/* enable byte channel B txintr */
+		printf("fh_vmpic_set_mask failed for byte channel B txint\n");
 		disable_extint();
 		goto bad;
 	}
 	debug("\n");
-	if ((status = fh_vmpic_set_mask(irq1[0], 0))) {/* enable byte channel 1 rxintr */
-		printf("fh_vmpic_set_mask failed for byte channel 1 rxint\n");
+	if ((status = fh_vmpic_set_mask(irq1[0], 0))) {/* enable byte channel A rxintr */
+		printf("fh_vmpic_set_mask failed for byte channel A rxint\n");
 		disable_extint();
 		goto bad;
 	}
 
 	while (rx_intr_state < 2);
+
+	/* partial write unit test */
+
+	/* mask all bc interrupts */
+	status = fh_vmpic_set_mask(irq1[0], 1);
+	status += fh_vmpic_set_mask(irq1[2], 1);
+	status += fh_vmpic_set_mask(irq2[0], 1);
+	status += fh_vmpic_set_mask(irq2[2], 1);
+	if (status) {
+		printf("ERROR: mask failed\n");
+		goto bad;
+	}
+
+	status = fh_byte_channel_poll(handle[0], &rxavail, &txavail);
+	if (rxavail) {
+		printf("ERROR: byte-channel not empty \n");
+		goto bad;
+	}
+
+	/* fill up byte-channel */
+	to_send = 1;
+	str = "byte-channel:-A!";	/* 16 chars*/
+	while (fh_byte_channel_send(handle[0], &to_send, str) != EAGAIN);
+
+	/* test write of 16 bytes w/ 1 byte free */
+	if (test_partial_write(handle[1], handle[0], 16, 1))
+		goto bad;
+
+	/* test write of 16 bytes w/ 15 bytes free */
+	if (test_partial_write(handle[1], handle[0], 16, 15))
+		goto bad;
+
+	/* test write of 16 bytes w/ 16 bytes free */
+	if (test_partial_write(handle[1], handle[0], 16, 16))
+		goto bad;
+
+	/* test write of 0 bytes */
+	if (test_partial_write(handle[1], handle[0], 0, 0))
+		goto bad;
 
 	printf("Test Complete\n");
 
