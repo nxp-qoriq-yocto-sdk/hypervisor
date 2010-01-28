@@ -142,7 +142,7 @@
 			guest-addr = <0 0>;
 		};
 
-		partition@1 {
+		reset-status {
 			compatible = "managed-partition";
 			partition = <&part2>;
 		};

@@ -1403,19 +1403,20 @@ static const uint32_t hv_version[4] = {
  * This function finds and initializes all of the managed guests for the
  * given manager partition.
  */
-static int process_managed_partition_node(dt_node_t *node, void *arg)
+static int process_managed_partition_node(dt_node_t *cfgnode, void *arg)
 {
 	guest_t *guest = arg;
 	dt_prop_t *prop;
+	dt_node_t *node;
 	uint32_t phandle;
 	int ret;
 
 	// The 'partition' property has a phandle to the managed node
-	prop = dt_get_prop(node, "partition", 0);
+	prop = dt_get_prop(cfgnode, "partition", 0);
 	if (!prop || (prop->len != 4)) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: guest %s: node %s has missing/invalid 'partition' property\n",
-			 __func__, guest->name, node->name);
+			 __func__, guest->name, cfgnode->name);
 		return 0;
 	}
 	phandle = *(const uint32_t *)prop->data;
@@ -1424,7 +1425,7 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 	if (!endpoint) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: guest %s: node %s has invalid phandle in 'partition' property\n",
-			 __func__, guest->name, node->name);
+			 __func__, guest->name, cfgnode->name);
 		return 0;
 	}
 
@@ -1455,7 +1456,7 @@ static int process_managed_partition_node(dt_node_t *node, void *arg)
 		return ERR_NOMEM;
 
 	// Find or create the pointer to the managed partition's subnode
-	node = dt_get_subnode(node, target_guest->name, 1);
+	node = dt_get_subnode(node, cfgnode->name, 1);
 	if (!node)
 		return ERR_NOMEM;
 

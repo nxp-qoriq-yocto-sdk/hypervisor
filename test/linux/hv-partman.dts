@@ -381,12 +381,12 @@
 			device = "/qman-portals/qman-pool@15";
 		};
 
-		partition@1 {
+		p2-linux {
 			compatible = "managed-partition";
 			partition = <&part2>;
 		};
 
-		partition@2 {
+		p3-linux {
 			compatible = "managed-partition";
 			partition = <&part3>;
 		};
