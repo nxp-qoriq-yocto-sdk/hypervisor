@@ -759,7 +759,7 @@ static unsigned long tb_to_nsec(uint64_t freq, unsigned long ticks)
 	return ticks * 1000000000ULL / freq;
 }
 
-static void print_benchs(shell_t *shell, gcpu_t *gcpu, int start, int end, int total_flag)
+static void print_stats(shell_t *shell, gcpu_t *gcpu, int start, int end, int total_flag)
 {
 	char *tmp;
 	int len, cplen;
@@ -795,7 +795,7 @@ static void print_benchs(shell_t *shell, gcpu_t *gcpu, int start, int end, int t
 	}
 }
 
-static void print_stats(shell_t *shell, int num)
+static void dump_stats(shell_t *shell, int num)
 {
 	guest_t *guest;
 	int i;
@@ -810,10 +810,10 @@ static void print_stats(shell_t *shell, int num)
 	for (i = 0; i < guest->cpucnt; i++) {
 		gcpu_t *gcpu = guest->gcpus[i];
 		qprintf(shell->out, 1, "guest gcpu: %d\n", i);
-		print_benchs(shell, gcpu, 0, MICRO_BENCHMARK_START, 1);
+		print_stats(shell, gcpu, 0, MICRO_BENCHMARK_START, 1);
 	#ifdef CONFIG_BENCHMARKS
 		qprintf(shell->out, 1, "\nMicro Benchmarks:\n");
-		print_benchs(shell, gcpu, MICRO_BENCHMARK_START, num_benchmarks, 0);
+		print_stats(shell, gcpu, MICRO_BENCHMARK_START, num_benchmarks, 0);
 	#endif
 	}
 	qprintf(shell->out, 1, "\n");
@@ -834,7 +834,7 @@ static void clear_stats(int num)
 	}
 }
 
-static void benchmark_fn(shell_t *shell, char *args)
+static void stats_fn(shell_t *shell, char *args)
 {
 	char *numstr, *cmdstr;
 	int num;
@@ -844,7 +844,7 @@ static void benchmark_fn(shell_t *shell, char *args)
 	numstr = nextword(&args);
 
 	if (!numstr || !cmdstr) {
-		qprintf(shell->out, 1, "Usage: benchmark <command> <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: stats <command> <partition-number>\n");
 		return;
 	}
 
@@ -853,19 +853,19 @@ static void benchmark_fn(shell_t *shell, char *args)
 		return;
 
 	if (!strcmp(cmdstr, "print"))
-		print_stats(shell, num);
+		dump_stats(shell, num);
 	else if (!strcmp(cmdstr, "clear"))
 		clear_stats(num);
 }
 
-static command_t benchmark = {
-	.name = "benchmark",
-	.action = benchmark_fn,
+static command_t stats = {
+	.name = "stats",
+	.action = stats_fn,
 	.shorthelp = "Print statistics/microbenchmark information",
-	.longhelp = "  Usage: benchmark <cmd> <partition number>\n\n"
+	.longhelp = "  Usage: stats <cmd> <partition number>\n\n"
 	            "  'print' & 'clear' commands are supported.",
 };
-shell_cmd(benchmark);
+shell_cmd(stats);
 #endif
 
 static void guestmem_fn(shell_t *shell, char *args)
