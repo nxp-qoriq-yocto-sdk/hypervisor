@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,13 +46,13 @@ int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq, int config);
 int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq);
 void vmpic_global_init(void);
 void vmpic_partition_init(guest_t *guest);
-void fh_vmpic_set_int_config(trapframe_t *regs);
-void fh_vmpic_get_int_config(trapframe_t *regs);
-void fh_vmpic_set_mask(trapframe_t *regs);
-void fh_vmpic_eoi(trapframe_t *regs);
-void fh_vmpic_iack(trapframe_t *regs);
-void fh_vmpic_get_mask(trapframe_t *regs);
-void fh_vmpic_get_activity(trapframe_t *regs);
-void fh_vmpic_get_msir(trapframe_t *regs);
+void hcall_vmpic_set_int_config(trapframe_t *regs);
+void hcall_vmpic_get_int_config(trapframe_t *regs);
+void hcall_vmpic_set_mask(trapframe_t *regs);
+void hcall_vmpic_eoi(trapframe_t *regs);
+void hcall_vmpic_iack(trapframe_t *regs);
+void hcall_vmpic_get_mask(trapframe_t *regs);
+void hcall_vmpic_get_activity(trapframe_t *regs);
+void hcall_vmpic_get_msir(trapframe_t *regs);
 
 #endif

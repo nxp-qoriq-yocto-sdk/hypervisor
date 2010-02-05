@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -273,7 +273,7 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-void fh_vmpic_set_int_config(trapframe_t *regs)
+void hcall_vmpic_set_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -318,7 +318,7 @@ void fh_vmpic_set_int_config(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_get_int_config(trapframe_t *regs)
+void hcall_vmpic_get_int_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -368,7 +368,7 @@ void fh_vmpic_get_int_config(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_set_mask(trapframe_t *regs)
+void hcall_vmpic_set_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -396,7 +396,7 @@ void fh_vmpic_set_mask(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_get_mask(trapframe_t *regs)
+void hcall_vmpic_get_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -417,7 +417,7 @@ void fh_vmpic_get_mask(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_eoi(trapframe_t *regs)
+void hcall_vmpic_eoi(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -438,7 +438,7 @@ void fh_vmpic_eoi(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_iack(trapframe_t *regs)
+void hcall_vmpic_iack(trapframe_t *regs)
 {
 	uint16_t vector;
 	int v = 0;
@@ -464,7 +464,7 @@ void fh_vmpic_iack(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_get_activity(trapframe_t *regs)
+void hcall_vmpic_get_activity(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -485,7 +485,7 @@ void fh_vmpic_get_activity(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void fh_vmpic_get_msir(trapframe_t *regs)
+void hcall_vmpic_get_msir(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
