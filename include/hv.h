@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,5 +65,12 @@ void set_hypervisor_strprop(struct guest *guest, const char *prop, const char *v
 phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size);
 
 __attribute__((noreturn)) void init_guest(void);
+
+struct guest *handle_to_guest(int handle);
+void hcall_get_core_state(trapframe_t *regs);
+void hcall_enter_nap(trapframe_t *regs);
+void hcall_exit_nap(trapframe_t *regs);
+
+int flush_disable_l1(void *disp_addr, uint32_t timeout);
 
 #endif

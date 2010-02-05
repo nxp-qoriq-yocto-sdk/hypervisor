@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -480,6 +480,8 @@ void init(unsigned long devtree_ptr)
 
 static void core_init(void)
 {
+	cpu->coreid = mfspr(SPR_PIR);
+
 	/* set up a TLB entry for CCSR space */
 	tlb1_init();
 }

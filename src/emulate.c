@@ -1,7 +1,7 @@
 /*
  * Instruction emulation
  *
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -240,11 +240,17 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
  
 	spin_lock_int(&guest->inv_lock);
 	guest->tlbivax_addr = va;
-	guest->tlbivax_count = guest->cpucnt;
+	guest->tlbivax_count = 1;
 
-	for (i = 0; i < guest->cpucnt; i++)
-		if (i != gcpu->gcpu_num)
+	/* We skip napping cores, as they won't respond to the event,
+	 * and they wouldn't snoop the tlbivax in real hardware.
+	 */
+	for (i = 0; i < guest->cpucnt; i++) {
+		if (i != gcpu->gcpu_num && !gcpu->napping) {
 			setevent(guest->gcpus[i], EV_TLBIVAX);
+			atomic_add(&guest->tlbivax_count, 1);
+		}
+	}
 
 	tlbivax_ipi(regs);
 

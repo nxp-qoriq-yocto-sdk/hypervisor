@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -147,5 +146,6 @@ void hcall(struct trapframe *regs);
 #define LOGTYPE_CCM          (CLIENT_BASE_LOGTYPE + 9)
 #define LOGTYPE_CPC          (CLIENT_BASE_LOGTYPE + 10)
 #define LOGTYPE_GUTS         (CLIENT_BASE_LOGTYPE + 11)
+#define LOGTYPE_PM           (CLIENT_BASE_LOGTYPE + 12)
 
 #endif

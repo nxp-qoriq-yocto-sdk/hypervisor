@@ -44,8 +44,13 @@ static eventfp_t event_table[] = {
 	&tlbivax_ipi,                    /* EV_TLBIVAX */
 	&schedule,                       /* EV_RESCHED */
 	&dbell_to_mcgdbell_glue,         /* EV_MCP */
-	&dbell_to_cgdbell_glue,         /* EV_GUEST_CRIT_INT */
-	&dump_hv_queue,                 /* EV_DUMP_HV_QUEUE */
+	&dbell_to_cgdbell_glue,          /* EV_GUEST_CRIT_INT */
+	&dump_hv_queue,                  /* EV_DUMP_HV_QUEUE */
+#ifdef CONFIG_PM
+	&sync_nap,                       /* EV_SYNC_NAP */
+#else
+	NULL,
+#endif
 };
 
 /* Guest events are processed when returning to the guest, but

@@ -116,7 +116,7 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
  * is invalid, does not point to a guest_t, or does not point to a guest_t
  * that the caller is allowed to access.
  */
-static guest_t *handle_to_guest(int handle)
+guest_t *handle_to_guest(int handle)
 {
 	if (handle == -1)
 		return get_gcpu()->guest;
@@ -678,9 +678,15 @@ static hcallfp_t hcall_table[] = {
 	hcall_vmpic_get_msir,
 	hcall_system_reset,                   /* 24 */
 	hcall_idle,
+#ifdef CONFIG_PM
+	hcall_get_core_state,
+	hcall_enter_nap,
+	hcall_exit_nap,                       /* 28 */
+#else
 	unimplemented,
 	unimplemented,
 	unimplemented,                        /* 28 */
+#endif
 	unimplemented,
 	unimplemented,
 	unimplemented,

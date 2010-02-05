@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,7 +70,7 @@ cpu_t cpu0 = {
 	.client.gcpu = &noguest[0],
 };
 
-static cpu_t secondary_cpus[MAX_CORES - 1];
+cpu_t secondary_cpus[MAX_CORES - 1];
 static uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
 
 static void core_init(void);

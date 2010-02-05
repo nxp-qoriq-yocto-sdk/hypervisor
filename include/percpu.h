@@ -2,7 +2,7 @@
  * Per-guest-cpu and Per-hypervisor-cpu data structures
  */
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,8 @@
 #include <thread.h>
 #include<benchmark.h>
 #endif
+
+extern cpu_t secondary_cpus[MAX_CORES - 1];
 
 #define TLB1_GSIZE 16 /* As seen by the guest */
 
@@ -233,8 +235,8 @@ typedef struct gcpu {
 	dt_node_t *dbgstub_cfg;
 #endif
 
-	/* Fields after this point are cleared on reset -- do not
-	 * insert new fields before gdbell_pending.
+	/* Fields after this point are cleared on partition reset -- do
+	 * not insert new fields between this comment and gdbell_pending.
 	 */
 	unsigned long gdbell_pending;
 	unsigned long crit_gdbell_pending;
@@ -247,6 +249,7 @@ typedef struct gcpu {
 	uint32_t timer_flags;
 	int evict_tlb1, clean_tlb, clean_tlb_pid;
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
+	int napping;
 #ifdef CONFIG_STATISTICS
 	struct benchmark benchmarks[num_benchmarks];
 #endif

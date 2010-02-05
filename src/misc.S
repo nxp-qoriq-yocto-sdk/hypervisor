@@ -1,7 +1,7 @@
 /** @file
  */
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
  */
 
 #include <libos/fsl-booke-tlb.h>
+#include <libos/core-regs.h>
 
 #if 1
 /* 32-bit */
@@ -70,3 +71,110 @@ branch_to_reloc:
 
 	/* Return into new text mapping */
 	blr
+
+#ifdef CONFIG_PM
+/** Flush and disable L1 cache.  We assume 8-way PLRU.
+ * r3 = address to use for displacement flush.
+ *      This needs to have a valid mapping with load access
+ *      for at least 13/8 the size of the cache.  It will not
+ *      be overwritten and it does not matter if parts of it
+ *      are already in the cache.
+ *
+ * r4 = timebase ticks for a timeout on invalidation
+ */
+.global flush_disable_l1
+flush_disable_l1:
+	mfspr	%r8, SPR_L1CFG0
+
+	rlwinm	%r5, %r8, 9, 3	/* Extract cache block size */
+	twlgti	%r5, 1		/* Only 32 and 64 byte cache blocks
+	                         * are currently defined.
+	                         */
+	li	%r10, 32
+	subfic	%r6, %r5, 2	/* %r6 = log2(1024/(block size * ways))
+				 * r5 contains log2(block size) - 5
+				 * log2(1024)-log2(block size)-log2(ways) =
+				 * 10 - r5 - 5 - 3 =
+				 * 2 - r5
+				 */
+	slw	%r5, %r10, %r5	/* %r5 = cache block size */
+
+	rlwinm	%r7, %r8, 0, 0x7ff /* Extract number of KiB in the cache */
+	mulli	%r7, %r7, 13	/* An 8-way cache will %require 13
+	                         * loads per way.
+	                         */
+	slw	%r7, %r7, %r6	/* r7 = cache KiB*13*1024/block size/ways
+				 *    = cache bytes * (13/8) / block size
+				 *    = cache blocks to flush
+				 */
+	mr	%r9, %r3
+	mtctr	%r7
+
+1:	lwz	%r0, 0(%r9)	/* Load... */
+	add	%r9, %r9, %r5
+	bdnz	1b
+
+	msync
+	mr	%r9, %r3
+	mtctr	%r7
+
+1:	dcbf	0, %r9		/* ...and flush. */
+	add	%r9, %r9, %r5
+	bdnz	1b
+
+	mfspr	%r10, SPR_L1CSR0	/* Invalidate and disable d-cache */
+	li	%r5, 2
+	rlwimi	%r10, %r5, 0, 3
+
+	msync
+	isync
+	mtspr	SPR_L1CSR0, %r10
+	isync
+
+	mfspr	%r11, SPR_TBL
+	li	%r3, -1
+
+1:	mfspr	%r10, SPR_L1CSR0 /* Wait for the invalidate to finish */
+
+	mfspr	%r12, SPR_TBL
+	sub	%r12, %r12, %r11
+	cmplw	%r12, %r4
+	bgelr
+
+	andi.	%r10, %r10, 2
+	bne	1b
+
+	rlwimi	%r10, %r8, 2, 3	/* Extract cache type */
+	twlgti	%r10, 1		/* Only 0 (Harvard) and 1 (Unified)
+	                         * are currently defined.
+	                         */
+
+	andi.	%r10, %r10, 1	/* If it's unified, we're done. */
+	li	%r3, 0
+	bnelr
+
+	mfspr	%r10, SPR_L1CSR1	/* Otherwise, invalidate the i-cache */
+	li	%r5, 2
+	rlwimi	%r10, %r5, 0, 3
+
+	msync
+	isync
+	mtspr	SPR_L1CSR1, %r10
+	isync
+
+	mfspr	%r11, SPR_TBL
+	li	%r3, -1
+
+1:	mfspr	%r10, SPR_L1CSR1 /* Wait for the invalidate to finish */
+
+	mfspr	%r12, SPR_TBL
+	sub	%r12, %r12, %r11
+	cmplw	%r12, %r4
+	bgelr
+
+	andi.	%r10, %r10, 2
+	bne	1b
+
+	li	%r3, 0
+	blr
+#endif
