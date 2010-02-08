@@ -237,8 +237,13 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 		         regs->srr0, va);
 		return 1;
 	}
- 
-	spin_lock_int(&guest->inv_lock);
+
+	/* Can't use an irq-safe lock because of the potential for
+	 * IPI deadlock.  The spinning should we get preempted shouldn't
+	 * be a problem, even with multiple guests per core, as we only
+	 * have one vcpu per guest/core combination.
+	 */
+	raw_spin_lock(&guest->inv_lock);
 	guest->tlbivax_addr = va;
 	guest->tlbivax_count = 1;
 
@@ -257,7 +262,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	while (guest->tlbivax_count != 0)
 		barrier();
 
-	spin_unlock_int(&guest->inv_lock);
+	spin_unlock(&guest->inv_lock);
 	return 0;
 }
 

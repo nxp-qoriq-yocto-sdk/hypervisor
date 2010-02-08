@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -242,6 +242,8 @@ static void mmucsr_test(int secondary)
 	inv_all_test("mmucsr", mmucsr_inv, secondary, 0);
 }
 
+static uint32_t tlbsync_lock;
+
 static void tlbivax_inv_all(int tlb_mask)
 {
 	if (tlb_mask & 1)
@@ -253,8 +255,10 @@ static void tlbivax_inv_all(int tlb_mask)
 		             "r" (TLBIVAX_TLB1 | TLBIVAX_INV_ALL) :
 		             "memory");
 
+	spin_lock(&tlbsync_lock);
 	asm volatile("tlbsync" : : : "memory");
 	sync();
+	spin_unlock(&tlbsync_lock);
 }
 
 static void tlbivax_inv(void *addr, int tlb_mask)
@@ -270,8 +274,10 @@ static void tlbivax_inv(void *addr, int tlb_mask)
 		             "r" (TLBIVAX_TLB1 | ea) :
 		             "memory");
 
+	spin_lock(&tlbsync_lock);
 	asm volatile("tlbsync" : : : "memory");
 	sync();
+	spin_unlock(&tlbsync_lock);
 }
 
 static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
@@ -371,11 +377,17 @@ static void inv_test(const char *name, void (*inv)(void *addr, int tlbmask),
 
 	sync_cores(secondary);
 	expect(name, 12, 3, addrs, vals, (int[]){fault, fault, fault});
+	sync_cores(secondary);
 
-	if (secondary == SECONDARY_NOINVAL) {
-		inv(tlb0, 1);
-		inv(tlb1, 2);
-	}
+	/* Test simultaneous invalidates */
+	create_mapping(1, 3, tlb1, memphys, TLB_TSIZE_64K);
+	expect(name, 13, 3, addrs, vals, (int[]){fault, 0, 0});
+	sync_cores(secondary);
+
+	inv(tlb0, 1);
+	inv(tlb1, 2);
+
+	expect(name, 14, 3, addrs, vals, (int[]){1, 1, 1});
 
 	sync_cores(secondary);
 }
