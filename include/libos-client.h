@@ -35,8 +35,9 @@
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
 #define KSTACK_SIZE 4096
 /* This stack size applies to all exception levels. It
-   changed from 2KB to 4KB due to stack pressure with the
-   TRK debug stub. */
+ * changed from 2KB to 4KB due to stack pressure with the
+ * TRK debug stub.
+ */
 
 #ifndef _ASM
 

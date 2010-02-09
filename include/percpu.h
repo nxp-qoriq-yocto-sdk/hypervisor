@@ -38,7 +38,7 @@
 #include <tlbcache.h>
 #include <devtree.h>
 #include <thread.h>
-#include<benchmark.h>
+#include <benchmark.h>
 #endif
 
 extern cpu_t secondary_cpus[MAX_CORES - 1];
@@ -67,7 +67,8 @@ typedef struct {
 } handle_ops_t;
 
 /* An extremely crude form of RTTI/multiple interfaces...
-  Add pointers here for other handle types as they are needed.*/
+ * Add pointers here for other handle types as they are needed.
+ */
 typedef struct handle {
 	handle_ops_t *ops;
 	struct byte_chan_handle *bc;
