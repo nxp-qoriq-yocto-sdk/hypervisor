@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,6 +58,11 @@ SECTIONS
 		hvdbgstub_begin = .;
 		*(.hvdbgstub)
 		hvdbgstub_end = .;
+
+		. = ALIGN(8);
+		virtual_driver_begin = .;
+		*(.virtual.drivers)
+		virtual_driver_end = .;
 
 		. = ALIGN(8);
 		driver_begin = .;

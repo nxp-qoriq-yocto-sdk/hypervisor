@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -78,18 +78,51 @@ static void pcie_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
 	regs->srr0 += 4;
 }
 
-int virtualize_pcie_node(guest_t *guest, dt_node_t *hwnode, phys_addr_t paddr,
-			phys_addr_t size)
-{
-	vf_range_t *vf;
-	int ret;
-	uint32_t tmpaddr[MAX_ADDR_CELLS];
-	phys_addr_t rangesize;
-	phys_addr_t gaddr = paddr;
+static int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node);
 
-	// Check to see if this is an PCIe node
-	if (!dt_node_is_compatible(hwnode, "fsl,p4080-pcie"))
-		return 0;
+static virtualizer_t __virtualized_device pcie = {
+	.compatible = "fsl,p4080-pcie",
+	.virtualize = virtualize_pcie_node,
+};
+
+int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node)
+{
+	dt_node_t *hwnode = owner->hwnode;
+	guest_t *guest = owner->guest;
+	vf_range_t *vf;
+	uint32_t tmpaddr[MAX_ADDR_CELLS];
+	int ret;
+	phys_addr_t rangesize, size;
+	phys_addr_t gaddr, paddr;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(owner->cfgnode, "atmu-guest-physical", 0);
+	if (!prop)
+		return ERR_UNHANDLED;
+
+	dt_lookup_regs(hwnode);
+
+	if (hwnode->dev.num_regs == 0)
+		return ERR_BADTREE;
+
+	ret = map_guest_ranges(owner);
+	if (ret < 0)
+		return ret;
+
+	dt_lookup_irqs(hwnode);
+
+	ret = map_guest_irqs(owner);
+	if (ret < 0)
+		return ret;
+
+	ret = patch_guest_intmaps(owner);
+	if (ret < 0)
+		return ret;
+
+	configure_dma(node, owner);
+
+	gaddr = paddr = hwnode->dev.regs[0].start;
+	size = hwnode->dev.regs[0].size;
 
 	if (guest->devranges) {
 		val_from_int(tmpaddr, paddr);
@@ -99,7 +132,7 @@ int virtualize_pcie_node(guest_t *guest, dt_node_t *hwnode, phys_addr_t paddr,
 		if (ret < 0) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 				"%s: 0x%llx does not translate through device-ranges\n", __func__, paddr);
-			return 0;
+			return ERR_BADTREE;
 		}
 
 		gaddr = ((phys_addr_t) tmpaddr[MAX_ADDR_CELLS - 2] << 32) |

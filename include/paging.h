@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -198,6 +198,16 @@ struct vpic_interrupt;
 struct vf_range;
 struct dt_node;
 
+struct dev_owner;
+
+typedef struct virtualizer {
+	const char *compatible;
+	int (*virtualize)(struct dev_owner *owner, struct dt_node *node);
+} virtualizer_t;
+
+#define __virtualized_device __attribute__((section(".virtual.drivers"))) \
+	__attribute__((used))
+
 typedef void (*vf_callback_t)(struct vf_range *vf, struct trapframe *regs, phys_addr_t paddr);
 
 typedef struct vf_range {
@@ -222,8 +232,6 @@ int virtualize_device_interrupt(struct guest *guest, struct dt_node *node,
 
 int virtualize_i2c_node(struct guest *guest, struct dt_node *node,
 			phys_addr_t paddr, phys_addr_t size);
-int virtualize_pcie_node(struct guest *guest, struct dt_node *node,
-			phys_addr_t paddr, phys_addr_t size);
 
 void fixup_tlb_sx_re(void);
 
@@ -232,5 +240,13 @@ int guest_tlb_search_mas(uintptr_t va);
 int guest_tlb_search(uintptr_t va, int as, int pid, tlb_entry_t *mas);
 
 void map_dev_range(struct guest *guest, phys_addr_t addr, phys_addr_t size);
+
+int configure_dma(struct dt_node *hwnode, struct dev_owner *owner);
+
+int map_guest_ranges(struct dev_owner *owner);
+
+int map_guest_irqs(struct dev_owner *owner);
+
+int patch_guest_intmaps(struct dev_owner *owner);
 
 #endif

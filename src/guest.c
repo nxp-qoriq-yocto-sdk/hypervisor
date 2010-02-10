@@ -272,7 +272,7 @@ static void map_guest_mem(guest_t *guest)
 	                       map_gpma_callback, guest);
 }
 
-static int map_guest_ranges(dev_owner_t *owner)
+int map_guest_ranges(dev_owner_t *owner)
 {
 	size_t len;
 	uint32_t naddr, nsize, caddr, csize;
@@ -442,7 +442,7 @@ static int search_liodn_index(dt_node_t *cfgnode, void *arg)
 	return 0;
 }
 
-static int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
+int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_node_t *cfgnode;
 	dt_prop_t *liodn_prop = NULL;
@@ -522,6 +522,11 @@ nomem:
         	 "%s: out of memory\n", __func__);
 	return ERR_NOMEM;
 }
+#else
+int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
+{
+	return 0;
+}
 #endif
 
 static int map_guest_reg(dev_owner_t *owner)
@@ -547,12 +552,8 @@ static int map_guest_reg(dev_owner_t *owner)
 	if (num == 0)
 		return 0;
 
-#ifdef CONFIG_VIRTUAL_PCIE
-	if (!virtualize_pcie_node(owner->guest, hwnode, regs[0].start,
-		regs[0].size))
-#endif
-		for (int i = 0; i < num; i++)
-			map_dev_range(owner->guest, regs[i].start, regs[i].size);
+	for (int i = 0; i < num; i++)
+		map_dev_range(owner->guest, regs[i].start, regs[i].size);
 
 	/* Only change reg if this is a top-level guest node */
  	if (owner->gnode->parent == owner->guest->devices) {
@@ -612,7 +613,7 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-static int map_guest_irqs(dev_owner_t *owner)
+int map_guest_irqs(dev_owner_t *owner)
 {
 	dt_node_t *hwnode = owner->hwnode;
 	int ret;
@@ -693,7 +694,7 @@ static int calc_new_imaplen(dt_node_t *node, uint32_t naddr, uint32_t nint)
 	return newmaplen;
 }
 
-static int patch_guest_intmaps(dev_owner_t *owner)
+int patch_guest_intmaps(dev_owner_t *owner)
 {
 	dt_node_t *hwnode = owner->hwnode;
 	int ret, newmaplen;
@@ -864,6 +865,50 @@ static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 	return ret;
 }
 
+#ifdef CONFIG_DEVICE_VIRT
+extern virtualizer_t virtual_driver_begin, virtual_driver_end;
+
+static int virtualize_device(dev_owner_t *owner, dt_node_t *node)
+{
+	const char *compat_strlist, *end_compat;
+	size_t compat_len;
+
+	dt_prop_t *compat = dt_get_prop(owner->hwnode, "compatible", 0);
+	if (!compat)
+		return ERR_UNHANDLED;
+
+	compat_strlist = compat->data;
+	compat_len =  compat->len;
+	end_compat = compat_strlist + compat_len;
+
+	/*
+	 * Code borrowed from LIBOS/driver.c
+	 * Search for matches from the most-specific name to the
+	 * least-specific name
+	 */
+	while (compat_strlist < end_compat) {
+		for (virtualizer_t *drv = &virtual_driver_begin;
+			drv < &virtual_driver_end; drv++) {
+			int ret;
+
+			if (strcmp(compat_strlist, drv->compatible))
+				continue;
+
+			ret = drv->virtualize(owner, node);
+			if (ret == ERR_UNHANDLED)
+				continue;
+
+			return ret;
+		}
+		compat_strlist = memchr(compat_strlist, 0, end_compat - compat_strlist);
+		if (!compat_strlist)
+			break;
+		compat_strlist++;
+	}
+
+	return ERR_UNHANDLED;
+}
+#endif
 
 static int map_device_to_guest(dt_node_t *node, void *arg)
 {
@@ -885,6 +930,19 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 
 	create_aliases(hwnode, owner->gnode, guest->devtree);
 	create_aliases(owner->cfgnode, owner->gnode, guest->devtree);
+
+#ifdef CONFIG_DEVICE_VIRT
+	ret = virtualize_device(owner, node);
+
+	if (ret == 1)
+		return 0;
+
+	if (ret < 0 && ret != ERR_UNHANDLED) {
+		if (dt_set_prop_string(owner->gnode, "status", "fail") < 0)
+			return ERR_NOMEM;
+		return 1;
+	}
+#endif
 
 	ret = map_guest_reg(owner);
 	if (ret < 0) {
