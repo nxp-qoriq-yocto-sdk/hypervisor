@@ -62,6 +62,8 @@ static void dump_and_halt(register_t mcsr, trapframe_t *regs)
 
 void critical_interrupt(trapframe_t *frameptr)
 {
+	set_stat(bm_stat_critint, frameptr);
+
 	do_mpic_critint();
 }
 
@@ -72,6 +74,8 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	error_info_t err = { };
 	mcheck_error_t *mc;
 	int recoverable = 1;
+
+	set_stat(bm_stat_mcheck, frameptr);
 
 	reason = mcsr = mfspr(SPR_MCSR);
 

@@ -169,6 +169,8 @@ void doorbell_int(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	assert(!(mfmsr() & MSR_EE));
 
+	set_stat(bm_stat_dbell, regs);
+
 	while (gcpu->dbell_pending) {
 		/* get the next event */
 		unsigned int bit = count_lsb_zeroes(gcpu->dbell_pending);

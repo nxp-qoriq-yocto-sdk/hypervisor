@@ -750,7 +750,6 @@ shell_cmd(gtlb);
 #endif
 
 #ifdef CONFIG_STATISTICS
-#define MAXLEN 24
 #define MICRO_BENCHMARK_START bm_tlb0_inv_pid
 extern const char *benchmark_names[];
 
@@ -766,32 +765,23 @@ static void print_stats(shell_t *shell, gcpu_t *gcpu, int start, int end, int to
 	unsigned long total = 0;
 	uint64_t freq = dt_get_timebase_freq();
 
-	qprintf(shell->out, 1, "Event                     Total(ns)     Avg(ns)    Min(ns)    Max(ns)    Count\n");
+	qprintf(shell->out, 1, "Event                      Total(ns)    Avg(ns)    Min(ns)    Max(ns)    Count\n");
 	qprintf(shell->out, 1, "-------------------------------------------------------------------------------\n");
+
 	for (benchmark_num_t i = start; i < end; i++) {
 		benchmark_t *bm = &gcpu->benchmarks[i];
-		tmp = malloc(MAXLEN);
-		assert(tmp);
-		len = strlen(benchmark_names[i]);
-		cplen = MAXLEN - 2 - len;
-		memcpy(tmp, benchmark_names[i], len);
-		memset(&tmp[len], ' ', cplen);
-		tmp[MAXLEN - 1] = 0;
-
-		qprintf(shell->out, 1, "%s %10lu %10lu %10lu %10lu %10lu\n",
-			tmp,
+		qprintf(shell->out, 1, "%-24s %10lu %10lu %10lu %10lu %10lu\n",
+			benchmark_names[i],
 			tb_to_nsec(freq, bm->accum),
 			bm->num ? tb_to_nsec(freq, bm->accum / bm->num) : 0,
 			tb_to_nsec(freq, bm->min),
 			tb_to_nsec(freq, bm->max), bm->num);
-
-		free(tmp);
 		total += tb_to_nsec(freq, bm->accum);
 	}
 
 	if (total_flag) {
 		qprintf(shell->out, 1, "-------------------------------------------------------------------------------\n");
-		qprintf(shell->out, 1, "TOTAL                  %10lu\n", total);
+		qprintf(shell->out, 1, "TOTAL                    %10lu\n", total);
 	}
 }
 

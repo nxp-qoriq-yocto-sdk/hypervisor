@@ -106,15 +106,17 @@ void decrementer(struct trapframe *regs);
 void fit(struct trapframe *regs);
 void watchdog_trap(struct trapframe *regs);
 void hcall(struct trapframe *regs);
+void align_trap(struct trapframe *regs);
+void fpunavail(struct trapframe *regs);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt
 #define EXC_MCHECK_HANDLER powerpc_mchk_interrupt
 #define EXC_DSI_HANDLER data_storage
 #define EXC_ISI_HANDLER inst_storage
-#define EXC_ALIGN_HANDLER reflect_trap
+#define EXC_ALIGN_HANDLER align_trap
 #define EXC_PROGRAM_HANDLER program_trap
-#define EXC_FPUNAVAIL_HANDLER reflect_trap
+#define EXC_FPUNAVAIL_HANDLER fpunavail
 #define EXC_DECR_HANDLER decrementer
 #define EXC_FIT_HANDLER fit
 #define EXC_DTLB_HANDLER tlb_miss

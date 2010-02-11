@@ -696,6 +696,8 @@ void hcall(trapframe_t *regs)
 {
 	unsigned int token;
 
+	set_stat(bm_stat_hcall, regs);
+
 	if (unlikely(regs->srr1 & MSR_PR)) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
 		         "guest hcall from 0x%lx\n", regs->srr0);

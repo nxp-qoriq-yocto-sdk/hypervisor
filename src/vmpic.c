@@ -422,6 +422,8 @@ void hcall_vmpic_eoi(trapframe_t *regs)
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
 
+	set_stat(bm_stat_vmpic_eoi, regs);
+
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
 		regs->gpregs[3] = EINVAL;

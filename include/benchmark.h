@@ -2,7 +2,7 @@
  * Microbenchmarks.
  */
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 /* If you add a benchmark here, you must update the table in benchmark.c */
 typedef enum benchmark_num {
 	bm_stat_other,  /**< untracked overhead */
+	/* emulated instructions start here */
 	bm_stat_tlbre, /**< Overhead of tlbre instructions */
 	bm_stat_tlbilx, /**< Overhead of tlbilx instructions */
 	bm_stat_tlbsx, /**< Overhead of tlbsx instructions */
@@ -42,17 +43,38 @@ typedef enum benchmark_num {
 	bm_stat_msgsnd, /**< Overhead of msgsnd instructions */
 	bm_stat_msgclr, /**< Overhead of msgclr instructions */
 	bm_stat_spr,   /**< Overhead of SPR accesses */
-	bm_stat_decr,      /**< Decrementer interrupts */
 	bm_stat_tlbwe_tlb0, /**< Overhead of tlbwe instructions for tlb0 */
 	bm_stat_tlbwe_tlb1, /**< Overhead of tlbwe instructions for tlb1 */
 	bm_stat_tlbivax_tlb0_all, /**< Overhead of tlbivax all instructions for tlb0 */
 	bm_stat_tlbivax_tlb0, /**< Overhead of tlbivax instructions for tlb0 */
 	bm_stat_tlbivax_tlb1_all, /**< Overhead of tlbivax all instructions for tlb1 */
 	bm_stat_tlbivax_tlb1, /**< Overhead of tlbivax instructions for tlb1 */
+	bm_stat_emulated_other, /**< emulated instruction overhead -- other */
+	/* hcalls start here */
+	bm_stat_vmpic_eoi, /**< vmpic eoi hcall */
+	bm_stat_hcall, /**< other hcalls not explicitly tracked */
+	/* other tracked exceptions go here */
+	bm_stat_mcheck, /**< Machine check */
+	bm_stat_critint, /**< Critical interrupt */
+	bm_stat_dsi, /**< data storage */
+	bm_stat_isi, /**< instruction storage */
+	bm_stat_program, /**< program exception */
+	bm_stat_decr, /**< Decrementer interrupt */
+	bm_stat_fit, /**< FIT interrupt */
+	bm_stat_gdbell, /**< guest doorbell */
+	bm_stat_gdbell_crit, /**< guest critical doorbell */
+	bm_stat_dbell, /**< doorbell */
+	bm_stat_debug, /**< debug interrupt */
+	bm_stat_watchdog, /**< watchdog interrupt */
+	bm_stat_align, /**< alignment exception */
+	bm_stat_fpunavail, /**< floating point unavailable */
 #ifdef CONFIG_TLB_CACHE
-	bm_stat_tlb_miss_reflect, /**< TLB misses reflected to guest in case of TLBCache */
 	bm_stat_tlb_miss_count, /**< TLB miss exceptions */
+	bm_stat_tlb_miss_reflect, /**< TLB misses reflected to guest in case of TLBCache */
+#else
+	bm_stat_tlb_miss, /**< TLB miss exceptions */
 #endif
+	/* microbenchmarks go here */
 	bm_tlb0_inv_pid, /**< microbenchmarks */
 	bm_tlb0_inv_all,
 	bm_tlb1_inv,

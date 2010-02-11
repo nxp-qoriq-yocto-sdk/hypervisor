@@ -892,7 +892,7 @@ void hvpriv(trapframe_t *regs)
 
 	assert(mfmsr() & MSR_EE);
 
-	set_stat(bm_stat_other, regs);
+	set_stat(bm_stat_emulated_other, regs);
 
 	guestmem_set_insn(regs);
 	printlog(LOGTYPE_EMU, LOGLEVEL_VERBOSE,

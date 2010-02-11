@@ -82,6 +82,8 @@ void enable_tcr_die(void)
 
 void fit(trapframe_t *regs)
 {
+	set_stat(bm_stat_fit, regs);
+
 	if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS))) {
 		reflect_trap(regs);
 		return;
@@ -150,6 +152,8 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
 void watchdog_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
+
+	set_stat(bm_stat_watchdog, regs);
 
 	/* watchdog_timeout is used to emulate the second watchdog timeout.
 	 * Normally, this timeout would cause a core reset and/or external

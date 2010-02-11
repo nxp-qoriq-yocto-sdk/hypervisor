@@ -36,6 +36,7 @@
 
 const char *benchmark_names[num_benchmarks] = {
 	"Other",
+	/* emulated instructions start here */
 	"tlbre",
 	"tlbilx",
 	"tlbsx",
@@ -43,17 +44,38 @@ const char *benchmark_names[num_benchmarks] = {
 	"msgsnd",
 	"msgclr",
 	"spr",
-	"dec",
 	"tlbwe(tlb0)",
 	"tlbwe(tlb1)",
 	"tlbivax(all tlb0)",
 	"tlbivax(tlb0)",
 	"tlbivax(all tlb1)",
 	"tlbivax(tlb1)",
+	"emulated inst - other",
+	/* hcalls start here */
+	"vmpic eoi",
+	"hcall - other",
+	/* other tracked exceptions go here */
+	"machine check",
+	"critical int",
+	"dsi",
+	"isi",
+	"program exception",
+	"decrementer int",
+	"fit interrupt",
+	"guest doorbell",
+	"guest doorbell crit",
+	"doorbell",
+	"debug interrupt",
+	"watchdog int",
+	"alignment",
+	"floating pt. unavail",
 #ifdef CONFIG_TLB_CACHE
+	"tlb miss count",
 	"tlb miss reflected",
-	"tlb miss stats",
+#else
+	"tlb miss",
 #endif
+	/* microbenchmarks go here */
 	"tlbinv by PID",
 	"tlbcache inv all",
 	"tlb1 inv",

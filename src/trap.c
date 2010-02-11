@@ -48,6 +48,7 @@
 
 void program_trap(trapframe_t *regs)
 {
+	set_stat(bm_stat_program, regs);
 #ifdef CONFIG_DEBUG_STUB_PROGRAM_INTERRUPT
 	gcpu_t *gcpu = get_gcpu();
 	if (mfspr(SPR_ESR) == ESR_PTR && (regs->srr1 & MSR_GS)
@@ -56,6 +57,18 @@ void program_trap(trapframe_t *regs)
 		return;
 #endif
 
+	reflect_trap(regs);
+}
+
+void align_trap(trapframe_t *regs)
+{
+	set_stat(bm_stat_align, regs);
+	reflect_trap(regs);
+}
+
+void fpunavail(trapframe_t *regs)
+{
+	set_stat(bm_stat_fpunavail, regs);
 	reflect_trap(regs);
 }
 
@@ -90,6 +103,9 @@ void reflect_trap(trapframe_t *regs)
 void debug_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
+
+	set_stat(bm_stat_debug, regs);
+
 	if (!gcpu->guest->guest_debug_mode) {
 #ifdef CONFIG_DEBUG_STUB
 		if (mfspr(SPR_DBSR) && (regs->srr1 & MSR_GS)
@@ -119,6 +135,8 @@ void guest_doorbell(trapframe_t *regs)
 
 	assert(gsrr1 & MSR_GS);
 	assert(gsrr1 & MSR_EE);
+
+	set_stat(bm_stat_gdbell, regs);
 
 	regs->srr0 = mfspr(SPR_GSRR0);
 	regs->srr1 = gsrr1;
@@ -255,6 +273,8 @@ void guest_critical_doorbell(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	int ret;
 
+	set_stat(bm_stat_gdbell_crit, regs);
+
 	if ((gcpu->mcsr & MCSR_MCP) && (regs->srr1 & MSR_ME)) {
 		reflect_mcheck(regs, MCSR_MCP, 0);
 		goto check_flags;
@@ -335,6 +355,9 @@ static void abort_guest_access(trapframe_t *regs, int stat)
 
 void data_storage(trapframe_t *regs)
 {
+
+	set_stat(bm_stat_dsi, regs);
+
 	/* If it's from the guest, then it was a virtualization
 	 * fault.  Currently, we only use that for bad mappings.
 	 * This includes emulated devices that do not have page table entries.
@@ -375,6 +398,8 @@ void data_storage(trapframe_t *regs)
 
 void inst_storage(trapframe_t *regs)
 {
+	set_stat(bm_stat_isi, regs);
+
 	if (regs->srr1 & MSR_GS) {
 		int space = (regs->srr1 & MSR_IS) >> 5;
 		int ret = guest_tlb_isi(regs->srr0, space, mfspr(SPR_PID));
@@ -437,6 +462,7 @@ void tlb_miss(trapframe_t *regs)
 		}
 	}
 #else
+	set_stat(bm_stat_tlb_miss, regs);
 	assert(!(regs->srr1 & MSR_GS));
 #endif
 
