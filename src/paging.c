@@ -1,7 +1,7 @@
 /*
  * Paging, including guest phys to real phys translation.
  *
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 #include <paging.h>
 #include <percpu.h>
 #include <errors.h>
+#include <limits.h>
 
 phys_addr_t CCSRBAR_PA;
 
@@ -212,7 +213,9 @@ next:
  * also assume that for CCSR address space, guest physical equals real
  * physical.
  */
-vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start, size_t size, phys_addr_t gphys_start, vf_callback_t callback)
+vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start,
+				size_t size, phys_addr_t gphys_start,
+				vf_callback_t callback, void *priv)
 {
 	vf_range_t *vf;
 
@@ -228,6 +231,7 @@ vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start, size_t s
 
 	// Get a permanent hypervisor virtual address
 	vf->vaddr = map(phys_start, size, TLB_MAS2_IO, TLB_MAS3_KERN);
+	vf->data = priv;
 
 	// Each guest has its own list
 	list_add(&guest->vf_list, &vf->list);
@@ -237,3 +241,56 @@ vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start, size_t s
 
 #endif
 
+/*
+ * Given a guest physical page number and size, return
+ * the real (true physical) page number
+ *
+ * return values
+ *    ULONG_MAX on failure
+ *    rpn value on success
+ */
+unsigned long get_rpn(guest_t *guest, unsigned long grpn, unsigned long pages)
+{
+	unsigned long attr;
+	unsigned long start_rpn = ULONG_MAX;
+	unsigned long cur_pages;
+	unsigned long next_rpn = ULONG_MAX;
+	unsigned long end = grpn + pages;
+
+	while (grpn < end) {
+		/*
+		 * Need to iterate over vptbl_xlate(), as it returns a single
+		 * mapping upto max. TLB page size on each call.
+		 */
+		unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr,
+		                                PTE_PHYS_LEVELS, 1);
+		if (!(attr & PTE_DMA)) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+			         "%s: mem-range has unmapped guest address at 0x%llx.\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
+			return ULONG_MAX;
+		}
+
+		if (start_rpn == ULONG_MAX) {
+			start_rpn = rpn;
+		} else if (rpn != next_rpn) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+			         "%s: mem-range has discontiguity at guest address 0x%llx.\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
+			return ULONG_MAX;
+		}
+
+		if (!(attr & (PTE_SW | PTE_UW))) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+			         "%s: mem-range not writeable at guest address 0x%llx\n",
+			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
+			return ULONG_MAX;
+		}
+
+		cur_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
+		grpn += cur_pages;
+		next_rpn = rpn + cur_pages;
+	}
+
+	return start_rpn;
+}

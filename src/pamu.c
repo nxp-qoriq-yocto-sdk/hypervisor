@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,61 +71,6 @@ static int is_subwindow_count_valid(int subwindow_cnt)
 	if (subwindow_cnt & (subwindow_cnt - 1))
 		return 0;
 	return 1;
-}
-
-/*
- * Given a guest physical page number and size, return
- * the real (true physical) page number
- *
- * return values
- *    ULONG_MAX on failure
- *    rpn value on success
- */
-static unsigned long get_rpn(guest_t *guest, unsigned long grpn,
-                             unsigned long pages)
-{
-	unsigned long attr;
-	unsigned long start_rpn = ULONG_MAX;
-	unsigned long cur_pages;
-	unsigned long next_rpn = ULONG_MAX;
-	unsigned long end = grpn + pages;
-
-	while (grpn < end) {
-		/*
-		 * Need to iterate over vptbl_xlate(), as it returns a single
-		 * mapping upto max. TLB page size on each call.
-		 */
-		unsigned long rpn = vptbl_xlate(guest->gphys, grpn, &attr,
-		                                PTE_PHYS_LEVELS, 1);
-		if (!(attr & PTE_DMA)) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: dma-window has unmapped guest address at 0x%llx.\n",
-			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
-			return ULONG_MAX;
-		}
-
-		if (start_rpn == ULONG_MAX) {
-			start_rpn = rpn;
-		} else if (rpn != next_rpn) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: dma-window has discontiguity at guest address 0x%llx.\n",
-			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
-			return ULONG_MAX;
-		}
-
-		if (!(attr & (PTE_SW | PTE_UW))) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: dma-window not writeable at guest address 0x%llx\n",
-			         __func__, (unsigned long long)grpn << PAGE_SHIFT);
-			return ULONG_MAX;
-		}
-
-		cur_pages = tsize_to_pages(attr >> PTE_SIZE_SHIFT);
-		grpn += cur_pages;
-		next_rpn = rpn + cur_pages;
-	}
-
-	return start_rpn;
 }
 
 #define L1 1

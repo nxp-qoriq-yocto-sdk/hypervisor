@@ -220,7 +220,8 @@ typedef struct vf_range {
 } vf_range_t;
 
 vf_range_t *register_vf_handler(struct guest *guest, phys_addr_t phys_start,
-	size_t size, phys_addr_t gphys_start, vf_callback_t callback);
+				size_t size, phys_addr_t gphys_start,
+				vf_callback_t callback, void *data);
 
 int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr,
 		   int *store, unsigned int *reg);
@@ -248,5 +249,8 @@ int map_guest_ranges(struct dev_owner *owner);
 int map_guest_irqs(struct dev_owner *owner);
 
 int patch_guest_intmaps(struct dev_owner *owner);
+
+unsigned long get_rpn(struct guest *guest, unsigned long grpn,
+			unsigned long pages);
 
 #endif
