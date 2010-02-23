@@ -28,6 +28,10 @@ Building the hypervisor
     NOTE: If dtc is not installed in ../dtc relative to the hypervisor,
     you must pass DTC_DIR=<path to dtc> in all make invocations.
 
+    You must also pass CROSS_COMPILE=<cross compiler prefix>.  E.g.
+    "make CROSS_COMPILE=powerpc-linux-gnu-" or
+    "export CROSS_COMPILE=powerpc-linux-gnu-; make".
+
     * to build the hypervisor
           o cd hv
           o git submodule init
