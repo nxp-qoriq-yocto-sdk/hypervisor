@@ -10,7 +10,7 @@
  *     Ninth Edition, for gdb version 6.7.50.20080119
  *     Free Software Foundation.
  *
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Anmol P. Paralkar <anmol@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -407,7 +407,7 @@ static uint8_t checksum(uint8_t *p, uint32_t length)
 	uint8_t s = 0, *q = p;
 	TRACE("length: %d", length);
 	while (q - p < length) {
-		TRACE("p[%d]: 0x%02x\n", q - p, *q);
+		TRACE("p[%td]: 0x%02x\n", q - p, *q);
 		s += *q++;
 	}
 	TRACE("checksum: %d", s);
@@ -1893,7 +1893,7 @@ return_to_guest:
 				offset = scan_num (&cur_pos, ',');
 				BREAK_IF_END(cur_pos);
 				length = scan_num (&cur_pos, '\0');
-				DEBUG ("td-len: %d, offset: %d, length: %d", strlen (td), offset, length);
+				DEBUG ("td-len:  %zu, offset: %u, length: %u", strlen (td), offset, length);
 				if (offset < strlen (td)) {
 					pkt_cat_string(stub->rsp, "m");
 					pkt_cat_stringn(stub->rsp, (const uint8_t *)(td + offset), length);

@@ -71,6 +71,12 @@ config 64BIT
 	help
 		Provides support for a 64-bit processor
 
+config GCC_CPU_FLAG
+	string "Processor specific compiler optimizations"
+	default "e500mc"
+	help
+		Provides compiler flag for processor specific optimizations
+
 config P4080_ERRATUM_PAMU3
 	bool
 	default y

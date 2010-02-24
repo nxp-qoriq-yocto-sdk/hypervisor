@@ -608,7 +608,7 @@ skip_snoop_id:
 	if (prop) {
 		if (prop->len != 4) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"%s: bad subwindow-count length %u in %s\n",
+				"%s: bad subwindow-count length %zu in %s\n",
 				 __func__, prop->len, cfgnode->name);
 			return ERR_BADTREE;
 		}

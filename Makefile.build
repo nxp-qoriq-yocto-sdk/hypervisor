@@ -61,14 +61,13 @@ export CRAZYWARNINGS := $(WARNINGS) -Wshadow -Wextra -Wcast-qual \
 
 export CC_OPTS_C := -fno-strict-aliasing -fno-common -O2 -g3 \
                     -msoft-float -pipe -ffixed-r2 -mmultiple \
-                    -mno-altivec -funit-at-a-time -mcpu=e500mc \
+                    -mno-altivec -funit-at-a-time \
                     -include $(LIBFDT_DIR)/libfdt_env.h
 
 export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
 export CC_OPTS_ASM_HV=$(CC_OPTS_ASM) -include bin/hv_assym.s
 
 export LD=$(CROSS_COMPILE)ld
-export LD_OPTS=-Wl,-m -Wl,elf32ppc -Wl,-Bstatic -nostdlib -msoft-float
 export KCONFIG=y
 
 TDGEN_DIR := $(src)tools/tdgen
@@ -83,9 +82,20 @@ include include/config/auto.conf
 
 ifeq ($(CONFIG_64BIT),y)
 CC_OPTS += -m64
+export LD_OPTS=-m64
+LD_SCRIPT = hv64.lds
+AWK := awk
+define update_lds
+	@ $(AWK) '{ gsub(/powerpc:common/, "powerpc:common64"); print }' $1 > $2
+endef
 else
 CC_OPTS += -m32
+export LD_OPTS=-m32 -msoft-float
+LD_SCRIPT = $(src)hv.lds
 endif
+
+CC_OPTS_C += -mcpu=$(CONFIG_GCC_CPU_FLAG)
+LD_OPTS += -static -nostdlib
 
 all: bin/hv.uImage bin/hv.map
 
@@ -150,7 +160,8 @@ bin/hv.bin: bin/hv
 bin/hv: include/config/auto.conf $(OBJS) $(OBJS_NOCHECK) \
                 $(src)hv.lds $(hypertrk-objs-y)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(src)hv.lds -o $@ \
+	$(call update_lds, $(src)hv.lds, $(LD_SCRIPT))
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ \
 		$(OBJS) $(OBJS_NOCHECK) $(hypertrk-objs-y) -lgcc
 
 bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/e500mc-data.h
