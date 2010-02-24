@@ -237,19 +237,28 @@ int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node)
 	 */
 	for (i=0; i < NUM_PEX_OUTBOUND_MEM_WINDOWS; i++) {
 		unsigned long grpn, attr;
+		uint32_t tmp;
 
-		/*
-		 * Make sure u-boot ATMU values are valid, i.e., mappable
-		 * to guest physical
-		 */
-		priv->gphys_owbar[i] = in32(vf->vaddr + PEXOTAR0_OFFSET +
-			PEXOWBAR_REG_OFFSET + i * PEX_OUTB_MEM_WINDOW_STRIDE);
-		grpn = vptbl_xlate(guest->gphys_rev, priv->gphys_owbar[i],
-					&attr, PTE_PHYS_LEVELS, 1);
-		if (!grpn) {
-			out32(vf->vaddr + PEXOTAR0_OFFSET +
-				PEXOWAR_REG_OFFSET +
-				i * PEX_OUTB_MEM_WINDOW_STRIDE, ~PEXOWAR_EN);
+		tmp = in32(vf->vaddr + PEXOTAR0_OFFSET +
+			PEXOWAR_REG_OFFSET + i * PEX_OUTB_MEM_WINDOW_STRIDE);
+
+		if (tmp & PEXOWAR_EN) {
+			/*
+			 * Make sure u-boot ATMU values are valid, i.e.,
+			 * mappable to guest physical
+			 */
+			priv->gphys_owbar[i] = in32(vf->vaddr +
+					PEXOTAR0_OFFSET + PEXOWBAR_REG_OFFSET +
+					i * PEX_OUTB_MEM_WINDOW_STRIDE);
+			grpn = vptbl_xlate(guest->gphys_rev,
+					priv->gphys_owbar[i], &attr,
+					PTE_PHYS_LEVELS, 1);
+			if (!grpn) {
+				out32(vf->vaddr + PEXOTAR0_OFFSET +
+					PEXOWAR_REG_OFFSET +
+					i * PEX_OUTB_MEM_WINDOW_STRIDE,
+					~PEXOWAR_EN);
+			}
 		}
 	}
 	priv->guest = guest;
