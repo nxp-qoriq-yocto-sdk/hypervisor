@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.6
-Revsion: 001
-Date: 1/28/2010
+Revsion: 002
+Date: 3/1/2010
 
 -------------------------------------------------------
 Contents
@@ -46,14 +46,24 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.6-001 has been tested with Simics 4.2.34 / pre38
+   -embedded-hv v0.6-002 has been tested with Simics 4.2.36 / pre43
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.880
+    0.881
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.6-002 bug fixes and changes
+      -initial nap hcall support
+      -initial error interrupt handling support
+      -support partial writes for byte-channel send API (bug 5164)
+      -implement virtual device driver framework
+      -add additional event types to the hypervisor statistics
+      -tlbivax deadlock bugfix (bug 5073)
+      -PCI-E outbound ATMU fixups (enables 32-bit OS with PCI-E
+       on 36-bit hypervisor)
 
    -v0.6-001 bug fixes and changes (since 0.5-008)
       -initial hypervisor statistics support in command shell
