@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,8 @@
 $kernel_image  = "hv.uImage"
 $kernel_cmdline = "config-addr=0xfe8900000"
 $dev_tree_blob = "p4080ds_36b.dtb"
+
+if not defined silicon_rev   {$silicon_rev = "rev2"}
 
 add-directory "%script%/../../../sim" -prepend
 add-directory "%script%/../../../images" -prepend
