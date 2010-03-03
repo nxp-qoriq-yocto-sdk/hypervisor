@@ -101,7 +101,7 @@ void hcall_get_core_state(trapframe_t *regs)
 	}
 
 	regs->gpregs[3] = 0;
-	regs->gpregs[5] = state;
+	regs->gpregs[4] = state;
 }
 
 typedef struct nap_state {
