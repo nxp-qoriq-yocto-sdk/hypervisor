@@ -366,7 +366,7 @@ void data_storage(trapframe_t *regs)
 	if (regs->srr1 & MSR_GS) {
 #ifdef CONFIG_DEVICE_VIRT
 		guest_t *guest = get_gcpu()->guest;
-		unsigned long vaddr = mfspr(SPR_DEAR);
+		unsigned long vaddr = regs->dear;
 		phys_addr_t paddr;
 		vf_range_t *vf;
 

@@ -755,7 +755,7 @@ static int emu_rfdi(trapframe_t *regs, uint32_t insn)
 
 /**
  * emu_load_store - emulate any of the load or store instructions
- * @vaddr - effective address from the DEAR register
+ * @vaddr - hypervisor mapped virtual address for trapped device register
  * @store - returns 0 if this is a load, non-zero if this is a store
  * @reg - returns the source/destination register number
  *
@@ -784,6 +784,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 	minor = (insn >> 1) & 0x3ff;
 	rSD = (insn >> 21) & 0x1f;	// Source or destination register
 	rA = (insn >> 26) & 0x1f;	// Base register
+	unsigned long gvaddr = regs->dear;
 
 	// Now decode the instruction and emulate it.
 
@@ -796,7 +797,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 				// instruction before it would trap on a VF,
 				// but just in case it doesn't.
 				return 1;
-			regs->gpregs[rA] = (register_t) vaddr;
+			regs->gpregs[rA] = gvaddr;
 			// fall-through ...
 		case 0x057:	// lbzx
 			regs->gpregs[rSD] = in8(vaddr);
@@ -806,7 +807,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 		case 0x0f7:	// stbux
 			if (unlikely(rA == 0))
 				return 1;
-			regs->gpregs[rA] = (register_t) vaddr;
+			regs->gpregs[rA] = gvaddr;
 			// fall-through ...
 		case 0x0d7:	// stbx
 			out8(vaddr, regs->gpregs[rSD]);
@@ -816,7 +817,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 		case 0x0b7:	// stwux
 			if (unlikely(rA == 0))
 				return 1;
-			regs->gpregs[rA] = (register_t) vaddr;
+			regs->gpregs[rA] = gvaddr;
 			// fall-through ...
 		case 0x097:	// stwx
 			out32(vaddr, regs->gpregs[rSD]);
@@ -853,7 +854,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 	case 0x23:	// lbzu
 		if (unlikely(rA == 0))
 			return 1;
-		regs->gpregs[rA] = (register_t) vaddr;
+		regs->gpregs[rA] = gvaddr;
 		// fall-through ...
 	case 0x22:	// lbz
 		regs->gpregs[rSD] = in8(vaddr);
@@ -868,7 +869,7 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 	case 0x27:	// stbu
 		if (unlikely(rA == 0))
 			return 1;
-		regs->gpregs[rA] = (register_t) vaddr;
+		regs->gpregs[rA] = gvaddr;
 		// fall-through ...
 	case 0x26:	// stb
 		out8(vaddr, regs->gpregs[rSD]);
