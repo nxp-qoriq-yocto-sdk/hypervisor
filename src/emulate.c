@@ -876,6 +876,21 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 		*store = 1;
 		break;
 
+	case 0x20:	// lwz
+		regs->gpregs[rSD] = in32(vaddr);
+		break;
+
+	case 0x28:	// lhz
+		regs->gpregs[rSD] = in16(vaddr);
+		break;
+
+	case 0x2c:	// sth
+		out16(vaddr, regs->gpregs[rSD]);
+		*store = 1;
+		break;
+
+	/* 64-bit FIXME, add support for 64-bit i/o load/stores */
+
 	default:
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			 "%s: unimplemented instruction %08x (major=0x%x minor=0x%x rSD=0x%x)\n",
