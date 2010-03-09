@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2007-2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,34 @@
 #include <paging.h>
 #include <errors.h>
 #include <benchmark.h>
+
+static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
+                                phys_addr_t pa, register_t tsize,
+                                register_t mas2flags, register_t mas3flags,
+                                unsigned int tid, unsigned int ts,
+                                register_t mas8)
+{
+	register_t mas0, mas1, mas2, mas3, mas7;
+	register_t saved;
+
+	saved = disable_int_save();
+
+	mas0 = mfspr(SPR_MAS0);
+	mas1 = mfspr(SPR_MAS1);
+	mas2 = mfspr(SPR_MAS2);
+	mas3 = mfspr(SPR_MAS3);
+	mas7 = mfspr(SPR_MAS7);
+
+	tlb1_set_entry(idx, va, pa, tsize, mas2flags, mas3flags, tid, ts, mas8);
+
+	mtspr(SPR_MAS0, mas0);
+	mtspr(SPR_MAS1, mas1);
+	mtspr(SPR_MAS2, mas2);
+	mtspr(SPR_MAS3, mas3);
+	mtspr(SPR_MAS7, mas7);
+
+	restore_int(saved);
+}
 
 /* function to synchronize caches when modifying instructions
  * This follows the recommended sequence in the EREF for
@@ -637,13 +665,11 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 			BUG();
 		}
 
-		tlb1_set_entry(real_entry, epn << PAGE_SHIFT,
-		               ((phys_addr_t)rpn) << PAGE_SHIFT,
-		               size,
-		               mas2flags, mas3flags,
-		               (mas1 >> MAS1_TID_SHIFT) & 0xff,
-		               (mas1 >> MAS1_TS_SHIFT) & 1,
-		               mas8);
+		tlb1_set_entry_safe(real_entry, epn << PAGE_SHIFT,
+		                    ((phys_addr_t)rpn) << PAGE_SHIFT,
+		                    size, mas2flags, mas3flags,
+		                    (mas1 >> MAS1_TID_SHIFT) & 0xff,
+		                    (mas1 >> MAS1_TS_SHIFT) & 1, mas8);
 
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
@@ -960,10 +986,10 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 		start_phys = start_page + me->phys_offset;
 	}
 
-	tlb1_set_entry(tlbe, start_page << PAGE_SHIFT,
-	               ((phys_addr_t)start_phys) << PAGE_SHIFT,
-	               me->tsize, me->mas2flags, me->mas3flags,
-	               0, 0, TLB_MAS8_HV);
+	tlb1_set_entry_safe(tlbe, start_page << PAGE_SHIFT,
+	                    ((phys_addr_t)start_phys) << PAGE_SHIFT,
+	                    me->tsize, me->mas2flags, me->mas3flags,
+	                    0, 0, TLB_MAS8_HV);
 }
 
 /** Try to handle a TLB miss on a hypervisor mapping
@@ -1181,9 +1207,10 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 	if (len)
 		*len = bytesize - offset;
 
-	tlb1_set_entry(tlbentry, (unsigned long)vpage,
-	               physaddr & ~((phys_addr_t)bytesize - 1),
-	               tsize, TLB_MAS2_MEM, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
+	                    physaddr & ~((phys_addr_t)bytesize - 1),
+	                    tsize, TLB_MAS2_MEM, TLB_MAS3_KERN,
+	                    0, 0, TLB_MAS8_HV);
 
 	return vpage + offset;
 }
@@ -1474,9 +1501,9 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 	bytesize = tsize_to_pages(tsize) << PAGE_SHIFT;
 	offset = paddr & (bytesize - 1);
 
-	tlb1_set_entry(tlbentry, (unsigned long)vpage,
-	               paddr & ~((phys_addr_t)bytesize - 1),
-	               tsize, mas2flags, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
+	                    paddr & ~((phys_addr_t)bytesize - 1),
+	                    tsize, mas2flags, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
 
 	*len = min(bytesize - offset, *len);
 	return vpage + offset;
