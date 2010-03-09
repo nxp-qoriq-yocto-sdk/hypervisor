@@ -1,0 +1,166 @@
+/*
+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		uart0: uart0 {
+			device = "serial0";
+		};
+
+		uart1: uart1 {
+			device = "serial1";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc-0 {
+			device = "/soc/l3-cache-controller@10000";
+		};
+
+		cpc-1 {
+			device = "/soc/l3-cache-controller@11000";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x2000000>;
+			allocate-cpc-ways = <0 1 2 3 4 5 6 7 8>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x2000000>;
+			size = <0 0x2000000>;
+			allocate-cpc-ways = <9 10 11 12 13 14 15 16>;
+		};
+	};
+
+	pcie-window {
+		compatible = "dma-window";
+//		subwindow-count = <2>;
+		guest-addr = <0 0>;
+		// Simics is currently broken with subwindows
+//		size = <0 0x40000000>; // 1GiB
+		size = <0 0x20000000>; // 512MiB
+
+/*
+		sub-window@0 {
+			compatible = "dma-subwindow";
+			guest-addr = <0 0>;
+			size = <0 0x20000000>; // 512 MiB
+		};
+
+		sub-window@1 {
+			compatible = "dma-subwindow";
+			guest-addr = <0 0x20000000>;
+			pcie-msi-subwindow;
+		};
+*/
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		cpus = <0 1>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		pci0 {
+			device = "pci0";
+			map-ranges;
+			dma-window = <&{/pcie-window}>;
+		};
+
+		aliases {
+			stdout = <&p1bc>;
+		};
+	};
+
+	chosen {
+	};
+};
