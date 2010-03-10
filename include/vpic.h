@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,7 @@ typedef struct vpic_interrupt {
 	struct guest *guest;
 	uint32_t destcpu;
 	uint8_t enable, irqnum, pending, active, config;
+	void (*eoi_callback)(struct vpic_interrupt *virq);
 } vpic_interrupt_t;
 
 typedef struct vpic {
@@ -63,6 +64,8 @@ void vpic_deassert_vint(vpic_interrupt_t *irq);
 
 void dbell_to_gdbell_glue(trapframe_t *regs);
 interrupt_t *vpic_iack(void);
+
+void vpic_unmask_parent(vpic_interrupt_t *virq);
 
 extern int_ops_t vpic_ops;
 

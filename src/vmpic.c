@@ -44,7 +44,7 @@ static void vmpic_reset(vmpic_interrupt_t *vmirq)
 {
 	interrupt_t *irq = vmirq->irq;
 
-	irq->ops->disable(irq);
+	interrupt_reset(irq);
 
 	if (irq->ops->set_priority)
 		irq->ops->set_priority(irq, 0);
@@ -389,10 +389,17 @@ void hcall_vmpic_set_mask(trapframe_t *regs)
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic %smask: %p %u\n",
 	         mask ? "" : "un", vmirq->irq, handle);
 
-	if (mask)
-		vmirq->irq->ops->disable(vmirq->irq);
-	else
-		vmirq->irq->ops->enable(vmirq->irq);
+	/* For taking care of shared interrupts between partitions */
+	register_t save = spin_lock_intsave(&vmpic_lock);
+	if (mask != vmirq->irq->oldmask) {
+		vmirq->irq->oldmask = mask;
+		if (mask)
+			interrupt_mask(vmirq->irq);
+		else
+			interrupt_unmask(vmirq->irq);
+	}
+	spin_unlock_intsave(&vmpic_lock, save);
+
 	regs->gpregs[3] = 0;  /* success */
 }
 

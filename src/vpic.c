@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -314,6 +314,10 @@ static void vpic_irq_mask(interrupt_t *irq)
 	register_t save = spin_lock_intsave(&guest->vpic.lock);
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic mask: %p\n", virq);
 	virq->enable = 0;
+
+	if (irq->parent)
+		interrupt_mask(irq->parent);
+
 	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
@@ -328,6 +332,9 @@ static void vpic_irq_unmask(interrupt_t *irq)
 	
 	if (virq->pending)
 		__vpic_assert_vint(virq);
+
+	if (irq->parent)
+		interrupt_unmask(irq->parent);
 	
 	spin_unlock_intsave(&guest->vpic.lock, save);
 }
@@ -351,6 +358,14 @@ static void vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
 	spin_unlock_intsave(&guest->vpic.lock, save);
 }
 
+/* EOI callback routine */
+void vpic_unmask_parent(vpic_interrupt_t *virq)
+{
+	interrupt_t *irq = &virq->irq;
+
+	interrupt_unmask(irq->parent);
+}
+
 /*
  * Clears the interrupt from being active.
  *
@@ -366,11 +381,19 @@ static void vpic_eoi(interrupt_t *irq)
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vpic eoi: %p\n", virq);
 
+	if (!virq->active) {
+		spin_unlock_intsave(&guest->vpic.lock, save);
+		return;
+	}
+
 	clear_virq_active(virq, gcpu);
 
 	/* check if more vints are pending */
 	if (!gcpu_virq_active(gcpu) && gcpu_virq_pending(gcpu))
 		send_vint(gcpu);
+
+	if (virq->eoi_callback)
+		virq->eoi_callback(virq);
 
 	spin_unlock_intsave(&guest->vpic.lock, save);
 }

@@ -59,6 +59,7 @@ void branch_to_reloc(void *bigmap_text_base,
 void reflect_trap(trapframe_t *regs);
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar);
 void reflect_crit_int(trapframe_t *regs, int trap_type);
+int reflect_errint(void *arg);
 
 void set_hypervisor_strprop(struct guest *guest, const char *prop, const char *value);
 

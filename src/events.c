@@ -46,6 +46,7 @@ static eventfp_t event_table[] = {
 	&dbell_to_mcgdbell_glue,         /* EV_MCP */
 	&dbell_to_cgdbell_glue,          /* EV_GUEST_CRIT_INT */
 	&dump_hv_queue,                  /* EV_DUMP_HV_QUEUE */
+	&deliver_pend_vint,              /* EV_DELIVER_PEND_VINT */
 #ifdef CONFIG_PM
 	&sync_nap,                       /* EV_SYNC_NAP */
 #else
@@ -242,6 +243,16 @@ void dump_hv_queue(trapframe_t *regs)
 	}
 
 	spin_unlock(&hv_queue_cons_lock);
+}
+
+void deliver_pend_vint(trapframe_t *regs)
+{
+	vpic_interrupt_t *virq;
+
+	while (queue_read(&pend_virq, (uint8_t *) &virq,
+			sizeof(vpic_interrupt_t *), 0)) {
+		vpic_assert_vint(virq);
+	}
 }
 
 /* Initialize the global gevents

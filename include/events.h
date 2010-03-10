@@ -27,6 +27,8 @@
 
 #include <percpu.h>
 
+extern queue_t pend_virq;
+
 typedef void (*eventfp_t)(trapframe_t *regs);
 
 void setevent(gcpu_t *gcpu, int event);
@@ -52,6 +54,7 @@ void dbell_to_mcgdbell_glue(trapframe_t *regs);
 void dbell_to_cgdbell_glue(trapframe_t *regs);
 void halt_core(trapframe_t *regs);
 void dump_hv_queue(trapframe_t *regs);
+void deliver_pend_vint(trapframe_t *regs);
 void sync_nap(trapframe_t *regs);
 
 #define EV_ASSERT_VINT            0
@@ -60,7 +63,8 @@ void sync_nap(trapframe_t *regs);
 #define EV_MCP                    3
 #define EV_GUEST_CRIT_INT         4
 #define EV_DUMP_HV_QUEUE          5
-#define EV_SYNC_NAP               6 /* must run on boot core */
+#define EV_DELIVER_PEND_VINT        6
+#define EV_SYNC_NAP               7 /* must run on boot core */
 
 extern int gev_stop; /**< Stop guest on this core */
 extern int gev_start; /**< Start guest on this core */

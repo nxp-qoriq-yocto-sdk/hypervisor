@@ -42,6 +42,7 @@
 #include <timers.h>
 #include <byte_chan.h>
 #include <vmpic.h>
+#include <vpic.h>
 #include <pamu.h>
 #include <ipi_doorbell.h>
 #include <devtree.h>
@@ -636,27 +637,44 @@ int map_guest_irqs(dev_owner_t *owner)
 			goto bad;
 
 		/* FIXME: handle more than just mpic */
-		handle = vmpic_alloc_mpic_handle(owner->guest, irq);
-		if (handle < 0) {
+		if (irq->config & IRQ_TYPE_MPIC_DIRECT) {
+			handle = vmpic_alloc_mpic_handle(owner->guest, irq);
+			if (handle < 0) {
 bad:
-			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
-			         "%s: couldn't grant interrupt %d for %s\n",
-			         __func__, i, hwnode->name);
+				printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+				         "%s: couldn't grant interrupt %d for %s\n",
+				         __func__, i, hwnode->name);
 
- 			intspec[i * 2 + 0] = 0xffffffff;
- 			intspec[i * 2 + 1] = 0xffffffff;
+				intspec[i * 2 + 0] = 0xffffffff;
+				intspec[i * 2 + 1] = 0xffffffff;
 
-			continue;
+				continue;
+			}
+
+			if (!owner->guest->mpic_direct_eoi) {
+				irq->config &= ~(IRQ_TYPE_MPIC_DIRECT);
+				((vmpic_interrupt_t *)irq->priv)->config &=
+							~(IRQ_TYPE_MPIC_DIRECT);
+			}
+
+			intspec[i * 2 + 0] = handle;
+			intspec[i * 2 + 1] = irq->config;
+		} else {
+			vpic_interrupt_t *virq = vpic_alloc_irq(owner->guest, IRQ_EDGE);
+			if (!virq)
+				goto bad;
+			ret = vpic_alloc_handle(virq, &intspec[i * 2]);
+			if (ret < 0)
+				/* FIXME : Free the allocated virq */
+				goto bad;
+			irq->priv = virq;
+			virq->irq.parent = irq;
+			virq->eoi_callback = vpic_unmask_parent;
+
+			/* Register the reflecting interrupt handler */
+			irq->ops->register_irq(irq, reflect_errint, irq, TYPE_MCHK);
 		}
 
-		if (!owner->guest->mpic_direct_eoi) {
-			irq->config &= ~(IRQ_TYPE_MPIC_DIRECT);
-			((vmpic_interrupt_t *)irq->priv)->config &=
-						~(IRQ_TYPE_MPIC_DIRECT);
-		}
-
-		intspec[i * 2 + 0] = handle;
-		intspec[i * 2 + 1] = irq->config;
 	}
 
 	ret = dt_set_prop(owner->gnode, "interrupts", intspec,

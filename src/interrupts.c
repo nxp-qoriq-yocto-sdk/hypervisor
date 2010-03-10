@@ -36,6 +36,12 @@
 #include <percpu.h>
 #include <error_log.h>
 #include <hv.h>
+#include <vpic.h>
+
+/* queue for pending reflected (virtual) interrupts */
+
+#define MAX_PEND_VIRQ 64
+DECLARE_QUEUE(pend_virq, MAX_PEND_VIRQ * sizeof(vpic_interrupt_t *));
 
 static void dump_and_halt(register_t mcsr, trapframe_t *regs)
 {
@@ -183,4 +189,20 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	mtspr(SPR_MCSR, mcsr);
 
 	return;
+}
+
+int reflect_errint(void *arg)
+{
+	interrupt_t *irq = arg;
+	vpic_interrupt_t *virq = irq->priv;
+	int ret;
+
+	interrupt_mask(irq);
+
+	ret = queue_write(&pend_virq, (const uint8_t *) &virq,
+			sizeof(vpic_interrupt_t *));
+	if (ret)
+		setevent(cpu->client.gcpu, EV_DELIVER_PEND_VINT);
+
+	return 0;
 }
