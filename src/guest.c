@@ -492,9 +492,14 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 
 		ret = pamu_config_liodn(owner->guest, liodn[i], hwnode, ctx.cfgnode);
 		if (ret < 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: config of liodn failed (rc=%d)\n",
-			         __func__, ret);
+			if (ret == ERR_NOMEM)
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "paact table not found-- pamu may not be"
+				         " assigned to hypervisor\n");
+			else
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			                 "%s: config of liodn failed (rc=%d)\n",
+			                 __func__, ret);
 			free(dma_handles);
 			return 0;
 		}
