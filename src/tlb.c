@@ -1667,7 +1667,7 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 		disable_int();
 		save_mas(gcpu);
 #ifndef CONFIG_TLB_CACHE
-		mtspr(SPR_MAS0, gmas->mas0 |  MAS0_ESEL(way));
+		mtspr(SPR_MAS0, MAS0_ESEL(way));
 		mtspr(SPR_MAS2, tlb_index << PAGE_SHIFT);
 		asm volatile ("tlbre" : : : "memory");
 		fixup_tlb_sx_re();
