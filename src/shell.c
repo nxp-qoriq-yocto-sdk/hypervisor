@@ -38,6 +38,7 @@
 #include <percpu.h>
 #include <guts.h>
 #include <benchmark.h>
+#include <error_mgmt.h>
 
 extern command_t *shellcmd_begin, *shellcmd_end;
 
@@ -942,3 +943,35 @@ static command_t guestmem = {
 	.longhelp = "  Usage: guestmem <partition-number> <address> [<length>]\n\n",
 };
 shell_cmd(guestmem);
+
+
+static void error_policy_dump_fn(shell_t *shell, char *args)
+{
+	int i, j;
+	error_policy_t *error_p;
+
+	qprintf(shell->out, 1, "error\n");
+	qprintf(shell->out, 1, "domain            error               policy\n");
+	qprintf(shell->out, 1, "---------------------------------------------\n");
+
+	/* get pointer to errors for this domain */
+	for (i = 0; i < ERROR_DOMAIN_COUNT; i++) {
+
+		error_p = error_domains[i].errors;
+
+		for (j = 0; j < error_domains[i].error_count; j++) {
+			qprintf(shell->out, 1, "%5s %30s %8s\n",
+			        error_domains[i].domain,
+				error_p[j].error,
+				error_p[j].policy);
+		}
+	}
+}
+
+static command_t error_policy = {
+	.name = "error_policy",
+	.action = error_policy_dump_fn,
+	.shorthelp = "Display error policies",
+};
+shell_cmd(error_policy);
+
