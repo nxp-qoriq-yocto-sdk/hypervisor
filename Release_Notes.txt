@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.6
-Revsion: 002
-Date: 3/1/2010
+Revsion: 003
+Date: 3/11/2010
 
 -------------------------------------------------------
 Contents
@@ -54,6 +54,19 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.6-003 bug fixes and changes
+      -support for error interrupt reflection
+      -fix bug where MAS registers were not saved for
+       temporary mappings, causing vcpu state to appear
+       incorrect to debug stubs
+      -pci-e virtualzation fix to not translate initial
+       ATMU values if ATMU is disabled
+      -bug 3731: for device virtualization-- fix update
+       forms of emulated load/stores
+      -fixed TLB way selection when reading TLB0 entries
+       with TLB_CACHE disasbled
+      -bug 5226-- assert when guest unmasks shared interrupt
 
    -v0.6-002 bug fixes and changes
       -initial nap hcall support
