@@ -52,6 +52,7 @@
 #include <events.h>
 #include <thread.h>
 #include <error_log.h>
+#include <error_mgmt.h>
 
 queue_t hv_global_event_queue;
 uint32_t hv_queue_prod_lock;
@@ -498,6 +499,13 @@ static void assign_hv_devs(void)
 	dt_read_aliases();
 	dt_assign_devices(hvconfig, NULL);
 	find_hv_console(hvconfig);
+
+	list_for_each(&hv_devs, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+
+		set_error_policy(owner);
+	}
+
 	early_bind_ccm_law_devices();
 
 	list_for_each(&hv_devs, i) {
@@ -518,6 +526,7 @@ static void assign_hv_devs(void)
 		dt_bind_driver(owner->hwnode);
 	}
 }
+
 
 /**
  * get_ccsr_phys_addr - get the CCSR physical address from the device tree
