@@ -652,13 +652,15 @@ bad:
 			}
 
 			if (!owner->guest->mpic_direct_eoi) {
-				irq->config &= ~(IRQ_TYPE_MPIC_DIRECT);
+				intspec[i * 2 + 1] = irq->config &
+				                     ~(IRQ_TYPE_MPIC_DIRECT);
 				((vmpic_interrupt_t *)irq->priv)->config &=
 							~(IRQ_TYPE_MPIC_DIRECT);
+			} else {
+				intspec[i * 2 + 1] = irq->config;
 			}
 
 			intspec[i * 2 + 0] = handle;
-			intspec[i * 2 + 1] = irq->config;
 		} else {
 			vpic_interrupt_t *virq = vpic_alloc_irq(owner->guest, IRQ_EDGE);
 			if (!virq)
