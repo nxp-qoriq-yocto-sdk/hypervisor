@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -313,8 +313,8 @@ static int set_law(dt_node_t *node, int csdid)
 		}
 	}
 
-	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
-	         "%s: No free LAW found\n", __func__);
+	printlog(LOGTYPE_CCM, LOGLEVEL_WARN,
+	         "%s: no free LAW found\n", __func__);
 	return ERR_BUSY;
 }
 
@@ -322,11 +322,8 @@ static int get_free_csd(void)
 {
 	int csdid;
 
-	if ((~csdid_map & ((1ULL << numcsds) - 1)) == 0) {
-		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
-		         "%s: out of CSDs\n", __func__);
+	if ((~csdid_map & ((1ULL << numcsds) - 1)) == 0)
 		return ERR_BUSY;
-	}
 
 	csdid = count_lsb_zeroes(~csdid_map);
 	assert(in32(&csdids[csdid]) == 0);
@@ -409,16 +406,33 @@ static int setup_csd_law(dt_node_t *node)
 	int csdid, lawid, ret;
 
 	ret = csdid = get_free_csd();
-	if (csdid < 0)
-		goto fail;
+	if (csdid < 0) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+	                 "%s: warning : getting free csd for %s.  Got ret=%d\n",
+		          __func__, node->name, ret);
+		return ret;
+	}
 
 	ret = lawid = set_law(node, csdid);
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == ERR_BUSY)
+			printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+				 "%s: warning: out of LAWs,  %s will use global"
+				 " coherence domain\n",
+				__func__, node->name);
+		else
+			printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+			         "%s: error (%d) setting LAW for %s\n",
+			         __func__, ret, node->name);
 		goto fail_csd;
+	}
 
 	node->csd = alloc_type(csd_info_t);
 	if (!node->csd) {
 		ret = ERR_NOMEM;
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+	                 "%s: memory allocation error for %s\n",
+		          __func__, node->name);
 		goto fail_law;
 	}
 
@@ -431,9 +445,6 @@ fail_law:
 	release_law(lawid);
 fail_csd:
 	release_csd(csdid);
-fail:
-	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
-	         "%s: error %d for %s\n", __func__, ret, node->name);
 	return ret;
 }
 
