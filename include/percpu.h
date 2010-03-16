@@ -199,6 +199,9 @@ typedef struct guest {
 
 	/** If !0, then don't load images from image-table on start */
 	int no_auto_load;
+
+	/** Error queue lock, to synchronize access to the error queue */
+	uint32_t error_queue_lock;
 } guest_t;
 
 #define MAX_PARTITIONS 8

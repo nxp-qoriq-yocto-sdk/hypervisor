@@ -619,10 +619,21 @@ static void hcall_err_get_info(trapframe_t *regs)
 	queue_t *q;
 	unsigned long *flag = NULL;
 	unsigned long mask = 0;
+	int peek = regs->gpregs[7];
+	int bufsize = regs->gpregs[4];
+	phys_addr_t addr;
+	hv_error_t err;
+	uint32_t *lock;
+
+	if ((peek !=0 && peek != 1) || (bufsize < sizeof(hv_error_t))) {
+		regs->gpregs[3] = EINVAL;
+		return;
+	}
 
 	switch(regs->gpregs[3]) {
 	case GUEST_ERROR_EVENT_QUEUE:
 		q = &guest->error_event_queue;
+		lock = &guest->error_queue_lock;
 		break;
 
 	case GLOBAL_ERROR_EVENT_QUEUE:
@@ -634,6 +645,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 		q = &global_event_queue;
 		flag = &gcpu->crit_gdbell_pending;
 		mask = GCPU_PEND_CRIT_INT;
+		lock = &global_event_cons_lock;
 		break;
 
 	default:
@@ -641,7 +653,22 @@ static void hcall_err_get_info(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[3] = error_get(q, (error_info_t *)&regs->gpregs[4], flag, mask);
+	addr = ((phys_addr_t) regs->gpregs[5]) << 32 |
+			regs->gpregs[6];
+
+	register_t save = spin_lock_intsave(lock);
+	regs->gpregs[3] = error_get(q, &err, flag, mask, peek);
+	spin_unlock_intsave(lock, save);
+
+	/* We return the length of data copied to guest space, ideally this
+	 * should be same as the sizeof(hv_error_t). We have already ensured
+	 * that the bufsize provided by guest isn't less than sizeof(hv_error_t).
+	 */
+
+	if (!regs->gpregs[3])
+		regs->gpregs[4] = copy_to_gphys(guest->gphys, addr, &err, sizeof(hv_error_t), 1);
+	else
+		regs->gpregs[4] = 0;
 }
 
 static void hcall_idle(trapframe_t *regs)

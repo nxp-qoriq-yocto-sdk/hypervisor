@@ -35,6 +35,7 @@
 #include <doorbell.h>
 #include <percpu.h>
 #include <error_log.h>
+#include <error_mgmt.h>
 #include <hv.h>
 #include <vpic.h>
 
@@ -77,8 +78,7 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 {
 	register_t mcsr, reason;
 	int guest_state = 0;
-	error_info_t err = { };
-	mcheck_error_t *mc;
+	hv_error_t err = { };
 	int recoverable = 1;
 
 	set_stat(bm_stat_mcheck, frameptr);
@@ -175,16 +175,16 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	if (!recoverable)
 		dump_and_halt(mcsr, frameptr);
 
-	err.error_code = ERROR_MACHINE_CHECK;
-	mc = &err.regs.mc_err;
-	mc->mcsr = mcsr;
-	mc->mcar = mcsr & MCSR_MAV ? mfspr(SPR_MCAR) : 0;
-	mc->mcsrr0 = mfspr(SPR_MCSRR0);
-	mc->mcsrr1 = mfspr(SPR_MCSRR1);
+	strncpy(err.domain, get_domain_str(error_mcheck), sizeof(err.domain));
+	strcpy(err.error, get_domain_str(error_mcheck));
+	err.mcheck.mcsr = mcsr;
+	err.mcheck.mcar = mcsr & MCSR_MAV ? mfspr(SPR_MCAR) : 0;
+	err.mcheck.mcsrr0 = mfspr(SPR_MCSRR0);
+	err.mcheck.mcsrr1 = mfspr(SPR_MCSRR1);
 	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
 	/* MCP machine checks would have been already reflected */
 	if (guest_state && (mcsr & ~MCSR_MCP))
-		reflect_mcheck(frameptr, (mc->mcsr & ~MCSR_MCP), mc->mcar);
+		reflect_mcheck(frameptr, (err.mcheck.mcsr & ~MCSR_MCP), err.mcheck.mcar);
 
 	mtspr(SPR_MCSR, mcsr);
 

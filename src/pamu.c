@@ -45,6 +45,7 @@
 #include <cpc.h>
 #include <limits.h>
 #include <error_log.h>
+#include <error_mgmt.h>
 
 uint32_t liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
@@ -756,7 +757,7 @@ static void setup_omt(void)
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 }
 
-static void pamu_error_log(error_info_t *err, guest_t *guest)
+static void pamu_error_log(hv_error_t *err, guest_t *guest)
 {
 	/* Access violations go to per guest and the global error queue*/
 	if (guest)
@@ -775,8 +776,8 @@ static int pamu_av_isr(void *arg)
 	phys_addr_t reg_size = dev->regs[0].size;
 	unsigned long reg_off;
 	int ret = -1;
-	error_info_t err;
-	pamu_av_error_t *av;
+	hv_error_t err = { };
+	dt_node_t *pamu_node;
 	uint32_t av_liodn, avs1;
 
 	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
@@ -789,27 +790,29 @@ static int pamu_av_isr(void *arg)
 			ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
 			/* We may get access violations for invalid LIODNs, just ignore them */
 			if (ppaace->v) {
-				memset(&err, 0, sizeof(error_info_t));
-				err.error_code = ERROR_PAMU_AV;
-				av = &err.regs.av_err;
-				av->avs1 = avs1;
-				av->avah = in32 ((uint32_t *) (reg + PAMU_AVAH));
-				av->aval = in32 ((uint32_t *) (reg + PAMU_AVAL));
-				av->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+				strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+				strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
+						sizeof(err.error));
+				pamu_node = to_container(dev, dt_node_t, dev);
+				dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+				err.pamu.avs1 = avs1;
+				err.pamu.access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) (reg + PAMU_AVAH)))
+									 << 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
+				err.pamu.avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
 				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
 						"PAMU access violation on PAMU#%ld, liodn = %x\n",
 						 reg_off / PAMU_OFFSET, av_liodn);
 				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-						"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
-						 av->avs1, av->avs2, av->avah, av->aval);
+						"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+						 err.pamu.avs1, err.pamu.avs2, err.pamu.access_violation_addr);
 
 				/*FIXME : LIODN index not in PPAACT table*/
 				assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
 
 				guest_t *guest = liodn_to_guest[av_liodn];
 				if (guest) {
-					av->lpid = guest->lpid;
-					av->handle = liodn_to_handle[av_liodn];
+					err.pamu.lpid = guest->lpid;
+					err.pamu.liodn_handle = liodn_to_handle[av_liodn];
 				}
 
 				pamu_error_log(&err, guest);

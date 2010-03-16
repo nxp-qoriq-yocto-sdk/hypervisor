@@ -67,6 +67,7 @@ error_policy_t ddr_error_policy[DDR_ERROR_COUNT] = {
 };
 
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
+	[error_mcheck] = { NULL, "machine check", NULL, 0 },
 	[error_cpc] = { "fsl,p4080-l3-cache-controller", "cpc", cpc_error_policy, CPC_ERROR_COUNT },
 	[error_ccf] = { "fsl,corenet-cf", "ccf", ccf_error_policy, CCF_ERROR_COUNT },
 	[error_misc] = { "fsl,soc-sram-error", "misc", misc_error_policy, MISC_ERROR_COUNT },

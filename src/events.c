@@ -38,6 +38,7 @@
 #include <percpu.h>
 #include <thread.h>
 #include <error_log.h>
+#include <error_mgmt.h>
 
 static eventfp_t event_table[] = {
 	&dbell_to_gdbell_glue,           /* EV_ASSERT_VINT */
@@ -208,37 +209,28 @@ void halt_core(trapframe_t *regs)
 
 void dump_hv_queue(trapframe_t *regs)
 {
-	error_info_t err;
+	hv_error_t err;
 
 	spin_lock(&hv_queue_cons_lock);
 
-	while (!error_get(&hv_global_event_queue, &err, NULL, 0)) {
-		switch(err.error_code) {
-		case ERROR_MACHINE_CHECK: {
-			mcheck_error_t *mc = &err.regs.mc_err;
-
+	while (!error_get(&hv_global_event_queue, &err, NULL, 0, 0)) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "domain: %s \n error: %s\n", err.domain, err.error);
+		if (!strcmp(err.domain, get_domain_str(error_mcheck))) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
 			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-				"Machine check interrupt\n");
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-				"mcsr = %x, mcar = %x, mcssr0 = %x, mcsrr1 = %x\n",
-				mc->mcsr, mc->mcar, mc->mcsrr0, mc->mcsrr1);
-			break;
+				"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
+				err.mcheck.mcsr, err.mcheck.mcar, err.mcheck.mcsrr0,
+				err.mcheck.mcsrr1);
 		}
 
-		case ERROR_PAMU_AV: {
-			pamu_av_error_t *av = &err.regs.av_err;
-
+		if (!strcmp(err.domain, get_domain_str(error_pamu))) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n", err.hdev_tree_path);
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"PAMU access violation avs1 = %x, avs2 = %x, avah = %x, aval = %x\n",
-				 av->avs1, av->avs2, av->avah, av->aval);
+				"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+				 err.pamu.avs1, err.pamu.avs2, err.pamu.access_violation_addr);
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				"PAMU access violation lpid = %x, handle = %x\n",
-				av->lpid, av->handle);
-			break;
-		}
-
-		default:
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Unknown error condition\n");
+				err.pamu.lpid, err.pamu.liodn_handle);
 		}
 	}
 

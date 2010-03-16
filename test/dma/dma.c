@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
+#include <libos/platform_error.h>
 #include <libfdt.h>
 #include <hvtest.h>
 
@@ -42,28 +43,31 @@ static uint32_t *dma_virt;
 static uint32_t liodn;
 static int window_test, sub_window_test;
 static volatile int mcheck_int, crit_int;
-static uint32_t mcheck_err[8], crit_err[16];
+static hv_error_t mcheck_err, crit_err[2];
 
 void crit_int_handler(trapframe_t *regs)
 {
-	uint32_t *ptr;
+	hv_error_t *ptr;
+	uint32_t bufsize = sizeof(hv_error_t);
 
 	if (!crit_int)
-		ptr = crit_err;
+		ptr = &crit_err[0];
 	else
-		ptr = &crit_err[8];
+		ptr = &crit_err[1];
 
-	int ret = fh_err_get_info(1, ptr);
+	int ret = fh_err_get_info(1, &bufsize, 0, virt_to_phys(ptr), 0);
 	if (!ret)
 		crit_int++;
 }
 
 void mcheck_interrupt(trapframe_t *regs)
 {
+	uint32_t bufsize = sizeof(hv_error_t);
+
 	if (!(mfspr(SPR_MCSR) & MCSR_MCP))
 		return;
 
-	int ret = fh_err_get_info(0, mcheck_err);
+	int ret = fh_err_get_info(0, &bufsize, 0, virt_to_phys(&mcheck_err), 0);
 	if (!ret)
 		mcheck_int++;
 
@@ -189,20 +193,31 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("DMA access violation test#1 : FAILED\n");
 
-
 	while (!mcheck_int);
-	for(i = 0; i < 8; i++)
-		printf("%x, ", mcheck_err[i]);
+	printf("domain: %s, error: %s, path: %s\n", mcheck_err.domain, mcheck_err.error,
+		 mcheck_err.hdev_tree_path);
+	printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+		 mcheck_err.pamu.avs1, mcheck_err.pamu.avs2, mcheck_err.pamu.access_violation_addr);
+	printf("PAMU access violation lpid = %x, handle = %x\n",
+		mcheck_err.pamu.lpid, mcheck_err.pamu.liodn_handle);
 	printf("\n");
 	printf("Access violation test : PASSED\n");
+	printf("\n");
 
 	const char *label = fdt_getprop(fdt, 0, "label", &len);
 	if(!strcmp("/part1", label)) {
 		while (crit_int < 2 );
-		for(i = 0 ; i < 16 ; i++)
-			printf("%x, ", crit_err[i]);
+		for(i = 0 ; i < 2 ; i++) {
+			printf("domain: %s, error: %s, path: %s\n", crit_err[i].domain, crit_err[i].error,
+				crit_err[i].hdev_tree_path);
+			printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+				crit_err[i].pamu.avs1, crit_err[i].pamu.avs2, crit_err[i].pamu.access_violation_addr);
+			printf("PAMU access violation lpid = %x, handle = %x\n",
+				crit_err[i].pamu.lpid, crit_err[i].pamu.liodn_handle);
+		}
 		printf("\n");
 		printf("Error Manager test : PASSED\n");
+		printf("\n");
 
 		/* PPAACE entry correponding to access violation LIODN is marked
 		 * invalid by the hypervisor. We need to explicitly mark the entry

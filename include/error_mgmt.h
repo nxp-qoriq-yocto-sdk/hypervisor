@@ -39,8 +39,9 @@ typedef struct error_domain {
 	int error_count;
 } error_domain_t;
 
-#define ERROR_DOMAIN_COUNT 5
+#define ERROR_DOMAIN_COUNT 6
 typedef enum {
+	error_mcheck,
 	error_cpc,
 	error_ccf,
 	error_misc,

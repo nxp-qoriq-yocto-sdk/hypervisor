@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009, 2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,7 +39,7 @@ void error_log_init(queue_t *q)
 {
 	int ret;
 
-	ret =  queue_init(q, sizeof(error_info_t) * MAX_ERROR_EVENTS);
+	ret =  queue_init(q, sizeof(hv_error_t) * MAX_ERROR_EVENTS);
 
 	if (ret)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -49,12 +49,12 @@ void error_log_init(queue_t *q)
 			ret);
 }
 
-int error_get(queue_t *q, error_info_t *err, unsigned long *flag,
-		 unsigned long mask)
+int error_get(queue_t *q, hv_error_t *err, unsigned long *flag,
+		 unsigned long mask, int peek)
 {
 	int ret;
 
-	ret = queue_read(q, (uint8_t *)err, sizeof(error_info_t), 0);
+	ret = queue_read(q, (uint8_t *)err, sizeof(hv_error_t), peek);
 
 	if (flag) {
 		atomic_and(flag, ~mask);
@@ -65,12 +65,12 @@ int error_get(queue_t *q, error_info_t *err, unsigned long *flag,
 	return ret ? 0 : ENOENT;
 }
 
-void error_log(queue_t *q, error_info_t *err, uint32_t *lock)
+void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 {
 	int ret;
 
 	spin_lock(lock);
-	ret = queue_write(q, (const uint8_t *)err, sizeof(error_info_t));
+	ret = queue_write(q, (const uint8_t *)err, sizeof(hv_error_t));
 	/* if queue is full we drop the errors */
 	/* FIXME: should do more here than a printlog */
 	if (!ret) {

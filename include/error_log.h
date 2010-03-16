@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009, 2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,41 +24,20 @@
 
 #include <libos/queue.h>
 
-typedef struct mcheck_error {
-	uint32_t mcsr;
-	uint32_t mcar;
-	uint32_t mcsrr0;
-	uint32_t mcsrr1;
-} mcheck_error_t;
+struct hv_error;
 
-typedef struct pamu_av_error {
-	uint32_t lpid;
-	uint32_t avah;
-	uint32_t aval;
-	uint32_t avs1;
-	uint32_t avs2;
-	uint32_t handle;
-	uint32_t pad;
-} pamu_av_error_t;
-
-typedef struct error_info {
-	uint32_t error_code;
-	union {
-		mcheck_error_t mc_err;
-		pamu_av_error_t av_err;
-		uint32_t regs[7];
-	} regs;
-} error_info_t;
+#define MAX_ERROR_EVENTS 64
 
 extern guest_t *error_manager_guest;
 extern int error_manager_gcpu;
 extern queue_t global_event_queue;
 extern uint32_t global_event_prod_lock;
+extern uint32_t global_event_cons_lock;
 extern queue_t hv_global_event_queue;
 extern uint32_t hv_queue_prod_lock;
 extern uint32_t hv_queue_cons_lock;
 
 void error_log_init(queue_t *q);
-int error_get(queue_t *q, error_info_t *err, unsigned long *flag,
-		 unsigned long mask);
-void error_log(queue_t *q, error_info_t *err, uint32_t *lock);
+int error_get(queue_t *q, struct hv_error *err, unsigned long *flag,
+		 unsigned long mask, int peek);
+void error_log(queue_t *q, struct hv_error *err, uint32_t *lock);

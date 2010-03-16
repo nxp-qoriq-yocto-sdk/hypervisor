@@ -60,6 +60,7 @@ guest_t *error_manager_guest;
 int error_manager_gcpu;
 queue_t global_event_queue;
 uint32_t global_event_prod_lock;
+uint32_t global_event_cons_lock;
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
