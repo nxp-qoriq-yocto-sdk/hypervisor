@@ -663,6 +663,42 @@ static int emu_mtspr(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_mfpmr(trapframe_t *regs, uint32_t insn)
+{
+	int pmr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+	register_t ret;
+
+	set_stat(bm_stat_pmr, regs);
+
+	if (read_pmr(regs, pmr, &ret)) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "mfpmr@0x%lx: unknown reg %d\n", regs->srr0, pmr);
+		return 1;
+	}
+
+	regs->gpregs[reg] = ret;
+	return 0;
+}
+
+static int emu_mtpmr(trapframe_t *regs, uint32_t insn)
+{
+	int pmr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+	register_t val = regs->gpregs[reg];
+
+	set_stat(bm_stat_pmr, regs);
+
+	if (write_pmr(regs, pmr, val)) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "mtpmr@0x%lx: unknown reg %d, val 0x%lx\n",
+		         regs->srr0, pmr, val);
+		return 1;
+	}
+
+	return 0;
+}
+
 static int emu_rfci(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -1020,6 +1056,14 @@ void hvpriv(trapframe_t *regs)
 
 		case 0xe6:
 			fault = emu_icblc(regs, insn);
+			break;
+
+		case 334:
+			fault = emu_mfpmr(regs, insn);
+			break;
+
+		case 462:
+			fault = emu_mtpmr(regs, insn);
 			break;
 		}
 		

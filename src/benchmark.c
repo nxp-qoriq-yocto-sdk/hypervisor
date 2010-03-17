@@ -44,6 +44,7 @@ const char *benchmark_names[num_benchmarks] = {
 	"msgsnd",
 	"msgclr",
 	"spr",
+	"pmr",
 	"tlbwe(tlb0)",
 	"tlbwe(tlb1)",
 	"tlbivax(all tlb0)",

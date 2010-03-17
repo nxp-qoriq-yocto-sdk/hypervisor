@@ -73,5 +73,6 @@ void hcall_enter_nap(trapframe_t *regs);
 void hcall_exit_nap(trapframe_t *regs);
 
 int flush_disable_l1(void *disp_addr, uint32_t timeout);
+int check_perfmon(trapframe_t *regs);
 
 #endif

@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -823,8 +823,7 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 }
 
 /**
- * Read performance monitor register
- *
+ * Read guest performance monitor register
  */
 int read_pmr(trapframe_t *regs, int pmr, register_t *val)
 {
@@ -906,6 +905,10 @@ int read_pmr(trapframe_t *regs, int pmr, register_t *val)
 		break;
 	case PMR_PMGC0:
 		*val = mfpmr(PMR_PMGC0);
+
+		if (mfspr(SPR_MSRP) & MSRP_PMMP)
+			*val |= PMGC0_PMIE;
+
 		break;
 	default:
 		return 1;
@@ -914,68 +917,86 @@ int read_pmr(trapframe_t *regs, int pmr, register_t *val)
 	return 0;
 }
 
+#define NUM_PERF_CTRS 4
+
+/** Checks whether a perfmon interrupt is pending.
+ *
+ * If so, returns 1.  Otherwise, disengages the PMMP/PCIE workaround and
+ * returns 0.
+ */
+int check_perfmon(trapframe_t *regs)
+{
+	uint32_t msrp = mfspr(SPR_MSRP);
+
+	if (msrp & MSRP_PMMP) {
+		register_t pmr;
+
+		for (int i = 0; i < NUM_PERF_CTRS; i++) {
+			/* If not enabled, can't be the cause of
+			 * pending interrupt.
+			 */
+			read_pmr(regs, PMR_PMLCA0 + i, &pmr);
+			if (!(pmr & PMLCA_CE))
+				continue;
+
+			/* If enabled and overflowing, we still need the
+			 * workaround to be engaged.
+			 */
+			read_pmr(regs, PMR_PMC0 + i, &pmr);
+			if (pmr & 0x80000000)
+				return 1;
+		}
+
+		/* No enabled, overflowing counters -- disengage
+		 * the workaround.  PMMP being set implies the guest
+		 * thinks PMIE is set.
+		 */
+		mtspr(SPR_MSRP, msrp & ~MSRP_PMMP);
+		mtpmr(PMR_PMGC0, mfpmr(PMR_PMGC0) | PMGC0_PMIE);
+	}
+
+	return 0;
+}
+
+/**
+ * Write guest performance monitor register
+ */
 int write_pmr(trapframe_t *regs, int pmr, register_t val)
 {
+	uint32_t reg;
+
 	switch (pmr) {
-	case PMR_UPMC0:
-		mtpmr(PMR_UPMC0, val);
-		break;
-	case PMR_UPMC1:
-		mtpmr(PMR_UPMC1, val);
-		break;
-	case PMR_UPMC2:
-		mtpmr(PMR_UPMC2, val);
-		break;
-	case PMR_UPMC3:
-		mtpmr(PMR_UPMC3, val);
-		break;
 	case PMR_PMC0:
 		mtpmr(PMR_PMC0, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMC1:
 		mtpmr(PMR_PMC1, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMC2:
 		mtpmr(PMR_PMC2, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMC3:
 		mtpmr(PMR_PMC3, val);
-		break;
-	case PMR_UPMLCA0:
-		mtpmr(PMR_UPMLCA0, val);
-		break;
-	case PMR_UPMLCA1:
-		mtpmr(PMR_UPMLCA1, val);
-		break;
-	case PMR_UPMLCA2:
-		mtpmr(PMR_UPMLCA2, val);
-		break;
-	case PMR_UPMLCA3:
-		mtpmr(PMR_UPMLCA3, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMLCA0:
 		mtpmr(PMR_PMLCA0, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMLCA1:
 		mtpmr(PMR_PMLCA1, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMLCA2:
 		mtpmr(PMR_PMLCA2, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMLCA3:
 		mtpmr(PMR_PMLCA3, val);
-		break;
-	case PMR_UPMLCB0:
-		mtpmr(PMR_UPMLCB0, val);
-		break;
-	case PMR_UPMLCB1:
-		mtpmr(PMR_UPMLCB1, val);
-		break;
-	case PMR_UPMLCB2:
-		mtpmr(PMR_UPMLCB2, val);
-		break;
-	case PMR_UPMLCB3:
-		mtpmr(PMR_UPMLCB3, val);
+		check_perfmon(regs);
 		break;
 	case PMR_PMLCB0:
 		mtpmr(PMR_PMLCB0, val);
@@ -989,13 +1010,21 @@ int write_pmr(trapframe_t *regs, int pmr, register_t val)
 	case PMR_PMLCB3:
 		mtpmr(PMR_PMLCB3, val);
 		break;
-	case PMR_UPMGC0:
-		mtpmr(PMR_UPMGC0, val);
-		break;
 	case PMR_PMGC0:
+		if (mfspr(SPR_MSRP) & MSRP_PMMP) {
+			/* The guest is masking perfmon interrupts,
+			 * so we can disengage the workaround.
+			 */
+			if (!(val & PMGC0_PMIE))
+				mtspr(SPR_MSRP, mfspr(SPR_MSRP) & ~MSRP_PMMP);
+
+			val &= ~PMGC0_PMIE;
+		}
+
 		mtpmr(PMR_PMGC0, val);
+
 		break;
-	default:
+	default: /* Includes all user PMRs, which are read-only */
 		return 1;
 	}
 

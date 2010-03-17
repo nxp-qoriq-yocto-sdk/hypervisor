@@ -43,6 +43,7 @@ typedef enum benchmark_num {
 	bm_stat_msgsnd, /**< Overhead of msgsnd instructions */
 	bm_stat_msgclr, /**< Overhead of msgclr instructions */
 	bm_stat_spr,   /**< Overhead of SPR accesses */
+	bm_stat_pmr,   /**< Overhead of PMR accesses */
 	bm_stat_tlbwe_tlb0, /**< Overhead of tlbwe instructions for tlb0 */
 	bm_stat_tlbwe_tlb1, /**< Overhead of tlbwe instructions for tlb1 */
 	bm_stat_tlbivax_tlb0_all, /**< Overhead of tlbivax all instructions for tlb0 */

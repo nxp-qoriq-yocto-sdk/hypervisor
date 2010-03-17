@@ -32,6 +32,7 @@
 #include <libos/core-regs.h>
 #include <libos/mpic.h>
 #include <libos/list.h>
+#include <libos/io.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -182,6 +183,20 @@ no_virq:
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELL];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
 		goto check_flags;
+	}
+
+	/* Perfmon is lowest priority. */
+	if (gcpu->gdbell_pending & GCPU_PEND_PERFMON) {
+		/* Don't reflect an interrupt that has been deasserted
+		 * by the hardware.
+		 */
+		if (check_perfmon(regs)) {
+			atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_PERFMON);
+			regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_PERFMON];
+			regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE |
+			                      MSR_GS | MSR_UCLE | MSR_RI);
+			goto check_flags;
+		}
 	}
 
 	if (gcpu->gdbell_pending & GCPU_PEND_TCR_FIE)
@@ -477,4 +492,34 @@ void tlb_miss(trapframe_t *regs)
 	}
 
 	reflect_trap(regs);
+}
+
+void perfmon_int(trapframe_t *regs)
+{
+	/* The perfmon interrupt cannot be masked by EE in guest state.
+	 * When an interrupt occurs, we mask it with PMGC0 and disable
+	 * direct guest access to the PMRs.  Access is restored when
+	 * the guest either masks or clears the interrupt.
+	 *
+	 * While PMRs are trapping to the hypervisor, the guest must not
+	 * set MSR[PMM] (it will be ignored) or read user PMRs from
+	 * userspace (will return zero).  This is a hardware limitation.
+	 */
+
+	uint32_t reg = mfpmr(PMR_PMGC0);
+	assert(reg & PMGC0_PMIE);
+
+	mtpmr(PMR_PMGC0, reg & ~PMGC0_PMIE);
+
+	reg = mfspr(SPR_MSRP);
+	assert(!(reg & MSRP_PMMP));
+	mtspr(SPR_MSRP, reg | MSRP_PMMP);
+
+	if (likely((regs->srr1 & (MSR_GS | MSR_EE)) == (MSR_GS | MSR_EE))) {
+		reflect_trap(regs);
+		return;
+	}
+
+	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_PERFMON);
+	send_local_guest_doorbell();
 }

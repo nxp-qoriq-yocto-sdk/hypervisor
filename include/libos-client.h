@@ -109,6 +109,7 @@ void watchdog_trap(struct trapframe *regs);
 void hcall(struct trapframe *regs);
 void align_trap(struct trapframe *regs);
 void fpunavail(struct trapframe *regs);
+void perfmon_int(struct trapframe *regs);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt
@@ -130,6 +131,7 @@ void fpunavail(struct trapframe *regs);
 #define EXC_DOORBELLC_HANDLER crit_dbell_int
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
+#define EXC_PERFMON_HANDLER perfmon_int
 
 #ifdef CONFIG_STATISTICS
 #define UPDATE_STATS statistics_stop
