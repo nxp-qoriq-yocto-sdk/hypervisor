@@ -89,6 +89,8 @@ static int validate_domain(const char *domain, dt_node_t *hwnode)
 	/* validate the the hwnode compatible corresponds to
            the domain */
 	for (i = 0; i < ERROR_DOMAIN_COUNT; i++) {
+		if (!error_domains[i].compatible)
+			continue;
 		if (!strcmp(compat, error_domains[i].compatible) &&
 		    !strcmp(domain, error_domains[i].domain))
 			return 0;  /* found it */
