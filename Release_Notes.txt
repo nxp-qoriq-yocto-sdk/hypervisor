@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.6
-Revsion: 003
-Date: 3/11/2010
+Revsion: 004
+Date: 3/23/2010
 
 -------------------------------------------------------
 Contents
@@ -46,7 +46,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.6-002 has been tested with Simics 4.2.36 / pre43
+   -embedded-hv v0.6-004 has been tested with Simics 4.2.36 / pre43
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -54,6 +54,16 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.6-004 bug fixes and changes
+      -bug 4502-- error message improvement
+      -bug 4989-- error message improvement
+      -bug 5250-- memset assertion failure
+      -bug 5123-- partman support partition labels in -h
+      -implement error handlers for HV owned devices
+      -framework for error policy configuration
+      -shell command for dumping error policy
+      -bug 5282-- gdb-A unit test can't set breakpoint
 
    -v0.6-003 bug fixes and changes
       -support for error interrupt reflection
