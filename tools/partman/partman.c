@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -996,6 +996,42 @@ static int get_handle(const char *name)
 	return *((uint32_t *) (prop->data));
 }
 
+/**
+ * get_part_handle_by_label - return the numeric handle of a partition having the specified label
+ * @param label: label of the partition to search for
+ *
+ * This function tries to find a partition by its "label" property and return its numeric handle.
+ *
+ * Returns the handle number, or -1 if error
+ */
+static int get_part_handle_by_label(const char *label)
+{
+	gdt_node_t *node = NULL;
+	gdt_prop_t *prop;
+	int reg = -1;
+
+	while ((node = gdt_find_next_compatible(node, "fsl,hv-partition-handle")) != NULL) {
+		prop = gdt_get_property(node, "label");
+		if (!prop || !prop->len) {
+			printf("%s: '%s' property for %s is missing or invalid\n",
+			       __func__, "label", node->name);
+			return -1;
+		}
+		if (!strcmp(prop->data, label)) {
+			prop = gdt_get_property(node, "reg");
+			if (!prop || (prop->len != sizeof(uint32_t))) {
+				printf("%s: '%s' property for %s is missing or invalid\n",
+				       __func__, "reg", node->name);
+				return -1;
+			}
+			reg = *((uint32_t *) prop->data);
+			break;
+		}
+	}
+
+	return reg;
+}
+
 static int cmd_getprop(struct parameters *p)
 {
 	struct fsl_hv_ioctl_prop param;
@@ -1071,6 +1107,7 @@ int main(int argc, char *argv[])
 	struct parameters p = {};
 	int c;
 	const char *handlestr;
+	int partition_cmd = 0;
 
 	opterr = 0;
 
@@ -1138,8 +1175,26 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	/* Check if it's a partition related command */
+	if (!strcmp(argv[optind], "load") ||
+	    !strcmp(argv[optind], "start") ||
+	    !strcmp(argv[optind], "stop") ||
+	    !strcmp(argv[optind], "restart") ||
+	    !strcmp(argv[optind], "getprop") ||
+	    !strcmp(argv[optind], "setprop"))
+		partition_cmd = 1;
+
+	/* Parse the generic handle argument and obtain its numeric equivalent.
+	 * The following cases are handled:
+	 * 1. Partition specified by its label
+	 * 2. Generic handle specified by the name of the node describing it
+	 * 3. Explicit numeric handle specified as argument
+	 * 4. No handle argument
+	 */
 	if (handlestr) {
-		int ret = get_handle(handlestr);
+		int ret;
+
+		ret = partition_cmd ? get_part_handle_by_label(handlestr) : get_handle(handlestr);
 		if (ret < 0) {
 			char *endptr;
 			p.h = strtol(handlestr, &endptr, 0);
@@ -1172,5 +1227,6 @@ int main(int argc, char *argv[])
 
 	fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], argv[optind]);
 	usage();
+
 	return 1;
 }
