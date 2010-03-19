@@ -150,5 +150,6 @@ void fpunavail(struct trapframe *regs);
 #define LOGTYPE_CPC          (CLIENT_BASE_LOGTYPE + 10)
 #define LOGTYPE_GUTS         (CLIENT_BASE_LOGTYPE + 11)
 #define LOGTYPE_PM           (CLIENT_BASE_LOGTYPE + 12)
+#define LOGTYPE_DDR          (CLIENT_BASE_LOGTYPE + 13)
 
 #endif

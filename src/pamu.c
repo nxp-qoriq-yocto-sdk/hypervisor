@@ -769,6 +769,23 @@ static void pamu_error_log(hv_error_t *err, guest_t *guest)
 	error_log(&hv_global_event_queue, err, &hv_queue_prod_lock);
 }
 
+static int pamu_error_isr(void *arg)
+{
+	hv_error_t err = { };
+	device_t *dev = arg;
+	interrupt_t *irq;
+
+	irq = dev->irqs[1];
+	irq->ops->disable(irq);
+
+	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+	strncpy(err.error, get_domain_str(error_pamu), sizeof(err.error));
+
+	pamu_error_log(&err, NULL);
+
+	return 0;
+}
+
 static int pamu_av_isr(void *arg)
 {
 	device_t *dev = arg;
@@ -854,6 +871,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	dt_node_t *guts_node, *pamu_node;
 	phys_addr_t guts_addr, guts_size;
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
+	interrupt_t *irq;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -929,10 +947,16 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	setup_pamu_law(pamu_node);
 	setup_omt();
 
-	if (dev->num_irqs >= 1) {
-		interrupt_t *irq = dev->irqs[0];
+	if (dev->num_irqs >= 1 && dev->irqs[0]) {
+		irq = dev->irqs[0];
 		if (irq && irq->ops->register_irq)
 			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_MCHK);
+	}
+
+	if (dev->num_irqs >= 2 && dev->irqs[1]) {
+		irq = dev->irqs[1];
+		if (irq && irq->ops->register_irq)
+			irq->ops->register_irq(irq, pamu_error_isr, dev, TYPE_MCHK);
 	}
 
 	/* Enable all relevant PAMU(s) */

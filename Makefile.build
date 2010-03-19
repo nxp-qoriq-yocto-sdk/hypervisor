@@ -116,7 +116,7 @@ shmem: bin/linux/shmem
 hv-src-y := interrupts.c trap.c events.c vpic.c init.c guest.c tlb.c emulate.c \
             timers.c paging.c hcalls.c devtree.c elf.c uimage.c vmpic.c \
             gspr.c misc.S livetree.c ipi_doorbell.c util.c ccm.c cpc.c guts.c \
-            error_log.c error_mgmt.c thread.c
+            error_log.c error_mgmt.c thread.c ddr.c sram.c
 
 hv-src-$(CONFIG_BYTE_CHAN) += byte_chan.c
 hv-src-$(CONFIG_BCMUX) += bcmux.c

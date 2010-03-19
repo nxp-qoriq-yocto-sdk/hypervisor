@@ -29,6 +29,7 @@
 #include <libos/printlog.h>
 #include <libos/io.h>
 #include <libos/alloc.h>
+#include <libos/platform_error.h>
 
 #include <p4080.h>
 #include <ccm.h>
@@ -36,6 +37,8 @@
 #include <devtree.h>
 #include <percpu.h>
 #include <errors.h>
+#include <error_log.h>
+#include <error_mgmt.h>
 
 #define HV_CPUS         (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
 #define PAMU_CSD_PORTS  0xfff80000
@@ -57,6 +60,23 @@ static driver_t __driver law = {
 	.compatible = "fsl,corenet-law",
 	.probe = law_probe
 };
+
+static int ccm_error_isr(void *arg)
+{
+	hv_error_t err = { };
+	device_t *dev = arg;
+	interrupt_t *irq;
+
+	irq = dev->irqs[0];
+	irq->ops->disable(irq);
+
+	strncpy(err.domain, get_domain_str(error_ccf), sizeof(err.domain));
+	strcpy(err.error, get_domain_str(error_ccf));
+
+	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+
+	return 0;
+}
 
 static int ccm_probe(driver_t *drv, device_t *dev)
 {
@@ -119,6 +139,12 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	 */
 	for (int i = 1; i < num_snoopids; i++)
 		out32(&sidmr[i], (0x80000000 >> (i - 1)));
+
+	if (dev->num_irqs >= 1) {
+		interrupt_t *irq = dev->irqs[0];
+		if (irq && irq->ops->register_irq)
+			irq->ops->register_irq(irq, ccm_error_isr, dev, TYPE_MCHK);
+	}
 
 	dev->driver = &ccm;
 

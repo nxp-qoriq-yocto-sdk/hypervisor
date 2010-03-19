@@ -2,7 +2,7 @@
  * CoreNet Platform Cache
  */
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009, 2010 Freescale Semiconductor, Inc.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,15 @@
 
 #include <libos/printlog.h>
 #include <libos/io.h>
+#include <libos/platform_error.h>
 
 #include <p4080.h>
 #include <cpc.h>
 #include <devtree.h>
 #include <percpu.h>
 #include <errors.h>
+#include <error_log.h>
+#include <error_mgmt.h>
 
 static cpc_dev_t cpcs[NUMCPCS];
 
@@ -111,6 +114,23 @@ static driver_t __driver cpc = {
 	.probe = cpc_probe
 };
 
+static int cpc_error_isr(void *arg)
+{
+	hv_error_t err = { };
+	device_t *dev = arg;
+	interrupt_t *irq;
+
+	irq = dev->irqs[0];
+	irq->ops->disable(irq);
+
+	strncpy(err.domain, get_domain_str(error_cpc), sizeof(err.domain));
+	strcpy(err.error, get_domain_str(error_cpc));
+
+	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+
+	return 0;
+}
+
 static int cpc_probe(driver_t *drv, device_t *dev)
 {
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
@@ -126,6 +146,12 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 		init_cpc_dev(0, dev->regs[0].virt);
 	else
 		init_cpc_dev(1, dev->regs[0].virt);
+
+	if (dev->num_irqs >= 1) {
+		interrupt_t *irq = dev->irqs[0];
+		if (irq && irq->ops->register_irq)
+			irq->ops->register_irq(irq, cpc_error_isr, dev, TYPE_MCHK);
+	}
 
 	dev->driver = &cpc;
 
