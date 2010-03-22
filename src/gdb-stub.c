@@ -35,8 +35,8 @@
  */
 
 #include <stdint.h>
-#include <malloc.h>
 
+#include <libos/alloc.h>
 #include <libos/trapframe.h>
 #include <libos/core-regs.h>
 #include <libos/trap_booke.h>
@@ -151,7 +151,8 @@ void gdb_stub_init(void)
 	stub->response.len = BUFMAX;
 	stub->response.cur = stub->rbuf;
 	stub->rsp = &stub->response;
-	stub->breakpoint_table = malloc(MAX_BREAKPOINT_COUNT*sizeof(breakpoint_t));
+	stub->breakpoint_table = alloc_type_num(breakpoint_t,
+	                                        MAX_BREAKPOINT_COUNT);
 	CHECK_MEM (stub->breakpoint_table);
 
 	gcpu->dbgstub_cpu_data = stub;
