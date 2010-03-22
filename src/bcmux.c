@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -267,6 +267,9 @@ static void mux_send_data_push(queue_t *q, int blocking)
 
 		spin_lock(&mux->byte_chan->tx_lock);
 	}
+
+	if (blocking)
+		queue_notify_consumer(mux->byte_chan->tx, 1);
 
 again: 
 	ret = __mux_send_data(mux, cbc);
