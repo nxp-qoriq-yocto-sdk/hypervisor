@@ -39,8 +39,7 @@ void error_log_init(queue_t *q)
 {
 	int ret;
 
-	ret =  queue_init(q, sizeof(hv_error_t) * MAX_ERROR_EVENTS);
-
+	ret =  queue_init(q, 32768);
 	if (ret)
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"%s error event queue init failed error = %d\n",

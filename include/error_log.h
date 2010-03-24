@@ -26,8 +26,6 @@
 
 struct hv_error;
 
-#define MAX_ERROR_EVENTS 64
-
 extern guest_t *error_manager_guest;
 extern int error_manager_gcpu;
 extern queue_t global_event_queue;
