@@ -60,7 +60,7 @@ typedef struct {
 	 * within critical interrupts (or similar elevated exception levels). 
 	 * This must be the first thing in cpu_t.
 	 */
-	char fastsave[64] __attribute__((aligned(64)));
+	char fastsave[16 * sizeof(unsigned long)] __attribute__((aligned(64)));
 
 	struct gcpu *gcpu;
 

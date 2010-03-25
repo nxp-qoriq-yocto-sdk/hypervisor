@@ -38,7 +38,7 @@
 #include <events.h>
 #include <benchmark.h>
 
-static int get_ea_indexed(trapframe_t *regs, uint32_t insn)
+static unsigned long get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
 	int ra = (insn >> 16) & 31;
 	int rb = (insn >> 11) & 31;
@@ -318,7 +318,7 @@ static int emu_tlbsync(trapframe_t *regs, uint32_t insn)
 
 static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t va = get_ea_indexed(regs, insn);
+	unsigned long va = get_ea_indexed(regs, insn);
 
 	set_stat(bm_stat_tlbsx, regs);
 	disable_int();
@@ -721,12 +721,13 @@ static int emu_rfmci(trapframe_t *regs, uint32_t insn)
 
 static int emu_dcbtls(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t addr, ct;
+	uint32_t ct;
+	unsigned long addr;
 
 	addr = get_ea_indexed(regs, insn);
 	ct = (insn >> 21) & 0x1f;
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
-			"emulating dcbtls ct =%x, addr = %x\n", ct, addr);
+			"emulating dcbtls ct =%x, addr = %lx\n", ct, addr);
 
 	if (ct == 0)
 		mtspr(SPR_L1CSR0, mfspr(SPR_L1CSR0) |  L1CSR0_DCUL);
@@ -736,12 +737,13 @@ static int emu_dcbtls(trapframe_t *regs, uint32_t insn)
 
 static int emu_icbtls(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t addr, ct;
+	uint32_t ct;
+	unsigned long addr;
 
 	addr =  get_ea_indexed(regs, insn);
 	ct = (insn >> 21) & 0x1f;
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
-			"emulating icbtls ct =%x, addr = %x\n", ct, addr);
+			"emulating icbtls ct =%x, addr = %lx\n", ct, addr);
 
 	if (ct == 0)
 		mtspr(SPR_L1CSR1, mfspr(SPR_L1CSR1) | L1CSR1_ICUL);
@@ -751,24 +753,26 @@ static int emu_icbtls(trapframe_t *regs, uint32_t insn)
 
 static int emu_dcblc(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t addr, ct;
+	uint32_t ct;
+	unsigned long addr;
 
 	addr =  get_ea_indexed(regs, insn);
 	ct = (insn >> 21) & 0x1f;
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
-			"emulating dcblc ct =%x, addr = %x\n", ct, addr);
+			"emulating dcblc ct =%x, addr = %lx\n", ct, addr);
 
 	return 0;
 }
 
 static int emu_icblc(trapframe_t *regs, uint32_t insn)
 {
-	uint32_t addr, ct;
+	uint32_t ct;
+	unsigned long addr;
 
 	addr =  get_ea_indexed(regs, insn);
 	ct = (insn >> 21) & 0x1f;
 	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
-			"emulating icblc ct =%x, addr = %x\n", ct, addr);
+			"emulating icblc ct =%x, addr = %lx\n", ct, addr);
 
 	return 0;
 }

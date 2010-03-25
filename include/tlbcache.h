@@ -1,7 +1,7 @@
 /* @file
  */
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@
 #include <paging.h>
 
 #ifdef CONFIG_TLB_CACHE
-/* FIXME: 64-bit */
 #define TLBC_WAYS 4
 
 #define TLBC_MIN_IDX_BITS 10
@@ -43,16 +42,20 @@ typedef union tlbctag {
 	 * fits in a pointer-size word.
 	 */
 	struct {
-	 	uintptr_t valid:1;
-		uintptr_t space:1;
-		uintptr_t lpid:6;
-		uintptr_t pid:14;
 
 		/* This assumes 10 bits of TLB index, corresponding to a
 		 * 64KiB TLB cache.  For larger caches, the high-order bits
 		 * are zero.
 		 */
-		uintptr_t vaddr:10; 
+#ifndef CONFIG_64BIT
+		uintptr_t vaddr:10;
+#else
+		uintptr_t vaddr:42;
+#endif
+		uintptr_t valid:1;
+		uintptr_t space:1;
+		uintptr_t lpid:6;
+		uintptr_t pid:14;
 	};
 } tlbctag_t;
 
