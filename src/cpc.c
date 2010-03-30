@@ -139,18 +139,20 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 		return ERR_INVALID;
 	}
 
-	/* FIXME : It's assumed that CPC start addr would be
-	 * CCSRBASE + CPC[cpc_index] offset.
+	/* The hardware device tree has a single l3-cache node.
+	 * This node would contain reg properties corresponding
+	 *  to both cpc0 and cpc1.
 	 */
-	if ((dev->regs[0].start & 0xfffff) == CPCADDR0)
-		init_cpc_dev(0, dev->regs[0].virt);
-	else
-		init_cpc_dev(1, dev->regs[0].virt);
 
-	if (dev->num_irqs >= 1) {
-		interrupt_t *irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, cpc_error_isr, dev, TYPE_MCHK);
+	for (int i = 0; i < NUMCPCS; i++) {
+		if ((dev->num_regs > i) && (dev->regs[i].virt != NULL))
+			init_cpc_dev(i, dev->regs[i].virt);
+
+		if (dev->num_irqs > i) {
+			interrupt_t *irq = dev->irqs[i];
+			if (irq && irq->ops->register_irq)
+				irq->ops->register_irq(irq, cpc_error_isr, dev, TYPE_MCHK);
+		}
 	}
 
 	dev->driver = &cpc;
