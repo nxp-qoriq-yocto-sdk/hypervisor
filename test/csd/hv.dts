@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -72,20 +72,8 @@
 			device = "/soc/pic";
 		};
 
-		L3_0:L3_0 {
-			device ="/soc/l3-cache-controller@10000";
-		};
-
-		L3_1:L3_1 {
-			device ="/soc/l3-cache-controller@11000";
-		};
-
-		cpc-0 {
-			device = "/soc/l3-cache-controller@10000";
-		};
-
-		cpc-1 {
-			device = "/soc/l3-cache-controller@11000";
+		cpc {
+			device = "/soc/l3-cache-controller";
 		};
 
 		corenet-law {
