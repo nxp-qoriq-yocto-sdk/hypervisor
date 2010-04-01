@@ -202,8 +202,6 @@ int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node)
 	if (ret < 0)
 		return ret;
 
-	configure_dma(node, owner);
-
 	gaddr = paddr = hwnode->dev.regs[0].start;
 	size = hwnode->dev.regs[0].size;
 
@@ -261,6 +259,11 @@ int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node)
 			}
 		}
 	}
+
+	node->vf = vf;
+	lwsync();
+	configure_dma(node, owner);
+
 	priv->guest = guest;
 
 	return 1;

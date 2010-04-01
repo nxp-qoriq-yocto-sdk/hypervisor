@@ -220,7 +220,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint64_t msi_addr = 0;
 	dt_node_t *msi_gnode, *msi_node;
 	unsigned long rpn = ULONG_MAX;
-	uint8_t *pci_ctrl;
+	uint8_t *pci_ctrl = NULL;
 	phys_addr_t pcie_addr, pcie_size;
 
 	prop = dt_get_prop(node, "fsl,msi", 0);
@@ -281,9 +281,14 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		}
 
 		size_t len = 0x1000;
+#ifndef CONFIG_DEVICE_VIRT
 		pci_ctrl = map_gphys(TEMPTLB1, guest->gphys, pcie_addr,
 		                     temp_mapping[0], &len, TLB_TSIZE_4K,
 		                     TLB_MAS2_IO, 0);
+#else
+		if (node->vf)
+			pci_ctrl = node->vf->vaddr;
+#endif
 		if (!pci_ctrl || len < 0x1000) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			         "%s: Couldn't map reg %llx (guest phys) of %s\n",
@@ -318,7 +323,9 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 			}
 		}
 
+#ifndef CONFIG_DEVICE_VIRT
 		tlb1_clear_entry(TEMPTLB1);
+#endif
 
 		if (i > 2) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,

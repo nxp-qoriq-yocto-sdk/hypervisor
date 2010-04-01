@@ -42,6 +42,9 @@
 
 struct guest;
 struct queue;
+#ifdef CONFIG_DEVICE_VIRT
+struct vf_range;
+#endif
 
 extern list_t hv_devs;
 extern uint32_t dt_owner_lock;
@@ -139,6 +142,10 @@ typedef struct dt_node {
 	struct csd_info *csd;
 
 	struct cpc_part_reg *cpc_reg[num_mem_tgts];
+
+#ifdef CONFIG_DEVICE_VIRT
+	struct vf_range *vf;
+#endif
 
 	device_t dev; /** libos device */
 	list_t owners;
