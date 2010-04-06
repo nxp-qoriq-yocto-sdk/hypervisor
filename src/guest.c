@@ -2183,6 +2183,8 @@ void start_core(trapframe_t *regs)
 
 	assert(guest->state == guest_starting);
 
+	atomic_and(&gcpu->napping, ~GCPU_NAPPING_STATE);
+
 	if (gcpu == guest->gcpus[0])
 		fn = start_guest_primary_noload;
 	else
@@ -2201,6 +2203,8 @@ void load_guest(trapframe_t *regs)
 	assert(gcpu == guest->gcpus[0]);
 	assert(guest->state == guest_starting);
 
+	atomic_and(&gcpu->napping, ~GCPU_NAPPING_STATE);
+
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
 	                   start_guest_primary, (void *)1, 0);
 	unblock(&gcpu->thread);
@@ -2214,6 +2218,8 @@ void start_load_guest(trapframe_t *regs)
 	guest_t *guest = gcpu->guest;
 	assert(gcpu == guest->gcpus[0]);
 	assert(guest->state == guest_starting);
+
+	atomic_and(&gcpu->napping, ~GCPU_NAPPING_STATE);
 
 	new_thread_inplace(&gcpu->thread, gcpu->hvstack,
 	                   start_guest_primary, (void *)0, 0);
@@ -2262,6 +2268,10 @@ void do_stop_core(trapframe_t *regs, int restart)
 	memset(&gcpu->gdbell_pending, 0,
 	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
+	raw_spin_lock(&guest->sync_ipi_lock);
+	atomic_or(&gcpu->napping, GCPU_NAPPING_STATE);
+	spin_unlock(&guest->sync_ipi_lock);
+
 	if (!is_idle()) {
 		prepare_to_block();
 		block();
@@ -2294,8 +2304,14 @@ void pause_core(trapframe_t *regs)
 		send_doorbells(guest->dbell_state_change);
 	}
 
-	prepare_to_block();
-	block();
+	raw_spin_lock(&guest->sync_ipi_lock);
+	atomic_or(&gcpu->napping, GCPU_NAPPING_STATE);
+	spin_unlock(&guest->sync_ipi_lock);
+
+	if (!is_idle()) {
+		prepare_to_block();
+		block();
+	}
 }
 
 void resume_core(trapframe_t *regs)
@@ -2311,6 +2327,7 @@ void resume_core(trapframe_t *regs)
 		send_doorbells(guest->dbell_state_change);
 	}
 
+	atomic_and(&gcpu->napping, ~GCPU_NAPPING_STATE);
 	unblock(&get_gcpu()->thread);
 }
 
@@ -2935,6 +2952,9 @@ __attribute__((noreturn)) void init_guest(void)
 
 	if (cpu->ret_hook)
 		send_doorbell(cpu->coreid);
+
+	if (cpu->coreid != 0)
+		atomic_or(&gcpu->napping, GCPU_NAPPING_STATE);
 
 	enable_int();
 	idle_loop();

@@ -82,6 +82,8 @@ void reflect_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 
+	assert(!is_idle());
+
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
 		set_crashing(1);
 		printf("unexpected trap in hypervisor\n");
@@ -244,6 +246,8 @@ void reflect_crit_int(trapframe_t *regs, int trap_type)
 {
 	gcpu_t *gcpu = get_gcpu();
 
+	assert(!is_idle());
+
 	/*
 	 * We save the values of CSSR0 and CSSR1 into gcpu for emu_mfspr() and
 	 * emu_mtspr().  Since there are no GCSRR0 and GCSRR1 registers, the
@@ -288,6 +292,8 @@ void guest_critical_doorbell(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	int ret;
 
+	assert(!is_idle());
+
 	set_stat(bm_stat_gdbell_crit, regs);
 
 	if ((gcpu->mcsr & MCSR_MCP) && (regs->srr1 & MSR_ME)) {
@@ -326,6 +332,8 @@ check_flags:
 void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
 {
 	gcpu_t *gcpu = get_gcpu();
+
+	assert(!is_idle());
 
 	gcpu->mcsr = mcsr;
 	if (!queue_empty(&gcpu->guest->error_event_queue))

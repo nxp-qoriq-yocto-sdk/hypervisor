@@ -39,10 +39,12 @@
 #define STORE std
 #endif
 
+#ifndef CONFIG_PM
 .global idle_loop
 idle_loop:
 	wait
 	b	idle_loop
+#endif
 
 /** Branch to relocated hypervisor code
  * r3 = bigmap virtual address of new text base
@@ -122,7 +124,7 @@ flush_disable_l1:
 	add	%r9, %r9, %r5
 	bdnz	1b
 
-	mfspr	%r10, SPR_L1CSR0	/* Invalidate and disable d-cache */
+	mfspr	%r10, SPR_L1CSR0 /* Invalidate and disable d-cache */
 	li	%r5, 2
 	rlwimi	%r10, %r5, 0, 3
 
@@ -153,7 +155,7 @@ flush_disable_l1:
 	li	%r3, 0
 	bnelr
 
-	mfspr	%r10, SPR_L1CSR1	/* Otherwise, invalidate the i-cache */
+	mfspr	%r10, SPR_L1CSR1 /* Otherwise, invalidate the i-cache */
 	li	%r5, 2
 	rlwimi	%r10, %r5, 0, 3
 

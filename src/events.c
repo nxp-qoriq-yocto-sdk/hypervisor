@@ -114,11 +114,22 @@ void setgevent(gcpu_t *gcpu, int event)
 	/* set the event bit */
 	smp_mbar();
 	atomic_or(&gcpu->gevent_pending, (1 << event));
-	smp_mbar();
+
+	/* Make sure that we see a gcpu->napping that is at least as
+	 * recent as when the napping core checked gevent_pending, if
+	 * that check was too early to see the above store.
+	 *
+	 * Also, make sure ret_hook is not seen before gevent_pending.
+	 */
+	sync();
+
 	gcpu->cpu->ret_hook = 1;
 
 	if (gcpu->cpu != cpu || cpu->traplevel != TRAPLEVEL_NORMAL)
 		send_doorbell(gcpu->cpu->coreid);
+
+	if (gcpu->napping)
+		setevent(cpu0.client.gcpu, EV_SYNC_NAP);
 }
 
 void return_hook(trapframe_t *regs)

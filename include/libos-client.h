@@ -75,6 +75,11 @@ typedef struct {
 
 	/** HV dynamic TLB round-robin eviction pointer */
 	int next_dyn_tlbe;
+
+	/** When set, sync_nap() will put the core into nap state.  When
+	 * clear, sync_nap() will wake the core from nap state.
+	 */
+	int nap_request;
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */

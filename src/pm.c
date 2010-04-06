@@ -186,9 +186,10 @@ void sync_nap(trapframe_t *regs)
 
 	for (i = 0; i < MAX_CORES - 1; i++) {
 		cpu_t *c = &secondary_cpus[i];
-		gcpu_t *gcpu = c->client.gcpu;
 
-		if (gcpu && gcpu->napping)
+		if (c->client.nap_request &&
+		    c->client.gcpu->napping &&
+		    !c->client.gcpu->gevent_pending)
 			cnapcrl |= 1 << c->coreid;
 	}
 
@@ -200,12 +201,8 @@ void hcall_enter_nap(trapframe_t *regs)
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	int vcpu = regs->gpregs[4];
 	gcpu_t *gcpu = get_gcpu();
-	nap_state_t ns;
 	int core;
 	int ret = EINVAL;
-
-	/* Arbitrary 1ms spin period between sync_nap()s */
-	uint32_t timeout = dt_get_timebase_freq() / 1000;
 
 	if (!rcpm) {
 		ret = ENODEV;
@@ -223,65 +220,131 @@ void hcall_enter_nap(trapframe_t *regs)
 	if (core == 0)
 		goto out;
 
-	disable_int();
-
-	/* Disable decrementer, FIT, watchdog */
-	ns.tcr = mfspr(SPR_TCR);
-	mtspr(SPR_TCR, ns.tcr & ~(TCR_DIE | TCR_FIE | TCR_WIE));
-
-	/* Remember watchdog status, so that we don't get confused when
-	 * the watchdog expires during nap.
+	/* sync_ipi_lock is used for senders of events that want to wait
+	 * for a response from the target and skip napping cores (currently
+	 * just tlbivax).  See emu_tlbivax for why we use raw_spin_lock.
 	 */
-	ns.tsr = mfspr(SPR_TSR);
+	raw_spin_lock(&guest->sync_ipi_lock);
+	atomic_or(&gcpu->napping, GCPU_NAPPING_HCALL);
+	spin_unlock(&guest->sync_ipi_lock);
 
-	if (flush_caches(&ns)) {
-		ret = EIO;
-		goto out_timers;
+	while (1) {
+		prepare_to_block();
+
+		if (!gcpu->napping)
+			break;
+
+		assert(!cpu->client.nap_request);
+		block();
+		assert(!cpu->client.nap_request);
 	}
 
-	/* To avoid races with multiple nap transitions, we can't let
-	 * cores set their own nap bit.  Instead, we ask the boot core
-	 * to do it for us.  The napping flag also protects against
-	 * spurious wakeups.
+	ret = 0;
+out:
+	regs->gpregs[3] = ret;
+}
+
+void idle_loop(void)
+{
+	nap_state_t ns;
+	gcpu_t *gcpu = get_gcpu();
+	uint64_t tb_freq = dt_get_timebase_freq();
+
+	if (cpu->coreid == 0)
+		goto wait;
+
+	/* Currently, other than the boot core we should never become
+	 * idle without intending to nap.
 	 */
+	while (1) {
+		disable_int();
 
-	gcpu->napping = 1;
+		/* Disable decrementer, FIT, watchdog */
+		ns.tcr = mfspr(SPR_TCR);
+		mtspr(SPR_TCR, ns.tcr & ~(TCR_DIE | TCR_FIE | TCR_WIE));
 
-	while (gcpu->napping) {
-		uint32_t tb;
-		setevent(cpu0.client.gcpu, EV_SYNC_NAP);
+		/* Remember watchdog status, so that we don't get confused when
+		 * the watchdog expires during nap.
+		 */
+		ns.tsr = mfspr(SPR_TSR);
 
-		/* We can't use "wait", at least with doorbells as a
-		 * wakeup source, because the doorbell can get lost if
-		 * we're still napping when it's sent.  Instead, spin in
-		 * a minimally-intrusive manner, checking gcpu->napping
-		 * every 100 us, and calling sync_nap() every 1000 us.
+		if (flush_caches(&ns))
+			goto out_timers;
+
+		/* To avoid races with multiple nap transitions, we can't let
+		 * cores set their own nap bit.  Instead, we ask the boot core
+		 * to do it for us.  The napping flag also protects against
+		 * spurious wakeups.
 		 */
 
-		tb = mfspr(SPR_TBL);
-		while (mfspr(SPR_TBL) - tb < timeout) {
-			uint32_t tb2 = mfspr(SPR_TBL);
-			while (mfspr(SPR_TBL) - tb2 < timeout / 10)
-				;
+		cpu->client.nap_request = 1;
 
-			if (!gcpu->napping)
-				break;
+		while (gcpu->napping && !gcpu->gevent_pending) {
+			uint32_t tb;
+			setevent(cpu0.client.gcpu, EV_SYNC_NAP);
+
+			/* We can't use "wait", at least with doorbells
+			 * as a wakeup source, because the doorbell can
+			 * get lost if we're still napping when it's
+			 * sent.  Instead, spin in a minimally-intrusive
+			 * manner, checking for events every 100 us, and
+			 * calling sync_nap() every 1 second.
+			 */
+
+			tb = mfspr(SPR_TBL);
+			while (mfspr(SPR_TBL) - tb < tb_freq) {
+				uint32_t tb2 = mfspr(SPR_TBL);
+				while (mfspr(SPR_TBL) - tb2 < tb_freq / 10000)
+					;
+
+				if (!gcpu->napping || gcpu->gevent_pending)
+					break;
+			}
+		}
+
+		cpu->client.nap_request = 0;
+
+		restore_caches(&ns);
+
+		/* Restore decrementer, FIT, watchdog.  Make sure any watchdog
+		 * status bits that were clear before are still clear.
+		 */
+		mtspr(SPR_TSR, ~ns.tsr & (TSR_ENW | TSR_WIS));
+		mtspr(SPR_TCR, ns.tcr);
+
+		enable_int();
+
+		/* The core doesn't listen to doorbells while napping. */
+		if (gcpu->gevent_pending || gcpu->dbell_pending ||
+		    gcpu->gdbell_pending) {
+			send_doorbell(cpu->coreid);
+
+			/* What is required to ensure that a doorbell
+			 * sent to self has been delivered before we
+			 * disable interrupts?  This may be overkill,
+			 * but if all we have to go on is that it's
+			 * ordered as a store, this should do it.
+			 */
+			register_t tmp;
+			asm volatile("msync;"
+			             "lwz %0, 0(1);"
+			             "twi 0, %0, 0;"
+			             "isync" : "=r" (tmp) : : "memory");
 		}
 	}
 
-	restore_caches(&ns);
-
-	ret = 0;
 out_timers:
-	/* Restore decrementer, FIT, watchdog.  Make sure any watchdog
-	 * status bits that were clear before are still clear.
-	 */
 	mtspr(SPR_TSR, ~ns.tsr & (TSR_ENW | TSR_WIS));
 	mtspr(SPR_TCR, ns.tcr);
 
 	enable_int();
-out:
-	regs->gpregs[3] = ret;
+
+	printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
+	         "idle_loop: couldn't nap, using wait instead\n");
+
+wait:
+	while (1)
+		asm volatile("wait");
 }
 
 void hcall_exit_nap(trapframe_t *regs)
@@ -305,8 +368,11 @@ void hcall_exit_nap(trapframe_t *regs)
 	gcpu = guest->gcpus[vcpu];
 	core = gcpu->cpu->coreid;
 
-	gcpu->napping = 0;
+	unblock(&gcpu->thread);
+
+	atomic_and(&gcpu->napping, ~GCPU_NAPPING_HCALL);
 	setevent(cpu0.client.gcpu, EV_SYNC_NAP);
 
 	regs->gpregs[3] = 0;
+	unblock(&gcpu->thread);
 }

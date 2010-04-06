@@ -188,6 +188,15 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Odd numbered cores putting themselves to nap...\n");
 	sync_cores(0); /* tell secondaries to nap */
 
+	/* Make sure this doesn't hang waiting for the napping cores.
+	 * Try at it a bunch of times to try to reveal races.
+	 */
+	for (int i = 0; i < 100; i++) {
+		asm volatile("tlbivax 0, %0" : :
+		             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
+		             "memory");
+	}
+
 	/* Wait an arbitrary amount of time for the secondaries to nap...
 	 * we can't use sync_cores, because they'll be napping.
 	 *
@@ -195,7 +204,15 @@ void libos_client_entry(unsigned long devtree_ptr)
 	 * will have expired.
 	 */
 	time = mfspr(SPR_TBL);
-	while (mfspr(SPR_TBL) - time < 50000000)
+	while (mfspr(SPR_TBL) - time < 25000000)
+		;
+
+	asm volatile("tlbivax 0, %0" : :
+	             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
+	             "memory");
+
+	time = mfspr(SPR_TBL);
+	while (mfspr(SPR_TBL) - time < 25000000)
 		;
 
 	printf("Checking nap status...\n");

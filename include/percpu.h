@@ -140,7 +140,7 @@ typedef struct guest {
 #ifdef CONFIG_DEBUG_STUB
 	struct stub_ops *stub_ops;
 #endif
-	uint32_t state_lock, inv_lock;
+	uint32_t state_lock, sync_ipi_lock;
 	gstate_t state;
 
 	int guest_cache_lock;
@@ -208,14 +208,17 @@ typedef struct guest {
 
 extern struct guest guests[MAX_PARTITIONS];
 extern unsigned long last_lpid;
-/* The following flags correspond to crit_gdbell_pending */
+
+/* The following flags correspond to gdbell_pending */
 #define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
 #define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
-#define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 #define GCPU_PEND_FIT      0x00000010 /* FIT event pending */
 #define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
+
+/* The following flags correspond to crit_gdbell_pending */
+#define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 #define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
 #define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
 #define GCPU_PEND_PERFMON  0x00000200 /* Performance monitor interrupt */
@@ -254,7 +257,13 @@ typedef struct gcpu {
 	uint32_t timer_flags;
 	int evict_tlb1, clean_tlb, clean_tlb_pid;
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
-	int napping;
+
+/*** gcpu is napping on explicit request */
+#define GCPU_NAPPING_HCALL 1
+/*** gcpu is napping because of guest is paused/stopped, or no guest on core */
+#define GCPU_NAPPING_STATE 2
+	unsigned long napping;
+
 #ifdef CONFIG_STATISTICS
 	struct benchmark benchmarks[num_benchmarks];
 #endif

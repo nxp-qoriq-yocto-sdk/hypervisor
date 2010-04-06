@@ -243,7 +243,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	 * be a problem, even with multiple guests per core, as we only
 	 * have one vcpu per guest/core combination.
 	 */
-	raw_spin_lock(&guest->inv_lock);
+	raw_spin_lock(&guest->sync_ipi_lock);
 	guest->tlbivax_addr = va;
 	guest->tlbivax_count = 1;
 
@@ -251,7 +251,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	 * and they wouldn't snoop the tlbivax in real hardware.
 	 */
 	for (i = 0; i < guest->cpucnt; i++) {
-		if (i != gcpu->gcpu_num && !gcpu->napping) {
+		if (i != gcpu->gcpu_num && !guest->gcpus[i]->napping) {
 			setevent(guest->gcpus[i], EV_TLBIVAX);
 			atomic_add(&guest->tlbivax_count, 1);
 		}
@@ -262,7 +262,7 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	while (guest->tlbivax_count != 0)
 		barrier();
 
-	spin_unlock(&guest->inv_lock);
+	spin_unlock(&guest->sync_ipi_lock);
 	return 0;
 }
 
