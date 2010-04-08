@@ -82,8 +82,6 @@ void reflect_trap(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 
-	assert(!is_idle());
-
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
 		set_crashing(1);
 		printf("unexpected trap in hypervisor\n");
@@ -92,6 +90,7 @@ void reflect_trap(trapframe_t *regs)
 		stopsim();
 	}
 
+	assert(!is_idle());
 	assert(regs->exc < sizeof(gcpu->ivor) / sizeof(int));
 
 	mtspr(SPR_GSRR0, regs->srr0);

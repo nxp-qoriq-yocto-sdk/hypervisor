@@ -77,6 +77,10 @@ config GCC_CPU_FLAG
 	help
 		Provides compiler flag for processor specific optimizations
 
+config P4080_ERRATUM_CPU20
+	bool
+	default y
+
 config P4080_ERRATUM_PAMU3
 	bool
 	default y

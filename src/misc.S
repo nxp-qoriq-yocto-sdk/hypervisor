@@ -77,10 +77,12 @@ branch_to_reloc:
 #ifdef CONFIG_PM
 /** Flush and disable L1 cache.  We assume 8-way PLRU.
  * r3 = address to use for displacement flush.
- *      This needs to have a valid mapping with load access
- *      for at least 13/8 the size of the cache.  It will not
- *      be overwritten and it does not matter if parts of it
- *      are already in the cache.
+ *      This needs to have a valid mapping with load access for at least
+ *      the size of the cache.  It will be overwritten.  It does not
+ *      matter if parts of it are already in the cache (e.g. from
+ *      speculative loads), as we will invalidate the range. It must not
+ *      be accessed from any other core or device while the invalidation
+ *      is in progress (use a separate area per core).
  *
  * r4 = timebase ticks for a timeout on invalidation
  */
@@ -93,40 +95,85 @@ flush_disable_l1:
 	                         * are currently defined.
 	                         */
 	li	%r10, 32
-	subfic	%r6, %r5, 2	/* %r6 = log2(1024/(block size * ways))
+	subfic	%r6, %r5, 5	/* %r6 = log2(1024/block size)
 				 * r5 contains log2(block size) - 5
-				 * log2(1024)-log2(block size)-log2(ways) =
-				 * 10 - r5 - 5 - 3 =
-				 * 2 - r5
+				 * log2(1024) - log2(block size) =
+				 * 10 - r5 - 5 =
+				 * 5 - r5
 				 */
 	slw	%r5, %r10, %r5	/* %r5 = cache block size */
 
 	rlwinm	%r7, %r8, 0, 0x7ff /* Extract number of KiB in the cache */
-	mulli	%r7, %r7, 13	/* An 8-way cache will %require 13
-	                         * loads per way.
-	                         */
-	slw	%r7, %r7, %r6	/* r7 = cache KiB*13*1024/block size/ways
-				 *    = cache bytes * (13/8) / block size
+	slw	%r7, %r7, %r6	/* r7 = cache KiB * 1024 / block size
+				 *    = cache bytes / block size
 				 *    = cache blocks to flush
 				 */
 	mr	%r9, %r3
+
+#ifdef CONFIG_P4080_ERRATUM_CPU20
+	/* Stashing must be disabled while doing a flash d-cache lock clear. */
+	mfspr	%r10, SPR_L1CSR2
+	rlwinm	%r10, %r10, 0, ~L1CSR2_DCSTASHID
+	msync
+	isync
+	mtspr	SPR_L1CSR2, %r10
+	isync
+	msync
+#endif
+
+	mfspr	%r10, SPR_L1CSR0 /* Clear d-cache locks, so they don't
+				  * escape the displacement flush.
+				  */
+	ori	%r10, %r10, L1CSR0_DCLFC
+
+	msync
+	isync
+	mtspr	SPR_L1CSR0, %r10
+	isync
+
+	li	%r3, -1
+	mfspr	%r11, SPR_TBL
+1:	mfspr	%r10, SPR_L1CSR0 /* Wait for the lock clear to finish */
+
+	mfspr	%r12, SPR_TBL
+	sub	%r12, %r12, %r11
+	cmplw	%r12, %r4
+	bgelr
+
+	andi.	%r10, %r10, L1CSR0_DCLFC
+	bne	1b
+
+	mr	%r3, %r9
 	mtctr	%r7
 
-1:	lwz	%r0, 0(%r9)	/* Load... */
+1:	dcbi	0, %r9		/* Make sure the displacement area
+				 * isn't in the cache.
+				 */
 	add	%r9, %r9, %r5
 	bdnz	1b
 
+	mfspr	%r10, SPR_HID0	/* Enable data cache flush assist,
+				 * reducing the size of the displacement
+				 * area needed from 12 per set to 8.
+				 */
+	ori	%r10, %r10, HID0_DCFA
 	msync
+	isync
+	mtspr	SPR_HID0, %r10
+	isync
+
 	mr	%r9, %r3
 	mtctr	%r7
 
-1:	dcbf	0, %r9		/* ...and flush. */
+1:	dcbz	0, %r9		/* Force junk data into the cache line,
+ 				 * displacing real data.
+ 				 */
 	add	%r9, %r9, %r5
 	bdnz	1b
 
 	mfspr	%r10, SPR_L1CSR0 /* Invalidate and disable d-cache */
-	li	%r5, 2
-	rlwimi	%r10, %r5, 0, 3
+	li	%r5, L1CSR0_DCFI
+	rlwimi	%r10, %r5, 0, L1CSR0_DCFI | L1CSR0_DCE
 
 	msync
 	isync
@@ -143,10 +190,17 @@ flush_disable_l1:
 	cmplw	%r12, %r4
 	bgelr
 
-	andi.	%r10, %r10, 2
+	andi.	%r10, %r10, L1CSR0_DCFI
 	bne	1b
 
-	rlwimi	%r10, %r8, 2, 3	/* Extract cache type */
+	mfspr	%r10, SPR_HID0	/* Tun data cache flush assist back off */
+	rlwinm	%r10, %r10, 0, ~HID0_DCFA
+	msync
+	isync
+	mtspr	SPR_HID0, %r10
+	isync
+
+	rlwinm	%r10, %r8, 2, 3	/* Extract cache type */
 	twlgti	%r10, 1		/* Only 0 (Harvard) and 1 (Unified)
 	                         * are currently defined.
 	                         */
@@ -156,8 +210,8 @@ flush_disable_l1:
 	bnelr
 
 	mfspr	%r10, SPR_L1CSR1 /* Otherwise, invalidate the i-cache */
-	li	%r5, 2
-	rlwimi	%r10, %r5, 0, 3
+	li	%r5, L1CSR1_ICFI
+	rlwimi	%r10, %r5, 0, L1CSR1_ICFI | L1CSR1_ICE
 
 	msync
 	isync
@@ -174,7 +228,7 @@ flush_disable_l1:
 	cmplw	%r12, %r4
 	bgelr
 
-	andi.	%r10, %r10, 2
+	andi.	%r10, %r10, L1CSR1_ICFI
 	bne	1b
 
 	li	%r3, 0

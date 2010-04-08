@@ -86,6 +86,8 @@ void *temp_mapping[2];
 extern char _end, _start;
 uint64_t text_phys, bigmap_phys;
 
+char *displacement_flush_area[MAX_CORES];
+
 static void exclude_phys(phys_addr_t addr, phys_addr_t end)
 {
 	if (addr < bigmap_phys)
@@ -808,8 +810,18 @@ static void partition_init(void)
 
 static void core_init(void)
 {
+	int l1_cache_size = (mfspr(SPR_L1CSR0) & 0x7ff) * 1024;
+
 	/* PIR was set by firmware-- record in cpu_t struct */
 	cpu->coreid = mfspr(SPR_PIR);
+
+	displacement_flush_area[cpu->coreid] =
+		memalign(l1_cache_size, l1_cache_size);
+
+	if (!displacement_flush_area[cpu->coreid]) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		         "Couldn't allocate displacement flush area\n");
+	}
 
 	/* dec init sequence
 	 *  -disable DEC interrupts

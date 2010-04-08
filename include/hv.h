@@ -75,4 +75,6 @@ void hcall_exit_nap(trapframe_t *regs);
 int flush_disable_l1(void *disp_addr, uint32_t timeout);
 int check_perfmon(trapframe_t *regs);
 
+extern char *displacement_flush_area[MAX_CORES];
+
 #endif

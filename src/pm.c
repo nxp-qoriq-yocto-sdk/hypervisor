@@ -123,8 +123,6 @@ static void restore_caches(nap_state_t *ns)
 	set_cache_reg(SPR_L1CSR1, ns->l1csr1);
 }
 
-extern char _start;
-
 /* No snooping during nap, so flush core caches, and stop allocation */
 static int flush_caches(nap_state_t *ns)
 {
@@ -139,6 +137,12 @@ static int flush_caches(nap_state_t *ns)
 		uint32_t tb = mfspr(SPR_TBL);
 		int lock = L2CSR0_L2IO | L2CSR0_L2DO;
 
+		/* The lock bits need to be set, with a read-back
+		 * to ensure completion, before requesting a flush.
+		 */
+		set_cache_reg(SPR_L2CSR0, ns->l2csr0 | lock);
+		mfspr(SPR_L2CSR0);
+		
 		set_cache_reg(SPR_L2CSR0, ns->l2csr0 | L2CSR0_L2FL | lock);
 
 		while ((mfspr(SPR_L2CSR0) & (L2CSR0_L2FL | lock)) != lock) {
@@ -164,7 +168,8 @@ static int flush_caches(nap_state_t *ns)
 		}
 	}
 
-	if (flush_disable_l1(&_start, timeout) < 0) {
+	if (flush_disable_l1(displacement_flush_area[cpu->coreid],
+	                     timeout) < 0) {
 		restore_caches(ns);
 		printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
 		         "flush_caches: L1 cache invalidate timeout\n");
@@ -183,6 +188,9 @@ void sync_nap(trapframe_t *regs)
 {
 	uint32_t cnapcrl = 0;
 	int i;
+
+	if (!rcpm)
+		return;
 
 	for (i = 0; i < MAX_CORES - 1; i++) {
 		cpu_t *c = &secondary_cpus[i];
@@ -204,7 +212,7 @@ void hcall_enter_nap(trapframe_t *regs)
 	int core;
 	int ret = EINVAL;
 
-	if (!rcpm) {
+	if (!rcpm || !displacement_flush_area[cpu->coreid]) {
 		ret = ENODEV;
 		goto out;
 	}
@@ -250,7 +258,7 @@ void idle_loop(void)
 	gcpu_t *gcpu = get_gcpu();
 	uint64_t tb_freq = dt_get_timebase_freq();
 
-	if (cpu->coreid == 0)
+	if (cpu->coreid == 0 || !rcpm || !displacement_flush_area[cpu->coreid])
 		goto wait;
 
 	/* Currently, other than the boot core we should never become
