@@ -325,6 +325,20 @@ static command_t hdt = {
 
 shell_cmd(hdt);
 
+static void cdt_fn(shell_t *shell, char *args)
+{
+	dt_print_tree(config_tree, shell->out);
+}
+
+static command_t cdt = {
+	.name = "cdt",
+	.action = cdt_fn,
+	.shorthelp = "Display hypervisor configuration tree",
+	.longhelp = "  Displays the hypervisor configuration tree.",
+};
+
+shell_cmd(cdt);
+
 #ifdef CONFIG_PAMU
 #define BUFF_SIZE 64
 #define BIT_SHIFT_1P 50
