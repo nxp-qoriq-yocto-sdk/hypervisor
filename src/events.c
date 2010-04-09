@@ -211,9 +211,9 @@ void dbell_to_cgdbell_glue(trapframe_t *regs)
 
 void halt_core(trapframe_t *regs)
 {
-	cpu->crashing++;
+	set_crashing(1);
 	dump_regs(regs);
-	cpu->crashing--;
+	set_crashing(0);
 
 	asm volatile("1: wait;" "b 1b;");
 }
