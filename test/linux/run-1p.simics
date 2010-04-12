@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,8 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$use_uart0 = 0
-$use_uart0_net = 1
+$use_uart2 = 1
 
 $create_fman = TRUE
 

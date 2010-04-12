@@ -54,13 +54,7 @@
 	// =====================================================
 	hv:hypervisor-config {
 		compatible = "hv-config";
-		stdout = <&hvbc>;
-
-		hvbc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <0>;
-		};
+		stdout = <&uart0>;
 
 		hv-memory {
 			compatible = "hv-memory";
@@ -96,11 +90,6 @@
 		};
 	};
 
-	uartmux: uartmux {
-		compatible = "byte-channel-mux";
-		endpoint = <&uart0>;
-	};
-
 	// =====================================================
 	// Partition 1
 	// =====================================================
@@ -110,7 +99,7 @@
 		cpus = <0 2>;
 
 		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
-		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x00f00000>;
+		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x01800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 
 		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
@@ -281,14 +270,12 @@
 			guest-addr = <0 0>;
 		};
 
-		p1bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <1>;
+		node-update {
+			chosen {
+				linux,stdout-path = "/serial2";
+				bootargs = "console=ttyS0,115200";
+			};
 		};
 
-		aliases {
-			stdout = <&p1bc>;
-		};
 	};
 };

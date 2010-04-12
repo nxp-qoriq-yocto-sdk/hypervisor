@@ -98,7 +98,6 @@ $(test)-run-partman: $(test)
 	$(SIMICS) $(testdir)linux/run-partman.simics
 
 $(test)-run-1p: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
 	$(SIMICS) $(testdir)linux/run-1p.simics
 
 $(test)-run-1core: $(test)
