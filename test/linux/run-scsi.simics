@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,29 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
-$use_uart2 = 1
-
-$create_fman = TRUE
-
-$guest_image[0]  = "uImage"
-$guest_addr[0]   = 0x00020000
-$guest_image[1]  = "hv-pci.dtb"
-$guest_addr[1]   = 0x00900000
-$guest_image[2]  = "rootfs.ext2.gz"
-$guest_addr[2]   = 0x01300000
-
-$dev_tree_blob = "p4080ds_36b.dtb"
-
-add-directory "%script%/../common" -prepend
-run-command-file "common.simics"
-
-$kernel_cmdline = "config-addr=0xfe8900000"
-
-add-directory "%script%" -prepend
-add-directory "bin/linux" -prepend
-
-run-command-file "boot.simics"
-
+$pcie0_device = "sym53c875"
+add-directory "%script%/" -prepend
+run-command-file "run-pci.simics"
