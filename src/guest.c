@@ -1637,7 +1637,7 @@ static int register_gcpu_with_guest(guest_t *guest)
 	return gpir;
 }
 
-int restart_guest(guest_t *guest)
+int restart_guest(guest_t *guest, const char *reason, const char *who)
 {
 	int ret = 0;
 	unsigned int i;
@@ -1647,6 +1647,9 @@ int restart_guest(guest_t *guest)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
+
+	set_hypervisor_strprop(guest, "fsl,hv-stopped-by", who);
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", reason);
 
 	spin_unlock_intsave(&guest->state_lock, saved);
 
@@ -2334,7 +2337,7 @@ void resume_core(trapframe_t *regs)
 	unblock(&get_gcpu()->thread);
 }
 
-int stop_guest(guest_t *guest)
+int stop_guest(guest_t *guest, const char *reason, const char *who)
 {
 	unsigned int i, ret = 0;
 	register_t saved = spin_lock_intsave(&guest->state_lock);
@@ -2343,6 +2346,9 @@ int stop_guest(guest_t *guest)
 		ret = ERR_INVALID;
 	else
 		guest->state = guest_stopping;
+
+	set_hypervisor_strprop(guest, "fsl,hv-stopped-by", who);
+	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", reason);
 
 	spin_unlock_intsave(&guest->state_lock, saved);
 

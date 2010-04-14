@@ -38,8 +38,8 @@ struct guest;
 struct queue;
 
 int start_guest(struct guest *guest, int load);
-int stop_guest(struct guest *guest);
-int restart_guest(struct guest *guest);
+int stop_guest(struct guest *guest, const char *reason, const char *who);
+int restart_guest(struct guest *guest, const char *reason, const char *who);
 int pause_guest(struct guest *guest);
 int resume_guest(struct guest *guest);
 phys_addr_t find_lowest_guest_phys(void *fdt);

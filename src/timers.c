@@ -194,10 +194,8 @@ void watchdog_trap(trapframe_t *regs)
 
 			ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
 			assert(ret < (int)sizeof(buf));
-			set_hypervisor_strprop(guest, "fsl,hv-stopped-by", buf);
-			set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "watchdog");
 
-			restart_guest(guest);
+			restart_guest(guest, buf, "watchdog");
 		}
 		return;
 	}

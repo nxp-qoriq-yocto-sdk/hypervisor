@@ -251,6 +251,8 @@ static void hcall_partition_set_dtprop(trapframe_t *regs)
 static void hcall_partition_restart(trapframe_t *regs)
 {
 	guest_t *guest;
+	const char *who;
+	int ret;
 	
 	guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
@@ -262,13 +264,12 @@ static void hcall_partition_restart(trapframe_t *regs)
 	get_gcpu()->tsr = 0;
 
 	if ((int)regs->gpregs[3] == -1)
-		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
+		who = "self";
 	else
-		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
+		who = "manager";
 
-	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "restart");
-
-	regs->gpregs[3] = restart_guest(guest) ? FH_ERR_INVALID_STATE : 0;
+	ret = restart_guest(guest, "restart", who);
+	regs->gpregs[3] = ret ? FH_ERR_INVALID_STATE : 0;
 }
 
 static void hcall_partition_get_status(trapframe_t *regs)
@@ -583,6 +584,9 @@ static void hcall_partition_start(trapframe_t *regs)
 static void hcall_partition_stop(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
+	const char *who;
+	int ret;
+
 	if (!guest) {
 		regs->gpregs[3] = EINVAL;
 		return;
@@ -592,13 +596,12 @@ static void hcall_partition_stop(trapframe_t *regs)
 	get_gcpu()->tsr = 0;
 
 	if ((int)regs->gpregs[3] == -1)
-		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "self");
+		who = "self";
 	else 
-		set_hypervisor_strprop(guest, "fsl,hv-stopped-by", "manager");
+		who = "manager";
 
-	set_hypervisor_strprop(guest, "fsl,hv-reason-stopped", "stop");
-
-	regs->gpregs[3] = stop_guest(guest) ? FH_ERR_INVALID_STATE : 0;
+	ret = stop_guest(guest, "stop", who);
+	regs->gpregs[3] = ret ? FH_ERR_INVALID_STATE : 0;
 }
 
 static void hcall_system_reset(trapframe_t *regs)

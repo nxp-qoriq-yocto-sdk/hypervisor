@@ -1938,7 +1938,7 @@ return_to_guest:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got '%s' monitor command.\n", cur_pos);
 			if (strcmp((char *) cur_pos, "restart") == 0) {
 				printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Restarting partition.\n");
-				restart_guest(get_gcpu()->guest);
+				restart_guest(get_gcpu()->guest, "restart", "gdb");
 				pkt_cat_string(stub->rsp, "OK");
 				transmit_response(stub);
 				goto return_to_guest;
@@ -1956,7 +1956,7 @@ return_to_guest:
 		case kill:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG, "Got 'k' packet.\n");
 			DEBUG("Resetting partition.");
-			restart_guest(get_gcpu()->guest);
+			restart_guest(get_gcpu()->guest, "restart", "gdb");
 			goto return_to_guest;
 			break;
 

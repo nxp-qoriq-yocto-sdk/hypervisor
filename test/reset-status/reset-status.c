@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +48,45 @@ void ext_int_handler(trapframe_t *frameptr)
 	fh_vmpic_eoi(irq);
 }
 
+#define NUM_CORES 8
+
+static int core_state[NUM_CORES];
+
+static void sync_cores(int secondary)
+{
+	sync();
+	isync();
+
+	if (!secondary) {
+		static int next_state;
+		int i;
+
+		next_state++;
+
+		for (i = 1; i < NUM_CORES; i++)
+			while (core_state[i] != next_state)
+				sync();
+
+		core_state[0] = next_state;
+	} else {
+		int pir = mfspr(SPR_PIR);
+		core_state[pir]++;
+
+		while (core_state[0] != core_state[pir])
+			sync();
+	}
+
+	sync();
+	isync();
+}
+
+/* Test races with multiple simultaneous requests to reset a partition */
+static void secondary_entry(void)
+{
+	sync_cores(1);
+	fh_partition_restart(-1);
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	uint32_t status;
@@ -57,6 +96,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	int len;
 
 	init(devtree_ptr);
+
+	secondary_startp = secondary_entry;
+	release_secondary_cores();
 
 	printf("Reset status test\n");
 
@@ -86,10 +128,11 @@ void libos_client_entry(unsigned long devtree_ptr)
 	str = fdt_getprop(fdt, node, "fsl,hv-stopped-by", &len);
 	if (!str) {
 		printf(" <no property present>\n");
+		sync_cores(0);
+		fh_partition_restart(-1);
 	} else {
 		printf(" %s\n",str);
 	}
-
 
 	printf("Test Complete\n");
 }
