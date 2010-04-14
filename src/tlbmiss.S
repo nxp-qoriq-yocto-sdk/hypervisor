@@ -106,9 +106,32 @@
 	SHIFTR	%r7, %r8, %r7		// r7 = address
 	li	%r9, 22
 	SHIFTL	%r7, %r7, %r9		// r7 = tag bits from address
+
+	.if	\itlb == 0
+	mfspr	%r11, SPR_ESR
+	andi.	%r10, %r11, ESR_EPID
+
+	bne-	epid
 	rlwimi	%r7, %r6, \asbit - 43, 11, 11 // Insert AS into tag
+	mfspr	%r12, SPR_PID
+ret_epid:
+	.else
+	rlwimi	%r7, %r6, \asbit - 43, 11, 11 // Insert AS into tag
+	mfspr	%r12, SPR_PID
+	.endif
+
 	b	tlb_miss_fast_common
 	.endm
+
+epid:
+	andis.	%r10, %r11, ESR_ST@h
+	bne	1f
+	mfspr	%r10, SPR_EPLC
+	b	2f
+1:	mfspr	%r10, SPR_EPSC
+2:	rlwimi	%r7, %r10, 32 + EPCBIT_EAS - 43, 11, 11 // Insert AS into tag
+	rlwinm	%r12, %r10, 0, EPC_EPID
+	b	ret_epid
 
 	tlb_miss_fast itlb_miss_fast 58 SPR_SRR0 1
 	tlb_miss_fast dtlb_miss_fast 59 SPR_DEAR 0
@@ -127,15 +150,15 @@ tlb_miss_fast_common:
 	mfspr	%r5, SPR_LPIDR
 	LOAD	%r10, LONGBYTES*1(%r3)
 	LOAD	%r11, LONGBYTES*2(%r3)
-	LOAD	%r12, LONGBYTES*3(%r3)
 	beq-	tlb_miss_slow
 
-	mfspr	%r6, SPR_PID
 	rlwimi	%r7, %r5, 14, 12, 17	// Insert LPID into tag
 	li	%r4, -1
 	oris	%r5, %r7, 0x20		// Set valid bit in tag
 	oris	%r7, %r7, 0x20		// r7 will be used as PID zero tag
-	rlwimi	%r5, %r6, 0, 18, 31	// Insert PID into tag
+	rlwimi	%r5, %r12, 0, 18, 31	// Insert PID into tag
+
+	LOAD	%r12, LONGBYTES*3(%r3)
 
 	COMPARE	%cr0, %r5, %r9		// Compare tags
 	COMPARE	%cr1, %r7, %r9		// Compare tags with PID zero

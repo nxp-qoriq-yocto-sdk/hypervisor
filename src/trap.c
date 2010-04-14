@@ -445,16 +445,25 @@ void tlb_miss(trapframe_t *regs)
 #ifdef CONFIG_TLB_CACHE
 	if (guest || epid) {
 		register_t mas1, mas2;
-		int pid = mfspr(SPR_PID);
-		int space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
-		                   (regs->srr1 & MSR_DS) >> 4;
-		int ret = guest_tlb1_miss(vaddr, space, pid);
+		int store = mfspr(SPR_ESR) & ESR_ST;
+		int pid, space, ret;
 
+		if (epid) {
+			uint32_t epc = store ? regs->epsc : regs->eplc;
+
+			pid = epc & EPC_EPID;
+			space = !!(epc & EPC_EAS);
+		} else {
+			pid = mfspr(SPR_PID);
+			space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
+			               (regs->srr1 & MSR_DS) >> 4;
+		}
+
+		ret = guest_tlb1_miss(vaddr, space, pid);
 		if (likely(ret == TLB_MISS_HANDLED))
 			return;
 
 		if (ret == TLB_MISS_MCHECK && guest) {
-			int store = mfspr(SPR_ESR) & ESR_ST;
 			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA |
 			                     (itlb ? MCSR_IF : (store ? MCSR_ST : MCSR_LD)), vaddr);
 			return;

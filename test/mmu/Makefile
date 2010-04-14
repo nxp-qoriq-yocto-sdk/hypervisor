@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,10 +25,11 @@
 test := mmu
 dir := $(testdir)$(test)/
 
+$(test)-run:: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
+
+$(test)-check: $(test)-run-batch
+	$(testdir)common/check-results 0
+
 include $(testdir)common/Makefile.inc
 
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
-
-mmu-check: mmu-run-batch
-	$(testdir)common/check-results 0

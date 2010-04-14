@@ -2062,7 +2062,9 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	regs->gpregs[1] = 0xdeadbeef;
 	regs->gpregs[3] = guest->dtb_gphys;
 	regs->gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
+
 	regs->srr1 = MSR_GS;
+	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
 
 #ifdef CONFIG_DEBUG_STUB
 	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
@@ -2166,6 +2168,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	setup_ima(regs, entry, 1);
 
 	regs->srr1 = MSR_GS;
+	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
 
 #ifdef CONFIG_DEBUG_STUB
 	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
