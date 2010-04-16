@@ -43,7 +43,6 @@ CONFIG_LIBOS_PHYS_64BIT=y
 #
 # Platform Support
 #
-CONFIG_LIBOS_OLD_TLBILX_OPCODE=y
 
 #
 # Device Drivers
