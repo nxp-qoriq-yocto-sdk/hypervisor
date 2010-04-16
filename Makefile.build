@@ -62,7 +62,6 @@ export CRAZYWARNINGS := $(WARNINGS) -Wshadow -Wextra -Wcast-qual \
 export CC_OPTS_C := -fno-strict-aliasing -fno-common -O2 -g3 \
                     -msoft-float -pipe -ffixed-r2 -mmultiple \
                     -mno-altivec -funit-at-a-time \
-                    -include $(LIBFDT_DIR)/libfdt_env.h
 
 export CC_OPTS_ASM=-D_ASM -include $(LIBOS_BIN)/assym.s
 export CC_OPTS_ASM_HV=$(CC_OPTS_ASM) -include bin/hv_assym.s
