@@ -2,7 +2,7 @@
  * Operations on live (unflattened) device trees
  */
 
-/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -111,7 +111,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 			const struct fdt_property *fdtprop;
 			dt_prop_t *prop;
 
-			fdtprop = fdt_offset_ptr(fdt, offset, sizeof(*prop));
+			fdtprop = fdt_offset_ptr(fdt, offset, sizeof(*fdtprop));
 			if (!fdtprop) {
 				ret = -FDT_ERR_TRUNCATED;
 				goto err;
@@ -134,7 +134,7 @@ dt_node_t *unflatten_dev_tree(const void *fdt)
 				goto nomem;
 
 			prop->len = fdt32_to_cpu(fdtprop->len);
-			fdtprop = fdt_offset_ptr(fdt, offset, sizeof(*prop) + prop->len);
+			fdtprop = fdt_offset_ptr(fdt, offset, sizeof(*fdtprop) + prop->len);
 			if (!fdtprop) {
 				ret = -FDT_ERR_TRUNCATED;
 				goto err;
