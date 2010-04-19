@@ -128,8 +128,10 @@ void setgevent(gcpu_t *gcpu, int event)
 	if (gcpu->cpu != cpu || cpu->traplevel != TRAPLEVEL_NORMAL)
 		send_doorbell(gcpu->cpu->coreid);
 
+#ifdef CONFIG_PM
 	if (gcpu->napping)
 		setevent(cpu0.client.gcpu, EV_SYNC_NAP);
+#endif
 }
 
 void return_hook(trapframe_t *regs)
