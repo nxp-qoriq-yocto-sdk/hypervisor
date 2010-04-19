@@ -162,11 +162,15 @@ void guest_doorbell(trapframe_t *regs)
 no_virq:
 
 	/* Then, check for a FIT. */
-	if (gcpu->gdbell_pending & GCPU_PEND_FIT) {
-		run_deferred_fit();
-
+	if ((gcpu->gtcr & TCR_FIE) && (gcpu->gtsr & TSR_FIS)) {
+		/* If FIS is set, then it means that the guest didn't get an
+		 * interrupt when the FIT expired, or it didn't clear FIS in its
+		 * interrupt handler. We need to reassert the FIT interrupt, but
+		 * we can only do this is FIE is enabled.
+		 */
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_FIT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+
 		goto check_flags;
 	}
 
@@ -176,7 +180,6 @@ no_virq:
 
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
-		goto check_flags;
 	}
 
 	if (gcpu->gdbell_pending & GCPU_PEND_MSGSND) {
@@ -200,9 +203,6 @@ no_virq:
 		}
 	}
 
-	if (gcpu->gdbell_pending & GCPU_PEND_TCR_FIE)
-		enable_tcr_fie();
-
 	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
 		enable_tcr_die();
 
@@ -213,7 +213,7 @@ check_flags:
 	 * issue another guest doorbell so that we return to this function to
 	 * process them.
 	 */
-	if (gcpu->gdbell_pending)
+	if ((gcpu->gdbell_pending) || ((gcpu->gtcr & TCR_FIE) && (gcpu->gtsr & TSR_FIS)))
 		send_local_guest_doorbell();
 }
 

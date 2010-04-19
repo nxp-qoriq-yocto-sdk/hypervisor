@@ -76,6 +76,9 @@ typedef struct {
 	/** HV dynamic TLB round-robin eviction pointer */
 	int next_dyn_tlbe;
 
+	uint32_t hv_tcr; // What the HV wants for FPEXT|FP
+	uint64_t previous_tb; // The previous value of tb
+
 	/** When set, sync_nap() will put the core into nap state.  When
 	 * clear, sync_nap() will wake the core from nap state.
 	 */

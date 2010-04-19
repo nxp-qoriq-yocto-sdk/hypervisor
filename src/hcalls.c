@@ -261,7 +261,7 @@ static void hcall_partition_restart(trapframe_t *regs)
 	}
 	
 	// TSR[WRS] is reset to zero during a normal restart
-	get_gcpu()->tsr = 0;
+	get_gcpu()->watchdog_tsr = 0;
 
 	if ((int)regs->gpregs[3] == -1)
 		who = "self";
@@ -593,7 +593,7 @@ static void hcall_partition_stop(trapframe_t *regs)
 	}
 
 	// TSR[WRS] is reset to zero during a normal restart
-	get_gcpu()->tsr = 0;
+	get_gcpu()->watchdog_tsr = 0;
 
 	if ((int)regs->gpregs[3] == -1)
 		who = "self";

@@ -213,8 +213,6 @@ extern unsigned long last_lpid;
 #define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
 #define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
-#define GCPU_PEND_FIT      0x00000010 /* FIT event pending */
-#define GCPU_PEND_TCR_FIE  0x00000020 /* Set TCR[FIE] after pending decr. */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
 
 /* The following flags correspond to crit_gdbell_pending */
@@ -237,7 +235,7 @@ typedef struct gcpu {
 	unsigned long gevent_pending;
 	unsigned int gcpu_num;
 	vpic_cpu_t vpic;
-	register_t tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
+	uint32_t watchdog_tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
 #ifdef CONFIG_DEBUG_STUB
 	void *dbgstub_cpu_data;
 	dt_node_t *dbgstub_cfg;
@@ -254,7 +252,9 @@ typedef struct gcpu {
 	register_t ivor[38];
 	register_t sprg[6]; /* Guest SPRG4-9 */
 	register_t mas0, mas1, mas2, mas3, mas6, mas7;
-	uint32_t timer_flags;
+	uint32_t gtcr;  // virtualized guest TCR
+	// gtsr should be a u32, but atomic_or() takes an unsigned long
+	unsigned long gtsr;  // virtualized guest TSR
 	int evict_tlb1, clean_tlb, clean_tlb_pid;
 	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
 

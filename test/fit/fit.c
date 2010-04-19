@@ -34,22 +34,25 @@
 
 static volatile int count = 0;
 
+#define FP	38
+
 void fit_handler(trapframe_t *frameptr)
 {
-	printf("got FIT interrupt\n");
+	printf("got FIT interrupt %u\n", ++count);
 	mtspr(SPR_TSR, TSR_FIS);
-	count++;
 }
 
-void libos_client_entry(unsigned long devtree_ptr)
+static void delay(unsigned int period)
 {
-	init(devtree_ptr);
-	printf("Fixed Interval Timer test\n");
+	while (!(mfspr(SPR_TBL) & (1 << period)));
+	while (mfspr(SPR_TBL) & (1 << period));
+}
 
-	enable_extint();
-	mtspr(SPR_TCR, 0x00812000);
+static void wait_for_interrupt(unsigned int c)
+{
+	unsigned int target = count + c;
 	
-	while (count < 3) {
+	while (count < target) {
 		fh_idle();
 
 		/* Should not see more than one of these in a row,
@@ -58,8 +61,60 @@ void libos_client_entry(unsigned long devtree_ptr)
 		 */
 		printf("woke from idle\n");
 	}
+}
+
+void libos_client_entry(unsigned long devtree_ptr)
+{
+	// Wait for the HV to stop printing text.  This will reduce byte
+	// channel switching.
+	delay(24);
+
+	init(devtree_ptr);
+
+	printf("Fixed Interval Timer test\n");
+
+	enable_extint();
+
+	printf("Test 1: Keep FIE disabled, wait for FIS to get set\n");
+	mtspr(SPR_TCR, TCR_INT_TO_FP(FP));
+	delay(63 - FP);
+	if (!(mfspr(SPR_TSR) & TSR_FIS))
+		printf("FAILED: FIS is not set\n");
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_TSR, TSR_FIS);
+
+	printf("Test 2: Wait for three timer interrupts\n");
+	mtspr(SPR_TCR, TCR_FIE | TCR_INT_TO_FP(FP));
+	wait_for_interrupt(3);
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_TSR, TSR_FIS);
+
+	printf("Test 3: Disable FIE, wait for FIS to get set\n");
+	// Disable FIE
+	mtspr(SPR_TCR, TCR_INT_TO_FP(38));
+	delay((63 - FP) + 2);
+	if (!(mfspr(SPR_TSR) & TSR_FIS))
+		printf("FAILED: FIS is not set\n");
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_TSR, TSR_FIS);
+
+	printf("Test 4: Clear FIS, Enable FIE, disable EE, wait for FIS to get set\n");
+	// Clear FIS and disable interrupts but re-enable FIE
+	disable_extint();
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_TSR, TSR_FIS);
+	mtspr(SPR_TCR, TCR_FIE | TCR_INT_TO_FP(FP));
+	delay((63 - FP) + 2);
+	if (!(mfspr(SPR_TSR) & TSR_FIS))
+		printf("FAILED: FIS is not set\n");
+
+	// Enable interrupts.  We should get an interrupt immediately
+	printf("Test 5: Enable EE, wait for interrupt\n");
+	enable_extint();
 	
+	// Stop everything
+	mtspr(SPR_TCR, 0);
 	disable_extint();
 
-	printf("Test Complete, PASSED\n");
+	printf("Test Complete\n");
 }

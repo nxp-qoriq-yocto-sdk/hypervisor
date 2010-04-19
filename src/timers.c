@@ -65,7 +65,7 @@ void run_deferred_decrementer(void)
 	gcpu_t *gcpu = get_gcpu();
 	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
 
-	if (gcpu->timer_flags & TCR_DIE) {
+	if (gcpu->gtcr & TCR_DIE) {
 		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_TCR_DIE);
 		send_local_guest_doorbell();
 	}
@@ -76,54 +76,111 @@ void enable_tcr_die(void)
 	gcpu_t *gcpu = get_gcpu();
 	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_TCR_DIE);
 
-	if (gcpu->timer_flags & TCR_DIE)
+	if (gcpu->gtcr & TCR_DIE)
 		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
 }
 
+/**
+ * fit -- Fixed Interval Timer interrupt handler
+ *
+ * Because we virtualize the FIT for the guest, the actual hardware FIT might
+ * be running at a higher frequency than what the guest asked for.  So we need
+ * to reflect the interrupt to the guest only when we're supposed to.  Let's
+ * assume that the guest has programmed virtual FPEXT|FP to X (variable
+ * 'bit').  We only want to call the guest if X has transitioned from 0 to 1.
+ * So if this bit was 0 the last time this function was called, but it's 1
+ * now, then call the guest.
+ */
 void fit(trapframe_t *regs)
 {
 	set_stat(bm_stat_fit, regs);
+	uint64_t tb, mask;
+	int was_zero; // True, if the period bit of the previous TB was zero
+	unsigned int bit, hwbit;
+	gcpu_t *gcpu = get_gcpu();
 
-	if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS))) {
-		reflect_trap(regs);
-		return;
-	}
+	// We always clear the FIS because we control the hardware FIT.
+	mtspr(SPR_TSR, TSR_FIS);
 
-	/* We disable the FIT interrupt because when we jump to the guest, GS is
-	 * set to one.  When GS=1, interrupts are enabled (EE and CE are
-	 * ignored). The core ignores EE/CE because we don't want the guest to
-	 * be able to disable interrupts for the hypervisor.  The side-effect is
-	 * that as soon as interrupts are enabled, the FIT interrupt will be
-	 * triggered again.  This is because the FIT interrupt remains pending
-	 * until the guest clears the FIT (by writing 1 to TSR[FIS]), and that
-	 * won't happen until (the end of) the guest's ISR.  We trap the write
-	 * to TSR[FIS], and so after TSR[FIS] is cleared, we re-enable the FIT
-	 * interrupt.
+	/* We use the current value of the timebase to determine whether we
+	 * should reflect this interrupt to the guest and/or HV.  This does not
+	 * need to be an atomic read because we only care about one bit at a
+	 * time.
 	 */
-	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_FIT);
-	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_FIE);
+	tb = ((uint64_t)mfspr(SPR_TBU) << 32) | mfspr(SPR_TBL);
 
-	send_local_guest_doorbell();
-}
+	/* Determine whether the TB bit that we care about has changed from
+	 * 0 to 1.  If guest FIT period is *equal* to the hardware FIT period,
+	 * then the bit we care about will never be 0.  To handle this, we force
+	 * the hardware's FIT period bit to zero.  Note: bit >= hwbit
+	 */
+	hwbit = 63 - TCR_FP_TO_INT(mfspr(SPR_TCR));
+	bit = 63 - TCR_FP_TO_INT(gcpu->gtcr);
+	mask = (1ULL << bit) & ~(1ULL << hwbit);
+	was_zero = (cpu->client.previous_tb & mask) == 0;
 
-void run_deferred_fit(void)
-{
-	gcpu_t *gcpu = get_gcpu();
-	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_FIT);
+	// If the period bit was 0 last time, but is 1 this time, then reflect
+	// the interrupt to the guest.
+	if (was_zero && (tb & (1ULL << bit))) {
+		// This is a FIT interrupt for the guest, so FIS should be set.
+		atomic_or(&gcpu->gtsr, TSR_FIS);
 
-	if (gcpu->timer_flags & TCR_FIE) {
-		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_TCR_FIE);
-		send_local_guest_doorbell();
+		/* We only reflect the interrupt immediately if these three
+		 * conditions are true:
+		 *
+		 * 1) We were interrupt from guest state (the guest was running
+		 * when the interrupt occurred).
+		 * 2) Guest interrupts are enabled in (guest MSR[EE] is 1).
+		 * 3) Guest FIT interrupts are enabled (guest TCR[FIE] is 1).
+		 */
+		if (likely(gcpu->gtcr & TCR_FIE)) {
+			if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS)))
+				reflect_trap(regs);
+
+			/* There are three cases when we need to
+			 * create a doorbell:
+			 *
+			 * 1) If we reflect the trap to the guest, we need to
+			 * create a doorbell in case the guest does not clear
+			 * FIS in its interrupt handler.  Because the FIT is
+			 * level-sensitive, the FIT interrupt needs to be
+			 * re-asserted after the RFI if FIS is not cleared, and
+			 * the doorbell takes care of this.
+			 *
+			 * 2) If we do not reflect the trap because we were not
+			 * in guest state when the FIT interrupt occured, then
+			 * we need to reflect the interrupt when we return to
+			 * guest state.
+			 *
+			 * 3) If we do not reflect the trap because MSR[EE] was
+			 * disabled, then the trap will need to be reflected
+			 * when the guest re-enables interrupts.
+			 *
+			 * We don't need to set a flag in gdbell_pending because
+			 * guest_doorbell() checks the registers directly.
+			 */
+			send_local_guest_doorbell();
+		}
+
+		/* If we did not reflect the trap because TCR[FIE] was
+		 * disabled, we will handle that in set_tcr() when the guest
+		 * re-enables FIE.
+		 */
 	}
-}
 
-void enable_tcr_fie(void)
-{
-	gcpu_t *gcpu = get_gcpu();
-	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_TCR_DIE);
+#if 0
+	// Check for HV usage of the timer.
+	bit = 63 - TCR_FP_TO_INT(cpu->client.hv_tcr);
+	mask = (1ULL << bit) & ~(1ULL << hwbit);
+	was_zero = (cpu->client.previous_tb & mask) == 0;
 
-	if (gcpu->timer_flags & TCR_FIE)
-		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_FIE);
+	if (was_zero && (tb & (1ULL << bit))) {
+		// TODO: call function to handle HV timer interrupts
+	}
+#endif
+
+	// Finally, remember the current timebase for next time
+	cpu->client.previous_tb = tb;
 }
 
 /**
@@ -174,7 +231,7 @@ void watchdog_trap(trapframe_t *regs)
 		mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_WIE);
 
 		// Does the guest want nothing to happen?
-		if (!(gcpu->timer_flags & TCR_WRC))
+		if (!(gcpu->gtcr & TCR_WRC))
 			return;
 
 		// Either we notify the manager or we restart the guest.
@@ -190,7 +247,7 @@ void watchdog_trap(trapframe_t *regs)
 				"Watchdog: restarting partition\n");
 
 			// Save the current value of TCR[WRC]
-			gcpu->tsr = gcpu->timer_flags & TCR_WRC;
+			gcpu->watchdog_tsr = gcpu->gtcr & TCR_WRC;
 
 			ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
 			assert(ret < (int)sizeof(buf));
@@ -216,7 +273,7 @@ void watchdog_trap(trapframe_t *regs)
 	 * no need to support a pending interrupt.  If the guest thinks that WIE
 	 * is disabled, then we just won't reflect the interrupt.
 	 */
-	if (gcpu->timer_flags & TCR_WIE) {
+	if (gcpu->gtcr & TCR_WIE) {
 		/* We have already cleared the interrupt (by writing to
 		 * TSR[WIS], so we need to emulate the interrupt whenever the
 		 * guest would normally get it.
@@ -245,8 +302,11 @@ void watchdog_trap(trapframe_t *regs)
 	}
 }
 
-/* Bit mask of the bits that are remembered in gcpu->timer_flags */
-#define TIMER_FLAGS_MASK (TCR_WRC | TCR_DIE | TCR_FIE | TCR_WIE)
+// Bit mask of the bits that are remembered in gcpu->gtcr
+#define GTCR_FLAGS_MASK (TCR_WRC | TCR_DIE | TCR_FIE | TCR_WIE | TCR_FP | TCR_FPEXT)
+
+// Bit mask of the bits that are remembered in gcpu->gtsr
+#define GTSR_FLAGS_MASK TSR_FIS
 
 void set_tcr(uint32_t val)
 {
@@ -256,10 +316,10 @@ void set_tcr(uint32_t val)
 	 * non-zero to TCR[WRC] again, we override those bits with the current
 	 * value.
 	 */
-	if (gcpu->timer_flags & TCR_WRC)
-		val = (val & ~TCR_WRC) | (gcpu->timer_flags & TCR_WRC);
+	if (gcpu->gtcr & TCR_WRC)
+		val = (val & ~TCR_WRC) | (gcpu->gtcr & TCR_WRC);
 
-	gcpu->timer_flags = val & TIMER_FLAGS_MASK;
+	gcpu->gtcr = val & GTCR_FLAGS_MASK;
 
 	/* The WRC register controls what the watchdog does on the second
 	 * timeout.  Because we emulate that behavior, we program our own value
@@ -273,8 +333,6 @@ void set_tcr(uint32_t val)
 
 	if (gcpu->gdbell_pending & GCPU_PEND_DECR)
 		val &= ~TCR_DIE;
-	if (gcpu->gdbell_pending & GCPU_PEND_FIT)
-		val &= ~TCR_FIE;
 
 	if (val & TCR_WIE) {
 		/* If there's a watchdog interrupt pending while the virtual
@@ -298,8 +356,22 @@ void set_tcr(uint32_t val)
 	 * might miss the first timeout interrupt and then we won't be able to
 	 * emulate the second timeout (e.g. restart the partition).
 	 */
-	if (gcpu->timer_flags & TCR_WRC)
+	if (gcpu->gtcr & TCR_WRC)
 		val |= TCR_WIE;
+
+	// If the guest re-enables FIE, and there's an interrupt pending, then
+	// create a doorbell so that we can send that pending interrupt.
+	if ((val & TCR_FIE) && (gcpu->gtsr & TSR_FIS))
+		send_local_guest_doorbell();
+
+	// The hardware FIE is always enabled, so dn't let the guest turn it
+	// off. We need FIT interrupts in order to properly emulate guest FIS
+	val |= TCR_FIE;
+
+	/* TODO: Check to see if the HV is already using the FIT, and if so,
+	 * set the hardware TCR to the maximum (highest frequency) of the guest
+	 * TCR and the HV TCR.
+	 */
 
 	mtspr(SPR_TCR, val);
 }
@@ -320,12 +392,22 @@ void set_tsr(uint32_t tsr)
 
 	if (tsr & TSR_DIS) {
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
-		tcr |= (gcpu->timer_flags & TCR_DIE);
+		tcr |= (gcpu->gtcr & TCR_DIE);
 	}
 
 	if (tsr & TSR_FIS) {
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_FIT);
-		tcr |= (gcpu->timer_flags & TCR_FIE);
+		// The FIT is emulated, so writing a 1 to FIS doesn't go to
+		// the actual hardware.
+		tsr &= ~TSR_FIS;
+
+		// But we still need to remember that the guest cleared FIS
+		gcpu->gtsr &= ~TSR_FIS;
+
+		/* There might be a doorbell waiting to handle a pending FIT
+		 * interrupt.  We don't have to worry about that because
+		 * guest_doorbell() will notice that the conditions for a
+		 * pending FIT are no longer there, and it won't do anything.
+		 */
 	}
 
 	if (tsr & TSR_WIS) {
@@ -341,9 +423,9 @@ void set_tsr(uint32_t tsr)
 	mtspr(SPR_TCR, tcr);
 
 	// Since we're setting TSR, we don't want to remember the value of
-	// TCR upon a watchdog reset any more.  gcpu->tsr is non-zero only if
-	// the system was reset by a watchdog.
-	gcpu->tsr = 0;
+	// TCR upon a watchdog reset any more.  gcpu->watchdog_tsr is non-zero
+	// only if the system was reset by a watchdog.
+	gcpu->watchdog_tsr = 0;
 
 	restore_int(saved);
 }
@@ -352,8 +434,8 @@ uint32_t get_tcr(void)
 {
 	uint32_t val = mfspr(SPR_TCR);
 
-	val &= ~TIMER_FLAGS_MASK;
-	val |= get_gcpu()->timer_flags;
+	val &= ~GTCR_FLAGS_MASK;
+	val |= get_gcpu()->gtcr;
 
 	return val;
 }
@@ -370,9 +452,14 @@ uint32_t get_tsr(void)
 	if (gcpu->watchdog_timeout)
 		val |= TSR_WIS;
 
-	// gcpu->tsr is non-zero only if the system was reset by a watchdog.
-	if (gcpu->tsr)
-		val = (val & ~TSR_WRS) | (gcpu->tsr & TSR_WRS);
+	// gcpu->watchdog_tsr is non-zero only if the system was reset by a
+	// watchdog.
+	if (gcpu->watchdog_tsr)
+		val = (val & ~TSR_WRS) | (gcpu->watchdog_tsr & TSR_WRS);
+
+	// We virtualize FIS for the guest, so hide the hardware FIS and pass
+	// down the virtualized FIS only.
+	val = (val & ~TSR_FIS) | (gcpu->gtsr & TSR_FIS);
 
 	return val;
 }

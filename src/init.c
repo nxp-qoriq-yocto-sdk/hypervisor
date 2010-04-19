@@ -833,6 +833,9 @@ static void core_init(void)
 	mtspr(SPR_DEC, 0x0);
 	mtspr(SPR_TSR, TSR_DIS);
 
+	// Enable FIT hardware interrupts.  We fully emulate the FIT for the
+	// guest, but we need interrupts enabled to do so.
+	mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_FIE);
 
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
 
