@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -80,5 +80,28 @@ typedef struct cpc_dev {
 } cpc_dev_t;
 
 #define NUM_SNOOP_IDS 32
+
+/* CCF error registers */
+#define CCF_CEDR         0xA00 // CCF error detect register
+#define   CCF_CEDR_MINT       0x2 // Multiple intervention response
+#define   CCF_CEDR_LAE        0x1 // Local access error
+
+#define CCF_CEER         0xA04 // CCF error enable register
+#define   CCF_CEER_MINT       0x00000002 // Enable MINT error reporting
+#define   CCF_CEER_LAE        0x00000001 // Enable LAE error reporting
+
+#define CCF_CECAR        0xA0C // CCF error capture attribute register
+#define   CCF_CECAR_SRC       0xff000000 // Transaction source
+#define   CCF_CECAR_UVT       0x00008000 // Unavailable target
+#define   CCF_CECAR_VAL       0x00000001 // Error capture attribute register is valid
+
+#define CCF_CECADRH      0xA10 // CCF error capture high address register
+#define CCF_CECADRL      0xA14 // CCF error capture low address register
+
+#define CCF_CMECAR       0xA18 // CCF error capture attribute register
+#define   CCF_CMECAR_SYND     0xff000000 // Intervention response per port
+#define   CCF_CMECAR_MINT     0x00000200 // MINT detected
+#define   CCF_CMECAR_SOLE     0x00000100 // SOLE data and intervention detected
+
 
 #endif

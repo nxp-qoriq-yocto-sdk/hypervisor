@@ -42,7 +42,7 @@ error_policy_t cpc_error_policy[CPC_ERROR_COUNT] = {
 };
 
 error_policy_t ccf_error_policy[CCF_ERROR_COUNT] = {
-	[ccf_multiple_invervention] = {"multiple invervention", "disable"},
+	[ccf_multiple_intervention] = {"multiple intervention", "disable"},
 	[ccf_local_access] = {"local access", "disable"},
 };
 

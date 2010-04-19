@@ -27,6 +27,8 @@
 
 #include <devtree.h>
 
+extern int halt_system;
+
 typedef struct error_policy {
 	const char *error;
 	const char *policy;
@@ -64,7 +66,7 @@ extern error_policy_t cpc_error_policy[];
 
 #define CCF_ERROR_COUNT 2
 typedef enum {
-	ccf_multiple_invervention,
+	ccf_multiple_intervention,
 	ccf_local_access
 } ccf_errors_t;
 extern error_policy_t ccf_error_policy[];

@@ -44,6 +44,8 @@
 #define MAX_PEND_VIRQ 64
 DECLARE_QUEUE(pend_virq, MAX_PEND_VIRQ * sizeof(vpic_interrupt_t *));
 
+int halt_system;
+
 static void dump_and_halt(register_t mcsr, trapframe_t *regs)
 {
 	set_crashing(1);
@@ -172,7 +174,7 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 		recoverable = 0;
 	}
 
-	if (!recoverable)
+	if (!recoverable || halt_system)
 		dump_and_halt(mcsr, frameptr);
 
 	strncpy(err.domain, get_domain_str(error_mcheck), sizeof(err.domain));

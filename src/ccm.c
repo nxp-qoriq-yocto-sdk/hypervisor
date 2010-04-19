@@ -39,12 +39,24 @@
 #include <errors.h>
 #include <error_log.h>
 #include <error_mgmt.h>
+#include <guts.h>
+
+struct ccf_error_info {
+	const char *policy;
+	uint32_t reg_val;
+};
+
+static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
+	[ccf_multiple_intervention] = {NULL, CCF_CEDR_MINT},
+	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
+};
 
 #define HV_CPUS         (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
 #define PAMU_CSD_PORTS  0xfff80000
 
 static law_t *laws;
 static uint32_t *csdids;
+static uint32_t *err_det_reg, *err_enb_reg;
 static uint32_t csdid_map, pma_lock;
 static uint32_t numcsds, numlaws;
 
@@ -63,17 +75,63 @@ static driver_t __driver law = {
 
 static int ccm_error_isr(void *arg)
 {
-	hv_error_t err = { };
 	device_t *dev = arg;
+	void *reg_base = dev->regs[0].virt;
 	interrupt_t *irq;
-
-	irq = dev->irqs[0];
-	irq->ops->disable(irq);
+	uint32_t val;
+	hv_error_t err = { };
+	dt_node_t *ccf_node;
 
 	strncpy(err.domain, get_domain_str(error_ccf), sizeof(err.domain));
-	strcpy(err.error, get_domain_str(error_ccf));
+	ccf_node = to_container(dev, dt_node_t, dev);
+	dt_get_path(NULL, ccf_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
-	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	val = in32(err_det_reg);
+
+	for (int i = ccf_multiple_intervention; i < CCF_ERROR_COUNT; i++) {
+		const char *policy = ccf_err[i].policy;
+		uint32_t err_val = ccf_err[i].reg_val;
+
+		if ( val & err_val) {
+			/* Local access errors are write one to clear */
+			if (i != ccf_local_access)
+				val &= ~err_val;
+
+			if (!strcmp(policy, "notify") && error_manager_guest) {
+				ccf_error_t *ccf = &err.ccf;
+
+				strncpy(err.error, get_error_str(error_ccf, i), sizeof(err.error));
+
+				ccf->cedr = val;
+				ccf->ceer = in32(err_enb_reg);
+				ccf->cecar = in32((uint32_t *)(reg_base + CCF_CECAR));
+				ccf->cecaddr = ((phys_addr_t) in32((uint32_t *)(reg_base + CCF_CECADRH)) << 32) |
+						in32((uint32_t *)(reg_base + CCF_CECADRL));
+				ccf->cmecar = in32((uint32_t *)(reg_base + CCF_CMECAR));
+
+				error_log(&global_event_queue, &err, &global_event_prod_lock);
+
+			} else if (!strcmp(policy, "halt")) {
+				halt_system = 1;
+			} else if (!strcmp(policy, "system-reset")) {
+				system_reset();
+			}
+		}
+	}
+
+
+	if (!halt_system) {
+		error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	} else {
+		set_crashing(1);
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "error domain : %s, path : %s\n",
+					err.domain, err.hdev_tree_path);
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "CCF error detect register : %x\n",
+					in32(err_det_reg));
+		set_crashing(0);
+	}
+
+	out32(err_det_reg, val);
 
 	return 0;
 }
@@ -140,10 +198,27 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	for (int i = 1; i < num_snoopids; i++)
 		out32(&sidmr[i], (0x80000000 >> (i - 1)));
 
+	err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEDR);
+	err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEER);
+	/* clear all error interrupts */
+	out32(err_enb_reg, 0);
+
 	if (dev->num_irqs >= 1) {
+		uint32_t val = 0;
+
 		interrupt_t *irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq)
+		if (irq && irq->ops->register_irq) {
 			irq->ops->register_irq(irq, ccm_error_isr, dev, TYPE_MCHK);
+			for (int i = ccf_multiple_intervention; i < CCF_ERROR_COUNT; i++) {
+				ccf_err[i].policy = get_error_policy(error_ccf, i);
+
+				if (!strcmp(ccf_err[i].policy, "disable"))
+					continue;
+
+				val |= ccf_err[i].reg_val;
+			}
+			out32(err_enb_reg, val);
+		}
 	}
 
 	dev->driver = &ccm;
