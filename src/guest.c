@@ -2249,7 +2249,14 @@ void do_stop_core(trapframe_t *regs, int restart)
 #endif
 
 	disable_int();
+
 	guest_reset_tlb();
+
+	/* The guest can get its caches into an unpleasant state
+	 * with noncoherent mappings.  Clean things up for the next guest.
+	 */
+	flush_caches();
+
 	enable_int();
 
 	if (atomic_add(&guest->active_cpus, -1) == 0) {

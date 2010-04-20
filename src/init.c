@@ -810,7 +810,7 @@ static void partition_init(void)
 
 static void core_init(void)
 {
-	int l1_cache_size = (mfspr(SPR_L1CSR0) & 0x7ff) * 1024;
+	int l1_cache_size = (mfspr(SPR_L1CFG0) & 0x7ff) * 1024;
 
 	/* PIR was set by firmware-- record in cpu_t struct */
 	cpu->coreid = mfspr(SPR_PIR);
@@ -847,4 +847,95 @@ static void core_init(void)
 	      EPCR_EXTGS | EPCR_DTLBGS | EPCR_ITLBGS |
 	      EPCR_DSIGS | EPCR_DUVD | EPCR_DGTMI);
 #endif
+}
+
+/** Flush and disable core L2 cache
+ * 
+ * The cache is disabled by restricting allocations before flushing;
+ * the actual cache enable bit is not cleared.
+ *
+ * @param[in] timeout timeout in timebase ticks
+ * @param[in] unlock Clear locks if non-zero.
+ *    If the cache supports persistent locks (as on e500mc), not clearing
+ *    the locks keeps that cache line slot reserved until the "locked"
+ *    cache line is referenced again.  If the cache does not support
+ *    persistent locks, then locks will be cleared regardless of the
+ *    unlock parameter (implicitly by the invalidate operation).
+ * @param[out] old_l2csr0
+ *    The old L2CSR0 is stored here, even if the operation fails.
+ * @return negative on error
+ */
+int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
+{
+	uint32_t l2csr0 = mfspr(SPR_L2CSR0);
+	int inval = L2CSR0_L2FI;
+
+	if (old_l2csr0)
+		*old_l2csr0 = l2csr0;
+
+	if (unlock)
+		inval |= L2CSR0_L2LFC;
+
+	if (l2csr0 & L2CSR0_L2E) {
+		uint32_t tb = mfspr(SPR_TBL);
+		int lock = L2CSR0_L2IO | L2CSR0_L2DO;
+
+		/* The lock bits need to be set, with a read-back
+		 * to ensure completion, before requesting a flush.
+		 */
+		set_cache_reg(SPR_L2CSR0, l2csr0 | lock);
+		mfspr(SPR_L2CSR0);
+
+		set_cache_reg(SPR_L2CSR0, l2csr0 | L2CSR0_L2FL | lock);
+
+		while ((mfspr(SPR_L2CSR0) & (L2CSR0_L2FL | lock)) != lock) {
+			if (mfspr(SPR_TBL) - tb > timeout) {
+				mtspr(SPR_L2CSR0, l2csr0);
+				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				         "%s: L2 cache flush timeout\n",
+				         __func__);
+				return ERR_HARDWARE;
+			}
+		}
+
+		set_cache_reg(SPR_L2CSR0, l2csr0 | inval | lock);
+
+		while ((mfspr(SPR_L2CSR0) & (inval | lock)) != lock) {
+			if (mfspr(SPR_TBL) - tb > timeout) {
+				mtspr(SPR_L2CSR0, l2csr0);
+				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				         "%s: L2 cache invalidate timeout\n",
+				         __func__);
+				return ERR_HARDWARE;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/** Flush core L1 and L2 caches, leaving them enabled.
+ */
+void flush_caches(void)
+{
+	/* Arbitrary 100ms timeout for cache to flush */
+	uint32_t timeout = dt_get_timebase_freq() / 10;
+	uint32_t l2csr0, l1csr0, l1csr1;
+	int ret;
+
+	flush_disable_l2_cache(timeout, 1, &l2csr0);
+
+	l1csr0 = mfspr(SPR_L1CSR0);
+	l1csr1 = mfspr(SPR_L1CSR1);
+
+	ret = flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
+	                             timeout);
+
+	set_cache_reg(SPR_L1CSR0, l1csr0);
+	set_cache_reg(SPR_L1CSR1, l1csr1);
+	set_cache_reg(SPR_L2CSR0, l2csr0);
+
+	if (ret < 0)
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		         "%s: L1 cache invalidate timeout\n", __func__);
 }

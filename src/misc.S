@@ -74,7 +74,6 @@ branch_to_reloc:
 	/* Return into new text mapping */
 	blr
 
-#ifdef CONFIG_PM
 /** Flush and disable L1 cache.  We assume 8-way PLRU.
  * r3 = address to use for displacement flush.
  *      This needs to have a valid mapping with load access for at least
@@ -86,8 +85,8 @@ branch_to_reloc:
  *
  * r4 = timebase ticks for a timeout on invalidation
  */
-.global flush_disable_l1
-flush_disable_l1:
+.global flush_disable_l1_cache
+flush_disable_l1_cache:
 	mfspr	%r8, SPR_L1CFG0
 
 	rlwinm	%r5, %r8, 9, 3	/* Extract cache block size */
@@ -233,4 +232,3 @@ flush_disable_l1:
 
 	li	%r3, 0
 	blr
-#endif

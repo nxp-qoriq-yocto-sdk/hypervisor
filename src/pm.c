@@ -109,13 +109,6 @@ typedef struct nap_state {
 	uint32_t l1csr0, l1csr1, l2csr0;
 } nap_state_t;
 
-#define set_cache_reg(reg, val) do { \
-	sync(); \
-	isync(); \
-	mtspr((reg), (val)); \
-	isync(); \
-} while (0)
-
 static void restore_caches(nap_state_t *ns)
 {
 	set_cache_reg(SPR_L2CSR0, ns->l2csr0);
@@ -124,56 +117,25 @@ static void restore_caches(nap_state_t *ns)
 }
 
 /* No snooping during nap, so flush core caches, and stop allocation */
-static int flush_caches(nap_state_t *ns)
+static int flush_disable_caches(nap_state_t *ns)
 {
 	/* Arbitrary 100ms timeout for cache to flush */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
+	int ret;
 
 	ns->l1csr0 = mfspr(SPR_L1CSR0);
 	ns->l1csr1 = mfspr(SPR_L1CSR1);
-	ns->l2csr0 = mfspr(SPR_L2CSR0);
 
-	if (ns->l2csr0 & L2CSR0_L2E) {
-		uint32_t tb = mfspr(SPR_TBL);
-		int lock = L2CSR0_L2IO | L2CSR0_L2DO;
+	ret = flush_disable_l2_cache(timeout, 0, &ns->l2csr0);
+	if (ret < 0)
+		return ret;
 
-		/* The lock bits need to be set, with a read-back
-		 * to ensure completion, before requesting a flush.
-		 */
-		set_cache_reg(SPR_L2CSR0, ns->l2csr0 | lock);
-		mfspr(SPR_L2CSR0);
-		
-		set_cache_reg(SPR_L2CSR0, ns->l2csr0 | L2CSR0_L2FL | lock);
-
-		while ((mfspr(SPR_L2CSR0) & (L2CSR0_L2FL | lock)) != lock) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
-				restore_caches(ns);
-				printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
-				         "flush_caches: L2 cache "
-				         "flush timeout\n");
-				return -1;
-			}
-		}
-
-		set_cache_reg(SPR_L2CSR0, ns->l2csr0 | L2CSR0_L2FI | lock);
-
-		while ((mfspr(SPR_L2CSR0) & (L2CSR0_L2FI | lock)) != lock) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
-				restore_caches(ns);
-				printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
-				         "flush_caches: L2 cache "
-				         "invalidate timeout\n");
-				return -1;
-			}
-		}
-	}
-
-	if (flush_disable_l1(displacement_flush_area[cpu->coreid],
-	                     timeout) < 0) {
+	if (flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
+	                           timeout) < 0) {
 		restore_caches(ns);
 		printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
-		         "flush_caches: L1 cache invalidate timeout\n");
-		return -1;
+		         "%s: L1 cache invalidate timeout\n", __func__);
+		return ERR_HARDWARE;
 	}
 
 	return 0;
@@ -276,7 +238,7 @@ void idle_loop(void)
 		 */
 		ns.tsr = mfspr(SPR_TSR);
 
-		if (flush_caches(&ns))
+		if (flush_disable_caches(&ns))
 			goto out_timers;
 
 		/* To avoid races with multiple nap transitions, we can't let
