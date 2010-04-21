@@ -36,6 +36,7 @@
 
 struct guest;
 struct queue;
+struct gcpu;
 
 int start_guest(struct guest *guest, int load);
 int stop_guest(struct guest *guest, const char *reason, const char *who);
@@ -71,6 +72,14 @@ struct guest *handle_to_guest(int handle);
 void hcall_get_core_state(trapframe_t *regs);
 void hcall_enter_nap(trapframe_t *regs);
 void hcall_exit_nap(trapframe_t *regs);
+
+#ifdef CONFIG_PM
+void wake_hcall_nap(struct gcpu *gcpu);
+#else
+static void wake_hcall_nap(struct gcpu *gcpu)
+{
+}
+#endif
 
 int flush_disable_l1_cache(void *disp_addr, uint32_t timeout);
 int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0);

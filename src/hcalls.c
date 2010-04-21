@@ -304,8 +304,13 @@ static void hcall_send_nmi(trapframe_t *regs)
 	}
 
 	while (vcpu_mask) {
+		gcpu_t *gcpu;
+
 		bit = count_lsb_zeroes(vcpu_mask);
-		setgevent(get_gcpu()->guest->gcpus[bit], gev_nmi);
+		gcpu = get_gcpu()->guest->gcpus[bit];
+
+		setgevent(gcpu, gev_nmi);
+		wake_hcall_nap(gcpu);
 		vcpu_mask &= ~(1 << bit);
 	}
 

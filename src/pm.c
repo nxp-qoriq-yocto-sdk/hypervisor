@@ -198,6 +198,18 @@ void hcall_enter_nap(trapframe_t *regs)
 	atomic_or(&gcpu->napping, GCPU_NAPPING_HCALL);
 	spin_unlock(&guest->sync_ipi_lock);
 
+	/* Check for races with events that are guest-visible wakeup
+	 * sources. 
+	 */
+	sync();
+	if ((gcpu->gdbell_pending & (1 << gev_nmi)) ||
+	    (gcpu->mcsr & MCSR_MCP)) {
+	    	atomic_and(&gcpu->napping, GCPU_NAPPING_HCALL);
+	    	ret = 0;
+	    	goto out;
+	}
+		
+
 	while (1) {
 		prepare_to_block();
 
@@ -317,12 +329,22 @@ wait:
 		asm volatile("wait");
 }
 
+void wake_hcall_nap(gcpu_t *gcpu)
+{
+	sync();
+
+	if (gcpu->napping & GCPU_NAPPING_HCALL) {
+		atomic_and(&gcpu->napping, ~GCPU_NAPPING_HCALL);
+		unblock(&gcpu->thread);
+		setevent(cpu0.client.gcpu, EV_SYNC_NAP);
+	}
+}
+
 void hcall_exit_nap(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	unsigned int vcpu = regs->gpregs[4];
 	gcpu_t *gcpu;
-	int core;
 	int ret = 0;
 
 	if (!rcpm) {
@@ -335,14 +357,6 @@ void hcall_exit_nap(trapframe_t *regs)
 		return;
 	}
 
-	gcpu = guest->gcpus[vcpu];
-	core = gcpu->cpu->coreid;
-
-	unblock(&gcpu->thread);
-
-	atomic_and(&gcpu->napping, ~GCPU_NAPPING_HCALL);
-	setevent(cpu0.client.gcpu, EV_SYNC_NAP);
-
+	wake_hcall_nap(guest->gcpus[vcpu]);
 	regs->gpregs[3] = 0;
-	unblock(&gcpu->thread);
 }

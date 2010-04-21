@@ -37,7 +37,13 @@ static int fail;
 #define NUM_CORES 4
 
 static int core_state[NUM_CORES];
+static volatile int mcheck[NUM_CORES];
 volatile static int should_be_awake;
+
+void mcheck_interrupt(trapframe_t *regs)
+{
+	mcheck[mfspr(SPR_PIR)]++;
+}
 
 static void sync_cores(int secondary)
 {
@@ -70,27 +76,60 @@ static void sync_cores(int secondary)
 static void secondary_entry(void)
 {
 	int ret;
+	int pir = mfspr(SPR_PIR);
 
 	sync_cores(1); /* start */
 	sync_cores(1); /* ready to nap */
 
-	if (mfspr(SPR_PIR) & 1) {
+	if (pir & 1) {
 		ret = fh_enter_nap(-1, cpu->coreid);
 		if (ret) {
 			printf("fh_enter_nap: FAILED: "
-			       "vcpu %lu failed %d\n", mfspr(SPR_PIR), ret);
+			       "vcpu %d failed %d\n", pir, ret);
 			fail = 1;
 		}
 
 		if (!should_be_awake) {
 			printf("fh_enter_nap: FAILED: "
-			       "vcpu %lu awake too soon\n", mfspr(SPR_PIR));
+			       "vcpu %d awake too soon\n", pir);
 			fail = 1;
 		}
 	}
 
 	sync_cores(1); /* tells the primary we're all awake */
+	sync_cores(1); /* ready to nap again */
 
+	if (pir & 1) {
+		if (mcheck[pir] != 0) {
+			printf("fh_enter_nap: FAILED: "
+			       "vcpu %d mcheck too early\n", pir);
+			fail = 1;
+		}
+
+		ret = fh_enter_nap(-1, cpu->coreid);
+		if (ret) {
+			printf("fh_enter_nap: FAILED: "
+			       "vcpu %d failed %d\n", pir, ret);
+			fail = 1;
+		}
+
+		if (!should_be_awake) {
+			printf("fh_enter_nap: FAILED: "
+			       "vcpu %d awake too soon\n", pir);
+			fail = 1;
+		}
+	}
+
+	sync_cores(1); /* tells the primary we're all awake */
+	
+	if (pir & 1) {
+		if (mcheck[pir] != 1) {
+			printf("fh_enter_nap: FAILED: "
+			       "vcpu %d got %d mchecks\n", pir, ret);
+			fail = 1;
+		}
+	}
+	
 	for (;;);
 }
 
@@ -247,6 +286,68 @@ void libos_client_entry(unsigned long devtree_ptr)
 			       "vcpu %d from boot core failed %d\n", i, ret);
 		}
 	}
+
+	/* After this all should be awake; if one doesn't return we'll
+	 * get stuck here.
+	 */
+	sync_cores(0);
+
+	for (i = 0; i < NUM_CORES; i++) {
+		unsigned int state;
+		ret = fh_get_core_state(-1, i, &state);
+		if (ret) {
+			printf("fh_get_core_state: FAILED: "
+			       "vcpu %d status %u\n", i, ret);
+			fail = 1;
+			continue;
+		}
+
+		if (state != FH_VCPU_RUN) {
+			printf("fh_get_core_state: FAILED: "
+			       "vcpu %d unexpected state %u\n", i, ret);
+			fail = 1;
+		}
+	}
+
+	printf("Odd numbered cores putting themselves to nap...\n");
+	sync_cores(0); /* tell secondaries to nap */
+
+	/* Wait an arbitrary amount of time for the secondaries to nap...
+	 * we can't use sync_cores, because they'll be napping.
+	 *
+	 * The delay should be large enough that DEC/FIT/watchdog
+	 * will have expired.
+	 */
+	time = mfspr(SPR_TBL);
+	while (mfspr(SPR_TBL) - time < 50000000)
+		;
+
+	printf("Checking nap status...\n");
+	sync();
+
+	/* Now every odd-numbered core should be napping. */
+	for (i = 0; i < NUM_CORES; i++) {
+		unsigned int state;
+		ret = fh_get_core_state(-1, i, &state);
+		if (ret) {
+			printf("fh_get_core_state: FAILED: "
+			       "vcpu %d status %u\n", i, ret);
+			fail = 1;
+			continue;
+		}
+
+		if (state != (i & 1 ? FH_VCPU_NAP : FH_VCPU_RUN)) {
+			printf("fh_get_core_state: FAILED: "
+			       "vcpu %d unexpected state %u\n", i, ret);
+			fail = 1;
+		}
+	}
+
+	printf("Waking cores with NMI...\n");
+
+	should_be_awake = 1;
+	lwsync();
+	fh_send_nmi(0xaaaaaaaa & ((1 << NUM_CORES) - 1));
 
 	/* After this all should be awake; if one doesn't return we'll
 	 * get stuck here.

@@ -88,8 +88,10 @@ void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 		setevent(error_manager_guest->gcpus[error_manager_gcpu], EV_GUEST_CRIT_INT);
 	} else {
 		guest_t *guest = to_container(q, guest_t, error_event_queue);
-		atomic_or(&guest->gcpus[0]->mcsr, MCSR_MCP);
-		setevent(guest->gcpus[0], EV_MCP);
-	}
+		gcpu_t *gcpu = guest->gcpus[0];
 
+		atomic_or(&gcpu->mcsr, MCSR_MCP);
+		setevent(gcpu, EV_MCP);
+		wake_hcall_nap(gcpu);
+	}
 }
