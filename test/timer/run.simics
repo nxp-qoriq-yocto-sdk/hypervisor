@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,13 +22,18 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := fit
-dir := $(testdir)$(test)/
+$use_uart0 = 0
+$use_uart0_net = 1
 
-include $(testdir)common/Makefile.inc
+$guest_image[0] = "timer"
+$guest_addr[0]  = 0x00a00000
 
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+$guest_image[1] = "hv.dtb"
+$guest_addr[1]  = 0x00900000
 
-$(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 2
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
+add-directory "bin/timer" -prepend
+
+run-command-file "boot.simics"

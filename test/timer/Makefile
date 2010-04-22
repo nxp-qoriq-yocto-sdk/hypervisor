@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,15 +22,13 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$guest_image[0] = "fit"
-$guest_addr[0]  = 0x00a00000
+test := timer
+dir := $(testdir)$(test)/
 
-$guest_image[1] = "hv.dtb"
-$guest_addr[1]  = 0x00900000
+$(test)-run:: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
 
-add-directory "%script%/../common" -prepend
-run-command-file "common.simics"
+$(test)-check: $(test)-run-batch
+	$(testdir)common/check-results 2
 
-add-directory "bin/fit" -prepend
-
-run-command-file "boot.simics"
+include $(testdir)common/Makefile.inc

@@ -95,7 +95,7 @@
 	// =====================================================
 	part1 {
 		compatible = "partition";
-		label = "fit-test";
+		label = "timer-test";
 		// Run the guest on core 1 instead of core 0 so that the
 		// fh_idle() doesn't wake up because of serial I/O interrupts
 		// on core 0.
