@@ -1,5 +1,7 @@
+#!/usr/bin/expect -f
+
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,11 +24,55 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := hello
-dir := $(testdir)$(test)/
+log_user 0
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
+# set timeout (seconds)
+set timeout 360
 
-include $(testdir)common/Makefile.inc
+spawn ../../tools/mux_server/mux_server localhost:9124 9000 9001 9002
+set mux_id $spawn_id
 
+spawn simics ../../test/linux/run-2p.simics
+set simics_id $spawn_id
+
+spawn socat -,raw,echo=0 tcp:localhost:9000
+set ch0_id $spawn_id
+
+spawn socat -,raw,echo=0 tcp:localhost:9001
+set ch1_id $spawn_id
+
+spawn socat -,raw,echo=0 tcp:localhost:9002
+set ch2_id $spawn_id
+
+set spawn_id $simics_id
+expect {
+	"simics>" {send "c\r"}
+	timeout {
+		send_user "FAIL: couldn't start simics\n"
+		exit 1
+	}
+}
+
+# partition1 - look for linux prompt
+set spawn_id $ch1_id
+expect {
+	"p4080 login:" {}
+	timeout {
+		send_user "FAIL: P1 timeout\n"
+		exit 1
+	}
+}
+
+# partition2 - look for linux prompt
+set spawn_id $ch2_id
+expect {
+	"p4080 login:" {}
+	timeout {
+		send_user "FAIL: P2 timeout\n"
+		exit 1
+	}
+}
+
+send_user "linux-2p: PASS\n"
+
+exit 0

@@ -1,5 +1,6 @@
+#!/bin/bash
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,11 +23,26 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := hello
-dir := $(testdir)$(test)/
+tests=$(find test -name '[mh]*.exp')
+#tests=test/hello/hello.exp test/mmu/mmu.exp
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
+# build the tests
+for test in $tests
+do
+	primary=${test##*test/}
+	primary=${primary%/*}
+	make test-$primary
+done
 
-include $(testdir)common/Makefile.inc
+cd output/test
 
+rc=0
+
+# run the .exp scripts
+for test in $tests
+do
+	../../$test
+	((rc = $rc + $?))
+done
+
+exit $rc

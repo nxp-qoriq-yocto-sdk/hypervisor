@@ -1,5 +1,6 @@
+#!/usr/bin/expect -f
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,11 +23,50 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := hello
-dir := $(testdir)$(test)/
+log_user 0
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
+set test "hello"
 
-include $(testdir)common/Makefile.inc
+# set timeout (seconds)
+set timeout 30
 
+spawn ../../tools/mux_server/mux_server localhost:9124 9000 9001
+set mux_id $spawn_id
+
+spawn simics ../../test/$test/run.simics
+set simics_id $spawn_id
+
+spawn socat -,raw,echo=0 tcp:localhost:9000
+set ch0_id $spawn_id
+
+spawn socat -,raw,echo=0 tcp:localhost:9001
+set ch1_id $spawn_id
+
+set spawn_id $simics_id
+expect {
+	"simics>" {send "c\r"}
+	timeout {
+		send_user "FAIL: couldn't start simics\n"
+		exit 1
+	}
+}
+
+set spawn_id $ch1_id
+expect {
+	"PASSED" {
+		exp_continue
+	}
+	"Test Complete" {}
+	"FAILED" {
+		send_user "FAIL: $test failed\n"
+		exit 1
+	}
+	timeout {
+		send_user "FAIL: $test timeout\n"
+		exit 1
+	}
+}
+
+send_user "$test: PASS\n"
+
+exit 0
