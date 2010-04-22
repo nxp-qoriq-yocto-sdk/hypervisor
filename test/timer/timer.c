@@ -42,10 +42,15 @@ void fit_handler(trapframe_t *frameptr)
 	mtspr(SPR_TSR, TSR_FIS);
 }
 
+/* Delay for a time equivalent to the expected interval
+ * for a fit of the given period.
+ */
 static void delay(unsigned int period)
 {
-	while (!(mfspr(SPR_TBL) & (1 << period)));
-	while (mfspr(SPR_TBL) & (1 << period));
+	uint32_t start = mfspr(SPR_TBL);
+
+	while (mfspr(SPR_TBL) - start < (2 << period))
+		;
 }
 
 static void wait_for_interrupt(unsigned int c)
@@ -92,7 +97,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Test 3: Disable FIE, wait for FIS to get set\n");
 	// Disable FIE
 	mtspr(SPR_TCR, TCR_INT_TO_FP(38));
-	delay((63 - FP) + 2);
+	delay(63 - FP);
 	if (!(mfspr(SPR_TSR) & TSR_FIS))
 		printf("FAILED: FIS is not set\n");
 	mtspr(SPR_TCR, 0);
@@ -104,7 +109,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	mtspr(SPR_TCR, 0);
 	mtspr(SPR_TSR, TSR_FIS);
 	mtspr(SPR_TCR, TCR_FIE | TCR_INT_TO_FP(FP));
-	delay((63 - FP) + 2);
+	delay(63 - FP);
 	if (!(mfspr(SPR_TSR) & TSR_FIS))
 		printf("FAILED: FIS is not set\n");
 
