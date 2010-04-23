@@ -210,16 +210,14 @@ extern struct guest guests[MAX_PARTITIONS];
 extern unsigned long last_lpid;
 
 /* The following flags correspond to gdbell_pending */
-#define GCPU_PEND_DECR     0x00000001 /* Decrementer event pending */
-#define GCPU_PEND_TCR_DIE  0x00000002 /* Set TCR[DIE] after pending decr. */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */
 #define GCPU_PEND_VIRQ     0x00000040 /* Virtual IRQ pending */
+#define GCPU_PEND_PERFMON  0x00000200 /* Performance monitor interrupt */
 
 /* The following flags correspond to crit_gdbell_pending */
 #define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 #define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
 #define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
-#define GCPU_PEND_PERFMON  0x00000200 /* Performance monitor interrupt */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 

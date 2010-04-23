@@ -48,36 +48,24 @@ void decrementer(trapframe_t *regs)
 
 	set_stat(bm_stat_decr, regs);
 
-	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_DIE);
+	/* Clear the interrupt now so that it won't immediately reassert. */
+	mtspr(SPR_TSR, TSR_DIS);
 
+	/* The guest will continue to receive decrementer interrupts
+	 * reflected from the guest doorbell handler until it clears
+	 * the guest DIS bit.
+	 */
+	atomic_or(&gcpu->gtsr, TSR_DIS);
+	send_local_guest_doorbell();
+
+	/* Reflect right away if possible to save a trap -- but
+	 * we still need the doorbell armed in case the guest
+	 * re-enables interrupts without clearing its DIS.
+	 */
 	if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS))) {
 		reflect_trap(regs);
 		return;
 	}
-
-	/* The guest has interrupts disabled, so defer it. */
-	atomic_or(&gcpu->gdbell_pending, GCPU_PEND_DECR);
-	send_local_guest_doorbell();
-}
-
-void run_deferred_decrementer(void)
-{
-	gcpu_t *gcpu = get_gcpu();
-	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
-
-	if (gcpu->gtcr & TCR_DIE) {
-		atomic_or(&gcpu->gdbell_pending, GCPU_PEND_TCR_DIE);
-		send_local_guest_doorbell();
-	}
-}
-
-void enable_tcr_die(void)
-{
-	gcpu_t *gcpu = get_gcpu();
-	atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_TCR_DIE);
-
-	if (gcpu->gtcr & TCR_DIE)
-		mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_DIE);
 }
 
 /**
@@ -331,9 +319,6 @@ void set_tcr(uint32_t val)
 	 */
 	val = (val & ~TCR_WRC) | TCR_WRC_NOP;
 
-	if (gcpu->gdbell_pending & GCPU_PEND_DECR)
-		val &= ~TCR_DIE;
-
 	if (val & TCR_WIE) {
 		/* If there's a watchdog interrupt pending while the virtual
 		 * WIE was disabled, and the guest re-enables it, then send
@@ -380,7 +365,6 @@ void set_tsr(uint32_t tsr)
 {
 	gcpu_t *gcpu = get_gcpu();
 	register_t saved;
-	register_t tcr;
 
 	/*
 	 * We disable critical interrupts so that watchdog_trap() is not called
@@ -388,12 +372,8 @@ void set_tsr(uint32_t tsr)
 	 */
 	saved = disable_int_save();
 
-	tcr = mfspr(SPR_TCR);
-
-	if (tsr & TSR_DIS) {
-		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_DECR);
-		tcr |= (gcpu->gtcr & TCR_DIE);
-	}
+	if (tsr & TSR_DIS)
+		atomic_and(&gcpu->gtsr, ~TSR_DIS);
 
 	if (tsr & TSR_FIS) {
 		// The FIT is emulated, so writing a 1 to FIS doesn't go to
@@ -401,7 +381,7 @@ void set_tsr(uint32_t tsr)
 		tsr &= ~TSR_FIS;
 
 		// But we still need to remember that the guest cleared FIS
-		gcpu->gtsr &= ~TSR_FIS;
+		atomic_and(&gcpu->gtsr, ~TSR_FIS);
 
 		/* There might be a doorbell waiting to handle a pending FIT
 		 * interrupt.  We don't have to worry about that because
@@ -420,7 +400,6 @@ void set_tsr(uint32_t tsr)
 	}
 
 	mtspr(SPR_TSR, tsr);
-	mtspr(SPR_TCR, tcr);
 
 	// Since we're setting TSR, we don't want to remember the value of
 	// TCR upon a watchdog reset any more.  gcpu->watchdog_tsr is non-zero
@@ -457,9 +436,14 @@ uint32_t get_tsr(void)
 	if (gcpu->watchdog_tsr)
 		val = (val & ~TSR_WRS) | (gcpu->watchdog_tsr & TSR_WRS);
 
-	// We virtualize FIS for the guest, so hide the hardware FIS and pass
-	// down the virtualized FIS only.
-	val = (val & ~TSR_FIS) | (gcpu->gtsr & TSR_FIS);
+	// FIS and DIS get cleared by the hypervisor immediately.
+	// The guest has its own virtualized status bits.
+	//
+	// Only FIS keeps running despite the guest clearing the enable
+	// bit, though, so the guest should also see DIS if it is set
+	// in hardware.
+	val &= ~TSR_FIS;
+	val |= gcpu->gtsr & (TSR_FIS | TSR_DIS);
 
 	return val;
 }

@@ -175,11 +175,10 @@ no_virq:
 	}
 
 	/* Then, check for a decrementer. */
-	if (gcpu->gdbell_pending & GCPU_PEND_DECR) {
-		run_deferred_decrementer();
-
+	if ((gcpu->gtcr & TCR_DIE) && (gcpu->gtsr & TSR_DIS)) {
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+		goto check_flags;
 	}
 
 	if (gcpu->gdbell_pending & GCPU_PEND_MSGSND) {
@@ -203,17 +202,22 @@ no_virq:
 		}
 	}
 
-	if (gcpu->gdbell_pending & GCPU_PEND_TCR_DIE)
-		enable_tcr_die();
-
 	return;
 
 check_flags:
 	/* Are there still any pending doorbells?  If so, then we need to
 	 * issue another guest doorbell so that we return to this function to
 	 * process them.
+	 *
+	 * A FIT or decrementer interrupt is still considered pending
+	 * even if we just reflected it, to mimic level-triggered
+	 * hardware behavior.
 	 */
-	if ((gcpu->gdbell_pending) || ((gcpu->gtcr & TCR_FIE) && (gcpu->gtsr & TSR_FIS)))
+	if (gcpu->gdbell_pending)
+		send_local_guest_doorbell();
+	if ((gcpu->gtcr & TCR_FIE) && (gcpu->gtsr & TSR_FIS))
+		send_local_guest_doorbell();
+	if ((gcpu->gtcr & TCR_DIE) && (gcpu->gtsr & TSR_DIS))
 		send_local_guest_doorbell();
 }
 
