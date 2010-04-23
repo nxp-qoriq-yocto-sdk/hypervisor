@@ -227,23 +227,16 @@ void dump_hv_queue(trapframe_t *regs)
 	spin_lock(&hv_queue_cons_lock);
 
 	while (!error_get(&hv_global_event_queue, &err, NULL, 0, 0)) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "domain: %s \n error: %s\n", err.domain, err.error);
 		if (!strcmp(err.domain, get_domain_str(error_mcheck))) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-				"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
-				err.mcheck.mcsr, err.mcheck.mcar, err.mcheck.mcsrr0,
-				err.mcheck.mcsrr1);
+			dump_domain_error_info(&err, error_mcheck);
 		}
 
 		if (!strcmp(err.domain, get_domain_str(error_pamu))) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n", err.hdev_tree_path);
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
-				 err.pamu.avs1, err.pamu.avs2, err.pamu.access_violation_addr);
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-				"PAMU access violation lpid = %x, handle = %x\n",
-				err.pamu.lpid, err.pamu.liodn_handle);
+			dump_domain_error_info(&err, error_pamu);
+		}
+
+		if (!strcmp(err.domain, get_domain_str(error_ccf))) {
+			dump_domain_error_info(&err, error_ccf);
 		}
 	}
 

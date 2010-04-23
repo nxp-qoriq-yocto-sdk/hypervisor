@@ -85,6 +85,7 @@ typedef struct cpc_dev {
 #define CCF_CEDR         0xA00 // CCF error detect register
 #define   CCF_CEDR_MINT       0x2 // Multiple intervention response
 #define   CCF_CEDR_LAE        0x1 // Local access error
+#define   CCF_ERR_MASK        (CCF_CEDR_MINT | CCF_CEDR_LAE)
 
 #define CCF_CEER         0xA04 // CCF error enable register
 #define   CCF_CEER_MINT       0x00000002 // Enable MINT error reporting

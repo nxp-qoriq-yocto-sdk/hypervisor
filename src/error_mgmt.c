@@ -26,7 +26,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include<libos/platform_error.h>
+
+#include <percpu.h>
 #include <error_mgmt.h>
+#include <error_log.h>
+#include <guts.h>
 
 typedef struct setpolicy_ctx {
 	dt_node_t *hwnode;
@@ -196,4 +201,67 @@ const char *get_error_str(domains_t domain,int error)
 const char *get_domain_str(domains_t domain)
 {
 	return error_domains[domain].domain;
+}
+
+void dump_domain_error_info(hv_error_t *err, domains_t domain)
+{
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error domain : %s\n", err->domain);
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error  : %s\n", err->error);
+
+	switch (domain) {
+	case error_ccf: {
+		ccf_error_t *ccf = &err->ccf;
+
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cedr : %x, ccf ceer : %x, ccf cmecar : %x\n",
+					ccf->cedr, ccf->ceer, ccf->cmecar);
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cecar : %x, ccf cecaddr : %llx\n",
+					ccf->cecar, ccf->cecaddr);
+		break;
+	}
+
+	case error_mcheck: {
+		mcheck_error_t *mcheck = &err->mcheck;
+
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
+			mcheck->mcsr, mcheck->mcar, mcheck->mcsrr0, mcheck->mcsrr1);
+		break;
+	}
+
+	case error_pamu: {
+		pamu_error_t *pamu = &err->pamu;
+
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+			 pamu->avs1, pamu->avs2, pamu->access_violation_addr);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU access violation lpid = %x, handle = %x\n",
+			pamu->lpid, pamu->liodn_handle);
+		break;
+	}
+
+	default:
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Unsupported error domain\n");
+
+	}
+}
+
+void error_policy_action(hv_error_t *err, domains_t domain, const char *policy)
+{
+	if (!strcmp(policy, "notify") && error_manager_guest) {
+		error_log(&global_event_queue, err, &global_event_prod_lock);
+	} else if (!strcmp(policy, "halt")) {
+		halt_system = 1;
+		set_crashing(1);
+		dump_domain_error_info(err, domain);
+		set_crashing(0);
+	} else if (!strcmp(policy, "system-reset")) {
+		system_reset();
+	}
+
+	if (!halt_system)
+		error_log(&hv_global_event_queue, err, &hv_queue_prod_lock);
 }
