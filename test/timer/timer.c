@@ -32,32 +32,59 @@
 #include <libfdt.h>
 #include <hvtest.h>
 
-static volatile int count = 0;
+static volatile int fit_count, dec_count;
+static volatile int dont_clear;
 
 #define FP	38
 
 void fit_handler(trapframe_t *frameptr)
 {
-	printf("got FIT interrupt %u\n", ++count);
-	mtspr(SPR_TSR, TSR_FIS);
+	printf("got FIT interrupt %u\n", ++fit_count);
+
+	if (!dont_clear) {
+		mtspr(SPR_TSR, TSR_FIS);
+	} else {
+		dont_clear = 0;
+	}
+}
+
+void dec_handler(trapframe_t *frameptr)
+{
+	printf("got DEC interrupt %u\n", ++dec_count);
+
+	if (!dont_clear) {
+		mtspr(SPR_TSR, TSR_DIS);
+	} else {
+		dont_clear = 0;
+	}
+}
+
+static unsigned long period_to_ticks(unsigned int period)
+{
+	return 2UL << period;
+}
+
+static void delay(unsigned long ticks)
+{
+	unsigned long start = mfspr(SPR_TBL);
+
+	while (mfspr(SPR_TBL) - start < ticks)
+		;
 }
 
 /* Delay for a time equivalent to the expected interval
  * for a fit of the given period.
  */
-static void delay(unsigned int period)
+static void delay_period(unsigned int period)
 {
-	uint32_t start = mfspr(SPR_TBL);
-
-	while (mfspr(SPR_TBL) - start < (2 << period))
-		;
+	return delay(period_to_ticks(period));
 }
 
-static void wait_for_interrupt(unsigned int c)
+static void wait_for_interrupt(volatile int *count, unsigned int c)
 {
-	unsigned int target = count + c;
-	
-	while (count < target) {
+	int target = *count + c;
+
+	while (*count < target) {
 		fh_idle();
 
 		/* Should not see more than one of these in a row,
@@ -68,11 +95,45 @@ static void wait_for_interrupt(unsigned int c)
 	}
 }
 
+static int wait_for_tsr(uint32_t tsr_mask, unsigned long timeout)
+{
+	unsigned long start = mfspr(SPR_TBL);
+
+	while (!(mfspr(SPR_TSR) & tsr_mask)) {
+		if (mfspr(SPR_TBL) - start >= timeout)
+			break;
+	}
+
+	return mfspr(SPR_TSR) & tsr_mask;
+}
+
+static void fit_wait(unsigned int period)
+{
+	if (wait_for_tsr(TSR_FIS, period_to_ticks(period))) {
+		if (!(mfspr(SPR_TBL) & (1UL << period)))
+			printf("FAILED: FIS set with timebase bit clear\n");
+	} else {
+		printf("FAILED: FIS is not set\n");
+	}
+}
+
+static void dec_wait(unsigned long ticks)
+{
+	if (wait_for_tsr(TSR_DIS, ticks)) {
+		if (mfspr(SPR_DEC) != 0)
+			printf("FAILED: DIS set with unexpired decrementer\n");
+	} else {
+		printf("FAILED: DIS is not set\n");
+	}
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
+	int prev;
+
 	// Wait for the HV to stop printing text.  This will reduce byte
 	// channel switching.
-	delay(24);
+	delay_period(24);
 
 	init(devtree_ptr);
 
@@ -82,24 +143,20 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("Test 1: Keep FIE disabled, wait for FIS to get set\n");
 	mtspr(SPR_TCR, TCR_INT_TO_FP(FP));
-	delay(63 - FP);
-	if (!(mfspr(SPR_TSR) & TSR_FIS))
-		printf("FAILED: FIS is not set\n");
+	fit_wait(63 - FP);
 	mtspr(SPR_TCR, 0);
 	mtspr(SPR_TSR, TSR_FIS);
 
 	printf("Test 2: Wait for three timer interrupts\n");
 	mtspr(SPR_TCR, TCR_FIE | TCR_INT_TO_FP(FP));
-	wait_for_interrupt(3);
+	wait_for_interrupt(&fit_count, 3);
 	mtspr(SPR_TCR, 0);
 	mtspr(SPR_TSR, TSR_FIS);
 
 	printf("Test 3: Disable FIE, wait for FIS to get set\n");
 	// Disable FIE
-	mtspr(SPR_TCR, TCR_INT_TO_FP(38));
-	delay(63 - FP);
-	if (!(mfspr(SPR_TSR) & TSR_FIS))
-		printf("FAILED: FIS is not set\n");
+	mtspr(SPR_TCR, TCR_INT_TO_FP(FP));
+	fit_wait(63 - FP);
 	mtspr(SPR_TCR, 0);
 	mtspr(SPR_TSR, TSR_FIS);
 
@@ -109,14 +166,79 @@ void libos_client_entry(unsigned long devtree_ptr)
 	mtspr(SPR_TCR, 0);
 	mtspr(SPR_TSR, TSR_FIS);
 	mtspr(SPR_TCR, TCR_FIE | TCR_INT_TO_FP(FP));
-	delay(63 - FP);
-	if (!(mfspr(SPR_TSR) & TSR_FIS))
-		printf("FAILED: FIS is not set\n");
+	fit_wait(63 - FP);
 
 	// Enable interrupts.  We should get an interrupt immediately
-	printf("Test 5: Enable EE, wait for interrupt\n");
+	// Don't clear FIS on the first interrupt, to test level-triggered
+	// delivery.
+	printf("Test 5: Enable EE, wait for interrupt and reassertion\n");
+	prev = fit_count;
+	dont_clear = 1;
 	enable_extint();
-	
+	if (fit_count != prev + 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n",
+		       fit_count - prev);
+	}
+
+	printf("Test 6: Wait for one more interrupt and reassertion\n");
+	prev = fit_count;
+	dont_clear = 1;
+	delay_period(63 - FP);
+	if (fit_count != prev + 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n",
+		       fit_count - prev);
+	}
+
+	// Test decrementer
+	printf("Test 7: Decrementer and reassertion\n");
+	prev = dec_count;
+	dont_clear = 1;
+	mtspr(SPR_DEC, 100000);
+	mtspr(SPR_TCR, TCR_DIE);
+	delay(100000);
+	if (dec_count != prev + 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n",
+		       dec_count - prev);
+	}
+
+	// Test decrementer auto-reload
+	printf("Test 8: Test decrementer auto-reload\n");
+	prev = dec_count;
+	mtspr(SPR_DECAR, 100000);
+	mtspr(SPR_DEC, 1000);
+	mtspr(SPR_TCR, TCR_DIE | TCR_ARE);
+	delay(301000);
+	if (dec_count != prev + 4) {
+		printf("FAILED: got %d interrupt(s) instead of four\n",
+		       dec_count - prev);
+	}
+
+	wait_for_interrupt(&dec_count, 3);
+
+	printf("Test 9: Disable DIE, wait for DIS to get set\n");
+	mtspr(SPR_TCR, 0);
+	mtspr(SPR_DEC, 100000);
+	dec_wait(100000);
+
+	printf("Test 10: Clear DIS, Enable DIE, disable EE, wait for DIS to get set\n");
+	disable_extint();
+	mtspr(SPR_TCR, TCR_DIE);
+	mtspr(SPR_TSR, TSR_DIS);
+	mtspr(SPR_DEC, 100000);
+	dec_wait(100000);
+
+	// Enable interrupts.  We should get an interrupt immediately
+	// Don't clear DIS on the first interrupt, to test level-triggered
+	// delivery.
+	printf("Test 11: Enable EE, wait for interrupt and reassertion\n");
+	prev = dec_count;
+	dont_clear = 1;
+	enable_extint();
+	if (dec_count != prev + 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n",
+		       dec_count - prev);
+	}
+
 	// Stop everything
 	mtspr(SPR_TCR, 0);
 	disable_extint();
