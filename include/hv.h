@@ -37,6 +37,7 @@
 struct guest;
 struct queue;
 struct gcpu;
+struct dt_node;
 
 int start_guest(struct guest *guest, int load);
 int stop_guest(struct guest *guest, const char *reason, const char *who);
@@ -86,6 +87,7 @@ static void wake_hcall_nap(struct gcpu *gcpu)
 int flush_disable_l1_cache(void *disp_addr, uint32_t timeout);
 int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0);
 int check_perfmon(trapframe_t *regs);
+void gcov_config(struct dt_node *hvconfig);
 
 extern char *displacement_flush_area[MAX_CORES];
 

@@ -2,7 +2,7 @@
  * Byte channel interface.
  */
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,5 +66,7 @@ byte_chan_t *other_attach_byte_chan(struct dt_node *node,
                                     struct dt_node *endpoint);
 
 int init_byte_channel(dt_node_t *node);
+
+extern uint32_t bchan_lock;
 
 #endif

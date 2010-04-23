@@ -690,6 +690,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 	open_stdout_bytechan(stdout_node);
 #endif
 
+#ifdef CONFIG_GCOV
+	gcov_config(config_tree);
+#endif
+
 	vmpic_global_init();
 
 #ifdef CONFIG_SHELL

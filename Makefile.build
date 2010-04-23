@@ -130,6 +130,7 @@ hv-src-$(CONFIG_LIBOS_NS16550) += ns16550.c
 hv-src-nocheck-$(CONFIG_ZLIB) += zlib.c
 hv-src-$(CONFIG_STATISTICS) += benchmark.c
 hv-src-$(CONFIG_PM) += pm.c
+hv-src-$(CONFIG_GCOV) += gcov.c
 
 LIBFDT_SRCS := fdt.c fdt_ro.c fdt_sw.c fdt_strerror.c
 

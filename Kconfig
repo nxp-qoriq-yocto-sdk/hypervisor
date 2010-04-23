@@ -226,3 +226,23 @@ config PM
 		Enable support for power management hypercalls and sleep
 		states.  Note that the idle hcall is considered base
 		functionality and is enabled regardless of this option.
+
+config GCOV
+	bool "gcov test coverage"
+	depends on BCMUX
+	help
+		Enable support for gcov test coverage.  gcov data
+		is extracted and aggregated with the gcov-extract
+                tool for pre-processing prior to running the
+                gcov command. Warning: this flag is for development
+                use only.  This enables an external tool to read
+                hypervisor memory, which is a security risk.
+
+config GCOV_CHANNEL
+	int "gcov mux channel number"
+	default 31
+	depends on GCOV
+	help
+		Specifies the mux channel to use.  Note: The implementation
+		currently assumes the byte-channel is on a mux and that there
+		is only 1 mux in the system.

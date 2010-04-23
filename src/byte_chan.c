@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -83,7 +83,7 @@ err_bc:
 	return NULL;
 }
 
-static uint32_t bchan_lock;
+uint32_t bchan_lock;
 
 byte_chan_handle_t *byte_chan_claim(byte_chan_t *bc)
 {
