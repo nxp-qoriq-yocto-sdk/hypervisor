@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Print additional version information for non-release trees.
 #
 # This script was copied from the Linux kernel
