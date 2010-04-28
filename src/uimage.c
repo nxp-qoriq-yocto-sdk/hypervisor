@@ -5,7 +5,7 @@
  * binary, generated using mkimage tool.
  */
 
-/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Naveen Burmi <naveenburmi@freescale.com>
  *
  *
@@ -129,7 +129,7 @@ static int parse_gzip_header(unsigned char *buffer)
 	return index;
 }
 
-static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
+static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 		       phys_addr_t image_phys, uint32_t size)
 {
 	int err;
@@ -146,6 +146,8 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	                 TLB_TSIZE_16M, TLB_MAS2_MEM);
 	size -= comprlen;
 	index = parse_gzip_header(compr);
+	if (index < 0)
+		return ERR_BADIMAGE;
 	compr += index;
 	comprlen -= index;
 	image_phys += index;
@@ -163,7 +165,7 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"load_uimage: inflateInit2 failed with zlib error "
 			"code %d\n", err);
-		return;
+		return err;
 	}
 
 	d_stream.next_out = uncompr;
@@ -204,16 +206,19 @@ static void do_inflate(pte_t *guest_gphys, phys_addr_t target,
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				"load_uimage: uImage decompression failed with "
 				"zlib error code %d\n", err);
-			return;
+			return err;
 		}
 
 	} while (1);
 
 	err = inflateEnd(&d_stream);
-	if (err < 0)
+	if (err < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			"load_uimage: inflateEnd failed with zlib error code "
 			"%d\n", err);
+		return err;
+	}
+	return 0;
 }
 #endif
 
@@ -230,6 +235,7 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
 {
 	struct image_header hdr;
 	uint32_t size;
+	int ret;
 
 	if (copy_from_phys(&hdr, image_phys, sizeof(hdr)) != sizeof(hdr))
 		return ERR_UNHANDLED;
@@ -255,7 +261,9 @@ int load_uimage(guest_t *guest, phys_addr_t image_phys, size_t *length,
  	if (cpu_from_be32(hdr.type) == IMAGE_TYPE_KERNEL &&
  	    cpu_from_be32(hdr.comp) == 1) {
 #ifdef CONFIG_ZLIB
-		do_inflate(guest->gphys, target, image_phys, size);
+		ret = do_inflate(guest->gphys, target, image_phys, size);
+		if (ret < 0)
+			return ERR_BADIMAGE;
 #else
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "load_uimage: compressed uimages not supported\n");
