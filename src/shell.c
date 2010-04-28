@@ -388,7 +388,7 @@ static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
 			wcount++;
 			memset(str, 0, BUFF_SIZE);
 			decode_wse(sentry->swse, str);
-			qprintf(shell->out, 1, "   ");
+			qprintf(shell->out, 1, "       ");
 			qprintf(shell->out, 1, " % 4d  ", wcount);
 			qprintf(shell->out, 1, "%08x  ", subwin_base);
 			qprintf(shell->out, 1, "%08x  ",
@@ -412,9 +412,9 @@ static void paact_dump_fn(shell_t *shell, char *args)
 	 * Currently all PAMUs in the platform share the same PAACT(s), hence,
 	 * this command does not support a PAMU#
 	 */
-	qprintf(shell->out, 1, "      sub                              sub   stash   \n");
-	qprintf(shell->out, 1, "      win   base     xlate             win   cache   OMT\n");
-	qprintf(shell->out, 1, "liodn  #    addr      addr    size     cnt   id      mode\n");
+	qprintf(shell->out, 1, "          sub                              sub   stash   \n");
+	qprintf(shell->out, 1, "      val win   base     xlate             win   cache   OMT\n");
+	qprintf(shell->out, 1, "liodn bit  #    addr      addr    size     cnt   id      mode\n");
 	qprintf(shell->out, 1, "-----------------------------------------------------------------\n");
 
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
@@ -427,6 +427,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 				wce = 2 * (1 << entry->wce) - 1;
 
 			qprintf(shell->out, 1, " %03d ", liodn);
+			qprintf(shell->out, 1, " % 2d ", entry->v);
 			qprintf(shell->out, 1, "  -  ");
 			qprintf(shell->out, 1, "%08x  ",
 				entry->wbal << PAGE_SHIFT);
