@@ -2911,6 +2911,21 @@ static int init_guest_one(dt_node_t *node, void *arg)
 	return 0;
 }
 
+static void start_partitions(void)
+{
+	int i;
+
+	for (i = 0; i < last_lpid; i++) {
+		guest_t *guest = &guests[i];
+		gcpu_t *gcpu = guest->gcpus[0];
+
+		if (dt_get_prop(guest->partition, "no-auto-start", 0))
+			setgevent(gcpu, gev_load);
+		else
+			setgevent(gcpu, gev_start_load);
+	}
+}
+
 /* init_guest() is called once per CPU
  */
 __attribute__((noreturn)) void init_guest(void)
@@ -2934,19 +2949,8 @@ __attribute__((noreturn)) void init_guest(void)
 
 		if (pir == guest->cpulist[0]) {
 			/* Boot CPU */
-			int load_only = 0;
-
-			if (dt_get_prop(guest->partition, "no-auto-start", 0))
-				load_only = 1;
-
-			if (init_guest_primary(guest) == 0) {
+			if (init_guest_primary(guest) == 0)
 				guest->state = guest_starting;
-				
-				if (load_only)
-					setgevent(gcpu, gev_load);
-				else
-					setgevent(gcpu, gev_start_load);
-			}
 		} else {
 			register_gcpu_with_guest(guest);
 
@@ -2963,6 +2967,9 @@ __attribute__((noreturn)) void init_guest(void)
 #endif
 		}
 	}
+
+	if (atomic_add(&partition_init_counter, -1) == 0)
+		start_partitions();
 
 	cur_thread()->can_take_gevent = 1;
 

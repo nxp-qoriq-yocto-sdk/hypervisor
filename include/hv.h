@@ -45,6 +45,8 @@ int pause_guest(struct guest *guest);
 int resume_guest(struct guest *guest);
 phys_addr_t find_lowest_guest_phys(void *fdt);
 
+extern unsigned long partition_init_counter;
+
 char *stripspace(const char *str);
 char *nextword(char **str);
 uint64_t get_number64(struct queue *out, const char *numstr);

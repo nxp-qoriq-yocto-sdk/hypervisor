@@ -796,8 +796,30 @@ static int release_secondary(dt_node_t *node, void *arg)
 	return 0;
 }
 
+/* partition_init_done is atomically decremented each time a core
+ * completes its partition init (or lack thereof if it has no
+ * partition).  Once this reaches zero, gevents will be sent
+ * to start the partitions.
+ */
+unsigned long partition_init_counter;
+
+static int count_cores(dt_node_t *node, void *arg)
+{
+	dt_prop_t *prop = dt_get_prop(node, "reg", 0);
+	if (prop && prop->len == 4) {
+		uint32_t reg = *(const uint32_t *)prop->data;
+
+		if (reg <= MAX_CORES)
+			partition_init_counter++;
+	}
+
+	return 0;
+}
+
 static void release_secondary_cores(void)
 {
+	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
+	                       count_cores, NULL);
 	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
 	                       release_secondary, NULL);
 }
