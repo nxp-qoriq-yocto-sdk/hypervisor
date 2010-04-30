@@ -974,3 +974,167 @@ fail_mem:
 	free(pamumem);
 	return ERR_NOMEM;
 }
+
+static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
+{
+	dt_prop_t *prop;
+
+	if (!dt_node_is_compatible(hwnode->parent, "fsl,qman-portal")) {
+		return owner->cfgnode;  /* normal case */
+	}
+
+	/* if parent of hwnode is fsl,qman-portal it's a special case */
+
+	/* iterate over all children of the config node */
+	list_for_each(&owner->cfgnode->children, i) {
+		dt_node_t *config_child = to_container(i, dt_node_t, child_node);
+
+		/* look for nodes with a "device" property */
+		const char *s = dt_get_prop_string(config_child, "device");
+		if (!s)
+			continue;
+
+		dt_node_t *devnode = dt_lookup_alias(hw_devtree, s);
+		if (!devnode) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: missing device (%s) reference at %s\n",
+			         __func__, s, config_child->name);
+			continue;
+		}
+		uint32_t hw_phandle_cfg = dt_get_phandle(devnode, 0);
+
+		prop = dt_get_prop(hwnode, "dev-handle", 0);
+		if (prop) {
+			if (prop->len != 4) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "%s: missing/bad dev-handle on %s\n",
+				         __func__, owner->hwnode->name);
+				continue;
+			}
+			uint32_t hw_phandle = *(const uint32_t *)prop->data;
+
+			if (hw_phandle == hw_phandle_cfg)
+				return config_child; /* found match */
+		}
+	}
+
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: no config node found for %s\n",
+	         __func__, owner->hwnode->name);
+
+	return NULL;
+}
+
+typedef struct search_liodn_ctx {
+	dt_node_t *cfgnode;
+	uint32_t liodn_index;
+} search_liodn_ctx_t;
+
+static int search_liodn_index(dt_node_t *cfgnode, void *arg)
+{
+	search_liodn_ctx_t *ctx = arg;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(cfgnode, "liodn-index", 0);
+	if (prop) {
+		if (prop->len != 4) {
+			ctx->cfgnode = NULL;
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: bad liodn-index on %s\n",
+			         __func__, cfgnode->name);
+			return 0;
+		}
+		if (ctx->liodn_index == *(const uint32_t *)prop->data) {
+			ctx->cfgnode = cfgnode;
+			return 1; /* found match */
+		}
+	}
+
+	return 0;
+}
+
+int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
+{
+	dt_node_t *cfgnode;
+	dt_prop_t *liodn_prop = NULL;
+	const uint32_t *liodn;
+	int liodn_cnt, i;
+	int ret;
+	uint32_t *dma_handles = NULL;
+	pamu_handle_t *pamu_handle;
+
+	cfgnode = find_cfgnode(hwnode, owner);
+	if (!cfgnode)
+		return 0;
+
+	/* get the liodn property on the hw node */
+	liodn_prop = dt_get_prop(hwnode, "fsl,liodn", 0);
+	if (!liodn_prop)
+		return 0;  /* continue */
+
+	if (liodn_prop->len & 3 || liodn_prop->len == 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		         "%s: bad liodn on %s\n",
+		         __func__, hwnode->name);
+		return 0;
+	}
+	liodn = (const uint32_t *)liodn_prop->data;
+
+	/* get a count of liodns */
+	liodn_cnt = liodn_prop->len / 4;
+
+	dma_handles = malloc(liodn_cnt * sizeof(uint32_t));
+	if (!dma_handles)
+		goto nomem;
+
+	for (i = 0; i < liodn_cnt; i++) {
+		search_liodn_ctx_t ctx;
+
+		/* search for an liodn-index that matches this liodn */
+		ctx.liodn_index = i;
+		ctx.cfgnode = cfgnode;  /* default */
+		dt_for_each_node(cfgnode, &ctx, search_liodn_index, NULL);
+
+		if (!ctx.cfgnode) { /* error */
+			free(dma_handles);
+			return 0;
+		}
+
+		ret = pamu_config_liodn(owner->guest, liodn[i], hwnode, ctx.cfgnode);
+		if (ret < 0) {
+			if (ret == ERR_NOMEM)
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+				         "paact table not found-- pamu may not be"
+				         " assigned to hypervisor\n");
+			else
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			                 "%s: config of liodn failed (rc=%d)\n",
+			                 __func__, ret);
+			free(dma_handles);
+			return 0;
+		}
+
+		pamu_handle = alloc_type(pamu_handle_t);
+		if (!pamu_handle)
+			goto nomem;
+
+		pamu_handle->assigned_liodn = liodn[i];
+		pamu_handle->user.pamu = pamu_handle;
+		dma_handles[i] = alloc_guest_handle(owner->guest,
+							&pamu_handle->user);
+		liodn_to_handle[liodn[i]] = dma_handles[i];
+	}
+
+	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,
+				i * sizeof(uint32_t)) < 0)
+		goto nomem;
+
+	free(dma_handles);
+	return 0;
+
+nomem:
+	free(dma_handles);
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+        	 "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
+}
