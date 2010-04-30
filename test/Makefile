@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,6 +53,8 @@ CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
         -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H) \
         -I$(testdir)common
+
+LD_OPTS=-m32 -msoft-float -static -nostdlib
 
 include $(SUBMAKES)
 

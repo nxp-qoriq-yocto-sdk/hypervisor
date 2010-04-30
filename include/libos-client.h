@@ -26,14 +26,23 @@
 #define LIBOS_CLIENT_H
 
 #define BASE_TLB_ENTRY 63 /**< TLB entry used for initial mapping */
+#ifndef CONFIG_64BIT
 #define PHYSBASE 0x100000 /**< Virtual base of text mapping */
 #define PHYSMAPSIZE TLB_TSIZE_1M
+#else
+#define PHYSBASE 0x400000 /**< Virtual base of text mapping */
+#define PHYSMAPSIZE TLB_TSIZE_4M
+#endif
 #define BIGPHYSBASE 0x40000000 /**< Virtual base of large page physical mapping */
 #define VMAPBASE 0x10000000 /**< Base of dynamically allocated virtual space */
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
+#ifndef CONFIG_64BIT
 #define KSTACK_SIZE 4096
+#else
+#define KSTACK_SIZE (4096 * 4)
+#endif
 /* This stack size applies to all exception levels. It
  * changed from 2KB to 4KB due to stack pressure with the
  * TRK debug stub.

@@ -36,6 +36,10 @@
 
 static sched_t scheds[MAX_CORES];
 
+#ifdef CONFIG_64BIT
+extern unsigned long toc_start;
+#endif
+
 static void do_schedule(sched_t *sched)
 {
 	libos_thread_t *thread = &sched->idle.libos_thread;
@@ -133,12 +137,28 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 	thread->prio = prio;
 
 	regs->gpregs[1] = (register_t)regs;
+#ifndef CONFIG_64BIT
 	regs->gpregs[2] = (register_t)cpu;
+#else
+	regs->gpregs[2] = (register_t)(&toc_start) + 0x8000UL;
+	regs->gpregs[13] = (register_t)cpu;
+#endif
 	regs->gpregs[3] = (register_t)regs;
 	regs->gpregs[4] = (register_t)arg;
 
+#ifndef CONFIG_64BIT
 	regs->srr0 = (register_t)func;
 	regs->srr1 = MSR_ME | MSR_CE | MSR_EE | MSR_RI;
+#else
+	/* NOTE:
+	 * function pointers are implemented as function descriptors on 64-bit
+	 * As HV is using a single TOC and we don't need to save and restore
+	 * pTOC, hence de-reference the function address from the descriptor.
+	 * If HV ever uses multiple TOCs, support needs to be added here
+	 */
+	regs->srr0 = *(register_t *)func;
+	regs->srr1 = MSR_CM | MSR_ME | MSR_CE | MSR_EE | MSR_RI;
+#endif
 
 	regs->lr = (register_t)ret_from_exception;
 }

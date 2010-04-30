@@ -82,11 +82,8 @@ include include/config/auto.conf
 ifeq ($(CONFIG_64BIT),y)
 CC_OPTS += -m64
 export LD_OPTS=-m64
-LD_SCRIPT = hv64.lds
+LD_SCRIPT = $(src)hv64.lds
 AWK := awk
-define update_lds
-	@ $(AWK) '{ gsub(/powerpc:common/, "powerpc:common64"); print }' $1 > $2
-endef
 else
 CC_OPTS += -m32
 export LD_OPTS=-m32 -msoft-float
@@ -158,9 +155,8 @@ bin/hv.bin: bin/hv
 	$(CROSS_COMPILE)objcopy -O binary $< $@
 
 bin/hv: include/config/auto.conf $(OBJS) $(OBJS_NOCHECK) \
-                $(src)hv.lds $(hypertrk-objs-y)
+                $(LD_SCRIPT) $(hypertrk-objs-y)
 	$(call show,link: $@)
-	$(call update_lds, $(src)hv.lds, $(LD_SCRIPT))
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ \
 		$(OBJS) $(OBJS_NOCHECK) $(hypertrk-objs-y) -lgcc
 
