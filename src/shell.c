@@ -407,6 +407,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 	ppaace_t *entry;
 	char str[BUFF_SIZE];
 	int wce;
+	int is_table_empty = 1;
 
 	/*
 	 * Currently all PAMUs in the platform share the same PAACT(s), hence,
@@ -421,6 +422,7 @@ static void paact_dump_fn(shell_t *shell, char *args)
 		entry = pamu_get_ppaace(liodn);
 		wce = 0;
 		if (entry && entry->wse) {
+			is_table_empty = 0;
 			memset(str, 0, BUFF_SIZE);
 			decode_wse(entry->wse, str);
 			if (entry->mw)
@@ -440,6 +442,8 @@ static void paact_dump_fn(shell_t *shell, char *args)
 				spaact_dump_fn(shell, entry);
 		}
 	}
+	if (is_table_empty)
+		qprintf(shell->out, 1, "No entry found\n");
 }
 
 static command_t paact = {
