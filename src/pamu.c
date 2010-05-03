@@ -1120,9 +1120,14 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 
 		pamu_handle->assigned_liodn = liodn[i];
 		pamu_handle->user.pamu = pamu_handle;
-		dma_handles[i] = alloc_guest_handle(owner->guest,
-							&pamu_handle->user);
-		liodn_to_handle[liodn[i]] = dma_handles[i];
+
+		ret = alloc_guest_handle(owner->guest, &pamu_handle->user);
+		if (ret < 0) {
+			free(dma_handles);
+			return ret;
+		}
+
+		dma_handles[i] = liodn_to_handle[liodn[i]] = ret;
 	}
 
 	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,

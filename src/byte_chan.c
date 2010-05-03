@@ -217,27 +217,16 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 	rxirq = vpic_alloc_irq(guest, 0);
 	txirq = vpic_alloc_irq(guest, 0);
 
-	if (!rxirq || !txirq) {
-		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-		         "%s: can't alloc vpic irqs\n", __func__);
-		return ERR_NOMEM;
-	}
+	if (!rxirq || !txirq)
+		goto nomem;
 
 	if (vpic_alloc_handle(rxirq, &intspec[0]) < 0||
-	    vpic_alloc_handle(txirq, &intspec[2]) < 0) {
-		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-		         "%s: can't alloc vmpic irqs\n", __func__);
-		return ERR_NOMEM;
-	}
+	    vpic_alloc_handle(txirq, &intspec[2]) < 0)
+		return ERR_NORESOURCE;
 
 	ghandle = alloc_guest_handle(guest, &handle->user);
-	if (ghandle < 0) {
-		handle->attached = 0;
-		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
-		         "%s: cannot alloc guest %s handle\n",
-		         __func__, guest->name);
-		return ERR_NOMEM;
-	}
+	if (ghandle < 0)
+		return ghandle;
 
 	if (rxirq) {
 		rxirq->guest = guest;

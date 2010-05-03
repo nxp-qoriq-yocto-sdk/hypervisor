@@ -1356,12 +1356,8 @@ static int process_managed_partition_node(dt_node_t *cfgnode, void *arg)
 
 	// Allocate a handle
 	int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
-	if (ghandle < 0) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			 "%s: guest %s: too many handles\n",
-			 __func__, guest->name);
+	if (ghandle < 0)
 		return ghandle;
-	}
 
 	// Get a pointer to the manager's 'handles' node
 	node = get_handles_node(guest);

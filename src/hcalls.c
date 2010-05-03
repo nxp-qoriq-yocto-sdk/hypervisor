@@ -108,7 +108,10 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 		}
 	} while (again);
 
-	return -1;
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of handles in %s\n", __func__, guest->name);
+
+	return ERR_NORESOURCE;
 }
 
 /**

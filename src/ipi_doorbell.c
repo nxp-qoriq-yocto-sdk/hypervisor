@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -147,9 +147,6 @@ static int create_doorbell(dt_node_t *node, void *arg)
 		dbell->fast_dbell->irq = mpic_get_ipi_irq(ipi_fast_dbell++);
 		dbell->fast_dbell->global_handle = alloc_global_handle();
 		if (dbell->fast_dbell->global_handle < 0) {
-			printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-				"%s: global handle not available\n",
-				__func__);
 			free(dbell->fast_dbell);
 			free(dbell);
 			ipi_fast_dbell--;
@@ -278,11 +275,8 @@ static int attach_normal_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 	}
 
 	ret = vpic_alloc_handle(virq, irq);
-	if (ret < 0) {
-		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
-		         "%s: can't alloc vmpic irqs\n", __func__);
+	if (ret < 0)
 		goto error;
-	}
 
 	// Write the 'interrupts' property to the doorbell receive handle node
 	ret = dt_set_prop(node, "interrupts", irq, sizeof(irq));
