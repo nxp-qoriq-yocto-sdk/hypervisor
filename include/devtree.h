@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@
 #include <libos/libos.h>
 #include <libos/list.h>
 #include <libfdt.h>
+
+#include <cpc.h>
 
 #define MAX_DT_PATH 256
 
@@ -83,7 +85,7 @@ typedef struct dt_node {
 
 	struct csd_info *csd;
 
-	struct cpc_part_reg *cpc_reg[2];
+	struct cpc_part_reg *cpc_reg[num_mem_tgts];
 
 	device_t dev; /** libos device */
 	list_t owners;

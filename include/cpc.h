@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,13 @@
 
 struct dt_node;
 struct dt_prop;
+
+/* Derived from available DDR targets for P4080 */
+typedef enum mem_tgts {
+	mem_tgt_ddr1,
+	mem_tgt_ddr2,
+	num_mem_tgts
+} mem_tgts_t;
 
 void allocate_cpc_ways(struct dt_prop *prop, uint32_t tgt, uint32_t csdid, struct dt_node *node);
 int cpcs_enabled(void);

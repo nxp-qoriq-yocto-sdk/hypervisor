@@ -44,12 +44,6 @@ typedef struct {
 	uint32_t high, low, attr, reserved;
 } law_t;
 
-#define NUMCPCS 2
-#define NUMCPCWAYS 32
-
-#define CPCADDR0 0x10000
-#define CPCADDR1 0x11000
-
 #define CPCCSR0 0
 #define CPCCSR0_CPCE 0x80000000
 #define CPCCSR0_CPCFL 0x800
