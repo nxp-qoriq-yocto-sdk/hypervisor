@@ -1106,12 +1106,12 @@ int main(int argc, char *argv[])
 {
 	struct parameters p = {};
 	int c;
-	const char *handlestr;
+	const char *handlestr = NULL, *cmdstr = NULL;
 	int partition_cmd = 0;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, ":vqh:f:a:e:n:p:t:")) != -1) {
+	while ((c = getopt(argc, argv, "-:vqh:f:a:e:n:p:t:")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose = 1;
@@ -1142,6 +1142,15 @@ int main(int argc, char *argv[])
 		case 't':
 			add_to_prop(&p, optarg);
 			break;
+		case 1:
+			if (cmdstr) {
+				fprintf(stderr, "%s: unexpected command '%s'\n",
+					argv[0], optarg);
+				usage();
+				return 1;
+			}
+			cmdstr = optarg;
+			break;
 		case '?':
 			fprintf(stderr, "%s: unrecognized option '%c'\n",
 			        argv[0], optopt);
@@ -1159,7 +1168,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (optind > argc - 1) {
+	if (!cmdstr) {
 		usage();
 		return 1;
 	}
@@ -1176,12 +1185,12 @@ int main(int argc, char *argv[])
 	}
 
 	/* Check if it's a partition related command */
-	if (!strcmp(argv[optind], "load") ||
-	    !strcmp(argv[optind], "start") ||
-	    !strcmp(argv[optind], "stop") ||
-	    !strcmp(argv[optind], "restart") ||
-	    !strcmp(argv[optind], "getprop") ||
-	    !strcmp(argv[optind], "setprop"))
+	if (!strcmp(cmdstr, "load") ||
+	    !strcmp(cmdstr, "start") ||
+	    !strcmp(cmdstr, "stop") ||
+	    !strcmp(cmdstr, "restart") ||
+	    !strcmp(cmdstr, "getprop") ||
+	    !strcmp(cmdstr, "setprop"))
 		partition_cmd = 1;
 
 	/* Parse the generic handle argument and obtain its numeric equivalent.
@@ -1208,24 +1217,24 @@ int main(int argc, char *argv[])
 		p.h_specified = 1;
 	}
 
-	if (!strcmp(argv[optind], "status"))
+	if (!strcmp(cmdstr, "status"))
 		return cmd_status();
-	if (!strcmp(argv[optind], "load"))
+	if (!strcmp(cmdstr, "load"))
 		return cmd_load_image(&p);
-	if (!strcmp(argv[optind], "start"))
+	if (!strcmp(cmdstr, "start"))
 		return cmd_start(&p);
-	if (!strcmp(argv[optind], "stop"))
+	if (!strcmp(cmdstr, "stop"))
 		return cmd_stop(&p);
-	if (!strcmp(argv[optind], "restart"))
+	if (!strcmp(cmdstr, "restart"))
 		return cmd_restart(&p);
-	if (!strcmp(argv[optind], "doorbell"))
+	if (!strcmp(cmdstr, "doorbell"))
 		return cmd_doorbells(&p);
-	if (!strcmp(argv[optind], "getprop"))
+	if (!strcmp(cmdstr, "getprop"))
 		return cmd_getprop(&p);
-	if (!strcmp(argv[optind], "setprop"))
+	if (!strcmp(cmdstr, "setprop"))
 		return cmd_setprop(&p);
 
-	fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], argv[optind]);
+	fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], cmdstr);
 	usage();
 
 	return 1;
