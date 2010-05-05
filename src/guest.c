@@ -1668,11 +1668,11 @@ static int partition_config(guest_t *guest)
 	int ret;
 
 	/* guest cache lock mode */
-	if (guest->guest_cache_lock) {
+	if (!guest->guest_cache_lock) {
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
 		if (!hv_node)
 			return -1;
-		ret = dt_set_prop(hv_node, "fsl,hv-guest-cache-lock", NULL, 0);
+		ret = dt_set_prop(hv_node, "fsl,hv-guest-cache-lock-disable", NULL, 0);
 		if (ret < 0)
 			return -1;
 	}
@@ -1786,7 +1786,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		}
 
 		/* guest cache lock mode */
-		if (dt_get_prop(partition, "guest-cache-lock", 0))
+		if (!dt_get_prop(partition, "guest-cache-lock-disable", 0))
 			guests[i].guest_cache_lock = 1;
 
 		/* guest debug mode */

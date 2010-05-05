@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,7 +43,8 @@ static volatile char *arr;
  * As ours is a 32K 8 way set associative cache data cache
  * k = 8, so evict(PLRU)(k) = 2*(8) - sqroot(2 * 8)
  *                          = 16 - 4 = 12
- * so, cache size for eviction = numsets * num ways per set * cache block size
+ * so, cache size fo/ evictio
+ = numsets * num ways per set * cache block size
  *                             = 64 * 12 * 64
  *                             = 48K
  * The above formula has been obtained from the following research paper :
@@ -121,7 +122,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	uint32_t ct = 0;
 	uint32_t status;
 	char str[16] = "cache lock test";
-	int guest_cache_lock_mode = 0, ret, len;
+	int guest_cache_lock_mode = 1, ret, len;
 	const uint32_t *prop;
 
 	printf("cache lock test\n");
@@ -129,9 +130,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	init(devtree_ptr);
 	ret = fdt_subnode_offset(fdt, 0, "hypervisor");
 	if (ret != -FDT_ERR_NOTFOUND) {
-		prop = fdt_getprop(fdt, ret, "fsl,hv-guest-cache-lock", &len);
+		prop = fdt_getprop(fdt, ret, "fsl,hv-guest-cache-lock-disable", &len);
 		if (prop)
-			guest_cache_lock_mode = 1;
+			guest_cache_lock_mode = 0;
 	}
 	printf("guest cache lock mode: %d\n",guest_cache_lock_mode);
 
