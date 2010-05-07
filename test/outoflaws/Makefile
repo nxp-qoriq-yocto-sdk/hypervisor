@@ -26,7 +26,3 @@ test := outoflaws
 dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
-
-$(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 1
-

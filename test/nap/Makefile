@@ -28,7 +28,4 @@ dir := $(testdir)$(test)/
 $(test)-run:: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
 
-$(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 0
-
 include $(testdir)common/Makefile.inc

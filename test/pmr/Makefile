@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008 Freescale Semiconductor, Inc.
+# Copyright (C) 2008,2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,3 @@ include $(testdir)common/Makefile.inc
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(testdir)$</run-$*.simics
-
-$(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 2
