@@ -82,6 +82,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	int node;
 	const char *path;
 	int len;
+	uint32_t config;
+	unsigned int priority;
+	uint32_t destination;
 
 	init(devtree_ptr);
 
@@ -107,8 +110,13 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	fh_vmpic_set_mask(*handle_p, 0);
 
+	fh_vmpic_get_int_config(*handle_p, &config, &priority, &destination);
+	if (config != 0x3 && priority != 0 && destination != 0x1) {
+		printf("ERROR: unexpected default interrupt config\n");
+	}
+
 	/* VMPIC config */
-	fh_vmpic_set_int_config(*handle_p,1,15,0x00000001);
+	fh_vmpic_set_int_config(*handle_p,0x3,15,0x00000001);
 
 	/* enable TX interrupts at the UART */
 	out8(&uart_virt[1], 0x2);

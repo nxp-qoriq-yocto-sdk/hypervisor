@@ -171,7 +171,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	fh_vmpic_set_mask(*handle_p, 0);
 
 	/* VMPIC config */
-	fh_vmpic_set_int_config(*handle_p, 1, 15, 0x00000001);
+	fh_vmpic_set_int_config(*handle_p, 0x3 , 15, 0x00000001);
 
 	/* enable TX interrupts at the UART */
 	out8(&uart_virt[1], 0x2);
