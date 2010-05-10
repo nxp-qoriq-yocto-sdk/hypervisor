@@ -56,6 +56,10 @@ CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
 
 LD_OPTS=-m32 -msoft-float -static -nostdlib
 
+CC_OPTS_C=-fno-strict-aliasing -fno-common -O2 -g3 \
+          -msoft-float -pipe -ffixed-r2 -mmultiple \
+          -mno-altivec -funit-at-a-time \
+
 include $(SUBMAKES)
 
 #HDRS := $(shell cd $(testdir); find . -name '*.h')
