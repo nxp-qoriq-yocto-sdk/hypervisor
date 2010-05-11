@@ -737,7 +737,7 @@ static void gtlb_fn(shell_t *shell, char *args)
 	}
 
 	if (guests[guest_num].state != guest_paused) {
-		qprintf(shell->out, 1, "Can't display tlb, guest not pasued\n");
+		qprintf(shell->out, 1, "Can't display tlb, guest not paused\n");
 		return;
 	}
 
