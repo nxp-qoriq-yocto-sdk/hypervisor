@@ -2149,13 +2149,13 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	guest_core_init(guest);
 
 	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
-	         "secondary %d/%d spun up, addr %lx\n",
+	         "secondary %d/%d spun up, addr %x\n",
 	         pir, gpir, guest->spintbl[gpir].addr_lo);
 
 	if (guest->spintbl[gpir].pir != gpir)
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
 		         "WARNING: cpu %d (guest cpu %d) changed spin-table "
-		         "PIR to %ld, ignoring\n",
+		         "PIR to %d, ignoring\n",
 		         pir, gpir, guest->spintbl[gpir].pir);
 
 	entry = ((uint64_t)guest->spintbl[gpir].addr_hi << 32) |
