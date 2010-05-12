@@ -25,9 +25,9 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 0.6
-Revsion: 004
-Date: 3/23/2010
+Topaz Version: 0.7
+Revsion: 001
+Date: 5/13/2010
 
 -------------------------------------------------------
 Contents
@@ -46,55 +46,34 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.6-004 has been tested with Simics 4.2.36 / pre43
+   -embedded-hv v0.7-001 has been tested with Simics 4.2.41 / pre50
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
-    0.881
+    0.882
 
 -------------------------------------------------------
 3.  Detailed List of Changes
 
-   -v0.6-004 bug fixes and changes
-      -bug 4502-- error message improvement
-      -bug 4989-- error message improvement
-      -bug 5250-- memset assertion failure
-      -bug 5123-- partman support partition labels in -h
-      -implement error handlers for HV owned devices
-      -framework for error policy configuration
-      -shell command for dumping error policy
-      -bug 5282-- gdb-A unit test can't set breakpoint
-
-   -v0.6-003 bug fixes and changes
-      -support for error interrupt reflection
-      -fix bug where MAS registers were not saved for
-       temporary mappings, causing vcpu state to appear
-       incorrect to debug stubs
-      -pci-e virtualzation fix to not translate initial
-       ATMU values if ATMU is disabled
-      -bug 3731: for device virtualization-- fix update
-       forms of emulated load/stores
-      -fixed TLB way selection when reading TLB0 entries
-       with TLB_CACHE disasbled
-      -bug 5226-- assert when guest unmasks shared interrupt
-
-   -v0.6-002 bug fixes and changes
-      -initial nap hcall support
-      -initial error interrupt handling support
-      -support partial writes for byte-channel send API (bug 5164)
-      -implement virtual device driver framework
-      -add additional event types to the hypervisor statistics
-      -tlbivax deadlock bugfix (bug 5073)
-      -PCI-E outbound ATMU fixups (enables 32-bit OS with PCI-E
-       on 36-bit hypervisor)
-
-   -v0.6-001 bug fixes and changes (since 0.5-008)
-      -initial hypervisor statistics support in command shell
-      -bug 4284-- improve robustness of getting crash dumps
-       out of the hypervisor when the console is on a mux
-      -added mechanism to get machine check info out to
-       console
-      -machine check handler improvements
-      -support for shell command to dump guest physical memory
-      -add FH_IDLE hcall
-      -unit test cleanup to sync with sim.git
+   -v0.7-001 bug fixes and changes (since 0.6-004)
+       -cleanup for 64-bit support
+       -enable perfmon interrupt reflection
+       -nap updates to handle race conditions
+       -added shell command to dump config tree
+       -improve ability to get output to console on a
+        crash
+       -flush L1/L2 caches on a vcpu stop
+       -added CCM error interrupt handler
+       -pre-work for hypervisor watchdog-- virtualize the
+        FIT
+       -make decrementer interrupt level triggered
+       -gcov-extract support-- infrastructure to let
+        an external tool extract gcov data
+       -bug 4167- do_inflate in uimage loading does not
+        return error codes
+       -show valid bit in paact command in shell
+       -give message if no entries in paact are found
+       -get CPC config information from hardware device tree
+       -enable guest cache locking by default
+       -bug 4471- handle unexpected command line arguments in 
+        partman
