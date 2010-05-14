@@ -23,8 +23,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-tests=$(find test -name '[mh]*.exp')
-#tests=test/hello/hello.exp test/mmu/mmu.exp
+tests=$(find test -name '*.exp')
 
 # build the tests
 for test in $tests
