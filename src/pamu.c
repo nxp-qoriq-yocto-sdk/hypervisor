@@ -47,6 +47,9 @@
 #include <error_log.h>
 #include <error_mgmt.h>
 
+/* mcheck-safe lock, used to ensure atomicity of reassignment */
+static uint32_t pamu_error_lock;
+
 uint32_t liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
 static uint32_t pamu_lock;
@@ -659,15 +662,20 @@ int pamu_enable_liodn(unsigned int handle)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		return -1;
+		return EINVAL;
 	}
 
 	pamu_handle = guest->handles[handle]->pamu;
 	if (!pamu_handle) {
-		return -1;
+		return EINVAL;
 	}
 
 	liodn = pamu_handle->assigned_liodn;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	if (liodn_to_guest[liodn] != guest)
+		return FH_ERR_INVALID_STATE;
+#endif
 
 	current_ppaace = pamu_get_ppaace(liodn);
 	current_ppaace->v = 1;
@@ -684,15 +692,20 @@ int pamu_disable_liodn(unsigned int handle)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		return -1;
+		return EINVAL;
 	}
 
 	pamu_handle = guest->handles[handle]->pamu;
 	if (!pamu_handle) {
-		return -1;
+		return EINVAL;
 	}
 
 	liodn = pamu_handle->assigned_liodn;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	if (liodn_to_guest[liodn] != guest)
+		return FH_ERR_INVALID_STATE;
+#endif
 
 	current_ppaace = pamu_get_ppaace(liodn);
 	current_ppaace->v = 0;
@@ -826,11 +839,15 @@ static int pamu_av_isr(void *arg)
 				/*FIXME : LIODN index not in PPAACT table*/
 				assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
 
+				spin_lock(&pamu_error_lock);
+
 				guest_t *guest = liodn_to_guest[av_liodn];
 				if (guest) {
 					err.pamu.lpid = guest->lpid;
 					err.pamu.liodn_handle = liodn_to_handle[av_liodn];
 				}
+
+				spin_unlock(&pamu_error_lock);
 
 				pamu_error_log(&err, guest);
 				ppaace->v = 0;
@@ -975,6 +992,24 @@ fail_mem:
 	return ERR_NOMEM;
 }
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
+static int claim_dma(claim_action_t *action, dev_owner_t *owner,
+                     dev_owner_t *prev)
+{
+	pamu_handle_t *ph = to_container(action, pamu_handle_t, claim_action);
+	uint32_t liodn = ph->assigned_liodn;
+	uint32_t saved;
+	
+	saved = spin_lock_mchksave(&pamu_error_lock);
+
+	liodn_to_handle[liodn] = ph->user.id;
+	liodn_to_guest[liodn] = owner->guest;
+
+	spin_unlock_mchksave(&pamu_error_lock, saved);
+	return 0;
+}
+#endif
+
 static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_prop_t *prop;
@@ -1053,6 +1088,25 @@ static int search_liodn_index(dt_node_t *cfgnode, void *arg)
 	return 0;
 }
 
+static int configure_liodn(dt_node_t *hwnode, dev_owner_t *owner,
+                           uint32_t liodn, dt_node_t *cfgnode)
+{
+	int ret = pamu_config_liodn(owner->guest, liodn,
+	                            hwnode, cfgnode);
+	if (ret < 0) {
+		if (ret == ERR_NOMEM)
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "paact table not found-- pamu may not be"
+			         " assigned to hypervisor\n");
+		else
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		                 "%s: config of liodn failed (rc=%d)\n",
+		                 __func__, ret);
+	}
+
+	return ret;
+}
+
 int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_node_t *cfgnode;
@@ -1062,6 +1116,8 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	int ret;
 	uint32_t *dma_handles = NULL;
 	pamu_handle_t *pamu_handle;
+	claim_action_t *claim_action;
+	int standby = get_claimable(owner) == claimable_standby;
 
 	cfgnode = find_cfgnode(hwnode, owner);
 	if (!cfgnode)
@@ -1095,23 +1151,25 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 		ctx.cfgnode = cfgnode;  /* default */
 		dt_for_each_node(cfgnode, &ctx, search_liodn_index, NULL);
 
-		if (!ctx.cfgnode) { /* error */
-			free(dma_handles);
-			return 0;
-		}
+		if (standby) {
+			if (ctx.cfgnode &&
+			    dt_get_prop(ctx.cfgnode, "dma-window", 0)) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+				         "%s: %s: warning: standby owners "
+				         "should not have a DMA config\n",
+				         __func__, cfgnode->name);
+			}
+		} else {
+			if (!ctx.cfgnode) { /* error */
+				free(dma_handles);
+				return 0;
+			}
 
-		ret = pamu_config_liodn(owner->guest, liodn[i], hwnode, ctx.cfgnode);
-		if (ret < 0) {
-			if (ret == ERR_NOMEM)
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-				         "paact table not found-- pamu may not be"
-				         " assigned to hypervisor\n");
-			else
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			                 "%s: config of liodn failed (rc=%d)\n",
-			                 __func__, ret);
-			free(dma_handles);
-			return 0;
+			if (configure_liodn(hwnode, owner, liodn[i],
+			                    ctx.cfgnode)) {
+				free(dma_handles);
+				return 0;
+			}
 		}
 
 		pamu_handle = alloc_type(pamu_handle_t);
@@ -1127,7 +1185,16 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 			return ret;
 		}
 
-		dma_handles[i] = liodn_to_handle[liodn[i]] = ret;
+		dma_handles[i] = ret;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+		pamu_handle->claim_action.claim = claim_dma;
+		pamu_handle->claim_action.next = owner->claim_actions;
+		owner->claim_actions = &pamu_handle->claim_action;
+#endif
+
+		if (!standby)
+			liodn_to_handle[liodn[i]] = ret;
 	}
 
 	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,

@@ -2,7 +2,7 @@
  * Device tree semantic processing
  */
 
-/* Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -913,6 +913,60 @@ typedef struct assignportal_ctx {
 	uint32_t pcpu_num;
 } assignportal_ctx_t;
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
+static void set_claimable(dev_owner_t *owner)
+{
+	const char *str = dt_get_prop_string(owner->cfgnode, "claimable");
+
+	if (!owner->guest && str) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: hv-owned devices cannot be claimable\n",
+		         __func__, owner->cfgnode->name);
+		return;
+	}
+	
+	if (!str)
+		owner->claimable = not_claimable;
+	else if (!strcmp(str, "active"))
+		owner->claimable = claimable_active;
+	else if (!strcmp(str, "standby"))
+		owner->claimable = claimable_standby;
+	else {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s in %s: unrecognized claimable state: %s\n",
+		         owner->cfgnode->name, owner->guest->name, str);
+
+		owner->claimable =  not_claimable;
+	}
+}
+
+void check_compatible_owners(dev_owner_t *new, dev_owner_t *old)
+{
+	/* If claimable and non-claimable owners are mixed, we warn the
+	 * user, and it is undefined which partition ends up with
+	 * interrupts and DMA, either initially or after a claim hcall.
+	 *
+	 * If multiple claimable owners try to be initially active,
+	 * we warn the user and arbitrarily pick one to be active.
+	 */
+	if (!new->claimable && old->claimable) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: not claimable in %s, but %s owns claimably\n",
+		         new->hwnode->name, new->guest->name, old->guest->name);
+	} else if (!old->claimable && new->claimable) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: not claimable in %s, but %s owns claimably\n",
+		         new->hwnode->name, old->guest->name, new->guest->name);
+	} else if (new->claimable == claimable_active &&
+	           old->claimable == claimable_active) { 
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s and %s are both active owners\n",
+		         new->hwnode->name, old->guest->name, new->guest->name);
+		new->claimable = claimable_standby;
+	}
+}
+#endif
+
 static int assign_callback(dt_node_t *node, void *arg)
 {
 	assign_ctx_t *ctx = arg;
@@ -948,7 +1002,7 @@ static int assign_callback(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	dev_owner_t *owner = malloc(sizeof(dev_owner_t));
+	dev_owner_t *owner = alloc_type(dev_owner_t);
 	if (!owner) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: out of memory\n", __func__);
@@ -959,20 +1013,21 @@ static int assign_callback(dt_node_t *node, void *arg)
 	owner->hwnode = hwnode;
 	owner->guest = ctx->guest;
 	owner->direct = owner;
-	owner->gnode = NULL;
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	set_claimable(owner);
+#endif
 
 	saved = spin_lock_intsave(&dt_owner_lock);
 
-	if (!list_empty(&hwnode->owners)) {
-		dev_owner_t *other = to_container(hwnode->owners.next,
-		                                  dev_owner_t, dev_node);
+	list_for_each(&hwnode->owners, i) {
+		dev_owner_t *other = to_container(i, dev_owner_t, dev_node);
 
 		/* Hypervisor ownership of a device is exclusive */
 		if (!other->guest) {
 			spin_unlock_intsave(&dt_owner_lock, saved);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		   	      "%s: device %s in %s already assigned to the hypervisor\n",
-	         		__func__, alias, node->name);
+			         "%s: device %s in %s already assigned to the hypervisor\n",
+			         __func__, alias, node->name);
 			free(owner);
 			return 0;
 		}
@@ -980,11 +1035,13 @@ static int assign_callback(dt_node_t *node, void *arg)
 		if (other->guest == ctx->guest) {
 			spin_unlock_intsave(&dt_owner_lock, saved);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		   	      "%s: device %s in %s already assigned to %s\n",
-	         		__func__, alias, node->name, ctx->guest->name);
+			         "%s: device %s in %s already assigned to %s\n",
+			         __func__, alias, node->name, ctx->guest->name);
 			free(owner);
 			return 0;
 		}
+
+		check_compatible_owners(owner, other);
 	}
 
 	if (ctx->guest)

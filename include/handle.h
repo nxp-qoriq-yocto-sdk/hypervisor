@@ -1,6 +1,8 @@
-
+/** @file
+ * Guest object handles
+ */
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,35 +25,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PAMU_H_
-#define __PAMU_H_
+#ifndef HANDLE_H
+#define HANDLE_H
 
-#include <percpu.h>
-#include <devtree.h>
-#include <handle.h>
+struct handle;
 
-typedef struct pamu_handle {
-	unsigned long assigned_liodn;
-	handle_t user;
+/** General handle operations that many types of handle will implement.
+ * Any member may be NULL.
+ */
+typedef struct {
+	/** Reset the handle to partition boot state.
+	 * If the handle was dynamically created, rather than
+	 * device-tree-originated, then close the handle.
+	 */
+	void (*reset)(struct handle *h);
+} handle_ops_t;
 
-#ifdef CONFIG_CLAIMABLE_DEVICES
-	claim_action_t claim_action;
-#endif
-} pamu_handle_t;
+/* An extremely crude form of RTTI/multiple interfaces...
+ * Add pointers here for other handle types as they are needed.
+ */
+typedef struct handle {
+	handle_ops_t *ops;
+	int id; /**< Guest handle ID number */
 
-/* define indexes for each operation mapping scenario */
-#define OMI_QMAN        0x00
-#define OMI_FMAN        0x01
-#define OMI_QMAN_PRIV   0x02
-#define OMI_CAAM        0x03
-#define OMI_MAX         0x03  /* define the max index defined */
+	struct byte_chan_handle *bc;
+	struct vmpic_interrupt *intr;
+	struct ipi_doorbell_handle *db;
+	struct pamu_handle *pamu;
+	struct ppid_handle *ppid;
+	struct guest *guest;
+	struct dev_owner *dev_owner;
+} handle_t;
 
-extern uint32_t liodn_to_handle[];
-
-void pamu_global_init(void);
-void pamu_partition_init(guest_t *guest);
-
-int pamu_enable_liodn(unsigned int liodn);
-int pamu_disable_liodn(unsigned int liodn);
-int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode);
-#endif
+#endif /* HANDLE_H */

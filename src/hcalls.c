@@ -82,6 +82,7 @@ int set_guest_global_handle(guest_t *guest, handle_t *handle,
 		return -1;
 	}
 
+	handle->id = global_handle;
 	guest->handles[global_handle] = handle;
 
 	return global_handle;
@@ -101,8 +102,10 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 				continue;
 		
 			if (compare_and_swap((unsigned long *)&guest->handles[i],
-			                     0, (unsigned long)handle))
+			                     0, (unsigned long)handle)) {
+				handle->id = i;
 				return i;
+			}
 
 			again = 1;
 		}
@@ -404,29 +407,13 @@ static void hcall_partition_memcpy(trapframe_t *regs)
 static void hcall_dma_enable(trapframe_t *regs)
 {
 	unsigned int liodn = regs->gpregs[3];
-	int ret;
-
-	ret = pamu_enable_liodn(liodn);
-	if (ret < 0) {
-		regs->gpregs[3] = EINVAL;
-		return;
-	}
-
-	regs->gpregs[3] = 0;
+	regs->gpregs[3] =  pamu_enable_liodn(liodn);
 }
 
 static void hcall_dma_disable(trapframe_t *regs)
 {
 	unsigned int liodn = regs->gpregs[3];
-	int ret;
-
-	ret = pamu_disable_liodn(liodn);
-	if (ret < 0) {
-		regs->gpregs[3] = EINVAL;
-		return;
-	}
-
-	regs->gpregs[3] = 0;
+	regs->gpregs[3] = pamu_disable_liodn(liodn);
 }
 #else
 #define hcall_dma_enable unimplemented
@@ -711,6 +698,94 @@ static void hcall_idle(trapframe_t *regs)
 	regs->gpregs[3] = 0;
 }
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
+static void hcall_claim_device(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	unsigned int handlenum = regs->gpregs[3];
+	dev_owner_t *owner, *prev;
+	guest_t *guest = gcpu->guest;
+	handle_t *handle;
+	claim_action_t *action;
+	int ret = EINVAL;
+
+	if (handlenum >= MAX_HANDLES)
+		goto out;
+
+	handle = gcpu->guest->handles[handlenum];
+	if (!handle)
+		goto out;
+
+	owner = handle->dev_owner;
+	if (!owner)
+		goto out;
+
+	prev = owner->hwnode->claimable_owner;
+	if (!prev)
+		goto out;
+
+	spin_lock_int(&prev->guest->state_lock);
+
+	/* Ensuring that the previous owner is stopped makes sure that
+	 * device tree modifications don't collide (if the partition
+	 * were starting), and avoids some other scenarios that are
+	 * likely trouble for the guest even if the hv isn't harmed.
+	 */
+	if (prev->guest->state != guest_stopped) {
+		ret = FH_ERR_INVALID_STATE;
+		goto out_onelock;
+	}
+
+	/* Allowable nesting for state_lock is a non-stopped partition's
+	 * lock inside a stopped partition's.  The calling partition
+	 * might be stopping, but it won't be stopped until all cores
+	 * have processed their stop gevents, which they haven't because
+	 * we're still running this code.
+	 *
+	 * We need to hold our own state lock to protect against other
+	 * device tree modifications.
+	 */
+	spin_lock(&guest->state_lock);
+	
+	ret = ENOMEM;
+	const char *hwstatus = dt_get_prop_string(owner->hwnode, "status");
+	int hwstatus_ok = !hwstatus || !strncmp(hwstatus, "ok", 2);
+
+	if (dt_set_prop_string(prev->gnode, "fsl,hv-claimable", "standby") < 0)
+		goto out_twolocks;
+
+	if (hwstatus_ok &&
+	    dt_set_prop_string(prev->gnode, "status", "disabled") < 0)
+		goto out_twolocks;
+
+	action = owner->claim_actions;
+	while (action) {
+		ret = action->claim(action, owner, prev);
+		if (ret)
+			goto out_twolocks;
+		
+		action = action->next;
+	}
+
+	if (dt_set_prop_string(owner->gnode, "fsl,hv-claimable", "active") < 0)
+		goto out_twolocks;
+
+	if (hwstatus_ok &&
+	    dt_set_prop_string(owner->gnode, "status", "okay") < 0)
+		goto out_twolocks;
+
+	owner->hwnode->claimable_owner = owner;
+	ret = 0;
+
+out_twolocks:
+	spin_unlock(&guest->state_lock);
+out_onelock:
+	spin_unlock_int(&prev->guest->state_lock);
+out:
+	regs->gpregs[3] = ret;
+}
+#endif
+
 static hcallfp_t hcall_table[] = {
 	unimplemented,                     /* 0 */
 	unimplemented,
@@ -747,7 +822,11 @@ static hcallfp_t hcall_table[] = {
 	unimplemented,
 	unimplemented,                        /* 28 */
 #endif
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	hcall_claim_device,
+#else
 	unimplemented,
+#endif
 	unimplemented,
 	unimplemented,
 	hcall_partition_send_dbell            /* 32 */

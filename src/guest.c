@@ -452,6 +452,7 @@ nomem:
 int map_guest_irqs(dev_owner_t *owner)
 {
 	dt_node_t *hwnode = owner->hwnode;
+	int standby = get_claimable(owner) == claimable_standby;
 	int ret;
 
 	if (!dt_get_prop(owner->gnode, "interrupts", 0))
@@ -473,7 +474,8 @@ int map_guest_irqs(dev_owner_t *owner)
 
 		/* FIXME: handle more than just mpic */
 		if (irq->config & IRQ_TYPE_MPIC_DIRECT) {
-			handle = vmpic_alloc_mpic_handle(owner->guest, irq);
+			handle = vmpic_alloc_mpic_handle(owner, irq,
+			                                 standby);
 			if (handle < 0) {
 bad:
 				printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
@@ -489,8 +491,6 @@ bad:
 			if (!owner->guest->mpic_direct_eoi) {
 				intspec[i * 2 + 1] = irq->config &
 				                     ~(IRQ_TYPE_MPIC_DIRECT);
-				((vmpic_interrupt_t *)irq->priv)->config &=
-							~(IRQ_TYPE_MPIC_DIRECT);
 			} else {
 				intspec[i * 2 + 1] = irq->config;
 			}
@@ -504,12 +504,17 @@ bad:
 			if (ret < 0)
 				/* FIXME : Free the allocated virq */
 				goto bad;
-			irq->priv = virq;
 			virq->irq.parent = irq;
 			virq->eoi_callback = vpic_unmask_parent;
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
 			/* Register the reflecting interrupt handler */
-			irq->ops->register_irq(irq, reflect_errint, irq, TYPE_MCHK);
+			if (owner->claimable != claimable_standby) {
+				irq->priv = virq;
+				irq->ops->register_irq(irq, reflect_errint,
+				                       irq, TYPE_MCHK);
+			}
+#endif
 		}
 
 	}
@@ -556,6 +561,7 @@ int patch_guest_intmaps(dev_owner_t *owner)
 	uint32_t *newmap, *mapptr;
 	uint32_t naddr, nint;
 	dt_prop_t *gimap;
+	int standby = get_claimable(owner) == claimable_standby;
 
 	gimap = dt_get_prop(owner->gnode, "interrupt-map", 0);
 	if (!gimap)
@@ -589,7 +595,8 @@ int patch_guest_intmaps(dev_owner_t *owner)
 
 		if (ent->irq) {
 			/* FIXME: handle more than just mpic */
-			handle = vmpic_alloc_mpic_handle(owner->guest, ent->irq);
+			handle = vmpic_alloc_mpic_handle(owner, ent->irq,
+			                                 standby);
 			if (handle < 0) {
 				printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 				         "%s: couldn't grant imap entry %d for %s\n",
@@ -2349,6 +2356,7 @@ static int assign_child(dt_node_t *node, void *arg)
 	guest_t *guest = arg;
 	dev_owner_t *direct = get_direct_owner(node->upstream, guest);
 	dev_owner_t *owner;
+	int ret;
 
 	/* No direct owner means it was created with node-update.  Skip it. */
 	if (!direct)
@@ -2358,17 +2366,41 @@ static int assign_child(dt_node_t *node, void *arg)
 	if (!owner) {
 		register_t saved;
 
-		owner = malloc(sizeof(dev_owner_t));
+		owner = alloc_type(dev_owner_t);
 		if (!owner)
 			return ERR_NOMEM;
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
+		owner->claimable = direct->claimable;
+#endif
+		owner->guest = guest;
+		owner->hwnode = node->upstream;
+
 		saved = spin_lock_intsave(&dt_owner_lock);
+
+		list_for_each(&owner->hwnode->owners, i) {
+			dev_owner_t *other = to_container(i, dev_owner_t,
+			                                  dev_node);
+
+			/* Hypervisor ownership of a device is exclusive */
+			if (!other->guest) {
+				spin_unlock_intsave(&dt_owner_lock, saved);
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: device %s, child of %s, already "
+				         "assigned to the hypervisor\n",
+				         __func__, owner->hwnode->name,
+				         direct->cfgnode->name);
+				free(owner);
+				return 0;
+			}
+
+			assert(other->guest != guest);
+
+			check_compatible_owners(owner, other);
+		}
 
 		list_add(&node->upstream->owners, &owner->dev_node);
 		list_add(&guest->dev_list, &owner->guest_node);
-
-		owner->guest = guest;
-		owner->hwnode = node->upstream;
 
 		spin_unlock_intsave(&dt_owner_lock, saved);
 	}
@@ -2376,8 +2408,56 @@ static int assign_child(dt_node_t *node, void *arg)
 	owner->cfgnode = direct->cfgnode;
 	owner->direct = direct;
 	owner->gnode = node;
+	owner->handle.dev_owner = owner;
+
+
+	uint32_t handle = alloc_guest_handle(guest, &owner->handle);
+	if (handle < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: too many handles\n",
+			 __func__, guest->name);
+		return handle;
+	}
+
+	ret = dt_set_prop(node, "fsl,hv-device-handle",
+	                  &handle, sizeof(handle));
+	if (ret)
+		goto nomem;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	if (owner->claimable) {
+		const char *active;
+	
+		if (owner->claimable == claimable_active) {
+			assert(!owner->hwnode->claimable_owner ||
+			       owner->hwnode->claimable_owner == owner);
+
+			owner->hwnode->claimable_owner = owner;
+			active = "active";
+		} else {
+			const char *status = dt_get_prop_string(node, "status");
+			if (!status || !strncmp(status, "ok", 2)) {
+				ret = dt_set_prop_string(node, "status",
+				                         "disabled");
+				if (ret < 0)
+					goto nomem;
+			}
+
+			active = "standby";
+		}
+
+		ret = dt_set_prop_string(node, "fsl,hv-claimable", active);
+		if (ret < 0)
+			goto nomem;
+	}
+#endif
 
 	return 0;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+		 "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
 }
 
 static int merge_guest_dev(dt_node_t *hwnode, void *arg)

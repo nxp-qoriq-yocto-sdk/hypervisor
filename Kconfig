@@ -246,3 +246,18 @@ config GCOV_CHANNEL
 		Specifies the mux channel to use.  Note: The implementation
 		currently assumes the byte-channel is on a mux and that there
 		is only 1 mux in the system.
+
+config CLAIMABLE_DEVICES
+	bool "Claimable Devices"
+	help
+		Enable support for a type of failover sharing of
+		devices between partitions.  A device is granted
+		to multiple partitions, but is only active in one
+		partition at once.  Active status relates to interrupt
+		and error delivery, but does not affect access to
+		the device's registers or memory.  DMA mapping is
+		done according to the initial owner, but the intent
+		is that the device's DMA map points to shared memory.
+		
+		See the documentation for the "claimable" property
+		in the hypervisor manual.

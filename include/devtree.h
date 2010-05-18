@@ -28,6 +28,7 @@
 #include <libos/libos.h>
 #include <libos/list.h>
 #include <libfdt.h>
+#include <handle.h>
 
 #include <cpc.h>
 
@@ -50,12 +51,62 @@ typedef struct alias {
 	const char *name;
 } alias_t;
 
+typedef enum claimable {
+	not_claimable = 0,
+	claimable_standby,
+	claimable_active,
+} claimable_t;
+
+struct dev_owner;
+
+typedef struct claim_action {
+	/** Perform a subsystem-specific action to claim this device.
+	 * 
+	 * @param[in] action context pointer
+	 * @param[in] owner dev_owner corresponding to the new owner
+	 * @param[in] prev dev_owner corresponding to the existing owner
+	 *            This partition will be in the stopped state.
+	 * @return An error in the hcall error space.  If nonzero, this
+	 *         will abort further action on this claim hcall.
+	 */
+	int (*claim)(struct claim_action *action, struct dev_owner *owner,
+	             struct dev_owner *prev);
+	struct claim_action *next;
+} claim_action_t;
+
 typedef struct dev_owner {
 	list_t dev_node, guest_node;
 	struct guest *guest; /* if NULL, owned by hypervisor */
 	struct dt_node *hwnode, *cfgnode, *gnode;
 	struct dev_owner *direct; /**< nearest ancestor which is directly assigned */
+	handle_t handle;
+#ifdef CONFIG_PAMU
+	uint32_t *liodn_handles;
+	int num_liodns;
+#endif
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	claimable_t claimable;
+	claim_action_t *claim_actions;
+#endif
 } dev_owner_t;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+static inline claimable_t get_claimable(dev_owner_t *owner)
+{
+	return owner->claimable;
+}
+
+void check_compatible_owners(dev_owner_t *new, dev_owner_t *old);
+#else
+static inline claimable_t get_claimable(dev_owner_t *owner)
+{
+	return not_claimable;
+}
+
+static inline void check_compatible_owners(dev_owner_t *new, dev_owner_t *old)
+{
+}
+#endif
 
 typedef struct intmap_entry {
 	struct interrupt *irq; /* If the interrupt goes through vmpic, else NULL */
@@ -99,6 +150,11 @@ typedef struct dt_node {
 	struct mux_complex *bcmux;
 
 	list_t aliases;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	/** Current active owner of a claimable device */
+	dev_owner_t *claimable_owner;
+#endif
 
 	intmap_entry_t *intmap;
 	uint32_t intmap_mask[MAX_ADDR_CELLS + MAX_INT_CELLS];

@@ -673,3 +673,32 @@ fail_one:
 
 	goto next_core;
 }
+
+int get_vmpic_irq(int node, int irq)
+{
+	uint32_t config, priority, destination;
+	int handle, len;
+
+	/* get the interrupt handle for the serial device */
+	const uint32_t *prop = fdt_getprop(fdt, node, "interrupts", &len);
+	if (!prop)
+		return len;
+
+	return prop[irq * 2];
+}
+
+int set_vmpic_irq_priority(int handle, int prio)
+{
+	uint32_t config, oldprio, dest;
+	int ret;
+	
+	ret = fh_vmpic_get_int_config(handle, &config, &oldprio, &dest);
+	if (ret)
+		return ret;
+	
+	ret = fh_vmpic_set_int_config(handle, config, prio, dest);
+	if (ret)
+		return ret;
+
+	return 0;
+}

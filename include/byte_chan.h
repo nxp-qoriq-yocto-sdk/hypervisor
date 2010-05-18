@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <percpu.h>
 #include <devtree.h>
+#include <handle.h>
 
 typedef struct byte_chan_handle {
 	queue_t *tx;      /**< queue for transmitting data */

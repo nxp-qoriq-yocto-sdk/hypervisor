@@ -39,6 +39,7 @@
 #include <devtree.h>
 #include <thread.h>
 #include <benchmark.h>
+#include <handle.h>
 #endif
 
 extern cpu_t secondary_cpus[MAX_CORES - 1];
@@ -51,33 +52,8 @@ struct guest;
 
 #define MAX_HANDLES 1024
 
-struct handle;
 struct ipi_doorbell;
 struct stub_ops;
-
-/** General handle operations that many types of handle will implement.
- * Any member may be NULL.
- */
-typedef struct {
-	/** Reset the handle to partition boot state.
-	 * If the handle was dynamically created, rather than
-	 * device-tree-originated, then close the handle.
-	 */
-	void (*reset)(struct handle *h);
-} handle_ops_t;
-
-/* An extremely crude form of RTTI/multiple interfaces...
- * Add pointers here for other handle types as they are needed.
- */
-typedef struct handle {
-	handle_ops_t *ops;
-	struct byte_chan_handle *bc;
-	struct vmpic_interrupt *intr;
-	struct ipi_doorbell_handle *db;
-	struct pamu_handle *pamu;
-	struct ppid_handle *ppid;
-	struct guest *guest;
-} handle_t;
 
 /**
  * Guest states

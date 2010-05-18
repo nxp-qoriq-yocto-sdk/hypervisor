@@ -32,6 +32,8 @@
 #include <libos/io.h>
 #include <libos/core-regs.h>
 #include <libos/bitops.h>
+#include <libos/errors.h>
+
 #include <vpic.h>
 #include <vmpic.h>
 #include <doorbell.h>
@@ -453,15 +455,42 @@ vpic_interrupt_t *vpic_alloc_irq(guest_t *guest, int config)
 
 int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec)
 {
-	int handle = vmpic_alloc_handle(vpic->guest, &vpic->irq,
-	                                vpic->config);
-	if (handle < 0)
-		return handle;
+	vmpic_interrupt_t *vmirq =
+		vmpic_alloc_handle(vpic->guest, &vpic->irq, vpic->config, 0);
+	if (!vmirq)
+		return ERR_NORESOURCE;
 
 	if (intspec) {
-		intspec[0] = handle;
+		intspec[0] = vmirq->handle;
 		intspec[1] = vpic->config;
 	}
 
-	return handle;
+	return vmirq->handle;
 }
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+typedef struct vpic_claim {
+	claim_action_t action;
+	vpic_interrupt_t *virq;
+} vpic_claim_t;
+
+static int claim_vpic_reflected_int(claim_action_t *action,
+                                    dev_owner_t *owner, dev_owner_t *prev)
+{
+	vpic_claim_t *vpc = to_container(action, vpic_claim_t, action);
+	interrupt_t *irq = &vpc->virq->irq;
+	vpic_interrupt_t *old_virq = irq->parent->priv;
+
+	assert(irq->ops->is_disabled(irq));
+	assert(vmpic_is_claimed(old_virq->irq.priv));
+
+	interrupt_reset(irq->parent);
+	vpic_deassert_vint(old_virq);
+
+	vmpic_set_claimed(old_virq->irq.priv, 0);
+	vmpic_set_claimed(irq->priv, 1);
+	smp_lwsync();
+	irq->parent->priv = vpc->virq;
+	return 0;
+}
+#endif

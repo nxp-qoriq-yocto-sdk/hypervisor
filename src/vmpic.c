@@ -27,6 +27,7 @@
 #include <libos/mpic.h>
 #include <libos/interrupts.h>
 #include <libos/alloc.h>
+#include <libos/hcall-errors.h>
 
 #include <vpic.h>
 #include <hv.h>
@@ -63,52 +64,112 @@ static void vmpic_reset(vmpic_interrupt_t *vmirq)
 
 static void vmpic_reset_handle(handle_t *h)
 {
-	vmpic_reset(h->intr);
+	if (vmpic_is_claimed(h->intr))
+		vmpic_reset(h->intr);
 }
 
 static handle_ops_t vmpic_handle_ops = {
 	.reset = vmpic_reset_handle,
 };
 
-int vmpic_alloc_handle(guest_t *guest, interrupt_t *irq, int config)
+vmpic_interrupt_t *vmpic_alloc_handle(guest_t *guest, interrupt_t *irq,
+                                      int config, int standby)
 {
-	assert(!irq->priv);
+	assert(!irq->priv || standby);
 
 	vmpic_interrupt_t *vmirq = alloc_type(vmpic_interrupt_t);
 	if (!vmirq) {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 		         "%s: out of memory\n", __func__);
-		return ERR_NOMEM;
+		return NULL;
 	}
 
 	vmirq->guest = guest;
 	vmirq->irq = irq;
-	irq->priv = vmirq;
 
 	vmirq->user.intr = vmirq;
 	vmirq->user.ops = &vmpic_handle_ops;
 
 	vmirq->config = config;
-	vmpic_reset(vmirq);
+
+	if (!standby) {
+		irq->priv = vmirq;
+		vmpic_reset(vmirq);
+		vmpic_set_claimed(vmirq, 1);
+	}
 
 	vmirq->handle = alloc_guest_handle(guest, &vmirq->user);
+	if (vmirq->handle < 0) {
+		free(vmirq);
+		return NULL;
+	}
 
 	printlog(LOGTYPE_IRQ, LOGLEVEL_DEBUG,
-	         "vmpic: %p is handle %d in %s\n",
-	         irq, vmirq->handle, guest->name);
+	         "vmpic: %p is handle %d in %s%s\n",
+	         irq, vmirq->handle, guest->name,
+	         standby ? " (standby)" : "");
 
-	return vmirq->handle;
+	return vmirq;
 }
 
 void vmpic_global_init(void)
 {
 }
 
-int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
+#ifdef CONFIG_CLAIMABLE_DEVICES
+static int claim_int(claim_action_t *action, dev_owner_t *owner,
+                     dev_owner_t *prev)
 {
+	vmpic_interrupt_t *vmirq = to_container(action, vmpic_interrupt_t,
+	                                        claim_action);
+	interrupt_t *irq = vmirq->irq;
+	
+	/* Arbitrary 100ms timeout for active bit to deassert */
+	uint32_t timeout = dt_get_timebase_freq() / 10;
+	uint32_t time;
+
+	/* NOTE: This sequence is designed around what the MPIC
+	 * expects.  It assumes that get_activity will return
+	 * zero at some point after the interrupt is masked, and that
+	 * it is OK to change the interrupt config at that point.
+	 */
+
+	/* Should be masked since partition must be stopped to have
+	 * devices claimed away from it.
+	 */
+	assert(irq->ops->is_disabled(irq));
+
+	/* Wait until active bit clears -- has most likely already
+	 * happened.
+	 */
+	time = mfspr(SPR_TBL);
+	while (irq->ops->is_active(irq)) {
+		if (mfspr(SPR_TBL) - time > timeout) {
+			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+			         "%s: %s: IRQ failed to become inactive\n",
+			         __func__, owner->hwnode->name);
+			return EIO;
+		}
+	}
+
+	/* FIXME: make this a libos callback */
+	mpic_irq_set_vector(irq, vmirq->handle);
+	vmpic_reset(vmirq);
+
+	assert(vmpic_is_claimed(irq->priv));
+	vmpic_set_claimed(irq->priv, 0);
+	irq->priv = vmirq;
+	smp_lwsync();
+	vmpic_set_claimed(vmirq, 1);
+	return 0;
+}
+#endif
+
+int vmpic_alloc_mpic_handle(dev_owner_t *owner, interrupt_t *irq, int standby)
+{
+	guest_t *guest = owner->guest;
 	vmpic_interrupt_t *vmirq;
 	register_t saved;
-	int handle;
 
 	if (irq->actions) {
 		printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
@@ -120,7 +181,7 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 	saved = spin_lock_intsave(&vmpic_lock);
 
 	vmirq = irq->priv;
-	if (vmirq) {
+	if (vmirq && !standby) {
 		assert(vmirq->irq == irq);
 
 		if (vmirq->guest != guest) {
@@ -133,18 +194,23 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 			return ERR_BUSY;
 		}
 
-	 	handle = vmirq->handle;
-	 	assert(handle < MAX_HANDLES);
-		assert(guest->handles[handle]);
-		assert(vmirq == guest->handles[handle]->intr);
+	 	assert(vmirq->handle < MAX_HANDLES);
+		assert(guest->handles[vmirq->handle]);
+		assert(vmirq == guest->handles[vmirq->handle]->intr);
 
 		spin_unlock_intsave(&vmpic_lock, saved);
-		return handle;
+		return vmirq->handle;
 	}
 
-	handle = vmpic_alloc_handle(guest, irq, irq->config);
-	if (handle < 0)
+	vmirq = vmpic_alloc_handle(guest, irq, irq->config, standby);
+	if (!vmirq)
 		goto out;
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	vmirq->claim_action.claim = claim_int;
+	vmirq->claim_action.next = owner->claim_actions;
+	owner->claim_actions = &vmirq->claim_action;
+#endif
 
 	/*
 	 * update mpic vector to return guest handle directly
@@ -152,13 +218,13 @@ int vmpic_alloc_mpic_handle(guest_t *guest, interrupt_t *irq)
 	 *
 	 * FIXME: don't assume MPIC, and handle cascaded IRQs
 	 */
-	mpic_irq_set_vector(irq, handle);
+	if (!standby)
+		mpic_irq_set_vector(irq, vmirq->handle);
 
 out:
 	spin_unlock_intsave(&vmpic_lock, saved);
-	return handle;
+	return vmirq->handle;
 }
-
 
 /**
  * @param[in] pointer to guest device tree
@@ -301,6 +367,11 @@ void hcall_vmpic_set_int_config(trapframe_t *regs)
 		return;
 	}
 
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
 	irq = vmirq->irq;
 
 	if (irq->ops->set_priority)
@@ -338,6 +409,11 @@ void hcall_vmpic_get_int_config(trapframe_t *regs)
 		return;
 	}
 
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
 	irq = vmirq->irq;
 
 	if (irq->ops->get_priority)
@@ -356,11 +432,8 @@ void hcall_vmpic_get_int_config(trapframe_t *regs)
 				lcpu_mask = 1 << i;
 	}
 
-	if (irq->ops->get_config) {
+	if (irq->ops->get_config)
 		config = irq->ops->get_config(irq);
-		if (vmirq->config & IRQ_TYPE_MPIC_DIRECT)
-			config |= IRQ_TYPE_MPIC_DIRECT;
-	}
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
@@ -386,17 +459,23 @@ void hcall_vmpic_set_mask(trapframe_t *regs)
 		return;
 	}
 
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
+	interrupt_t *irq = vmirq->irq;
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE, "vmpic %smask: %p %u\n",
-	         mask ? "" : "un", vmirq->irq, handle);
+	         mask ? "" : "un", irq, handle);
 
 	/* For taking care of shared interrupts between partitions */
 	register_t save = spin_lock_intsave(&vmpic_lock);
-	if (mask != vmirq->irq->oldmask) {
-		vmirq->irq->oldmask = mask;
+	if (mask != irq->oldmask) {
+		irq->oldmask = mask;
 		if (mask)
-			interrupt_mask(vmirq->irq);
+			interrupt_mask(irq);
 		else
-			interrupt_unmask(vmirq->irq);
+			interrupt_unmask(irq);
 	}
 	spin_unlock_intsave(&vmpic_lock, save);
 
@@ -420,7 +499,13 @@ void hcall_vmpic_get_mask(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[4] = vmirq->irq->ops->is_disabled(vmirq->irq);
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
+	interrupt_t *irq = vmirq->irq;
+	regs->gpregs[4] = irq->ops->is_disabled(irq);
 	regs->gpregs[3] = 0;  /* success */
 }
 
@@ -443,7 +528,13 @@ void hcall_vmpic_eoi(trapframe_t *regs)
 		return;
 	}
 
-	vmirq->irq->ops->eoi(vmirq->irq);
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
+	interrupt_t *irq = vmirq->irq;
+	irq->ops->eoi(irq);
 	regs->gpregs[3] = 0;  /* success */
 }
 
@@ -490,7 +581,13 @@ void hcall_vmpic_get_activity(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[4] = vmirq->irq->ops->is_active(vmirq->irq);
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
+	interrupt_t *irq = vmirq->irq;
+	regs->gpregs[4] = irq->ops->is_active(irq);
 	regs->gpregs[3] = 0;  /* success */
 }
 
@@ -511,6 +608,12 @@ void hcall_vmpic_get_msir(trapframe_t *regs)
 		return;
 	}
 
-	regs->gpregs[4] = vmirq->irq->ops->get_msir(vmirq->irq);
+	if (!vmpic_is_claimed(vmirq)) {
+		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		return;
+	}
+
+	interrupt_t *irq = vmirq->irq;
+	regs->gpregs[4] = irq->ops->get_msir(irq);
 	regs->gpregs[3] = 0;  /* success */
 }
