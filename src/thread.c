@@ -36,7 +36,7 @@
 
 static sched_t scheds[MAX_CORES];
 
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 extern unsigned long toc_start;
 #endif
 
@@ -137,7 +137,7 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 	thread->prio = prio;
 
 	regs->gpregs[1] = (register_t)regs;
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 	regs->gpregs[2] = (register_t)cpu;
 #else
 	regs->gpregs[2] = (register_t)(&toc_start) + 0x8000UL;
@@ -146,7 +146,7 @@ void new_thread_inplace(thread_t *thread, uint8_t *kstack,
 	regs->gpregs[3] = (register_t)regs;
 	regs->gpregs[4] = (register_t)arg;
 
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 	regs->srr0 = (register_t)func;
 	regs->srr1 = MSR_ME | MSR_CE | MSR_EE | MSR_RI;
 #else

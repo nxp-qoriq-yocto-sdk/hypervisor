@@ -26,7 +26,7 @@
 #define LIBOS_CLIENT_H
 
 #define BASE_TLB_ENTRY 63 /**< TLB entry used for initial mapping */
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 #define PHYSBASE 0x100000 /**< Virtual base of text mapping */
 #define PHYSMAPSIZE TLB_TSIZE_1M
 #else
@@ -38,7 +38,7 @@
 #define HYPERVISOR /**< Indicates that we have the Embedded Hypervisor APU */
 #define INTERRUPTS /**< Indicates that we are interrupt-driven */
 #define TOPAZ /**< Turns on Topaz-specfic hacks in libos */
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 #define KSTACK_SIZE 4096
 #else
 #define KSTACK_SIZE (4096 * 4)

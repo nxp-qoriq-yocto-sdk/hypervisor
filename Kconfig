@@ -66,11 +66,6 @@ config LIBOS_DEPS
 	select LIBOS_CRITICAL_INTS
 	select LIBOS_NO_BARE_SPINLOCKS
 
-config 64BIT
-	bool "64-bit Processor Support"
-	help
-		Provides support for a 64-bit processor
-
 config GCC_CPU_FLAG
 	string "Processor specific compiler optimizations"
 	default "e500mc"

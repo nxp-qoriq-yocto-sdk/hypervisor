@@ -47,7 +47,7 @@ typedef union tlbctag {
 		 * 64KiB TLB cache.  For larger caches, the high-order bits
 		 * are zero.
 		 */
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 		uintptr_t vaddr:10;
 #else
 		uintptr_t vaddr:42;

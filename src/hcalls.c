@@ -433,7 +433,7 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 	int handle = regs->gpregs[3];
 	size_t len = regs->gpregs[4];
 	const uint8_t *buf = (const uint8_t *)&regs->gpregs[5];
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	uint64_t tmp[2];
 
 	/* support for 32-bit guests */
@@ -513,7 +513,7 @@ static void hcall_byte_channel_receive(trapframe_t *regs)
 	regs->gpregs[4] = byte_chan_receive(bc, outbuf, max_receive);
 	spin_unlock_intsave(&bc->rx_lock, saved);
 
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	/* support for 32-bit guests */
 	if (!(regs->srr1 & MSR_CM)) {
 		uint64_t tmp[2];

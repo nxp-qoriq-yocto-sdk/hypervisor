@@ -29,7 +29,7 @@
 #include <libos/core-regs.h>
 #include <libos/fsl-booke-tlb.h>
 
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 /* 32-bit */
 #define LONGBYTES 4
 #define LOAD lwz
@@ -61,7 +61,7 @@
 	 */
 	dcba	0, %r2
 
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	addi	%r2, %r2, 64
 	dcba	0, %r2
 	addi	%r2, %r2, -64
@@ -91,7 +91,7 @@
 	mfspr	%r8, \addr
 	addi	%r5, %r5, -1
 	STORE	%r4, LONGBYTES*15(%r2)
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 	rlwinm	%r3, %r3, 0, 0xfffff000	// r3 = cache address from SPRG3
 #else
 	clrrdi	%r3, %r3, 12
@@ -262,7 +262,7 @@ tlb_miss_fast_common:
 	LOAD	%r11, LONGBYTES*8(%r2)
 	LOAD	%r12, LONGBYTES*9(%r2)
 	dcbi	0, %r2
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	addi	%r2, %r2, 64
 	dcbi	0, %r2
 #endif
@@ -286,7 +286,7 @@ tlb_miss_slow:
 	mtcr	%r12
 	LOAD	%r12, LONGBYTES*9(%r2)
 	dcbi	0, %r2
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	addi	%r2, %r2, 64
 	dcbi	0, %r2
 #endif
@@ -297,7 +297,7 @@ itlb_miss_slow:
 	mtcr	%r12
 	LOAD	%r12, LONGBYTES*9(%r2)
 	dcbi	0, %r2
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_LIBOS_64BIT
 	addi	%r2, %r2, 64
 	dcbi	0, %r2
 #endif

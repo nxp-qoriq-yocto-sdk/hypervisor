@@ -629,7 +629,7 @@ shell_cmd(resume);
 
 #ifdef CONFIG_TLB_CACHE
 
-#ifndef CONFIG_64BIT
+#ifndef CONFIG_LIBOS_64BIT
 #define VADDR_WIDTH	"8"
 #define PADDR_WIDTH	"9"
 #else
