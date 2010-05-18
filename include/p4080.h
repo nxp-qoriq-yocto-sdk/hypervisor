@@ -61,17 +61,7 @@ typedef struct {
  */
 #define CPCPAR_MASK 0x3FB
 
-typedef struct cpc_part_reg {
-	uint32_t cpcpir, reserved, cpcpar, cpcpwr;
-} cpc_part_reg_t;
-
 #define NUM_PART_REGS 16
-
-typedef struct cpc_dev {
-	unsigned long cpc_reg_map;
-	uint32_t *cpccsr0;
-	struct cpc_part_reg *cpc_part_base;
-} cpc_dev_t;
 
 #define NUM_SNOOP_IDS 32
 
@@ -98,5 +88,39 @@ typedef struct cpc_dev {
 #define   CCF_CMECAR_MINT     0x00000200 // MINT detected
 #define   CCF_CMECAR_SOLE     0x00000100 // SOLE data and intervention detected
 
+/* CPC error registers */
+#define CPC_CAPTDATAHI     0xE20 //CPC Error capture data high register
+#define CPC_CAPTDATALO     0xE24 //CPC Error capture data low register
+
+#define CPC_CAPTECC        0xE28 //CPC Error capture ECC syndrome register
+
+#define CPC_ERRDET         0xE40 //CPC error detect register
+#define   CPC_ERRDET_MULLERR    0x80000000 //Multiple CPC errors
+#define   CPC_ERRDET_TMHITERR   0x00000080 //Tag multi way hit error
+#define   CPC_ERRDET_TMBECCERR  0x00000040 //Tag or status multi bit ecc error
+#define   CPC_ERRDET_TSBECCERR  0x00000020 //Tag or status single bit ecc error
+#define   CPC_ERRDET_DMBECCERR  0x00000008 //Data multi bit ECC error
+#define   CPC_ERRDET_DSBECCERR  0x00000004 //Data single bit ECC error
+#define   CPC_ERR_MASK         (CPC_ERRDET_TMHITERR | CPC_ERRDET_TMBECCERR \
+	 | CPC_ERRDET_TSBECCERR | CPC_ERRDET_DMBECCERR | CPC_ERRDET_DSBECCERR)
+
+#define CPC_ERRDIS         0xE44 //CPC error disable register
+#define   CPC_ERRDIS_TMHITDIS   0x00000080 //Tag multi way hit error disable
+#define   CPC_ERRDIS_TMBECCDIS  0x00000040 //Tag or status multi bit ecc error disable
+#define   CPC_ERRDIS_TSBECCDIS  0x00000020 //Tag or status single bit ecc error disable
+#define   CPC_ERRDIS_DMBECCDIS  0x00000008 //Data multi bit ECC error disable
+#define   CPC_ERRDIS_DSBECCDIS  0x00000004 //Data single bit ECC error disable
+
+#define CPC_ERRINTEN       0xE48 //CPC error interrupt enable register
+#define   CPC_ERRINTEN_TMHITINTEN   0x00000080 //Tag multi way hit error interrupt enable
+#define   CPC_ERRINTEN_TMBECCINTEN  0x00000040 //Tag or status multi bit ecc error interrupt enable
+#define   CPC_ERRINTEN_TSBECCINTEN  0x00000020 //Tag or status single bit ecc error interrupt enable
+#define   CPC_ERRINTEN_DMBECCINTEN  0x00000008 //Data multi bit ECC error interrupt enable
+#define   CPC_ERRINTEN_DSBECCINTEN  0x00000004 //Data single bit ECC error interrupt enable
+
+#define CPC_ERRATTR       0xE4C //CPC error attribute register
+#define CPC_ERREADDR      0xE50 //CPC error extended address register
+#define CPC_ERRADDR       0xE54 //CPC error address register
+#define CPC_ERRCTL        0xE58 //CPC error control register
 
 #endif

@@ -56,12 +56,12 @@ extern error_domain_t error_domains[];
 
 #define CPC_ERROR_COUNT 6
 typedef enum {
+	cpc_multiple_errors,
 	cpc_tag_multi_way_hit,
 	cpc_tag_status_multi_bit_ecc,
 	cpc_tag_status_single_bit_ecc,
 	cpc_data_multi_bit_ecc,
-	cpc_data_single_bit_ecc,
-	cpc_config
+	cpc_data_single_bit_ecc
 } cpc_errors_t;
 extern error_policy_t cpc_error_policy[];
 

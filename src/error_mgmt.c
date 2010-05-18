@@ -38,12 +38,12 @@ typedef struct setpolicy_ctx {
 } setpolicy_ctx_t;
 
 error_policy_t cpc_error_policy[CPC_ERROR_COUNT] = {
+	[cpc_multiple_errors] = {"multiple errors", "disable"},
 	[cpc_tag_multi_way_hit] = {"tag multi-way hit", "disable"},
 	[cpc_tag_status_multi_bit_ecc] = {"tag status multi-bit ecc", "disable"},
 	[cpc_tag_status_single_bit_ecc] = {"tag status single-bit ecc",  "disable"},
 	[cpc_data_multi_bit_ecc] = {"data multi-bit ecc", "disable"},
 	[cpc_data_single_bit_ecc] = {"data single-bit ecc", "disable"},
-	[cpc_config] = {"config", "disable"}
 };
 
 error_policy_t ccf_error_policy[CCF_ERROR_COUNT] = {
@@ -240,6 +240,21 @@ void dump_domain_error_info(hv_error_t *err, domains_t domain)
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			"PAMU access violation lpid = %x, handle = %x\n",
 			pamu->lpid, pamu->liodn_handle);
+		break;
+	}
+
+	case error_cpc: {
+		cpc_error_t *cpc = &err->cpc;
+
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdet : %x, cpc errinten : %x\n",
+			cpc->cpcerrdet, cpc->cpcerrinten);
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdis : %x\n",
+			cpc->cpcerrdis);
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errattr : %x, cpc captecc : %x\n",
+			cpc->cpcerrattr, cpc->cpccaptecc);
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc erraddr : %llx, cpc errctl : %x\n",
+			cpc->cpcerraddr, cpc->cpcerrctl);
 		break;
 	}
 

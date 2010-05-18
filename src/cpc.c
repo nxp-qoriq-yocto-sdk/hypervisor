@@ -37,6 +37,20 @@
 #include <error_log.h>
 #include <error_mgmt.h>
 
+struct cpc_error_info {
+	const char *policy;
+	uint32_t reg_val;
+};
+
+static struct cpc_error_info cpc_err[CPC_ERROR_COUNT] = {
+	[cpc_multiple_errors] = {NULL, CPC_ERRDET_MULLERR},
+	[cpc_tag_multi_way_hit] = {NULL, CPC_ERRDET_TMHITERR},
+	[cpc_tag_status_multi_bit_ecc] = {NULL, CPC_ERRDET_TMBECCERR},
+	[cpc_tag_status_single_bit_ecc] = {NULL, CPC_ERRDET_TSBECCERR},
+	[cpc_data_multi_bit_ecc] = {NULL, CPC_ERRDET_DMBECCERR},
+	[cpc_data_single_bit_ecc] = {NULL, CPC_ERRDET_DSBECCERR},
+};
+
 static cpc_dev_t cpcs[num_mem_tgts];
 static uint32_t num_cpc_ways;
 
@@ -93,6 +107,8 @@ static void init_cpc_dev(mem_tgts_t mem_tgt, void *vaddr)
         }
 
 	cpcs[mem_tgt].cpccsr0 = vaddr;
+	cpcs[mem_tgt].cpc_err_base =
+		(cpc_err_reg_t *) ((uintptr_t)vaddr + CPC_ERRDET);
 	cpcs[mem_tgt].cpc_part_base =
 		(cpc_part_reg_t *)((uintptr_t)vaddr + CPCPIR0);
 	/*cpc_reg_map requires 16 bits*/
@@ -118,16 +134,48 @@ static driver_t __driver cpc = {
 static int cpc_error_isr(void *arg)
 {
 	hv_error_t err = { };
-	device_t *dev = arg;
-	interrupt_t *irq;
+	cpc_dev_t *cpc = arg;
+	uint32_t val;
+	uint32_t errattr = 0;
 
-	irq = dev->irqs[0];
-	irq->ops->disable(irq);
+	val = in32(&cpc->cpc_err_base->cpcerrdet);
 
 	strncpy(err.domain, get_domain_str(error_cpc), sizeof(err.domain));
-	strcpy(err.error, get_domain_str(error_cpc));
 
-	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	dt_get_path(NULL, cpc->cpc_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+
+	for (int i = cpc_multiple_errors; i < CPC_ERROR_COUNT; i++) {
+		const char *policy = cpc_err[i].policy;
+		uint32_t err_val = cpc_err[i].reg_val;
+
+		if ( val & err_val) {
+			cpc_error_t *cpc_err = &err.cpc;
+
+			strncpy(err.error, get_error_str(error_cpc, i), sizeof(err.error));
+
+			cpc_err->cpcerrdet = val;
+			cpc_err->cpcerrinten = in32(&cpc->cpc_err_base->cpcerrinten);
+			cpc_err->cpcerrdis = in32(&cpc->cpc_err_base->cpcerrdis);
+			errattr = in32(&cpc->cpc_err_base->cpcerrattr);
+			if (errattr & 0x1) {
+				cpc_err->cpcerrattr = errattr;
+				cpc_err->cpccaptecc =
+					in32((uint32_t *)((uintptr_t)cpc->cpccsr0 + CPC_CAPTECC));
+				cpc_err->cpcerraddr =
+					((phys_addr_t) in32(&cpc->cpc_err_base->cpcerreaddr) << 32) |
+					in32(&cpc->cpc_err_base->cpcerraddr);
+			}
+			cpc_err->cpcerrctl =
+				in32(&cpc->cpc_err_base->cpcerrctl);
+
+			error_policy_action(&err, error_cpc, policy);
+		}
+	}
+
+	if (errattr & 0x1)
+		out32(&cpc->cpc_err_base->cpcerrattr, errattr & ~0x1);
+
+	out32(&cpc->cpc_err_base->cpcerrdet, val);
 
 	return 0;
 }
@@ -193,13 +241,39 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 	}
 
 	for (int i = 0; i < dev->num_regs; i++) {
+		uint32_t *errinten;
+		uint32_t *errdis;
+
 		if ((dev->num_regs > i) && (dev->regs[i].virt != NULL))
 			init_cpc_dev(i, dev->regs[i].virt);
 
+		cpcs[i].cpc_node = cpc_node;
+
+		errinten = &cpcs[i].cpc_err_base->cpcerrinten;
+		errdis = &cpcs[i].cpc_err_base->cpcerrdis;
+
+		out32(errinten, 0);
+		out32(errdis, CPC_ERR_MASK);
+
 		if (dev->num_irqs > i) {
+			uint32_t val = 0;
+
 			interrupt_t *irq = dev->irqs[i];
-			if (irq && irq->ops->register_irq)
-				irq->ops->register_irq(irq, cpc_error_isr, dev, TYPE_MCHK);
+			if (irq && irq->ops->register_irq) {
+				for (int i = cpc_tag_multi_way_hit; i < CPC_ERROR_COUNT; i++) {
+					cpc_err[i].policy = get_error_policy(error_cpc, i);
+
+					if (!strcmp(cpc_err[i].policy, "disable"))
+						continue;
+
+					val |= cpc_err[i].reg_val;
+				}
+
+				irq->ops->register_irq(irq, cpc_error_isr, &cpcs[i], TYPE_MCHK);
+
+				out32(errdis, ~val & CPC_ERR_MASK);
+				out32(errinten, val);
+			}
 		}
 	}
 

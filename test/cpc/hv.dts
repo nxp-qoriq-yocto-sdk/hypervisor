@@ -63,6 +63,30 @@
 
 		cpc {
 			device = "/soc/l3-cache-controller";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "cpc";
+				error = "data single-bit ecc";
+				policy = "notify";
+			};
+			error-config@1 {
+				compatible = "error-config";
+				domain = "cpc";
+				error = "data multi-bit ecc";
+				policy = "notify";
+			};
+			error-config@2 {
+				compatible = "error-config";
+				domain = "cpc";
+				error = "tag status multi-bit ecc";
+				policy = "notify";
+			};
+			error-config@3 {
+				compatible = "error-config";
+				domain = "cpc";
+				error = "tag status single-bit ecc";
+				policy = "notify";
+			};
 		};
 
 		corenet-law {

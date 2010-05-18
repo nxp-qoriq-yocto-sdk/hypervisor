@@ -28,6 +28,28 @@
 struct dt_node;
 struct dt_prop;
 
+typedef struct cpc_part_reg {
+	uint32_t cpcpir, reserved, cpcpar, cpcpwr;
+} cpc_part_reg_t;
+
+typedef struct cpc_err_reg {
+	uint32_t cpcerrdet;
+	uint32_t cpcerrdis;
+	uint32_t cpcerrinten;
+	uint32_t cpcerrattr;
+	uint32_t cpcerreaddr;
+	uint32_t cpcerraddr;
+	uint32_t cpcerrctl;
+} cpc_err_reg_t;
+
+typedef struct cpc_dev {
+	unsigned long cpc_reg_map;
+	uint32_t *cpccsr0;
+	struct cpc_err_reg *cpc_err_base;
+	struct cpc_part_reg *cpc_part_base;
+	struct dt_node *cpc_node;
+} cpc_dev_t;
+
 /* Derived from available DDR targets for P4080 */
 typedef enum mem_tgts {
 	mem_tgt_ddr1,

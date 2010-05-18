@@ -238,6 +238,10 @@ void dump_hv_queue(trapframe_t *regs)
 		if (!strcmp(err.domain, get_domain_str(error_ccf))) {
 			dump_domain_error_info(&err, error_ccf);
 		}
+
+		if (!strcmp(err.domain, get_domain_str(error_cpc))) {
+			dump_domain_error_info(&err, error_cpc);
+		}
 	}
 
 	spin_unlock(&hv_queue_cons_lock);
