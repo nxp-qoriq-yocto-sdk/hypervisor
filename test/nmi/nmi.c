@@ -33,8 +33,8 @@
 #include <libos/fsl-booke-tlb.h>
 
 #define CPUCNT 5
-static int cpus_complete[CPUCNT];
-static int cpus_ready[CPUCNT];
+static volatile int cpus_complete[CPUCNT];
+static volatile int cpus_ready[CPUCNT];
 
 void init(unsigned long devtree_ptr);
 
