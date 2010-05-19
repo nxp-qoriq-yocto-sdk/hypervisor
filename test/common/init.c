@@ -458,7 +458,7 @@ void init(unsigned long devtree_ptr)
 		if (!fdt_node_check_compatible(fdt, node, "ns16550"))
 			stdout = test_init_uart(node);
 		else if (!fdt_node_check_compatible(fdt, node,
-		         "fsl,hv-byte-channel-handle"))
+		         "epapr,hv-byte-channel"))
 			stdout = test_init_byte_chan(node);
 		else {
 			printf("Unrecognized stdout compatible.\n");
