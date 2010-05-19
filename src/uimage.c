@@ -137,7 +137,7 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	int index;
 	unsigned char *compr, *uncompr;
 	size_t uncomprlen;
-	size_t comprlen = size >= PAGE_SIZE ? 1UL << ilog2(size) : size;
+	size_t comprlen = size >= PAGE_SIZE ? 1UL << ilog2_32(size) : size;
 
 	comprlen = comprlen > 16*1024*1024 ? 16*1024*1024 : comprlen;
 	uncompr = map_gphys(TEMPTLB1, guest_gphys, target, temp_mapping[0],
@@ -188,7 +188,8 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 		if (d_stream.avail_in == 0) {
 			size_t tsize;
 
-			tsize = size >= PAGE_SIZE ? 1UL << ilog2(size) : size;
+			tsize = size >= PAGE_SIZE ? 1UL << ilog2_32(size) :
+								size;
 			tsize = tsize > 16*1024*1024 ? 16*1024*1024 : tsize;
 			image_phys += comprlen;
 			compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1],

@@ -65,7 +65,7 @@ static unsigned int map_addrspace_size_to_wse(phys_addr_t addrspace_size)
 static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
 {
 	/* window count is 2^(WCE+1) bytes */
-	return count_lsb_zeroes(subwindow_cnt) - 1;
+	return count_lsb_zeroes_32(subwindow_cnt) - 1;
 }
 
 static int is_subwindow_count_valid(int subwindow_cnt)

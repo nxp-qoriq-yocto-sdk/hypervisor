@@ -407,7 +407,7 @@ static int get_free_csd(void)
 	if ((~csdid_map & ((1ULL << numcsds) - 1)) == 0)
 		return ERR_BUSY;
 
-	csdid = count_lsb_zeroes(~csdid_map);
+	csdid = count_lsb_zeroes_32(~csdid_map);
 	assert(in32(&csdids[csdid]) == 0);
 	csdid_map |= (1 << csdid);
 

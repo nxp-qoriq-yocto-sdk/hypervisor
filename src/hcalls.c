@@ -303,7 +303,7 @@ static void hcall_send_nmi(trapframe_t *regs)
 	unsigned int vcpu_mask = regs->gpregs[3];
 	unsigned int bit;
 
-	bit = 31 - count_msb_zeroes(vcpu_mask) + 1;
+	bit = 31 - count_msb_zeroes_32(vcpu_mask) + 1;
 	if (vcpu_mask != 0 && bit > ncpu) {
 		regs->gpregs[3] = EINVAL;
 		return;
@@ -312,7 +312,7 @@ static void hcall_send_nmi(trapframe_t *regs)
 	while (vcpu_mask) {
 		gcpu_t *gcpu;
 
-		bit = count_lsb_zeroes(vcpu_mask);
+		bit = count_lsb_zeroes_32(vcpu_mask);
 		gcpu = get_gcpu()->guest->gcpus[bit];
 
 		setgevent(gcpu, gev_nmi);
