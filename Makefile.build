@@ -141,6 +141,10 @@ OBJS_NOCHECK := $(basename $(hv-src-nocheck-y))
 OBJS := $(OBJS:%=bin/%.o)
 OBJS_NOCHECK := $(OBJS_NOCHECK:%=bin/nocheck/%.o)
 
+ifeq ($(CONFIG_BUILD_CONFIG),y)
+	OBJS += bin/bld_cfg.o
+endif
+
 hypertrk-objs-$(CONFIG_HYPERTRK) := $(src)hypertrk/libHyperTRK.o
 
 HDRS := $(shell cd $(src); find include -name '*.h' -print)
@@ -148,7 +152,7 @@ HDRS := $(shell cd $(src); find include -name '*.h' -print)
 bin/hv.uImage: bin/hv.bin
 	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $< $@
 
-Bbin/hv.bin.gz: bin/hv.bin
+bin/hv.bin.gz: bin/hv.bin
 	gzip -f $<
 
 bin/hv.bin: bin/hv
@@ -191,6 +195,13 @@ bin/hv_assym.s: bin/hv_assym.o
 	@$(MKDIR) $(@D)
 	$(call show,genassym: $(<:$(src)%=%))
 	$(V)$(GENASSYM) -o $@ $<
+
+bin/bld_cfg.o: bin/bld_cfg.c
+	$(call build,CHECKCC,$(CC_OPTS_NODEP) $(CC_OPTS) $(CC_OPTS_C) $(WARNINGS))
+
+bin/bld_cfg.c: .config
+	echo "const unsigned char build_config_data[] = {" >$@
+	od -txC -v .config | sed -e "s/^[0-9]*//" -e "s/ \([0-9a-f][0-9a-f]\)/0x\1,/g" -e "\$$d" | sed -e "\$$s/,$$/,0x00};/" >>$@
 
 # include the dependecy files
 ifneq ($(MAKECMDGOALS),clean)

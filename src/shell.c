@@ -988,3 +988,27 @@ static command_t error_policy = {
 };
 shell_cmd(error_policy);
 
+#ifdef CONFIG_BUILD_CONFIG
+extern const unsigned char build_config_data[];
+
+static void build_config_dump_fn(shell_t *shell, char *args)
+{
+        const unsigned char *p = build_config_data;
+
+        while (*p)
+        {
+                if (*p == '\n')
+                        queue_writechar_blocking(shell->out, '\r');
+                queue_writechar_blocking(shell->out, (*p++));
+        }
+}
+
+static command_t build_config = {
+        .name = "buildconfig",
+        .action = build_config_dump_fn,
+	.aliases = (const char *[]){ "bc", NULL },
+        .shorthelp = "Display build time configuration",
+};
+shell_cmd(build_config);
+#endif
+

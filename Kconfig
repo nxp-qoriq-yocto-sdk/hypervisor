@@ -242,6 +242,13 @@ config GCOV_CHANNEL
 		currently assumes the byte-channel is on a mux and that there
 		is only 1 mux in the system.
 
+config BUILD_CONFIG
+	bool "Shell command to display build time configuration"
+	default y
+	help
+		Enable "buildconfig" shell command to display the configuration
+		selected at build time.
+
 config CLAIMABLE_DEVICES
 	bool "Claimable Devices"
 	help
