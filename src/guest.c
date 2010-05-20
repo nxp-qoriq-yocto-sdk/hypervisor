@@ -507,14 +507,12 @@ bad:
 			virq->irq.parent = irq;
 			virq->eoi_callback = vpic_unmask_parent;
 
-#ifdef CONFIG_CLAIMABLE_DEVICES
 			/* Register the reflecting interrupt handler */
-			if (owner->claimable != claimable_standby) {
+			if (get_claimable(owner) != claimable_standby) {
 				irq->priv = virq;
 				irq->ops->register_irq(irq, reflect_errint,
 				                       irq, TYPE_MCHK);
 			}
-#endif
 		}
 
 	}
