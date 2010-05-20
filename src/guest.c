@@ -1017,7 +1017,7 @@ static int create_recv_dbell_handle(const char *kind, guest_t *guest,
 	// We can't embed a \0 in the format string, because that will confuse
 	// snprintf (it will stop scanning when it sees the \0), so we use %c.
 	length = snprintf(s, sizeof(s),
-		"fsl,hv-%s-doorbell%cfsl,hv-doorbell-receive-handle", kind, 0);
+		"fsl,hv-%s-doorbell%cepapr,hv-receive-doorbell", kind, 0);
 
 	ret = dt_set_prop(node, "compatible", s, length + 1);
 	if (ret < 0)
@@ -1069,7 +1069,7 @@ static int create_send_dbell_handle(const char *kind, guest_t *guest,
 	// We can't embed a \0 in the format string, because that will confuse
 	// snprintf (it will stop scanning when it sees the \0), so we use %c.
 	length = snprintf(s, sizeof(s),
-		"fsl,hv-%s-doorbell%cfsl,hv-doorbell-send-handle", kind, 0);
+		"fsl,hv-%s-doorbell%cepapr,hv-send-doorbell", kind, 0);
 
 	ret = dt_set_prop(node, "compatible", s, length + 1);
 	if (ret < 0)

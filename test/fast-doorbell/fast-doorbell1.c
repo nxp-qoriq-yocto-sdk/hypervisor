@@ -125,7 +125,7 @@ static int test_init(void)
 	if (ret)
 		return -1;
 	ret = fdt_node_offset_by_compatible(fdt, off,
-					"fsl,hv-doorbell-receive-handle");
+					"epapr,hv-receive-doorbell");
 	if (ret == -FDT_ERR_NOTFOUND)
 		return ret;
 	if (ret < 0)

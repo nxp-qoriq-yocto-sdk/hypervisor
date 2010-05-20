@@ -378,7 +378,7 @@ static int send_dbell_init_one(dt_node_t *node, void *arg)
 	dt_record_guest_phandle(hnode, node);
 
 	// Insert the 'compatible' property.
-	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-send-handle");
+	ret = dt_set_prop_string(hnode, "compatible", "epapr,hv-send-doorbell");
 	if (ret)
 		// Out of memory
 		return ret;
@@ -429,7 +429,7 @@ static int recv_dbell_init_one(dt_node_t *node, void *arg)
 	dt_record_guest_phandle(hnode, node);
 
 	// Insert the 'compatible' property.
-	ret = dt_set_prop_string(hnode, "compatible", "fsl,hv-doorbell-receive-handle");
+	ret = dt_set_prop_string(hnode, "compatible", "epapr,hv-receive-doorbell");
 	if (ret)
 		// Out of memory
 		return ret;

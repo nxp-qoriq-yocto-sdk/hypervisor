@@ -658,7 +658,7 @@ static int cmd_status(void)
 	       "--------------------------------------------\n");
 
 	node = NULL;
-	while ((node = gdt_find_next_compatible(node, "fsl,hv-doorbell-receive-handle")) != NULL) {
+	while ((node = gdt_find_next_compatible(node, "epapr,hv-receive-doorbell")) != NULL) {
 		gdt_prop_t *prop;
 		char name[32];
 		uint32_t *irq;
@@ -676,7 +676,7 @@ static int cmd_status(void)
 	}
 
 	node = NULL;
-	while ((node = gdt_find_next_compatible(node, "fsl,hv-doorbell-send-handle")) != NULL) {
+	while ((node = gdt_find_next_compatible(node, "epapr,hv-send-doorbell")) != NULL) {
 		gdt_prop_t *prop;
 		uint32_t reg;
 		char name[32];
@@ -985,7 +985,7 @@ static int get_handle(const char *name)
 	// Receive doorbells have their handle in the "interrupts" property.
 	// Everyone else has it in the "reg" property.
 
-	if (gdt_is_compatible(node, "fsl,hv-doorbell-receive-handle"))
+	if (gdt_is_compatible(node, "epapr,hv-receive-doorbell"))
 		prop = gdt_get_property(node, "interrupts");
 	else
 		prop = gdt_get_property(node, "reg");

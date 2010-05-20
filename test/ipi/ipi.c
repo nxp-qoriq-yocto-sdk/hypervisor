@@ -129,7 +129,7 @@ static int test_init(void)
 {
 	const uint32_t *handle_p;
 
-	handle_p_int = get_handle("fsl,hv-doorbell-receive-handle", "interrupts", fdt);
+	handle_p_int = get_handle("epapr,hv-receive-doorbell", "interrupts", fdt);
 
 	if (!handle_p_int) {
 		printf("Couldn't get recv doorbell handle\n");
@@ -142,7 +142,7 @@ static int test_init(void)
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 
-	handle_p = get_handle("fsl,hv-doorbell-send-handle", "reg", fdt);
+	handle_p = get_handle("epapr,hv-send-doorbell", "reg", fdt);
 
 	if (!handle_p) {
 		printf("Couldn't get send doorbell handle\n");
