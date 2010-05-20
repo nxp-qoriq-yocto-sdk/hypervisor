@@ -2,7 +2,7 @@
  * I2C device emulation
  */
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -200,7 +200,7 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 	// Check to see if the vmpic initialization code has already processed
 	// this node.  In other words, this node needs to have the vmpic as its
 	// interrupt parent.
-	if (!dt_node_is_compatible(controller, "fsl,hv-vmpic")) {
+	if (!dt_node_is_compatible(controller, "epapr,hv-pic")) {
 		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			 "node %s must have the VMPIC as an interrupt parent\n",
 			 node->name);

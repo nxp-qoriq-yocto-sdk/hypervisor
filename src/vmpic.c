@@ -255,11 +255,11 @@ void vmpic_partition_init(guest_t *guest)
 		int len;
 
 		len = snprintf(s, sizeof(s),
-				"fsl,hv-mpic-per-cpu%cfsl,hv-vmpic", 0);
+				"fsl,hv-mpic-per-cpu%cepapr,hv-pic", 0);
 		if (dt_set_prop(vmpic, "compatible", s, len + 1) < 0)
 			goto nomem;
 	} else {
-		if (dt_set_prop_string(vmpic, "compatible", "fsl,hv-vmpic") < 0)
+		if (dt_set_prop_string(vmpic, "compatible", "epapr,hv-pic") < 0)
 			goto nomem;
 	}
 
