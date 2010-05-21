@@ -121,6 +121,11 @@ typedef struct {
 #define CPC_ERRATTR       0xE4C //CPC error attribute register
 #define CPC_ERREADDR      0xE50 //CPC error extended address register
 #define CPC_ERRADDR       0xE54 //CPC error address register
+
 #define CPC_ERRCTL        0xE58 //CPC error control register
+#define   CPC_ERRCTL_DATA_CNT_MASK  0x000000ff //Mask for Data ECC count
+#define   CPC_ERRCTL_TAG_CNT_MASK   0x0000ff00 //Mask for Tag ECC count
+
+#define CPC_ERRCTL_THRESH_SHIFT 16
 
 #endif

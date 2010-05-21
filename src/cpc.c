@@ -149,24 +149,33 @@ static int cpc_error_isr(void *arg)
 		uint32_t err_val = cpc_err[i].reg_val;
 
 		if ( val & err_val) {
-			cpc_error_t *cpc_err = &err.cpc;
+			cpc_error_t *hv_cpc_err = &err.cpc;
+			uint32_t errctlval;
 
 			strncpy(err.error, get_error_str(error_cpc, i), sizeof(err.error));
 
-			cpc_err->cpcerrdet = val;
-			cpc_err->cpcerrinten = in32(&cpc->cpc_err_base->cpcerrinten);
-			cpc_err->cpcerrdis = in32(&cpc->cpc_err_base->cpcerrdis);
+			hv_cpc_err->cpcerrdet = val;
+			hv_cpc_err->cpcerrinten = in32(&cpc->cpc_err_base->cpcerrinten);
+			hv_cpc_err->cpcerrdis = in32(&cpc->cpc_err_base->cpcerrdis);
 			errattr = in32(&cpc->cpc_err_base->cpcerrattr);
 			if (errattr & 0x1) {
-				cpc_err->cpcerrattr = errattr;
-				cpc_err->cpccaptecc =
+				hv_cpc_err->cpcerrattr = errattr;
+				hv_cpc_err->cpccaptecc =
 					in32((uint32_t *)((uintptr_t)cpc->cpccsr0 + CPC_CAPTECC));
-				cpc_err->cpcerraddr =
+				hv_cpc_err->cpcerraddr =
 					((phys_addr_t) in32(&cpc->cpc_err_base->cpcerreaddr) << 32) |
 					in32(&cpc->cpc_err_base->cpcerraddr);
 			}
-			cpc_err->cpcerrctl =
+			hv_cpc_err->cpcerrctl = errctlval =
 				in32(&cpc->cpc_err_base->cpcerrctl);
+
+			if (i == cpc_data_single_bit_ecc)
+				errctlval &= ~CPC_ERRCTL_DATA_CNT_MASK;
+
+			if (i == cpc_tag_status_single_bit_ecc)
+				errctlval &= ~CPC_ERRCTL_TAG_CNT_MASK;
+
+			out32(&cpc->cpc_err_base->cpcerrctl, errctlval);
 
 			error_policy_action(&err, error_cpc, policy);
 		}
@@ -243,6 +252,7 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 	for (int i = 0; i < dev->num_regs; i++) {
 		uint32_t *errinten;
 		uint32_t *errdis;
+		uint32_t *errctl;
 
 		if ((dev->num_regs > i) && (dev->regs[i].virt != NULL))
 			init_cpc_dev(i, dev->regs[i].virt);
@@ -251,6 +261,7 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 
 		errinten = &cpcs[i].cpc_err_base->cpcerrinten;
 		errdis = &cpcs[i].cpc_err_base->cpcerrdis;
+		errctl = &cpcs[i].cpc_err_base->cpcerrctl;
 
 		out32(errinten, 0);
 		out32(errdis, CPC_ERR_MASK);
@@ -270,6 +281,9 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 				}
 
 				irq->ops->register_irq(irq, cpc_error_isr, &cpcs[i], TYPE_MCHK);
+
+				/*FIXME : Hard coding the single bit ecc threshold to 128*/
+				out32(errctl, 0x80 << CPC_ERRCTL_THRESH_SHIFT);
 
 				out32(errdis, ~val & CPC_ERR_MASK);
 				out32(errinten, val);
