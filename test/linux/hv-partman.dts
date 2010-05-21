@@ -229,11 +229,6 @@
 			dma-window = <&window0>;
 		};
 
-		pme {
-			device = "pme";
-			dma-window = <&window0>;
-		};
-
 		bman-portalA {
 			device = "/bman-portals/bman-portal@0";
 			vcpu = <0>;
@@ -465,7 +460,7 @@
 		node-update {
 			chosen {
 				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x02000000>;
+				linux,initrd-end = <0x02B00000>;
 			};
 		};
 	};
@@ -546,7 +541,7 @@
 		node-update {
 			chosen {
 				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x02000000>;
+				linux,initrd-end = <0x02B00000>;
 			};
 		};
 	};
