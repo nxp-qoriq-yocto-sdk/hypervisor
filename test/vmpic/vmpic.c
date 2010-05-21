@@ -45,7 +45,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	int rc;
 	unsigned int mask, active;
 
-	rc = ev_int_iack(&vector);
+	rc = ev_int_iack(0, &vector);
 
 	if (coreint) {
 		if (rc != EV_INVALID_STATE)
@@ -117,7 +117,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	}
 
 	/* VMPIC config */
-	ev_int_set_config(*handle_p,0x3,15,0x00000001);
+	ev_int_set_config(*handle_p,0x3,15,0);
 
 	/* enable TX interrupts at the UART */
 	out8(&uart_virt[1], 0x2);

@@ -46,7 +46,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		vector = mfspr(SPR_EPR);
 	else
-		ev_int_iack(&vector);
+		ev_int_iack(0, &vector);
 
 	// printf("ext int %d\n",vector);
 	ev_int_eoi(irq);

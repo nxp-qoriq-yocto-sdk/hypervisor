@@ -45,7 +45,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		irq = mfspr(SPR_EPR);
 	else
-		ev_int_iack(&irq);
+		ev_int_iack(0, &irq);
 
 	if (irq != *handle_p_int)
 		printf("Unknown extirq %d\n", irq);
@@ -140,7 +140,7 @@ static int test_init(void)
 	}
 
 	/* VMPIC config */
-	ev_int_set_config(*handle_p_int, 1, 15, 0x00000001);
+	ev_int_set_config(*handle_p_int, 1, 15, 0);
 	ev_int_set_mask(*handle_p_int, 0);
 	 /*VMPIC*/ enable_critint();
 	enable_extint();

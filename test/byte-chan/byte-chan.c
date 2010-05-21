@@ -118,7 +118,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		vector = mfspr(SPR_EPR);
 	else
-		ev_int_iack(&vector);
+		ev_int_iack(0, &vector);
 
 	debug("external interrupt ... vector  %d\n", vector);
 	if (vector == irq1[0]) {
@@ -279,20 +279,20 @@ void libos_client_entry(unsigned long devtree_ptr)
 	debug("byte-channel B irqs = %d %d\n", irq2[0], irq2[2]);
 
 	/* set int config for byte channel A */
-	if ((status = ev_int_set_config(irq1[0], 0, 0, 0x00000001))) {/* set int to cpu 0 */
+	if ((status = ev_int_set_config(irq1[0], 0, 0, 0))) {/* set int to cpu 0 */
 		printf("ev_int_set_config failed for byte channel A rxint\n");
 		goto bad;
 	}
-	if ((status = ev_int_set_config(irq1[2], 0, 0, 0x00000001))) {/* set int to cpu 0 */
+	if ((status = ev_int_set_config(irq1[2], 0, 0, 0))) {/* set int to cpu 0 */
 		printf("ev_int_set_config failed for byte channel A txint\n");
 		goto bad;
 	}
 	/* set int config for byte channel B */
-	if ((status = ev_int_set_config(irq2[0], 0, 0, 0x00000001))) {/* set int to cpu 0 */
+	if ((status = ev_int_set_config(irq2[0], 0, 0, 0))) {/* set int to cpu 0 */
 		printf("ev_int_set_config failed for byte channel B rxint\n");
 		goto bad;
 	}
-	if ((status = ev_int_set_config(irq2[2], 0, 0, 0x00000001)))	{/* set int to cpu 0 */
+	if ((status = ev_int_set_config(irq2[2], 0, 0, 0)))	{/* set int to cpu 0 */
 		printf("ev_int_set_config failed for byte channel B txint\n");
 		goto bad;
 	}

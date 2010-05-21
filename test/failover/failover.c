@@ -61,7 +61,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint) {
 		vector = mfspr(SPR_EPR);
 	} else {
-		vector = ev_int_iack(&vector);
+		vector = ev_int_iack(0, &vector);
 		if (vector == 0xffff)
 			return;
 	}

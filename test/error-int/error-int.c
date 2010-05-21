@@ -42,7 +42,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		vector = mfspr(SPR_EPR);
 	else
-		ev_int_iack(&vector);
+		ev_int_iack(0, &vector);
 
 	printf("ext int %d\n",vector);
 	ev_int_eoi(vector);
@@ -85,7 +85,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	}
 
 	/* VMPIC config */
-	ev_int_set_config(*handle_p_int, 1, 15, 0x00000001);
+	ev_int_set_config(*handle_p_int, 1, 15, 0);
 	ev_int_set_mask(*handle_p_int, 0);
 	enable_critint();
 	enable_extint();

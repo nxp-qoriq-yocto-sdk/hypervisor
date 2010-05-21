@@ -345,8 +345,8 @@ void hcall_int_set_config(trapframe_t *regs)
 	unsigned int handle = regs->gpregs[3];
 	int config = regs->gpregs[4];
 	int priority = regs->gpregs[5];
-	uint32_t lcpu_mask = regs->gpregs[6];
-	int lcpu_dest = count_lsb_zeroes(lcpu_mask);
+	uint32_t lcpu_dest = regs->gpregs[6];
+	uint32_t lcpu_mask = 1 << lcpu_dest;
 	interrupt_t *irq;
 
 	// FIXME: race against handle closure
@@ -361,12 +361,12 @@ void hcall_int_set_config(trapframe_t *regs)
 		return;
 	}
 
-	/* mask must have a valid bit set */
-	if (!(lcpu_mask & ((1 << guest->cpucnt) - 1))) {
+	/* destination CPU number must be valid */
+	if (lcpu_dest >= guest->cpucnt) {
 		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
-
+	
 	if (!vmpic_is_claimed(vmirq)) {
 		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
@@ -394,7 +394,7 @@ void hcall_int_get_config(trapframe_t *regs)
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
 	int priority = 0, config = IRQ_LEVEL;
-	uint32_t lcpu_mask = 1;
+	uint32_t lcpu_dest = 0;
 	interrupt_t *irq;
 
 	// FIXME: race against handle closure
@@ -419,17 +419,20 @@ void hcall_int_get_config(trapframe_t *regs)
 	if (irq->ops->get_priority)
 		priority = irq->ops->get_priority(irq);
 
-	if (irq->ops == &vpic_ops)
-		lcpu_mask = irq->ops->get_cpu_dest_mask(irq);
-	else if (irq->ops->get_cpu_dest_mask) {
+	if (irq->ops == &vpic_ops) {
+		uint32_t lcpu_mask = irq->ops->get_cpu_dest_mask(irq);
+		lcpu_dest = count_lsb_zeroes(lcpu_mask);
+	} else if (irq->ops->get_cpu_dest_mask) {
 		uint32_t pcpu_mask = irq->ops->get_cpu_dest_mask(irq);
 		unsigned int pcpu_dest = count_lsb_zeroes(pcpu_mask);
 		unsigned int i;
 
 		/* Map physical cpu to logical cpu within partition */
 		for (i = 0; i < guest->cpucnt; i++)
-			if (guest->gcpus[i]->cpu->coreid == pcpu_dest)
-				lcpu_mask = 1 << i;
+			if (guest->gcpus[i]->cpu->coreid == pcpu_dest) {
+				lcpu_dest = i;
+				break;
+			}
 	}
 
 	if (irq->ops->get_config)
@@ -437,7 +440,7 @@ void hcall_int_get_config(trapframe_t *regs)
 
 	regs->gpregs[4] = config;
 	regs->gpregs[5] = priority;
-	regs->gpregs[6] = lcpu_mask;
+	regs->gpregs[6] = lcpu_dest;
 	regs->gpregs[3] = 0;  /* success */
 }
 
@@ -542,6 +545,9 @@ void hcall_int_iack(trapframe_t *regs)
 {
 	uint16_t vector;
 	int v = 0;
+	unsigned int handle = regs->gpregs[3];
+
+	assert(handle == 0);
 
 	if (mpic_coreint) {
 		regs->gpregs[3] = EV_INVALID_STATE;
