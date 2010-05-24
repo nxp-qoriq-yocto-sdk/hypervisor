@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 001
-Date: 5/13/2010
+Revsion: 002
+Date: 5/24/2010
 
 -------------------------------------------------------
 Contents
@@ -46,7 +46,7 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.7-001 has been tested with Simics 4.2.41 / pre50
+   -embedded-hv v0.7-002 has been tested with Simics 4.2.41 / pre50
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Architecture specifciation
@@ -54,6 +54,16 @@ Contents
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.7-002 bug fixes and changes
+       -hcalls have been updated to be ePAPR compliant
+       -guest device tree compatibles have been updated to
+        be ePAPR compliant-- byte-channels, doorbells,
+        vmpic
+       -device claim feature is implemented
+       -CPC error handling is implemented
+       -64-bit cleanup sufficient to run a test 32-bit
+        guest
 
    -v0.7-001 bug fixes and changes (since 0.6-004)
        -cleanup for 64-bit support
