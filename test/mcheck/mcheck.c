@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +23,8 @@
  */
 
 #include <libos/alloc.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>

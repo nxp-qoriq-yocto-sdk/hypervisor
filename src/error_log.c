@@ -61,7 +61,7 @@ int error_get(queue_t *q, hv_error_t *err, unsigned long *flag,
 			atomic_or(flag, mask);
 	}
 
-	return ret ? 0 : ENOENT;
+	return ret ? 0 : EV_ENOENT;
 }
 
 void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)

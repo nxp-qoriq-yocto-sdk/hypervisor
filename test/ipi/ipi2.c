@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,8 @@
 
 
 #include <libos/libos.h>
-#include <libos/hcalls.h>
+#include <libos/epapr_hcalls.h>
+#include <libos/fsl_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
@@ -47,14 +48,14 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		irq = mfspr(SPR_EPR);
 	else
-		fh_vmpic_iack(&irq);
+		ev_int_iack(&irq);
 
 	if (irq != *handle_p_int)
 		printf("Unknown extirq %d\n", irq);
 	else
 		extint_cnt++;
 
-	fh_vmpic_eoi(irq);
+	ev_int_eoi(irq);
 }
 
 void ext_doorbell_handler(trapframe_t *frameptr)
@@ -130,8 +131,8 @@ static int test_init(void)
 	}
 
 	/* VMPIC config */
-	fh_vmpic_set_int_config(*handle_p_int, 1, 15, 0x00000001);
-	fh_vmpic_set_mask(*handle_p_int, 0);
+	ev_int_set_config(*handle_p_int, 1, 15, 0x00000001);
+	ev_int_set_mask(*handle_p_int, 0);
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 
@@ -142,7 +143,7 @@ static int test_init(void)
 		return -1;
 	}
 
-	fh_partition_send_dbell(*handle_p);
+	ev_doorbell_send(*handle_p);
 
 	return 0;
 }

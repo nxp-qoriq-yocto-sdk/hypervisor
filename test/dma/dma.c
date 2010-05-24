@@ -23,7 +23,8 @@
  */
 
 #include <libos/alloc.h>
-#include <libos/hcalls.h>
+#include <libos/epapr_hcalls.h>
+#include <libos/fsl_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>

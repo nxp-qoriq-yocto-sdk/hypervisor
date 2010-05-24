@@ -662,19 +662,19 @@ int pamu_enable_liodn(unsigned int handle)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	pamu_handle = guest->handles[handle]->pamu;
 	if (!pamu_handle) {
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	liodn = pamu_handle->assigned_liodn;
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	if (liodn_to_guest[liodn] != guest)
-		return FH_ERR_INVALID_STATE;
+		return EV_INVALID_STATE;
 #endif
 
 	current_ppaace = pamu_get_ppaace(liodn);
@@ -692,19 +692,19 @@ int pamu_disable_liodn(unsigned int handle)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	pamu_handle = guest->handles[handle]->pamu;
 	if (!pamu_handle) {
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	liodn = pamu_handle->assigned_liodn;
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	if (liodn_to_guest[liodn] != guest)
-		return FH_ERR_INVALID_STATE;
+		return EV_INVALID_STATE;
 #endif
 
 	current_ppaace = pamu_get_ppaace(liodn);

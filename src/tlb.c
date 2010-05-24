@@ -1421,7 +1421,7 @@ static ssize_t guest_strnlen(pte_t *tbl, phys_addr_t gaddr, ssize_t maxlen)
 		vaddr = map_gphys(TEMPTLB1, tbl, gaddr, temp_mapping[0],
 		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 		if (!vaddr)
-			return -EFAULT;
+			return -EV_EFAULT;
 
 		if (maxlen > 0) {
 			if (chunk > (size_t)maxlen)
@@ -1437,7 +1437,7 @@ static ssize_t guest_strnlen(pte_t *tbl, phys_addr_t gaddr, ssize_t maxlen)
 		}
 
 		if (maxlen == 0)
-			return -FH_ERR_TOO_LARGE;
+			return -EV_EINVAL;
 
 		gaddr += chunk;
 		len += chunk;
@@ -1468,12 +1468,12 @@ ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
 
 	*buf = malloc(len);
 	if (!buf)
-		return -ENOMEM;
+		return -EV_ENOMEM;
 
 	ret = copy_from_gphys(tbl, *buf, src, len);
 	if (ret < (size_t)len) {
 		free(*buf);
-		return -EFAULT;
+		return -EV_EFAULT;
 	}
 
 	return len;

@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,8 @@
 
 
 #include <libos/libos.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
@@ -89,7 +90,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	vcpu_mask = 0xf;
 	ret = fh_send_nmi(vcpu_mask);
 
-	if (ret == EINVAL) {
+	if (ret == EV_EINVAL) {
 		printf("NMI Test: Invalid vcpu mask 0x%x\n", vcpu_mask);
 		printf("NMI test Failed\n");
 		return;

@@ -27,7 +27,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/trapframe.h>
 #include <libos/printlog.h>
 #include <libos/io.h>
@@ -84,7 +85,7 @@ void hcall_get_core_state(trapframe_t *regs)
 	int i;
 
 	if (!rcpm || !guest || vcpu >= guest->cpucnt) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -172,10 +173,10 @@ void hcall_enter_nap(trapframe_t *regs)
 	int vcpu = regs->gpregs[4];
 	gcpu_t *gcpu = get_gcpu();
 	int core;
-	int ret = EINVAL;
+	int ret = EV_EINVAL;
 
 	if (!rcpm || !displacement_flush_area[cpu->coreid]) {
-		ret = ENODEV;
+		ret = EV_ENODEV;
 		goto out;
 	}
 
@@ -348,12 +349,12 @@ void hcall_exit_nap(trapframe_t *regs)
 	int ret = 0;
 
 	if (!rcpm) {
-		regs->gpregs[3] = ENODEV;
+		regs->gpregs[3] = EV_ENODEV;
 		return;
 	}
 
 	if (!guest || vcpu >= guest->cpucnt) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 

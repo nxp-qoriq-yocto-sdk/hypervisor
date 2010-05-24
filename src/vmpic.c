@@ -148,7 +148,7 @@ static int claim_int(claim_action_t *action, dev_owner_t *owner,
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 			         "%s: %s: IRQ failed to become inactive\n",
 			         __func__, owner->hwnode->name);
-			return EIO;
+			return EV_EIO;
 		}
 	}
 
@@ -339,7 +339,7 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
-void hcall_vmpic_set_int_config(trapframe_t *regs)
+void hcall_int_set_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -351,24 +351,24 @@ void hcall_vmpic_set_int_config(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	/* mask must have a valid bit set */
 	if (!(lcpu_mask & ((1 << guest->cpucnt) - 1))) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -389,7 +389,7 @@ void hcall_vmpic_set_int_config(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_get_int_config(trapframe_t *regs)
+void hcall_int_get_config(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -399,18 +399,18 @@ void hcall_vmpic_get_int_config(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -441,7 +441,7 @@ void hcall_vmpic_get_int_config(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_set_mask(trapframe_t *regs)
+void hcall_int_set_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -449,18 +449,18 @@ void hcall_vmpic_set_mask(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -482,25 +482,25 @@ void hcall_vmpic_set_mask(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_get_mask(trapframe_t *regs)
+void hcall_int_get_mask(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -509,7 +509,7 @@ void hcall_vmpic_get_mask(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_eoi(trapframe_t *regs)
+void hcall_int_eoi(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
@@ -518,18 +518,18 @@ void hcall_vmpic_eoi(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -538,13 +538,13 @@ void hcall_vmpic_eoi(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_iack(trapframe_t *regs)
+void hcall_int_iack(trapframe_t *regs)
 {
 	uint16_t vector;
 	int v = 0;
 
 	if (mpic_coreint) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -564,25 +564,25 @@ void hcall_vmpic_iack(trapframe_t *regs)
 	regs->gpregs[3] = 0;  /* success */
 }
 
-void hcall_vmpic_get_activity(trapframe_t *regs)
+void hcall_int_get_activity(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	unsigned int handle = regs->gpregs[3];
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 
@@ -598,18 +598,18 @@ void hcall_vmpic_get_msir(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
 	if (!vmirq) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = FH_ERR_INVALID_STATE;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		return;
 	}
 

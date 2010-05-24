@@ -55,13 +55,13 @@ vmpic_interrupt_t *vmpic_alloc_handle(guest_t *guest, interrupt_t *irq,
 int vmpic_alloc_mpic_handle(struct dev_owner *owner, interrupt_t *irq, int standby);
 void vmpic_global_init(void);
 void vmpic_partition_init(guest_t *guest);
-void hcall_vmpic_set_int_config(trapframe_t *regs);
-void hcall_vmpic_get_int_config(trapframe_t *regs);
-void hcall_vmpic_set_mask(trapframe_t *regs);
-void hcall_vmpic_eoi(trapframe_t *regs);
-void hcall_vmpic_iack(trapframe_t *regs);
-void hcall_vmpic_get_mask(trapframe_t *regs);
-void hcall_vmpic_get_activity(trapframe_t *regs);
+void hcall_int_set_config(trapframe_t *regs);
+void hcall_int_get_config(trapframe_t *regs);
+void hcall_int_set_mask(trapframe_t *regs);
+void hcall_int_eoi(trapframe_t *regs);
+void hcall_int_iack(trapframe_t *regs);
+void hcall_int_get_mask(trapframe_t *regs);
+void hcall_int_get_activity(trapframe_t *regs);
 void hcall_vmpic_get_msir(trapframe_t *regs);
 
 #ifdef CONFIG_CLAIMABLE_DEVICES

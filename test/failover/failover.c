@@ -23,7 +23,8 @@
  */
 
 #include <libos/alloc.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
@@ -60,7 +61,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint) {
 		vector = mfspr(SPR_EPR);
 	} else {
-		vector = fh_vmpic_iack(&vector);
+		vector = ev_int_iack(&vector);
 		if (vector == 0xffff)
 			return;
 	}
@@ -94,7 +95,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	}
 
 out:
-	fh_vmpic_eoi(vector);
+		ev_int_eoi(vector);
 }
 
 void crit_int_handler(trapframe_t *regs)
@@ -180,14 +181,14 @@ static int dma_init(void)
 		}
 
 		ret = set_vmpic_irq_priority(dma_irq, 15);
-		if (ret != FH_ERR_INVALID_STATE) {
+		if (ret != EV_INVALID_STATE) {
 			printf("FAILED: set prio on standby irq returned %d\n",
 			       ret);
 			return -14;
 		}
 
 		ret = fh_dma_enable(liodn);
-		if (ret != FH_ERR_INVALID_STATE) {
+		if (ret != EV_INVALID_STATE) {
 			printf("FAILED: enable standby dma returned %d\n",
 			       ret);
 			return -15;
@@ -273,7 +274,7 @@ static int dma_init(void)
 		return -17;
 	}
 
-	ret = fh_vmpic_set_mask(dma_irq, 0);
+	ret = ev_int_set_mask(dma_irq, 0);
 	if (ret) {
 		printf("FAILED: couldn't unmask dma irq\n");
 		return -17;
@@ -428,7 +429,7 @@ static int setup_managed(void)
 		return -1;
 	}
 
-	fh_vmpic_set_mask(state_change_irq, 0);
+	ev_int_set_mask(state_change_irq, 0);
 	return 0;
 }
 

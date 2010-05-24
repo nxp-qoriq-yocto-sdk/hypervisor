@@ -23,7 +23,8 @@
  */
 
 #include <libos/alloc.h>
-#include <libos/hcalls.h>
+#include <libos/epapr_hcalls.h>
+#include <libos/fsl_hcalls.h>
 #include <libos/percpu.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/trapframe.h>
@@ -692,11 +693,11 @@ int set_vmpic_irq_priority(int handle, int prio)
 	uint32_t config, oldprio, dest;
 	int ret;
 	
-	ret = fh_vmpic_get_int_config(handle, &config, &oldprio, &dest);
+	ret = ev_int_get_config(handle, &config, &oldprio, &dest);
 	if (ret)
 		return ret;
 	
-	ret = fh_vmpic_set_int_config(handle, config, prio, dest);
+	ret = ev_int_set_config(handle, config, prio, dest);
 	if (ret)
 		return ret;
 

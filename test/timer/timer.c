@@ -25,7 +25,8 @@
 
 
 #include <libos/libos.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
@@ -85,7 +86,7 @@ static void wait_for_interrupt(volatile int *count, unsigned int c)
 	int target = *count + c;
 
 	while (*count < target) {
-		fh_idle();
+		ev_idle();
 
 		/* Should not see more than one of these in a row,
 		 * without an intervening interrupt message --

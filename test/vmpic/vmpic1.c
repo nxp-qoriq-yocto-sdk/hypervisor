@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,8 @@
 
 
 #include <libos/libos.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/mpic.h>
 #include <libos/io.h>
 #include <libos/core-regs.h>
@@ -49,10 +50,10 @@ void ext_int_handler(trapframe_t *frameptr)
 	int rc;
 	unsigned int mask, active;
 
-	rc = fh_vmpic_iack(&vector);
+	rc = ev_int_iack(&vector);
 
 	if (coreint) {
-		if (rc != FH_ERR_INVALID_STATE)
+		if (rc != EV_INVALID_STATE)
 			printf("iack had bad rc: FAILED\n");
 
 		vector = mfspr(SPR_EPR);
@@ -63,9 +64,9 @@ void ext_int_handler(trapframe_t *frameptr)
 
 	if (vector == *handle_p) {
 		extint_cnt++;
-		fh_vmpic_set_mask(*handle_p, 1);
+		ev_int_set_mask(*handle_p, 1);
 		/* Make sure we are masked now */
-		fh_vmpic_get_mask(*handle_p, &mask);
+		ev_int_get_mask(*handle_p, &mask);
 		if (!mask)
 			printf("Unexpected behavior : Interrupt not masked\n");
 	} else {
@@ -75,7 +76,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	out32(((uint32_t *)((uint32_t)addr + MPIC_EOI)), 0);
 
 	/* Make sure that eoi has made the interrupt inactive */
-	fh_vmpic_get_activity(*handle_p, &active);
+	ev_int_get_activity(*handle_p, &active);
 	if (active == 1)
 		printf("Unexpected behavior : Interrupt in-service @eoi\n");
 }
@@ -168,10 +169,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 				0, 0, 0);
 	}
 
-	fh_vmpic_set_mask(*handle_p, 0);
+	ev_int_set_mask(*handle_p, 0);
 
 	/* VMPIC config */
-	fh_vmpic_set_int_config(*handle_p, 0x3 , 15, 0x00000001);
+	ev_int_set_config(*handle_p, 0x3 , 15, 0x00000001);
 
 	/* enable TX interrupts at the UART */
 	out8(&uart_virt[1], 0x2);
@@ -179,7 +180,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	/* enable interrupts at the CPU */
 	enable_extint();
 
-	fh_vmpic_set_mask(*handle_p, 0);
+	ev_int_set_mask(*handle_p, 0);
 	out8(&uart_virt[1], 0x2);
 
 	while (extint_cnt <= 1)

@@ -76,7 +76,7 @@ int get_sys_reset_status(void)
 	if (!guts_crstr0) {
 		printlog(LOGTYPE_GUTS, LOGLEVEL_ERROR,
 		        "%s: reset status reg not found\n", __func__);
-		return -ENODEV;
+		return -EV_ENODEV;
 	}
 
 	uint32_t val = in32(guts_crstr0);
@@ -89,7 +89,7 @@ int get_sys_reset_status(void)
 	} else if (val & CRSTR0_RST_HRST) {
 		return SYS_RESET_STATUS_HARD;
 	} else {
-		return -EIO;
+		return -EV_EIO;
 	}
 }
 
@@ -99,7 +99,7 @@ int system_reset(void)
 	if (!guts_rstcr) {
 		printlog(LOGTYPE_GUTS, LOGLEVEL_ERROR,
 		        "%s: reset control reg not found\n", __func__);
-		return ENODEV;
+		return EV_ENODEV;
 	}
 
 	out32(guts_rstcr, RSTCR_RESET_REQ);

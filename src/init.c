@@ -257,7 +257,7 @@ static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
 	return 0;
 }
 
-static const unsigned long hv_text_size = 1024 * 1024;
+static const unsigned long hv_text_size = 4 * 1024 * 1024;
 static int reloc_hv = 1;
 
 static void add_memory(phys_addr_t start, phys_addr_t size)

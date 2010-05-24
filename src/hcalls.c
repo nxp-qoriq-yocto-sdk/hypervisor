@@ -27,6 +27,8 @@
 #include <libos/trap_booke.h>
 #include <libos/alloc.h>
 #include <libos/platform_error.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -139,7 +141,7 @@ guest_t *handle_to_guest(int handle)
 static void unimplemented(trapframe_t *regs)
 {
 	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
-	regs->gpregs[3] = FH_ERR_UNIMPLEMENTED;
+	regs->gpregs[3] = EV_UNIMPLEMENTED;
 }
 
 static phys_addr_t reg_pair(trapframe_t *regs, int reg)
@@ -157,7 +159,7 @@ static void dtprop_access(trapframe_t *regs, int set)
 
 	target_guest = handle_to_guest(regs->gpregs[3]);
 	if (!target_guest) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 	regs->gpregs[3] = 0;
@@ -178,19 +180,19 @@ static void dtprop_access(trapframe_t *regs, int set)
 
 	proplen = regs->gpregs[10];
 	if (proplen > PAGE_SIZE * 8) {
-		regs->gpregs[3] = FH_ERR_TOO_LARGE;
+		regs->gpregs[3] = EV_EINVAL;
 		goto out;
 	}
 
 	propval = malloc(proplen);
 	if (!propval) {
-		regs->gpregs[3] = ENOMEM;
+		regs->gpregs[3] = EV_ENOMEM;
 		goto out;
 	}
 	
 	if (set && copy_from_gphys(cur_guest->gphys, propval,
 	                           reg_pair(regs, 8), proplen) < proplen) {
-		regs->gpregs[3] = EFAULT;
+		regs->gpregs[3] = EV_EFAULT;
 		goto out;
 	}
 
@@ -202,29 +204,29 @@ static void dtprop_access(trapframe_t *regs, int set)
 	 * tree -- at that point the partition will be stopped.
 	 */
 	if (target_guest->state == guest_starting) {
-		regs->gpregs[3] = ERR_INVALID;
+		regs->gpregs[3] = EV_INVALID_STATE;
 		goto unlock;
 	}
 
 	node = dt_lookup_path(target_guest->devtree, path, set);
 	if (!node) {
-		regs->gpregs[3] = set ? ENOMEM : ENOENT;
+		regs->gpregs[3] = set ? EV_ENOMEM : EV_ENOENT;
 		goto unlock;
 	}
 
 	if (set) {
 		if (dt_set_prop(node, propname, propval, proplen) < 0)
-			regs->gpregs[3] = ENOMEM;
+			regs->gpregs[3] = EV_ENOMEM;
 	} else {
 		dt_prop_t *prop = dt_get_prop(node, propname, 0);
 		if (!prop) {
-			regs->gpregs[3] = ENOENT;
+			regs->gpregs[3] = EV_ENOENT;
 		} else {
 			regs->gpregs[4] = prop->len;
 			if (prop->len <= proplen)
 				memcpy(propval, prop->data, prop->len);
 			else
-				regs->gpregs[3] = FH_ERR_BUFFER_OVERFLOW;
+				regs->gpregs[3] = EV_BUFFER_OVERFLOW;
 		}
 	}
 
@@ -235,7 +237,7 @@ unlock:
 		ret = copy_to_gphys(cur_guest->gphys, reg_pair(regs, 8),
 		                    propval, proplen, 0);
 		if ((size_t)ret < proplen)
-			regs->gpregs[3] = EFAULT;
+			regs->gpregs[3] = EV_EFAULT;
 	}
 
 out:
@@ -262,7 +264,7 @@ static void hcall_partition_restart(trapframe_t *regs)
 	
 	guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 	
@@ -275,7 +277,7 @@ static void hcall_partition_restart(trapframe_t *regs)
 		who = "manager";
 
 	ret = restart_guest(guest, "restart", who);
-	regs->gpregs[3] = ret ? FH_ERR_INVALID_STATE : 0;
+	regs->gpregs[3] = ret ? EV_INVALID_STATE : 0;
 }
 
 static void hcall_partition_get_status(trapframe_t *regs)
@@ -283,7 +285,7 @@ static void hcall_partition_get_status(trapframe_t *regs)
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 
 	if (!guest) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -305,7 +307,7 @@ static void hcall_send_nmi(trapframe_t *regs)
 
 	bit = 31 - count_msb_zeroes_32(vcpu_mask) + 1;
 	if (vcpu_mask != 0 && bit > ncpu) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -358,7 +360,7 @@ static void hcall_partition_memcpy(trapframe_t *regs)
 	static uint32_t sg_lock;
 
 	if (!source || !target) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -372,7 +374,7 @@ static void hcall_partition_memcpy(trapframe_t *regs)
 		   memory. */
 		if (copy_from_gphys(get_gcpu()->guest->gphys, sg_list, sg_gphys,
 				    bytes_to_copy) != bytes_to_copy) {
-			regs->gpregs[3] = EFAULT;
+			regs->gpregs[3] = EV_EFAULT;
 			spin_unlock_int(&sg_lock);
 			return;
 		}
@@ -387,7 +389,7 @@ static void hcall_partition_memcpy(trapframe_t *regs)
 				sg_list[i].size);
 
 			if (size != sg_list[i].size) {
-				regs->gpregs[3] = EFAULT;
+				regs->gpregs[3] = EV_EFAULT;
 				spin_unlock_int(&sg_lock);
 				return;
 			}
@@ -455,19 +457,19 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 #endif
 
 	if (len > (4 * (regs->srr1 & MSR_CM ? sizeof(register_t) : 4))) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	// FIXME: race against handle closure
 	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -475,7 +477,7 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 
 	ssize_t ret = byte_chan_send(bc, buf, len);
 	if (ret == 0 && len != 0)
-		regs->gpregs[3] = EAGAIN;
+		regs->gpregs[3] = EV_EAGAIN;
 	else
 		regs->gpregs[3] = 0;
 
@@ -499,13 +501,13 @@ static void hcall_byte_channel_receive(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -538,13 +540,13 @@ static void hcall_byte_channel_poll(trapframe_t *regs)
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	byte_chan_handle_t *bc = guest->handles[handle]->bc;
 	if (!bc) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -564,7 +566,7 @@ static void hcall_byte_channel_poll(trapframe_t *regs)
 #define hcall_byte_channel_poll unimplemented
 #endif
 
-static void hcall_partition_send_dbell(trapframe_t *regs)
+static void hcall_doorbell_send(trapframe_t *regs)
 {
 	guest_t *guest = get_gcpu()->guest;
 	ipi_doorbell_handle_t *db_handle;
@@ -573,29 +575,29 @@ static void hcall_partition_send_dbell(trapframe_t *regs)
 
 	/* FIXME: race against handle closure */
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	db_handle = guest->handles[handle]->db;
 	if (!db_handle) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
-	regs->gpregs[3] = (send_doorbells(db_handle->dbell) >= 0) ? 0 : FH_ERR_CONFIG;
+	regs->gpregs[3] = (send_doorbells(db_handle->dbell) >= 0) ? 0 : EV_CONFIG;
 }
 
 static void hcall_partition_start(trapframe_t *regs)
 {
 	guest_t *guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
 	guest->entry = regs->gpregs[4];
-	regs->gpregs[3] = start_guest(guest, 0) ? FH_ERR_INVALID_STATE : 0;
+	regs->gpregs[3] = start_guest(guest, 0) ? EV_INVALID_STATE : 0;
 }
 
 
@@ -606,7 +608,7 @@ static void hcall_partition_stop(trapframe_t *regs)
 	int ret;
 
 	if (!guest) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -619,7 +621,7 @@ static void hcall_partition_stop(trapframe_t *regs)
 		who = "manager";
 
 	ret = stop_guest(guest, "stop", who);
-	regs->gpregs[3] = ret ? FH_ERR_INVALID_STATE : 0;
+	regs->gpregs[3] = ret ? EV_INVALID_STATE : 0;
 }
 
 static void hcall_system_reset(trapframe_t *regs)
@@ -629,7 +631,7 @@ static void hcall_system_reset(trapframe_t *regs)
 	if (guest->privileged) {
 		regs->gpregs[3] = system_reset();
 	} else {
-		regs->gpregs[3] = EPERM;
+		regs->gpregs[3] = EV_EPERM;
 	}
 }
 
@@ -647,7 +649,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 	uint32_t *lock;
 
 	if ((peek !=0 && peek != 1) || (bufsize < sizeof(hv_error_t))) {
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -659,7 +661,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 
 	case GLOBAL_ERROR_EVENT_QUEUE:
 		if (guest != error_manager_guest) {
-			regs->gpregs[3] = EINVAL;
+			regs->gpregs[3] = EV_EINVAL;
 			return;
 		}
 
@@ -670,7 +672,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 		break;
 
 	default:
-		regs->gpregs[3] = EINVAL;
+		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
 
@@ -698,6 +700,7 @@ static void hcall_idle(trapframe_t *regs)
 	regs->gpregs[3] = 0;
 }
 
+
 #ifdef CONFIG_CLAIMABLE_DEVICES
 static void hcall_claim_device(trapframe_t *regs)
 {
@@ -707,7 +710,7 @@ static void hcall_claim_device(trapframe_t *regs)
 	guest_t *guest = gcpu->guest;
 	handle_t *handle;
 	claim_action_t *action;
-	int ret = EINVAL;
+	int ret = EV_EINVAL;
 
 	if (handlenum >= MAX_HANDLES)
 		goto out;
@@ -732,7 +735,7 @@ static void hcall_claim_device(trapframe_t *regs)
 	 * likely trouble for the guest even if the hv isn't harmed.
 	 */
 	if (prev->guest->state != guest_stopped) {
-		ret = FH_ERR_INVALID_STATE;
+		ret = EV_INVALID_STATE;
 		goto out_onelock;
 	}
 
@@ -747,7 +750,7 @@ static void hcall_claim_device(trapframe_t *regs)
 	 */
 	spin_lock(&guest->state_lock);
 	
-	ret = ENOMEM;
+	ret = EV_ENOMEM;
 	const char *hwstatus = dt_get_prop_string(owner->hwnode, "status");
 	int hwstatus_ok = !hwstatus || !strncmp(hwstatus, "ok", 2);
 
@@ -786,55 +789,67 @@ out:
 }
 #endif
 
-static hcallfp_t hcall_table[] = {
-	unimplemented,                     /* 0 */
+
+static hcallfp_t fsl_hcall_table[] = {
 	unimplemented,
 	hcall_err_get_info,
 	hcall_partition_get_dtprop,
-	hcall_partition_set_dtprop,           /* 4 */
-	hcall_partition_restart,
+	hcall_partition_set_dtprop,
+	hcall_partition_restart,              /* 4 */
 	hcall_partition_get_status,
 	hcall_partition_start,
-	hcall_partition_stop,                 /* 8 */
-	hcall_partition_memcpy,
-	hcall_vmpic_set_int_config,
-	hcall_vmpic_get_int_config,
-	hcall_dma_enable,                     /* 12 */
+	hcall_partition_stop,
+	hcall_partition_memcpy,               /* 8 */
+	hcall_dma_enable,
 	hcall_dma_disable,
-	hcall_vmpic_set_mask,
-	hcall_vmpic_get_mask,
-	hcall_vmpic_get_activity,             /* 16 */
-	hcall_vmpic_eoi,
-	hcall_byte_channel_send,
-	hcall_byte_channel_receive,
-	hcall_byte_channel_poll,              /* 20 */
-	hcall_vmpic_iack,
 	hcall_send_nmi,
-	hcall_vmpic_get_msir,
-	hcall_system_reset,                   /* 24 */
-	hcall_idle,
+	hcall_vmpic_get_msir,                 /* 12 */
+	hcall_system_reset,
 #ifdef CONFIG_PM
 	hcall_get_core_state,
 	hcall_enter_nap,
-	hcall_exit_nap,                       /* 28 */
+	hcall_exit_nap,                       /* 16 */
 #else
 	unimplemented,
 	unimplemented,
-	unimplemented,                        /* 28 */
+	unimplemented,                        /* 16 */
 #endif
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	hcall_claim_device,
 #else
 	unimplemented,
 #endif
-	unimplemented,
-	unimplemented,
-	hcall_partition_send_dbell            /* 32 */
 };
+
+static hcallfp_t epapr_hcall_table[] = {
+	unimplemented,
+	hcall_byte_channel_send,
+	hcall_byte_channel_receive,
+	hcall_byte_channel_poll,
+	hcall_int_set_config,               /* 4 */
+	hcall_int_get_config,
+	hcall_int_set_mask,
+	hcall_int_get_mask,
+	hcall_int_get_activity,             /* 8 */
+	hcall_int_iack,
+	hcall_int_eoi,
+	unimplemented,
+	unimplemented,                      /* 12 */
+	unimplemented,
+	hcall_doorbell_send,
+	unimplemented,
+	hcall_idle                          /* 16 */
+};
+
+#define HCALL_GET_VENDOR_ID(hcall_token)   (((hcall_token) & 0x7fffffff) >> 16)
+#define HCALL_GET_NUMBER(hcall_token)       ((hcall_token) & 0xffff)
 
 void hcall(trapframe_t *regs)
 {
 	unsigned int token;
+	unsigned int vendor_id;
+	unsigned int hcall_number;
+
 
 	set_stat(bm_stat_hcall, regs);
 
@@ -847,10 +862,20 @@ void hcall(trapframe_t *regs)
 	}
 
 	token = regs->gpregs[11];   /* hcall token is in r11 */
-	if (unlikely(token >= sizeof(hcall_table) / sizeof(hcallfp_t))) {
-		regs->gpregs[3] = FH_ERR_UNIMPLEMENTED;
-		return;
-	}
+	vendor_id = HCALL_GET_VENDOR_ID(token);
+	hcall_number = HCALL_GET_NUMBER(token);
 
-	hcall_table[token](regs);
+	if (vendor_id == EV_VENDOR_ID) {
+		if (unlikely(hcall_number >= sizeof(epapr_hcall_table) / sizeof(hcallfp_t))) {
+			regs->gpregs[3] = EV_UNIMPLEMENTED;
+			return;
+		}
+		epapr_hcall_table[hcall_number](regs);
+	} else {
+		if (unlikely(hcall_number >= sizeof(fsl_hcall_table) / sizeof(hcallfp_t))) {
+			regs->gpregs[3] = EV_UNIMPLEMENTED;
+			return;
+		}
+		fsl_hcall_table[hcall_number](regs);
+	}
 }

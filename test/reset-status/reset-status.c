@@ -26,7 +26,8 @@
 
 
 #include <libos/libos.h>
-#include <libos/hcalls.h>
+#include <libos/fsl_hcalls.h>
+#include <libos/epapr_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
@@ -42,10 +43,10 @@ void ext_int_handler(trapframe_t *frameptr)
 	if (coreint)
 		vector = mfspr(SPR_EPR);
 	else
-		fh_vmpic_iack(&vector);
+		ev_int_iack(&vector);
 
 	printf("ext int %d\n",vector);
-	fh_vmpic_eoi(irq);
+	ev_int_eoi(irq);
 }
 
 #define NUM_CORES 8
