@@ -234,6 +234,12 @@ static void guest_state_str(guest_t *guest, const char **str)
 	case guest_resuming:
 		*str = "resuming";
 		break;
+	case guest_stopping_percpu:
+		*str = "stopping (percpu)";
+		break;
+	default:
+		*str = "unknown";
+		break;
 	}
 
 	return;

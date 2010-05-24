@@ -41,11 +41,9 @@
 
 static uint32_t vmpic_lock;
 
-static void vmpic_reset(vmpic_interrupt_t *vmirq)
+static void vmpic_init_irq(vmpic_interrupt_t *vmirq)
 {
 	interrupt_t *irq = vmirq->irq;
-
-	interrupt_reset(irq);
 
 	if (irq->ops->set_priority)
 		irq->ops->set_priority(irq, 0);
@@ -62,14 +60,21 @@ static void vmpic_reset(vmpic_interrupt_t *vmirq)
 		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
 
-static void vmpic_reset_handle(handle_t *h)
+static void vmpic_prereset_handle(handle_t *h)
 {
 	if (vmpic_is_claimed(h->intr))
-		vmpic_reset(h->intr);
+		interrupt_reset(h->intr->irq);
+}
+
+static void vmpic_postreset_handle(handle_t *h)
+{
+	if (vmpic_is_claimed(h->intr))
+		vmpic_init_irq(h->intr);
 }
 
 static handle_ops_t vmpic_handle_ops = {
-	.reset = vmpic_reset_handle,
+	.prereset = vmpic_prereset_handle,
+	.postreset = vmpic_postreset_handle,
 };
 
 vmpic_interrupt_t *vmpic_alloc_handle(guest_t *guest, interrupt_t *irq,
@@ -94,7 +99,8 @@ vmpic_interrupt_t *vmpic_alloc_handle(guest_t *guest, interrupt_t *irq,
 
 	if (!standby) {
 		irq->priv = vmirq;
-		vmpic_reset(vmirq);
+		interrupt_reset(irq);
+		vmpic_init_irq(vmirq);
 		vmpic_set_claimed(vmirq, 1);
 	}
 
@@ -154,7 +160,7 @@ static int claim_int(claim_action_t *action, dev_owner_t *owner,
 
 	/* FIXME: make this a libos callback */
 	mpic_irq_set_vector(irq, vmirq->handle);
-	vmpic_reset(vmirq);
+	vmpic_init_irq(vmirq);
 
 	assert(vmpic_is_claimed(irq->priv));
 	vmpic_set_claimed(irq->priv, 0);
