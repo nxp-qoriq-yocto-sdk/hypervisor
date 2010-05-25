@@ -1508,12 +1508,12 @@ static int partition_config(guest_t *guest)
 	}
 
 	/* guest debug mode */
-	if (guest->guest_debug_mode) {
+	if (!guest->guest_debug_mode) {
 		hv_node = dt_get_subnode(guest->devtree, "hypervisor", 0);
 		if (!hv_node)
 			return -1;
 
-		ret = dt_set_prop(hv_node, "fsl,hv-guest-debug", NULL, 0);
+		ret = dt_set_prop(hv_node, "fsl,hv-guest-debug-disable", NULL, 0);
 		if (ret < 0)
 			return -1;
 	}
@@ -1620,7 +1620,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 			guests[i].guest_cache_lock = 1;
 
 		/* guest debug mode */
-		if (dt_get_prop(partition, "guest-debug", 0))
+		if (!dt_get_prop(partition, "guest-debug-disable", 0))
 			guests[i].guest_debug_mode = 1;
 
 		if (dt_get_prop(partition, "mpic-direct-eoi", 0))

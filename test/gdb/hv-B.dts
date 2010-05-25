@@ -127,6 +127,8 @@
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
+		guest-debug-disable;
+
 		gpma {
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma0>;
@@ -149,6 +151,8 @@
 		cpus = <1 1>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
+
+		guest-debug-disable;
 
 		gpma {
 			compatible = "guest-phys-mem-area";
@@ -173,6 +177,8 @@
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
+		guest-debug-disable;
+
 		gpma {
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma2>;
@@ -195,6 +201,8 @@
 		cpus = <3 1>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
+
+		guest-debug-disable;
 
 		gpma {
 			compatible = "guest-phys-mem-area";

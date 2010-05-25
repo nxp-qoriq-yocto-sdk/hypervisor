@@ -31,6 +31,7 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
 #include <hvtest.h>
+#include <libfdt.h>
 
 static int saved_trap_eip, saved_icmp_eip;
 static volatile int loopcnt, loopcnt_monitor;
@@ -90,15 +91,49 @@ __attribute__((noinline)) static void hwbreaktestfunc(void)
 		loopcnt = 0;
 	}
 }
+static void guest_debug_off(void)
+{
+	int test_events = DBCR0_TRAP | DBCR0_ICMP | DBCR0_IAC1 | DBCR0_DAC2W;
+	register_t old_dbcr0;
 
-void libos_client_entry(unsigned long devtree_ptr)
+	printf("Testing configuration : ");
+
+	old_dbcr0 = mfspr(SPR_DBCR0);
+	if (mfspr(SPR_DBCR0) & DBCR0_EDM)
+		printf("PASSED\n");
+	else 
+		printf("FAILED - the EDM bit should be set\n");
+
+	/* Write to debug registers, an error message should appear in the HV console */
+
+	mtspr(SPR_DBCR0, test_events);
+
+	if (old_dbcr0 != mfspr(SPR_DBCR0))
+		printf("FAILED - The register is not writable by guest\n");
+
+	mtspr(SPR_DBCR1, 0);
+
+	mtspr(SPR_DBCR2, test_events);
+
+	mtspr(SPR_DBCR4, test_events);
+	
+	mtspr(SPR_IAC1, (unsigned long) &hwbreaktestfunc);
+
+	mtspr(SPR_IAC2, (unsigned long) &hwbreaktestfunc);
+
+	mtspr(SPR_DAC1, (unsigned long) &loopcnt);
+
+	mtspr(SPR_DAC2, (unsigned long) &loopcnt);
+	
+	printf("Test Complete\n");
+
+
+}
+static void guest_debug_on(void)
 {
 	int test_events = DBCR0_TRAP | DBCR0_ICMP | DBCR0_IAC1 | DBCR0_DAC2W;
 
-	init(devtree_ptr);
-
-	printf("Guest Debug test:\n");
-
+	
 	/* Test notes :
 	 * Enable both TRAP & ICMP debug events, as the NIA is at a s/w trap
 	 * instruction, hence TRAP event will take precedence over
@@ -108,6 +143,12 @@ void libos_client_entry(unsigned long devtree_ptr)
 	 */
 
 	mtmsr(mfmsr() & ~MSR_DE);
+
+	printf("Testing configuration : ");
+
+	if (!(mfspr(SPR_DBCR0) & DBCR0_EDM))
+		printf("PASSED\n");
+
 	mtspr(SPR_DBCR0, DBCR0_IDM | test_events);
 
 	printf("Testing Trap Debug event : ");
@@ -150,3 +191,26 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("Test Complete\n");
 }
+
+void libos_client_entry(unsigned long devtree_ptr)
+{	int ret, len;
+	int guest_debug = 1;
+	const uint32_t *prop;
+
+	printf("Guest Debug test:\n");
+
+	init(devtree_ptr);
+
+	ret = fdt_subnode_offset(fdt, 0, "hypervisor");
+	if (ret != -FDT_ERR_NOTFOUND) {
+	        prop = fdt_getprop(fdt, ret, "fsl,hv-guest-debug-disable", &len);
+			if (prop)
+			      guest_debug = 0;
+	}
+	if (guest_debug)
+		guest_debug_on();
+	else 
+		guest_debug_off();
+
+}
+

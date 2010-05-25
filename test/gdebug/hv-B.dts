@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,23 +28,9 @@
 	compatible = "fsl,hv-config";
 
 	// =====================================================
-	// Physical Memory Areas
-	// =====================================================
-	pma0:pma0 {
-		compatible = "phys-mem-area";
-		addr = <0x0 0x00000000>;
-		size = <0x0 0x20000000>;  // 512MB
-	};
-	pma1:pma1 {
-		compatible = "phys-mem-area";
-		addr = <0x0 0x20000000>;
-		size = <0x0 0x20000000>;  // 512MB
-	};
-
-	// =====================================================
 	// Hypervisor Config
 	// =====================================================
-	hv:hypervisor-config {
+	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&hvbc>;
 
@@ -54,17 +40,25 @@
 			mux-channel = <0>;
 		};
 
-		hv-memory {
+		memory {
 			compatible = "hv-memory";
 			phys-mem = <&pma0>;
 		};
 
-		uart0:serial0 {
+		uart0: uart0 {
 			device = "serial0";
+		};
+
+		uart1: uart1 {
+			device = "serial1";
 		};
 
 		mpic {
 			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
 		};
 
 		cpc {
@@ -82,11 +76,6 @@
 		guts {
 			device = "/soc/global-utilities@e0000";
 		};
-
-		uart1:uart1 {
-			device = "serial1";
-		};
-
 	};
 
 	uartmux: uartmux {
@@ -95,16 +84,49 @@
 	};
 
 	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x2000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x2000000>;
+			size = <0 0x2000000>;
+		};
+	};
+
+	// =====================================================
 	// Partition 1
 	// =====================================================
 	part1 {
 		compatible = "partition";
-		label = "pmr-test";
-		cpus = <0 4>;
+		cpus = <0 1>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
 		guest-debug-disable;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		uart2: uart2 {
+			device = "serial2";
+		};
+
+		gdb-stub@0 {
+			compatible = "gdb-stub", "debug-stub";
+			endpoint = <&uartmux>;  // byte-channel endpoint
+			mux-channel = <2>;
+			debug-cpus = <0 1>; //virtual cpu 0
+		};
 
 		p1bc: byte-channel {
 			compatible = "byte-channel";
@@ -115,40 +137,8 @@
 		aliases {
 			stdout = <&p1bc>;
 		};
+	};
 
-		gpma0 {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma1>;
-			guest-addr = <0 0>;
-		};
-
-		gdb-stub@0 {
-			compatible = "gdb-stub", "debug-stub";
-			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <2>;
-			debug-cpus = <0 1>; //virtual cpu 0
-			// gdb-wait-at-start;
-		};
-		gdb-stub@1 {
-			compatible = "gdb-stub", "debug-stub";
-			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <3>;
-			debug-cpus = <1 1>; //virtual cpu 1
-			// gdb-wait-at-start;
-		};
-		gdb-stub@2 {
-			compatible = "gdb-stub", "debug-stub";
-			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <4>;
-			debug-cpus = <2 1>; //virtual cpu 2
-			// gdb-wait-at-start;
-		};
-		gdb-stub@3 {
-			compatible = "gdb-stub", "debug-stub";
-			endpoint = <&uartmux>;  // byte-channel endpoint
-			mux-channel = <5>;
-			debug-cpus = <3 1>; //virtual cpu 3
-			// gdb-wait-at-start;
-		};
+	chosen {
 	};
 };

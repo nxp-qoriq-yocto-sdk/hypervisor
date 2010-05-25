@@ -361,6 +361,8 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	case SPR_DBCR0:
 		*val = mfspr(SPR_DBCR0);
+		if (!gcpu->guest->guest_debug_mode)
+			*val |= DBCR0_EDM;
 		break;
 
 	case SPR_DBCR1:
@@ -742,17 +744,24 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_DBCR0:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+		         "mtspr@0x%08lx: unsupported write to DBCR0 (external debug on)\n", regs->srr0);
 			return 1;
-		/* we don't want guest access to DBCR0[RST,RET,IRPT,FT] */
+		}
+ 
+ 		/* we don't want guest access to DBCR0[RST,RET,IRPT,FT] */
 		val &= ~(DBCR0_RST | DBCR0_RET | DBCR0_IRPT | DBCR0_FT);
 		mtspr(SPR_DBCR0, val);
 		break;
 
 	case SPR_DBCR1:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+		         "mtspr@0x%08lx: unsupported write to DBCR1 (external debug on)\n", regs->srr0);
 			return 1;
-
+		}
+		
 		if (((val & DBCR1_IAC1ER_EAMSK) == DBCR1_IAC1ER_RADDR) ||
 		    ((val & DBCR1_IAC2ER_EAMSK) == DBCR1_IAC2ER_RADDR))
 			return 1;
@@ -762,9 +771,12 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_DBCR2:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+		         "mtspr@0x%08lx: unsupported write to DBCR2 (external debug on)\n", regs->srr0);
 			return 1;
-
+		}
+		
 		if (((val & DBCR2_DAC1ER_EAMSK) == DBCR2_DAC1ER_RADDR) ||
 		    ((val & DBCR2_DAC2ER_EAMSK) == DBCR2_DAC2ER_RADDR))
 			return 1;
@@ -774,8 +786,11 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_DBCR4:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+		         "mtspr@0x%08lx: unsupported write to DBCR4 (external debug on)\n", regs->srr0);
 			return 1;
+		}
 
 		if (((val & DBCR4_DAC1XM) > DBCR4_DAC1XM_RNG) ||
 		    ((val & DBCR4_DAC2XM) > DBCR4_DAC2XM_RNG))
@@ -786,32 +801,48 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_DBSR:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+	         "mtspr@0x%08lx: unsupported write to DBSR (external debug on)\n", regs->srr0);
 			return 1;
+		}
+	
 		mtspr(SPR_DBSR, val);
 		break;
 
 	case SPR_IAC1:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+	         "mtspr@0x%08lx: unsupported write to IAC1 (externall debug on)\n", regs->srr0);
 			return 1;
+		}
 		mtspr(SPR_IAC1, val);
 		break;
 
 	case SPR_IAC2:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+	         "mtspr@0x%08lx: unsupported write to IAC2 (external debug on)\n", regs->srr0);
 			return 1;
+		}
 		mtspr(SPR_IAC2, val);
 		break;
 
 	case SPR_DAC1:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+	         "mtspr@0x%08lx: unsupported write to DAC1 (external debug on)\n", regs->srr0);
 			return 1;
+		}
 		mtspr(SPR_DAC1, val);
 		break;
 
 	case SPR_DAC2:
-		if (!gcpu->guest->guest_debug_mode)
+		if (!gcpu->guest->guest_debug_mode) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ALWAYS,
+	         "mtspr@0x%08lx: unsupported write to DAC2 (external debug on)\n", regs->srr0);
 			return 1;
+		}
 		mtspr(SPR_DAC2, val);
 		break;
 
