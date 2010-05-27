@@ -699,13 +699,6 @@ static void hcall_err_get_info(trapframe_t *regs)
 		regs->gpregs[4] = 0;
 }
 
-static void hcall_idle(trapframe_t *regs)
-{
-	asm volatile("wait");
-	regs->gpregs[3] = 0;
-}
-
-
 #ifdef CONFIG_CLAIMABLE_DEVICES
 static void hcall_claim_device(trapframe_t *regs)
 {
@@ -843,7 +836,7 @@ static hcallfp_t epapr_hcall_table[] = {
 	unimplemented,
 	hcall_doorbell_send,
 	unimplemented,
-	hcall_idle                          /* 16 */
+	unimplemented /* idle */,           /* 16 */
 };
 
 #define HCALL_GET_VENDOR_ID(hcall_token)   (((hcall_token) & 0x7fffffff) >> 16)
