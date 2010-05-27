@@ -85,15 +85,8 @@ static void wait_for_interrupt(volatile int *count, unsigned int c)
 {
 	int target = *count + c;
 
-	while (*count < target) {
-		ev_idle();
-
-		/* Should not see more than one of these in a row,
-		 * without an intervening interrupt message --
-		 * eventually put this in check-results.
-		 */
-		printf("woke from idle\n");
-	}
+	while (*count < target)
+		;
 }
 
 static int wait_for_tsr(uint32_t tsr_mask, unsigned long timeout)
