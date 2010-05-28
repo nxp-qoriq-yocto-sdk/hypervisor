@@ -78,6 +78,7 @@ static int ccm_error_isr(void *arg)
 	void *reg_base = dev->regs[0].virt;
 	interrupt_t *irq = dev->irqs[0];
 	uint32_t val;
+	uint32_t errattr = 0;
 	hv_error_t err = { };
 	dt_node_t *ccf_node;
 
@@ -98,17 +99,24 @@ static int ccm_error_isr(void *arg)
 
 			ccf->cedr = val;
 			ccf->ceer = in32(err_enb_reg);
-			ccf->cecar = in32((uint32_t *)(reg_base + CCF_CECAR));
-			ccf->cecaddr = ((phys_addr_t) in32((uint32_t *)(reg_base + CCF_CECADRH)) << 32) |
-					in32((uint32_t *)(reg_base + CCF_CECADRL));
-			ccf->cmecar = in32((uint32_t *)(reg_base + CCF_CMECAR));
+			errattr = in32((uint32_t *)(reg_base + CCF_CECAR));
+			if (errattr & CCF_CECAR_VAL) {
+				ccf->cecar = errattr;
+				ccf->cecaddr = ((phys_addr_t) in32((uint32_t *)(reg_base + CCF_CECADRH)) << 32) |
+						in32((uint32_t *)(reg_base + CCF_CECADRL));
+				out32((uint32_t *)(reg_base + CCF_CECADRH), (uint32_t)(ccf->cecaddr >> 32));
+				out32((uint32_t *)(reg_base + CCF_CECADRL), (uint32_t)ccf->cecaddr);
+				ccf->cmecar = in32((uint32_t *)(reg_base + CCF_CMECAR));
+				out32((uint32_t *)(reg_base + CCF_CMECAR), ccf->cmecar);
+			}
 
 			error_policy_action(&err, error_ccf, policy);
+			break;
 		}
-		/* Local access errors are write one to clear */
-		if (i != ccf_local_access)
-			val &= ~err_val;
 	}
+
+	if (errattr & CCF_CECAR_VAL)
+		out32((uint32_t *) (reg_base + CCF_CECAR), errattr & CCF_CECAR_VAL);
 
 	out32(err_det_reg, val);
 
