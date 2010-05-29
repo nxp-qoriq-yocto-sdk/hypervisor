@@ -223,8 +223,7 @@ check_flags:
 
 static int check_wdog_crit_event(gcpu_t *gcpu, trapframe_t *regs)
 {
-	if (gcpu->crit_gdbell_pending & GCPU_PEND_WATCHDOG) {
-		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
+	if ((gcpu->gtcr & TCR_WIE) && (gcpu->gtsr & TSR_WIS)) {
 		reflect_watchdog(gcpu, regs);
 
 		return 1;

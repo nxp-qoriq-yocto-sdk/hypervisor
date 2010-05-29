@@ -45,10 +45,25 @@ void watchdog_handler(trapframe_t *frameptr)
 	watchdog = 1;
 }
 
-static void delay(void) {
-	// Wait a little extra to give the interrupt handler a chance to run
-	while (!(mfspr(SPR_TBL) & (1 << 5)));
-	while (mfspr(SPR_TBL) & (1 << 5));
+static unsigned long period_to_ticks(unsigned int period)
+{
+	return 2UL << period;
+}
+
+static void delay(unsigned long ticks)
+{
+	unsigned long start = mfspr(SPR_TBL);
+
+	while (mfspr(SPR_TBL) - start < ticks)
+		;
+}
+
+/* Delay for a time equivalent to the expected interval
+ * for a fit of the given period.
+ */
+static void delay_period(unsigned int period)
+{
+	return delay(period_to_ticks(period));
 }
 
 static void wait_for_timeout(unsigned int wp)
@@ -71,10 +86,9 @@ static int test1(void)
 	watchdog = 0;
 	enable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT) | TCR_WIE);
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT) | TCR_WIE);
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
-	delay();
 
 	return watchdog != 0;
 }
@@ -85,16 +99,15 @@ static int test2(void)
 	watchdog = 0;
 	disable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT) | TCR_WIE);
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT) | TCR_WIE);
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
-	delay();
+	delay(1000);
 	if (watchdog)
 		return 0;
 
 	enable_critint();
 
-	delay();
 	return watchdog != 0;
 }
 
@@ -105,18 +118,15 @@ static int test3(void)
 	watchdog = 0;
 	enable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT) | TCR_WIE);
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT) | TCR_WIE);
 	wait_for_timeout(TIMEOUT);
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
 	wait_for_timeout(TIMEOUT);
-	delay();
 	if (watchdog)
 		return 0;
-
 	wait_for_timeout(TIMEOUT);
 
-	delay();
-	return watchdog != 0;
+	return !!watchdog;
 }
 
 static int test4(void)
@@ -126,17 +136,16 @@ static int test4(void)
 	watchdog = 0;
 	enable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
-	delay();
+	delay(1000);
 	if (watchdog)
 		return 0;
 
 	mtspr(SPR_TCR, mfspr(SPR_TCR) | TCR_WIE);
 
-	delay();
-	return watchdog != 0;
+	return !!watchdog;
 }
 
 static int test5(void)
@@ -146,12 +155,12 @@ static int test5(void)
 	watchdog = 0;
 	enable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
 
-	delay();
+	delay(100000);
 
 	// TSR[WRS] should be 0
 	return (mfspr(SPR_TSR) & TSR_WRS) == 0;
@@ -166,18 +175,17 @@ static int test6(void)
 	watchdog = 0;
 	enable_critint();
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(TIMEOUT));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
 
-	delay();
+	delay(100000);
 	return 0;
 }
 
 static void secondary_entry(void)
 {
-
 	// If the WRS bits are set, then it means that we just rebooted from
 	// a watchdog timeout.  If we re-run test6(), then we'll just reboot
 	// again.  So instead, we stop.
@@ -190,7 +198,7 @@ static void secondary_entry(void)
 		// If we get here, then we didn't reboot.  That's a failure.
 		printf("test6 FAILED\n");
 		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-		mtspr(SPR_TCR, TCR_WP_SET(0));
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 	} else {
 		printf("test6 PASSED\nTest Complete\n");
 	}
@@ -213,35 +221,35 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
 	if (test2())
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
 	if (test3())
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
 	if (test4())
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
 	if (test5())
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");
 	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_WP_SET(0));
+	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
 	// Finish the test on the second core
 	secondary_startp = secondary_entry;

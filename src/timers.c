@@ -69,6 +69,43 @@ void decrementer(trapframe_t *regs)
 }
 
 /**
+ * watchdog_timeout -- called when a guest's watchdog has its final timeout
+ *
+ * This function is called when the guest watchdog emulator determines that
+ * the watchdog for that guest has had its last timeout and needs to be reset,
+ * or whatever other action is required.
+ */
+static void watchdog_timeout(void)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	if (!(gcpu->gtcr & TCR_WRC))
+		return;
+
+	if (guest->wd_notify) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			"Watchdog: notifying manager\n");
+
+		send_doorbells(guest->dbell_watchdog_expiration);
+	} else {
+		char buf[64];
+		int ret;
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			 "Watchdog: restarting partition\n");
+
+		// Save the current value of TCR[WRC]
+		gcpu->watchdog_tsr = gcpu->gtcr & TCR_WRC;
+
+		ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
+		assert(ret < (int)sizeof(buf));
+
+		restart_guest(guest, buf, "watchdog");
+	}
+}
+
+/**
  * fit -- Fixed Interval Timer interrupt handler
  *
  * Because we virtualize the FIT for the guest, the actual hardware FIT might
@@ -99,8 +136,8 @@ void fit(trapframe_t *regs)
 
 	/* Determine whether the TB bit that we care about has changed from
 	 * 0 to 1.  If guest FIT period is *equal* to the hardware FIT period,
-	 * then the bit we care about will never be 0.  To handle this, we force
-	 * the hardware's FIT period bit to zero.  Note: bit >= hwbit
+	 * then the bit we care about will never be 0.  To handle this, we set
+	 * the hardware's FIT period bit (hwbit) to zero.  Note: bit >= hwbit
 	 */
 	hwbit = 63 - TCR_FP_TO_INT(mfspr(SPR_TCR));
 	bit = 63 - TCR_FP_TO_INT(gcpu->gtcr);
@@ -113,7 +150,7 @@ void fit(trapframe_t *regs)
 		// This is a FIT interrupt for the guest, so FIS should be set.
 		atomic_or(&gcpu->gtsr, TSR_FIS);
 
-		/* We only reflect the interrupt immediately if these three
+		/* We only reflect the interrupt (via a doorbell) if these three
 		 * conditions are true:
 		 *
 		 * 1) We were interrupt from guest state (the guest was running
@@ -122,27 +159,12 @@ void fit(trapframe_t *regs)
 		 * 3) Guest FIT interrupts are enabled (guest TCR[FIE] is 1).
 		 */
 		if (likely(gcpu->gtcr & TCR_FIE)) {
-			if (likely((regs->srr1 & MSR_EE) && (regs->srr1 & MSR_GS)))
-				reflect_trap(regs);
-
-			/* There are three cases when we need to
-			 * create a doorbell:
-			 *
-			 * 1) If we reflect the trap to the guest, we need to
-			 * create a doorbell in case the guest does not clear
-			 * FIS in its interrupt handler.  Because the FIT is
-			 * level-sensitive, the FIT interrupt needs to be
-			 * re-asserted after the RFI if FIS is not cleared, and
-			 * the doorbell takes care of this.
-			 *
-			 * 2) If we do not reflect the trap because we were not
-			 * in guest state when the FIT interrupt occured, then
-			 * we need to reflect the interrupt when we return to
-			 * guest state.
-			 *
-			 * 3) If we do not reflect the trap because MSR[EE] was
-			 * disabled, then the trap will need to be reflected
-			 * when the guest re-enables interrupts.
+			/* If MSR[EE] and MSR[GS] are both set, then normally we
+			 * could just reflect the trap right away.  However,
+			 * because both the watchdog and FI timers might
+			 * expire at the same time, and we can't call
+			 * reflect_trap() twice, it's just simpler to handle all
+			 * interrupt reflections in the doorbell handler.
 			 *
 			 * We don't need to set a flag in gdbell_pending because
 			 * guest_doorbell() checks the registers directly.
@@ -156,16 +178,36 @@ void fit(trapframe_t *regs)
 		 */
 	}
 
-#if 0
-	// Check for HV usage of the timer.
-	bit = 63 - TCR_FP_TO_INT(cpu->client.hv_tcr);
+	// Check for watchdog expiration
+	bit = 63 - TCR_WP_TO_INT(gcpu->gtcr);
 	mask = (1ULL << bit) & ~(1ULL << hwbit);
 	was_zero = (cpu->client.previous_tb & mask) == 0;
 
 	if (was_zero && (tb & (1ULL << bit))) {
-		// TODO: call function to handle HV timer interrupts
+		// See AN2804 for a description of the watchdog ENW|WIS behavior
+		switch (gcpu->gtsr & (TSR_ENW | TSR_WIS)) {
+		case 0:
+			atomic_or(&gcpu->gtsr, TSR_ENW);
+			break;
+		case TSR_ENW:
+			atomic_or(&gcpu->gtsr, TSR_WIS);
+			if (likely(gcpu->gtcr & TCR_WIE))
+				send_local_crit_guest_doorbell();
+			break;
+		case TSR_WIS:
+			/* The only way we can get here is if we wait until
+			 * ENW,WIS == 1,1, and we clear ENW before the chip
+			 * resets.  Clearing ENW does not clear the interrupt,
+			 * however, so there should still be an interrupt
+			 * pending.
+			 */
+			atomic_or(&gcpu->gtsr, TSR_ENW);
+			break;
+		case TSR_ENW | TSR_WIS:
+			watchdog_timeout();
+			break;
+		}
 	}
-#endif
 
 	// Finally, remember the current timebase for next time
 	cpu->client.previous_tb = tb;
@@ -196,167 +238,56 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
  */
 void watchdog_trap(trapframe_t *regs)
 {
-	gcpu_t *gcpu = get_gcpu();
-
-	set_stat(bm_stat_watchdog, regs);
-
-	/* watchdog_timeout is used to emulate the second watchdog timeout.
-	 * Normally, this timeout would cause a core reset and/or external
-	 * interrupt.  To avoid this, we emulate the second timeout via
-	 * watchdog_timeout.  If this variable is 1 when we get watchdog
-	 * interrupt, then it means that the guest has missed two watchdog
-	 * timeouts, so we need to do whatever the watchdog would do during a
-	 * second timeout.
-	 */
-	if (gcpu->watchdog_timeout) {
-		guest_t *guest = gcpu->guest;
-
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			"Watchdog: second timeout\n");
-
-		// Turn of TCR[WIE] so that watchdog_trap() isn't called again,
-		// or prevent watchdog timeout during restart of the guest
-		mtspr(SPR_TCR, mfspr(SPR_TCR) & ~TCR_WIE);
-
-		// Does the guest want nothing to happen?
-		if (!(gcpu->gtcr & TCR_WRC))
-			return;
-
-		// Either we notify the manager or we restart the guest.
-		if (guest->wd_notify) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-				"Watchdog: notifying manager\n");
-
-			send_doorbells(guest->dbell_watchdog_expiration);
-		} else {
-			int ret;
-			char buf[64];
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-				"Watchdog: restarting partition\n");
-
-			// Save the current value of TCR[WRC]
-			gcpu->watchdog_tsr = gcpu->gtcr & TCR_WRC;
-
-			ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
-			assert(ret < (int)sizeof(buf));
-
-			restart_guest(guest, buf, "watchdog");
-		}
-		return;
-	}
-
-	/* We received the first watchdog timeout, so let's remember that in
-	 * case we get another one before the guest resets the watchdog timer.
-	 * Note that we actually reset the watchdog timer ourselves.  We do this
-	 * because we don't want to have the interrupt come right back as soon
-	 * as we return to guest state.
-	 */
-	gcpu->watchdog_timeout = 1;
-	mtspr(SPR_TSR, TSR_WIS);
-
-	/* Unlike the Decrementer and Fixed-Interval timers, we don't disable
-	 * the Watchdog interrupt.  First, we don't ever want the watchdog
-	 * interrupt to be disabled, because otherwise the HV might miss it.
-	 * Second, we've already cleared the interrupt status above, so there's
-	 * no need to support a pending interrupt.  If the guest thinks that WIE
-	 * is disabled, then we just won't reflect the interrupt.
-	 */
-	if (gcpu->gtcr & TCR_WIE) {
-		/* We have already cleared the interrupt (by writing to
-		 * TSR[WIS], so we need to emulate the interrupt whenever the
-		 * guest would normally get it.
-		 *
-		 * In this case, even if WIE and MSR[CE] are enabled, it's still
-		 * possible for the guest to get multiple watchdog interrupts
-		 * for the same event.  This can happen if the guest doesn't
-		 * clear the virtual TCR[WIS] but does enable MSR[CE].  As long
-		 * as virtual-TCR[WIS] is not cleared, every time the guest
-		 * re-enables MSR[CE], it will get a watchdog interrupt.
-		 *
-		 * To support that, we need to send a guest critical doorbell.
-		 * At this moment, the MSR[CE] is disabled, since we're in
-		 * a critical interrupt handler.  It will stay disabled in the
-		 * guest's critical interrupt handler as well.  If the guest
-		 * clears TSR[WIS], then set_tsr() will be called, which will
-		 * clear GCPU_PEND_WATCHDOG.
-		 *
-		 * However, if the guest doesn't clear TSR[WIS], then as soon
-		 * as MSR[CE] is enabled in the guest, guest_critical_doorbell()
-		 * will be called.  Since GCPU_PEND_WATCHDOG is set, we'll send
-		 * another watchdog interrupt to the guest.
-		 */
-		atomic_or(&gcpu->crit_gdbell_pending, GCPU_PEND_WATCHDOG);
-		send_local_crit_guest_doorbell();
-	}
+	// TBD
 }
 
 // Bit mask of the bits that are remembered in gcpu->gtcr
-#define GTCR_FLAGS_MASK (TCR_WRC | TCR_DIE | TCR_FIE | TCR_WIE | TCR_FP | TCR_FPEXT)
+#define GTCR_FLAGS_MASK (TCR_WRC | TCR_WP_MASK | TCR_FP_MASK | TCR_DIE | TCR_FIE | TCR_WIE)
 
 // Bit mask of the bits that are remembered in gcpu->gtsr
-#define GTSR_FLAGS_MASK TSR_FIS
+#define GTSR_FLAGS_MASK (TSR_FIS | TSR_WIS)
 
 void set_tcr(uint32_t val)
 {
 	gcpu_t *gcpu = get_gcpu();
+	unsigned int period;
 
-	/* TCR[WRC] can only be written to once.  If the guest tries to write
-	 * non-zero to TCR[WRC] again, we override those bits with the current
-	 * value.
+	/* The watchdog is fully emulated by the hypervisor, so we never allow
+	 * the guest to read or modify any of the real watchdog bits in TCR.
+	 *
+	 * The hardware does not allow the guest to write a different value to
+	 * TCR[WRC], if those bits are already non-zero.
 	 */
 	if (gcpu->gtcr & TCR_WRC)
 		val = (val & ~TCR_WRC) | (gcpu->gtcr & TCR_WRC);
 
 	gcpu->gtcr = val & GTCR_FLAGS_MASK;
 
-	/* The WRC register controls what the watchdog does on the second
-	 * timeout.  Because we emulate that behavior, we program our own value
-	 * and just remember what the guest wanted.
-	 *
-	 * Regardless of what the guest wants, we configure the watchdog to do
-	 * nothing on a second timeout. This way, if the hypervisor fails to
-	 * react to the first timeout, nothing bad will happen.
-	 */
-	val = (val & ~TCR_WRC) | TCR_WRC_NOP;
+	// If the guest re-enables WIE, and there's an interrupt pending, then
+	// create a doorbell so that we can send that pending interrupt.
+	if ((val & TCR_WIE) && (gcpu->gtsr & TSR_WIS))
+		send_local_crit_guest_doorbell();
 
-	if (val & TCR_WIE) {
-		/* If there's a watchdog interrupt pending while the virtual
-		 * WIE was disabled, and the guest re-enables it, then send
-		 * that interrupt now.  watchdog_timeout is non-zero only when
-		 * there's a pending watchdog interrupt.
-		 */
-		if (gcpu->watchdog_timeout) {
-			atomic_or(&gcpu->crit_gdbell_pending, GCPU_PEND_WATCHDOG);
-			send_local_crit_guest_doorbell();
-		}
-	} else
-		/* If the guest disables watchodog interrupts, then we
-		 * obviously should not send one.
-		 */
-		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
-
-	/* Once the guest has enabled watchdog support (by programming something
-	 * other than zero into TRC[WRC], we keep watchdog interrupts enabled
-	 * forever, since we always want the HV to receive them. Otherwise, it
-	 * might miss the first timeout interrupt and then we won't be able to
-	 * emulate the second timeout (e.g. restart the partition).
-	 */
-	if (gcpu->gtcr & TCR_WRC)
-		val |= TCR_WIE;
+	// Don't allow the guest to modify the real TCR[WRC] bits or enable
+	// the real watchdog interrupts.
+	val = (val & ~(TCR_WRC | TCR_WIE));
 
 	// If the guest re-enables FIE, and there's an interrupt pending, then
 	// create a doorbell so that we can send that pending interrupt.
 	if ((val & TCR_FIE) && (gcpu->gtsr & TSR_FIS))
 		send_local_guest_doorbell();
 
-	// The hardware FIE is always enabled, so dn't let the guest turn it
+	// The hardware FIE is always enabled, so don't let the guest turn it
 	// off. We need FIT interrupts in order to properly emulate guest FIS
 	val |= TCR_FIE;
 
-	/* TODO: Check to see if the HV is already using the FIT, and if so,
-	 * set the hardware TCR to the maximum (highest frequency) of the guest
-	 * TCR and the HV TCR.
-	 */
+	// Set the actual hardware FIT period to the maximum of the guest
+	// watchdog and guest FIT periods
+	period = max(TCR_FP_TO_INT(gcpu->gtcr), TCR_WP_TO_INT(gcpu->gtcr));
+	val = (val & ~TCR_FP_MASK) | TCR_INT_TO_FP(period);
+
+	// Don't let the guest change the actual watchdog period.
+	val = (val & ~TCR_WP_MASK) | (mfspr(SPR_TCR) & TCR_WP_MASK);
 
 	mtspr(SPR_TCR, val);
 }
@@ -364,13 +295,6 @@ void set_tcr(uint32_t val)
 void set_tsr(uint32_t tsr)
 {
 	gcpu_t *gcpu = get_gcpu();
-	register_t saved;
-
-	/*
-	 * We disable critical interrupts so that watchdog_trap() is not called
-	 * while we're working on TCR.
-	 */
-	saved = disable_int_save();
 
 	if (tsr & TSR_DIS)
 		atomic_and(&gcpu->gtsr, ~TSR_DIS);
@@ -391,22 +315,36 @@ void set_tsr(uint32_t tsr)
 	}
 
 	if (tsr & TSR_WIS) {
-		atomic_and(&gcpu->crit_gdbell_pending, ~GCPU_PEND_WATCHDOG);
+		// The watchdog is emulated, so writing a 1 to WIS doesn't go to
+		// the actual hardware.
+		tsr &= ~TSR_WIS;
 
-		/* If the guest is resetting the watchdog, then we no longer
-		 * emulate the second timeout.
+		// But we still need to remember that the guest cleared WIS
+		atomic_and(&gcpu->gtsr, ~TSR_WIS);
+
+		/* There might be a doorbell waiting to handle a pending
+		 * watchdog interrupt.  We don't have to worry about that
+		 * because guest_doorbell() will notice that the conditions for
+		 * a pending watchdog are no longer there, and it won't do
+		 * anything.
 		 */
-		gcpu->watchdog_timeout = 0;
+	}
+
+	if (tsr & TSR_ENW) {
+		// The watchdog is emulated, so writing a 1 to ENW doesn't go to
+		// the actual hardware.
+		tsr &= ~TSR_ENW;
+
+		// But we still need to remember that the guest cleared ENW
+		atomic_and(&gcpu->gtsr, ~TSR_ENW);
 	}
 
 	mtspr(SPR_TSR, tsr);
 
-	// Since we're setting TSR, we don't want to remember the value of
+	// Since we're setting guest TSR, we don't want to remember the value of
 	// TCR upon a watchdog reset any more.  gcpu->watchdog_tsr is non-zero
-	// only if the system was reset by a watchdog.
+	// only if the partition was reset by a watchdog.
 	gcpu->watchdog_tsr = 0;
-
-	restore_int(saved);
 }
 
 uint32_t get_tcr(void)
@@ -424,13 +362,6 @@ uint32_t get_tsr(void)
 	gcpu_t *gcpu = get_gcpu();
 	uint32_t val = mfspr(SPR_TSR);
 
-	/* If watchdog_timeout is true, then it means that the HV has reset
-	 * TSR[ENW,WIS] to 0b10, but we're pretending it's 0b11.  We emulate the
-	 * second timeout of the watchdog.
-	 */
-	if (gcpu->watchdog_timeout)
-		val |= TSR_WIS;
-
 	// gcpu->watchdog_tsr is non-zero only if the system was reset by a
 	// watchdog.
 	if (gcpu->watchdog_tsr)
@@ -442,8 +373,8 @@ uint32_t get_tsr(void)
 	// Only FIS keeps running despite the guest clearing the enable
 	// bit, though, so the guest should also see DIS if it is set
 	// in hardware.
-	val &= ~TSR_FIS;
-	val |= gcpu->gtsr & (TSR_FIS | TSR_DIS);
+	val &= ~(TSR_FIS | TSR_ENW | TSR_WIS);
+	val |= gcpu->gtsr & (TSR_FIS | TSR_DIS | TSR_ENW | TSR_WIS);
 
 	return val;
 }

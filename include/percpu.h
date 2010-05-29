@@ -197,7 +197,6 @@ extern unsigned long last_lpid;
 
 /* The following flags correspond to crit_gdbell_pending */
 #define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
-#define GCPU_PEND_WATCHDOG 0x00000080 /* Watchdog timeout event pending */
 #define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
 
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
@@ -235,7 +234,6 @@ typedef struct gcpu {
 	// gtsr should be a u32, but atomic_or() takes an unsigned long
 	unsigned long gtsr;  // virtualized guest TSR
 	int evict_tlb1, clean_tlb, clean_tlb_pid;
-	int watchdog_timeout;	/* 0=normal, 1=next WD int restarts partition */
 
 /*** gcpu is napping on explicit request */
 #define GCPU_NAPPING_HCALL 1
