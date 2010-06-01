@@ -2089,14 +2089,48 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 	enable_int();
 
+	/* Wait for all cores to leave the guest before resetting handles. */
 	if (atomic_add(&guest->active_cpus, -1) == 0) {
 		for (i = 0; i < MAX_HANDLES; i++) {
 			handle_t *h = guest->handles[i];
 
-			if (h && h->ops && h->ops->reset)
-				h->ops->reset(h);
+			if (h && h->ops && h->ops->prereset)
+				h->ops->prereset(h);
 		}
 
+		guest->active_cpus = guest->cpucnt;
+		smp_mbar();
+		guest->state = guest_stopping_percpu;
+	}
+
+	/* Wait for handles to be reset before clearing interrupts
+	 * on any core.
+	 */
+	while (guest->state != guest_stopping_percpu)
+		barrier();
+
+	mpic_reset_core();
+
+	/* Drain coreint interrupts -- see external_int(). */
+	if (mpic_coreint) {
+		mtspr(SPR_EPCR, mfspr(SPR_EPCR) & ~EPCR_EXTGS);
+		mtspr(SPR_EPCR, mfspr(SPR_EPCR) | EPCR_EXTGS);
+	}
+
+	memset(&gcpu->gdbell_pending, 0,
+	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
+
+	/* Wait for all cores to clear interrupts before doing postreset and
+	 * indicating "stopped", which allows device claiming.
+	 */
+	if (atomic_add(&guest->active_cpus, -1) == 0) {
+		for (i = 0; i < MAX_HANDLES; i++) {
+			handle_t *h = guest->handles[i];
+
+			if (h && h->ops && h->ops->postreset)
+				h->ops->postreset(h);
+		}
+	
 		if (restart) {
 			guest->state = guest_starting;
 			setgevent(guest->gcpus[0], gev_start_load);
@@ -2105,11 +2139,6 @@ void do_stop_core(trapframe_t *regs, int restart)
 			send_doorbells(guest->dbell_state_change);
 		}
 	}
-
-	mpic_reset_core();
-
-	memset(&gcpu->gdbell_pending, 0,
-	       sizeof(gcpu_t) - offsetof(gcpu_t, gdbell_pending));
 
 	raw_spin_lock(&guest->sync_ipi_lock);
 	atomic_or(&gcpu->napping, GCPU_NAPPING_STATE);

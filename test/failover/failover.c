@@ -58,13 +58,13 @@ void ext_int_handler(trapframe_t *frameptr)
 	unsigned int vector;
 	int ret;
 
-	if (coreint) {
+	if (coreint)
 		vector = mfspr(SPR_EPR);
-	} else {
+	else
 		vector = ev_int_iack(0, &vector);
-		if (vector == 0xffff)
-			return;
-	}
+
+	if (vector == 0xffff)
+		return;
 
 	if (vector == state_change_irq) {
 		unsigned int status;

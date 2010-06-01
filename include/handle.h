@@ -34,11 +34,25 @@ struct handle;
  * Any member may be NULL.
  */
 typedef struct {
-	/** Reset the handle to partition boot state.
-	 * If the handle was dynamically created, rather than
-	 * device-tree-originated, then close the handle.
+	/** Reset the handle to partition boot state, before core reset.
+	 *
+	 * This will happen after all cores have stopped executing in
+	 * the guest, but before per-core cleanup (such as interrupt
+	 * clearing) has taken place.
 	 */
-	void (*reset)(struct handle *h);
+	void (*prereset)(struct handle *h);
+
+	/** Reset the handle to partition boot state, after core reset.
+	 *
+	 * This will happen after all cores have performed their
+	 * per-core cleanup activities (such as interrupt clearing),
+	 * but before the guest has entered the stopped state (allowing
+	 * device claiming).
+	 *
+	 * If the handle was dynamically created (we don't do this yet),
+	 * rather than device-tree-originated, then close the handle.
+	 */
+	void (*postreset)(struct handle *h);
 } handle_ops_t;
 
 /* An extremely crude form of RTTI/multiple interfaces...

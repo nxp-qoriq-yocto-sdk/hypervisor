@@ -291,6 +291,11 @@ static void hcall_partition_get_status(trapframe_t *regs)
 
 	regs->gpregs[4] = guest->state;
 	regs->gpregs[3] = 0;  
+
+	/* Don't let internal states be public API. */
+	if (guest->state >= guest_stopping_min &&
+	    guest->state <= guest_stopping_max)
+		regs->gpregs[4] = guest_stopping;
 }
 
 static void hcall_whoami(trapframe_t *regs)
@@ -694,13 +699,6 @@ static void hcall_err_get_info(trapframe_t *regs)
 		regs->gpregs[4] = 0;
 }
 
-static void hcall_idle(trapframe_t *regs)
-{
-	asm volatile("wait");
-	regs->gpregs[3] = 0;
-}
-
-
 #ifdef CONFIG_CLAIMABLE_DEVICES
 static void hcall_claim_device(trapframe_t *regs)
 {
@@ -838,7 +836,7 @@ static hcallfp_t epapr_hcall_table[] = {
 	unimplemented,
 	hcall_doorbell_send,
 	unimplemented,
-	hcall_idle                          /* 16 */
+	unimplemented /* idle */,           /* 16 */
 };
 
 #define HCALL_GET_VENDOR_ID(hcall_token)   (((hcall_token) & 0x7fffffff) >> 16)

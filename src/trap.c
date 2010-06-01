@@ -543,3 +543,27 @@ void perfmon_int(trapframe_t *regs)
 	atomic_or(&get_gcpu()->gdbell_pending, GCPU_PEND_PERFMON);
 	send_local_guest_doorbell();
 }
+
+/* If a partition had an interrupt pending with coreint, it will remain
+ * pending on that core even after masking.  During partition shutdown,
+ * we temporarily redirect interrupts to the hypervisor to drain these
+ * interrupts.
+ *
+ * There should be only one per core.  We may want to record what it is, and
+ * if edge-triggered we reissue it if the interrupt is enabled again (e.g. 
+ * in a new claimable owner) -- but consider how to deal with the EOI from
+ * that replayed interrupt, especially if direct EOI is enabled.
+ */
+void external_int(trapframe_t *regs)
+{
+	if (!mpic_coreint)
+		in32(((uint32_t *)(CCSRBAR_VA + MPIC + MPIC_IACK)));
+
+	out32((uint32_t *)(CCSRBAR_VA + MPIC + MPIC_EOI), 0);
+
+	/* Flush the write, if there's another interrupt we
+	 * want to take it immediately before EXTGS is set
+	 * again.
+	 */
+	in32((uint32_t *)(CCSRBAR_VA + MPIC + MPIC_EOI));
+}

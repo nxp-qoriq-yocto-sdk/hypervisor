@@ -70,6 +70,11 @@ typedef enum {
 	guest_pausing = 4,
 	guest_paused = 5,
 	guest_resuming = 6,
+
+	/* Internal substates */
+	guest_stopping_min,
+	guest_stopping_percpu,
+	guest_stopping_max,
 } gstate_t;
 
 typedef struct guest {

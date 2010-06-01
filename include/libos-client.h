@@ -107,6 +107,7 @@ void critical_interrupt(struct trapframe *frameptr);
 void guest_doorbell(struct trapframe *regs);
 void guest_critical_doorbell(struct trapframe *regs);
 void inst_storage(struct trapframe *regs);
+void external_int(struct trapframe *regs);
 void powerpc_mchk_interrupt(struct trapframe *frameptr);
 void program_trap(struct trapframe *regs);
 void debug_trap(struct trapframe *regs);
@@ -128,6 +129,7 @@ void perfmon_int(struct trapframe *regs);
 #define EXC_MCHECK_HANDLER powerpc_mchk_interrupt
 #define EXC_DSI_HANDLER data_storage
 #define EXC_ISI_HANDLER inst_storage
+#define EXC_EXT_INT_HANDLER external_int
 #define EXC_ALIGN_HANDLER align_trap
 #define EXC_PROGRAM_HANDLER program_trap
 #define EXC_FPUNAVAIL_HANDLER fpunavail
