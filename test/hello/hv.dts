@@ -53,6 +53,24 @@
 
 		iommu {
 			device = "/soc/iommu";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "pamu";
+				error = "single-bit ecc";
+				policy = "notify";
+			};
+			error-config@1 {
+				compatible = "error-config";
+				domain = "pamu";
+				error = "multi-bit ecc";
+				policy = "notify";
+			};
+			error-config@2 {
+				compatible = "error-config";
+				domain = "pamu";
+				error = "operation";
+				policy = "notify";
+			};
 		};
 
 		cpc {

@@ -47,6 +47,9 @@
 #include <error_log.h>
 #include <error_mgmt.h>
 
+static const char *pamu_err_policy[PAMU_ERROR_COUNT];
+
+
 /* mcheck-safe lock, used to ensure atomicity of reassignment */
 static uint32_t pamu_error_lock;
 
@@ -772,29 +775,137 @@ static void setup_omt(void)
 
 static void pamu_error_log(hv_error_t *err, guest_t *guest)
 {
-	/* Access violations go to per guest and the global error queue*/
 	if (guest)
 		error_log(&guest->error_event_queue, err, &guest->error_log_prod_lock);
-
-	if (error_manager_guest)
-		error_log(&global_event_queue, err, &global_event_prod_lock);
-
-	error_log(&hv_global_event_queue, err, &hv_queue_prod_lock);
 }
 
 static int pamu_error_isr(void *arg)
 {
-	hv_error_t err = { };
 	device_t *dev = arg;
-	interrupt_t *irq;
+	void *reg_base = dev->regs[0].virt;
+	phys_addr_t reg_size = dev->regs[0].size;
+	unsigned long reg_off;
+	int ret = -1;
+	dt_node_t *pamu_node;
+	hv_error_t err = { };
 
-	irq = dev->irqs[1];
-	irq->ops->disable(irq);
+	pamu_node = to_container(dev, dt_node_t, dev);
+	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
+		void *reg = reg_base + reg_off;
+		uint32_t pics, poes1;
+
+		pics = in32((uint32_t *)(reg + PAMU_PICS));
+		if (pics & PAMU_OPERATION_ERROR_INT_STAT) {
+			strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+			strncpy(err.error, get_error_str(error_pamu, pamu_operation),
+				sizeof(err.error));
+			dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+			poes1 = in32((uint32_t *)(reg + PAMU_POES1));
+			if (poes1 & PAMU_POES1_POED) {
+				err.pamu.poes1 = poes1;
+				err.pamu.poeaddr = (((phys_addr_t)in32((uint32_t *)(reg + PAMU_POEAH))) << 32) |
+							in32((uint32_t *)(reg + PAMU_POEAL));
+			}
+			error_policy_action(&err, error_pamu, pamu_err_policy[pamu_operation]);
+			out32((uint32_t *)(reg + PAMU_POES1), PAMU_POES1_POED);
+			out32((uint32_t *)(reg + PAMU_PICS), pics);
+		}
+	}
+
+	return 0;
+}
+
+static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pics)
+{
+	uint32_t av_liodn, avs1;
+	hv_error_t err = { };
+	pamu_error_t *pamu = &err.pamu;
 
 	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
-	strncpy(err.error, get_domain_str(error_pamu), sizeof(err.error));
+	dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
-	pamu_error_log(&err, NULL);
+	avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
+	av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
+	ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
+	/* We may get access violations for invalid LIODNs, just ignore them */
+	if (!ppaace->v)
+		return -1;
+
+	strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
+			sizeof(err.error));
+	pamu->avs1 = avs1;
+	pamu->access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) (reg + PAMU_AVAH)))
+						 << 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
+	pamu->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+
+	/*FIXME : LIODN index not in PPAACT table*/
+	assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
+
+	spin_lock(&pamu_error_lock);
+
+	guest_t *guest = liodn_to_guest[av_liodn];
+	if (guest) {
+		pamu->lpid = guest->lpid;
+		pamu->liodn_handle = liodn_to_handle[av_liodn];
+	}
+
+	spin_unlock(&pamu_error_lock);
+
+	ppaace->v = 0;
+	pamu_error_log(&err, guest);
+	error_policy_action(&err, error_pamu, pamu_err_policy[pamu_access_violation]);
+
+	/* Clear the write one to clear bits in AVS1, mask out the LIODN */
+	out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
+	/* De-assert access violation pin */
+	out32((uint32_t *)(reg + PAMU_PICS), pics);
+
+#ifdef CONFIG_P4080_ERRATUM_PAMU3
+	/* erratum -- do it twice */
+	out32((uint32_t *)(reg + PAMU_PICS), pics);
+#endif
+
+	return 0;
+}
+
+static int handle_ecc_error(pamu_ecc_err_reg_t *ecc_regs, dt_node_t *pamu_node)
+{
+	uint32_t val = in32(&ecc_regs->eccdet);
+	uint32_t errattr, ctlval;
+	hv_error_t err = { };
+	pamu_error_t *pamu = &err.pamu;
+
+	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+	dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+
+	ctlval = pamu->eccctl = in32(&ecc_regs->eccctl);
+	pamu->eccdis = in32(&ecc_regs->eccdis);
+	pamu->eccinten = in32(&ecc_regs->eccinten);
+	pamu->eccdet = val;
+	errattr = in32(&ecc_regs->eccattr);
+	if (errattr & PAMU_ECC_ERR_ATTR_VAL) {
+		pamu->eccattr = errattr;
+		pamu->eccaddr = (((phys_addr_t)in32(&ecc_regs->eccaddrhi)) << 32) |
+					in32(&ecc_regs->eccaddrlo);
+		pamu->eccdata = (((phys_addr_t)in32(&ecc_regs->eccdatahi)) << 32) |
+					in32(&ecc_regs->eccdatalo);
+	}
+
+	if (val & PAMU_SB_ECC_ERR) {
+		strncpy(err.error, get_error_str(error_pamu, pamu_single_bit_ecc),
+				sizeof(err.error));
+		out32(&ecc_regs->eccctl, ctlval & ~PAMU_EECTL_CNT_MASK);
+		error_policy_action(&err, error_pamu, pamu_err_policy[pamu_single_bit_ecc]);
+	}
+
+	if (val & PAMU_MB_ECC_ERR) {
+		strncpy(err.error, get_error_str(error_pamu, pamu_multi_bit_ecc),
+				sizeof(err.error));
+		error_policy_action(&err, error_pamu, pamu_err_policy[pamu_multi_bit_ecc]);
+	}
+
+	out32(&ecc_regs->eccattr, PAMU_ECC_ERR_ATTR_VAL);
+	out32(&ecc_regs->eccdet, val);
 
 	return 0;
 }
@@ -806,65 +917,21 @@ static int pamu_av_isr(void *arg)
 	phys_addr_t reg_size = dev->regs[0].size;
 	unsigned long reg_off;
 	int ret = -1;
-	hv_error_t err = { };
 	dt_node_t *pamu_node;
-	uint32_t av_liodn, avs1;
 
+	pamu_node = to_container(dev, dt_node_t, dev);
 	for (reg_off = 0; reg_off < reg_size; reg_off += PAMU_OFFSET) {
 		void *reg = reg_base + reg_off;
+		uint32_t pics;
+		pamu_ecc_err_reg_t *ecc_regs;
 
-		uint32_t pics = in32((uint32_t *)(reg + PAMU_PICS));
-		if (pics & PAMU_ACCESS_VIOLATION_STAT) {
-			avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
-			av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
-			ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
-			/* We may get access violations for invalid LIODNs, just ignore them */
-			if (ppaace->v) {
-				strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
-				strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
-						sizeof(err.error));
-				pamu_node = to_container(dev, dt_node_t, dev);
-				dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
-				err.pamu.avs1 = avs1;
-				err.pamu.access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) (reg + PAMU_AVAH)))
-									 << 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
-				err.pamu.avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
-				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-						"PAMU access violation on PAMU#%ld, liodn = %x\n",
-						 reg_off / PAMU_OFFSET, av_liodn);
-				printlog(LOGTYPE_PAMU, LOGLEVEL_DEBUG,
-						"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
-						 err.pamu.avs1, err.pamu.avs2, err.pamu.access_violation_addr);
+		pics = in32((uint32_t *)(reg + PAMU_PICS));
+		if (pics & PAMU_ACCESS_VIOLATION_STAT)
+			ret = handle_access_violation(reg, pamu_node, pics);
 
-				/*FIXME : LIODN index not in PPAACT table*/
-				assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
-
-				spin_lock(&pamu_error_lock);
-
-				guest_t *guest = liodn_to_guest[av_liodn];
-				if (guest) {
-					err.pamu.lpid = guest->lpid;
-					err.pamu.liodn_handle = liodn_to_handle[av_liodn];
-				}
-
-				spin_unlock(&pamu_error_lock);
-
-				pamu_error_log(&err, guest);
-				ppaace->v = 0;
-			}
-
-			/* Clear the write one to clear bits in AVS1, mask out the LIODN */
-			out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
-			/* De-assert access violation pin */
-			out32((uint32_t *)(reg + PAMU_PICS), pics);
-
-#ifdef CONFIG_P4080_ERRATUM_PAMU3
-			/* erratum -- do it twice */
-			out32((uint32_t *)(reg + PAMU_PICS), pics);
-#endif
-
-			ret = 0;
-		}
+		ecc_regs = (pamu_ecc_err_reg_t *)(reg + PAMU_EECTL);
+		if (in32(&ecc_regs->eccdet))
+			ret = handle_ecc_error(ecc_regs, pamu_node);
 	}
 
 	return ret;
@@ -889,6 +956,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	phys_addr_t guts_addr, guts_size;
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
 	interrupt_t *irq;
+	uint8_t pamu_enable_ints = 0;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -942,12 +1010,45 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	                     TLB_MAS2_IO, TLB_MAS3_KERN);
 	pamubypenr = in32(pamubypenr_ptr);
 
+
+	if (dev->num_irqs >= 1 && dev->irqs[0]) {
+		const char *policy;
+
+		irq = dev->irqs[0];
+		if (irq && irq->ops->register_irq) {
+			for(int i = pamu_single_bit_ecc; i < PAMU_ERROR_COUNT; i++) {
+				const char *policy = get_error_policy(error_pamu, i);
+
+				pamu_err_policy[i] = policy;
+				if (!strcmp(policy, "disable"))
+					continue;
+
+				pamu_enable_ints |= 1 << i;
+			}
+
+			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_MCHK);
+		}
+	}
+
+	if (dev->num_irqs >= 2 && dev->irqs[1]) {
+		irq = dev->irqs[1];
+		if (irq && irq->ops->register_irq) {
+			const char *policy = get_error_policy(error_pamu, pamu_operation);
+
+			pamu_err_policy[pamu_operation] = policy;
+			if (strcmp(policy, "disable"))
+				pamu_enable_ints |= 1 << pamu_operation;
+
+			irq->ops->register_irq(irq, pamu_error_isr, dev, TYPE_MCHK);
+		}
+	}
+
 	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
 
 		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
 		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off,
-					pamumem, pamumem_size);
+					pamumem, pamumem_size, pamu_enable_ints);
 		if (ret < 0) {
 			/* This can only fail for the first instance due to
 			 * memory alignment issues, hence this failure
@@ -963,18 +1064,6 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 
 	setup_pamu_law(pamu_node);
 	setup_omt();
-
-	if (dev->num_irqs >= 1 && dev->irqs[0]) {
-		irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_MCHK);
-	}
-
-	if (dev->num_irqs >= 2 && dev->irqs[1]) {
-		irq = dev->irqs[1];
-		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, pamu_error_isr, dev, TYPE_MCHK);
-	}
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);

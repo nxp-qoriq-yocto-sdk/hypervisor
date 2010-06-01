@@ -240,6 +240,18 @@ void dump_domain_error_info(hv_error_t *err, domains_t domain)
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			"PAMU access violation lpid = %x, handle = %x\n",
 			pamu->lpid, pamu->liodn_handle);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU ecc error eccctl = %x, eccdis = %x, eccinten = %x\n",
+			pamu->eccctl, pamu->eccdis, pamu->eccinten);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU ecc error eccdet  = %x, eccattr = %x\n",
+			pamu->eccdet, pamu->eccattr);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU ecc error addr = %llx, data = %llx\n",
+			pamu->eccaddr, pamu->eccdata);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			"PAMU operation error poes1 = %x, poeaddr = %llx\n",
+			pamu->poes1, pamu->poeaddr);
 		break;
 	}
 

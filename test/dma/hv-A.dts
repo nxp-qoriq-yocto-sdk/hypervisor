@@ -59,6 +59,12 @@
 
 		iommu {
 			device = "/soc/iommu";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "pamu";
+				error = "access violation";
+				policy = "notify";
+			};
 		};
 
 		cpc {
