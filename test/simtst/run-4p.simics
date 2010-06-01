@@ -24,7 +24,7 @@
 
 add-directory "%script%/../../../sim/p4080ds/RS/hv-4p-lnx-lnx-lwe-lwe" -prepend
 
-run-command-file "run.simics"
-
 # pick up local HV
 add-directory "%script%/../../output/bin" -prepend
+
+run-command-file "run.simics"
