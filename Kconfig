@@ -150,12 +150,6 @@ config VIRTUAL_I2C
 		neither partition will be able to access the I2C registers
 		of the other.
 
-config VIRTUAL_PCIE
-	bool "PCIe controller virtualization"
-	select DEVICE_VIRT
-	help
-		Enable PCIe host controller virtualization support.
-
 config STATISTICS
 	bool "Hypervisor statistics"
 	select LIBOS_STATISTICS
