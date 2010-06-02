@@ -66,18 +66,20 @@ int error_get(queue_t *q, hv_error_t *err, unsigned long *flag,
 
 void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 {
-	int ret;
-
 	spin_lock(lock);
-	ret = queue_write(q, (const uint8_t *)err, sizeof(hv_error_t));
-	/* if queue is full we drop the errors */
-	/* FIXME: should do more here than a printlog */
-	if (!ret) {
+
+	/* Only write whole errors into the queue. */
+	if (queue_get_space(q) < sizeof(hv_error_t)) {
+		/* If the queue is full, we drop the errors.
+		 * FIXME: should do more here than a printlog
+		 */
 		spin_unlock(lock);
 		printlog(LOGTYPE_MISC, LOGLEVEL_DEBUG,
-				"Error event queue full, dropping errors\n");
+		         "Error event queue full, dropping errors\n");
 		return;
 	}
+
+	queue_write(q, (const uint8_t *)err, sizeof(hv_error_t));
 	spin_unlock(lock);
 
 	if (q == &hv_global_event_queue) {
