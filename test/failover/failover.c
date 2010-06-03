@@ -103,7 +103,7 @@ void crit_int_handler(trapframe_t *regs)
 	hv_error_t *ptr;
 	uint32_t bufsize = sizeof(hv_error_t);
 
-	int ret = fh_err_get_info(1, &bufsize, 0, virt_to_phys(&crit_err), 0);
+	int ret = fh_err_get_info(global_error_queue, &bufsize, 0, virt_to_phys(&crit_err), 0);
 	if (!ret)
 		crit_int++;
 }
@@ -115,7 +115,7 @@ void mcheck_interrupt(trapframe_t *regs)
 	if (!(mfspr(SPR_MCSR) & MCSR_MCP))
 		return;
 
-	int ret = fh_err_get_info(0, &bufsize, 0, virt_to_phys(&mcheck_err), 0);
+	int ret = fh_err_get_info(guest_error_queue, &bufsize, 0, virt_to_phys(&mcheck_err), 0);
 	if (!ret)
 		mcheck_int++;
 
@@ -440,6 +440,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	init(devtree_ptr);
 
 	printf("\nFailover test:\n");
+
+	if (init_error_queues() < 0)
+		return;
 
 	enable_extint();
 	enable_critint();

@@ -121,6 +121,52 @@ static unsigned int count_cpus(const uint32_t *cpulist, unsigned int len)
 	return total;
 }
 
+static int create_guest_error_node(guest_t *guest)
+{
+	dt_node_t *gnode, *handles;
+	int32_t ghandle;
+	int ret;
+
+	ghandle = alloc_guest_handle(guest, &guest->error_queue_handle);
+	if (ghandle < 0)
+		return ghandle;
+
+	guest->error_queue_handle.error_queue = &guest->error_event_queue;
+
+	handles = get_handles_node(guest);
+	if (!handles)
+		goto nomem;
+
+	gnode = dt_get_subnode(handles, "guest-error-queue", 1);
+	if (!gnode)
+		goto nomem;
+
+	// Insert the 'compatible' property.
+	ret = dt_set_prop_string(gnode, "compatible", "fsl,hv-guest-error-queue");
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, gnode->name, "compatible");
+		return ret;
+	}
+
+	// Insert a 'reg' property with the handle
+	ret = dt_set_prop(gnode, "reg", &ghandle, sizeof(ghandle));
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, gnode->name, "reg");
+		return ret;
+	}
+
+	return 0;
+
+nomem:
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+	         "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
+}
+
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 				phys_addr_t addr, phys_addr_t size,
 				uint32_t exc_flags)
@@ -2750,6 +2796,11 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 #ifdef CONFIG_DEVICE_VIRT
 	list_init(&guest->vf_list);
 #endif
+
+	// create the guest error queue node
+	ret = create_guest_error_node(guest);
+	if (ret < 0)
+		goto fail;
 
 	ret = init_guest_devs(guest);
 	if (ret < 0)

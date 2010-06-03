@@ -642,6 +642,7 @@ static void hcall_system_reset(trapframe_t *regs)
 
 static void hcall_err_get_info(trapframe_t *regs)
 {
+	int handle = regs->gpregs[3];
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	queue_t *q;
@@ -658,13 +659,10 @@ static void hcall_err_get_info(trapframe_t *regs)
 		return;
 	}
 
-	switch(regs->gpregs[3]) {
-	case GUEST_ERROR_EVENT_QUEUE:
-		q = &guest->error_event_queue;
-		lock = &guest->error_queue_lock;
-		break;
-
-	case GLOBAL_ERROR_EVENT_QUEUE:
+	// FIXME: use handle instead of hardcoded constant
+	// after global error queue is node based
+	if (handle == GLOBAL_ERROR_EVENT_QUEUE) {
+		guest = gcpu->guest;
 		if (guest != error_manager_guest) {
 			regs->gpregs[3] = EV_EINVAL;
 			return;
@@ -674,11 +672,20 @@ static void hcall_err_get_info(trapframe_t *regs)
 		flag = &gcpu->crit_gdbell_pending;
 		mask = GCPU_PEND_CRIT_INT;
 		lock = &global_event_cons_lock;
-		break;
+	} else {
+		// FIXME: race against handle closure
+		if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+			regs->gpregs[3] = EV_EINVAL;
+			return;
+		}
 
-	default:
-		regs->gpregs[3] = EV_EINVAL;
-		return;
+		q = guest->handles[handle]->error_queue;
+		if (!q) {
+			regs->gpregs[3] = EV_EINVAL;
+			return;
+		}
+
+		lock = &guest->error_queue_lock;
 	}
 
 	addr = ((phys_addr_t) regs->gpregs[5]) << 32 |

@@ -33,6 +33,8 @@ void release_secondary_cores(void);
 extern void (*secondary_startp)(void);
 extern void *fdt;
 extern int coreint;
+extern int guest_error_queue;
+extern int global_error_queue;
 
 extern phys_addr_t uart_addr;
 extern uint8_t *uart_virt;
@@ -62,5 +64,6 @@ int dt_get_reg(const void *tree, int node, int res,
 struct chardev *test_init_uart(int node);
 int get_vmpic_irq(int node, int irq);
 int set_vmpic_irq_priority(int handle, int prio);
+int init_error_queues(void);
 
 #endif

@@ -154,6 +154,7 @@ typedef struct guest {
 
 	/** Error event queue */
 	queue_t error_event_queue;
+	handle_t error_queue_handle;  /**< handle for the error event queue */
 
 	/** Platform error log producer lock*/
 	uint32_t error_log_prod_lock;

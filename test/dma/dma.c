@@ -56,7 +56,7 @@ void crit_int_handler(trapframe_t *regs)
 	else
 		ptr = &crit_err[1];
 
-	int ret = fh_err_get_info(1, &bufsize, 0, virt_to_phys(ptr), 0);
+	int ret = fh_err_get_info(global_error_queue, &bufsize, 0, virt_to_phys(ptr), 0);
 	if (!ret)
 		crit_int++;
 }
@@ -68,7 +68,7 @@ void mcheck_interrupt(trapframe_t *regs)
 	if (!(mfspr(SPR_MCSR) & MCSR_MCP))
 		return;
 
-	int ret = fh_err_get_info(0, &bufsize, 0, virt_to_phys(&mcheck_err), 0);
+	int ret = fh_err_get_info(guest_error_queue, &bufsize, 0, virt_to_phys(&mcheck_err), 0);
 	if (!ret)
 		mcheck_int++;
 
@@ -172,9 +172,12 @@ static int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst,
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
-	int ret, len, i;
+	int ret, len, i, node;
 
 	init(devtree_ptr);
+
+	if (init_error_queues() < 0)
+		return;
 
 	enable_extint();
 	enable_critint();

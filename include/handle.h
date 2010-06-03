@@ -69,6 +69,7 @@ typedef struct handle {
 	struct ppid_handle *ppid;
 	struct guest *guest;
 	struct dev_owner *dev_owner;
+	struct queue *error_queue;
 } handle_t;
 
 #endif /* HANDLE_H */

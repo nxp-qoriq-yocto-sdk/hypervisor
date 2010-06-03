@@ -29,6 +29,7 @@
 #include <libos/fsl-booke-tlb.h>
 #include <libos/platform_error.h>
 #include <libos/io.h>
+#include <libfdt.h>
 #include <hvtest.h>
 
 static unsigned long non_coherent_write;
@@ -39,7 +40,7 @@ void crit_int_handler(trapframe_t *regs)
 {
 	uint32_t bufsize = sizeof(hv_error_t);
 
-	int ret = fh_err_get_info(1, &bufsize, 0, virt_to_phys(&crit_err), 0);
+	int ret = fh_err_get_info(global_error_queue, &bufsize, 0, virt_to_phys(&crit_err), 0);
 	if (!ret)
 		crit_int++;
 }
@@ -71,7 +72,6 @@ static void update_mem(int flag)
 	memcpy(test_map, str, strlen(str) + 1);
 }
 
-
 static void secondary_entry(void)
 {
 	uint32_t pir = mfspr(SPR_PIR);
@@ -99,6 +99,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
+
+	if (init_error_queues() < 0)
+		return;
 
 	enable_extint();
 	enable_critint();

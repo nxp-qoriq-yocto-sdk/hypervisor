@@ -51,6 +51,8 @@ static void core_init(void);
 
 void *fdt;
 int coreint = 1;
+int guest_error_queue;
+int global_error_queue;
 
 #define PAGE_SIZE 4096
 
@@ -700,6 +702,30 @@ int set_vmpic_irq_priority(int handle, int prio)
 	ret = ev_int_set_config(handle, config, prio, dest);
 	if (ret)
 		return ret;
+
+	return 0;
+}
+
+int init_error_queues(void)
+{
+	int len, node;
+	const uint32_t *prop;
+
+	node = fdt_node_offset_by_compatible(fdt, -1, "fsl,hv-guest-error-queue");
+	if (node < 0) {
+		printf("ERROR: error queue node not found\n");
+		return node;
+	}
+
+	prop = fdt_getprop(fdt, node, "reg", &len);
+	if (!prop || len != 4) {
+		printf("BROKEN: missing/bad reg in error queue node\n");
+		return -1;
+	}
+	guest_error_queue = *prop;
+
+	// FIXME: need to get global queue from dev tree
+	global_error_queue = 1;
 
 	return 0;
 }
