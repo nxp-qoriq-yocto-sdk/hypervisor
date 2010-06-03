@@ -993,11 +993,43 @@ fail_mem:
 }
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
+/* At this point, nothing else should be popping errors from the source
+ * queue (we can only claim one thing at a time from the same partition). 
+ * The producer side can still be active.  We shouldn't receive any
+ * additional errors from this liodn, though, because we've already switched
+ * ownership.
+ */
+static void migrate_access_violations(guest_t *guest, queue_t *src,
+                                      uint32_t oldhandle, uint32_t newhandle)
+{
+	hv_error_t err;
+
+	size_t avail = queue_get_avail(src);
+	assert(avail % sizeof(hv_error_t) == 0);
+
+	for (size_t pos = 0; pos < avail; pos += sizeof(hv_error_t)) {
+		queue_read_at(src, (uint8_t *)&err, pos, sizeof(hv_error_t));
+
+		/* The only per-partition PAMU errors should be access
+		 * violations.
+		 */
+		if (!strcmp(err.domain, get_domain_str(error_pamu)) &&
+		    err.pamu.liodn_handle == oldhandle) {
+			err.pamu.liodn_handle = newhandle;
+			
+			error_log(&guest->error_event_queue, &err,
+			          &guest->error_log_prod_lock);
+		}
+	}
+}
+
 static int claim_dma(claim_action_t *action, dev_owner_t *owner,
                      dev_owner_t *prev)
 {
 	pamu_handle_t *ph = to_container(action, pamu_handle_t, claim_action);
 	uint32_t liodn = ph->assigned_liodn;
+	guest_t *oldguest = liodn_to_guest[liodn];
+	uint32_t oldhandle = liodn_to_handle[liodn];
 	uint32_t saved;
 	
 	saved = spin_lock_mchksave(&pamu_error_lock);
@@ -1006,6 +1038,10 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	liodn_to_guest[liodn] = owner->guest;
 
 	spin_unlock_mchksave(&pamu_error_lock, saved);
+
+	migrate_access_violations(owner->guest, &oldguest->error_event_queue,
+	                          oldhandle, ph->user.id);
+
 	return 0;
 }
 #endif

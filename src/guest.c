@@ -1871,6 +1871,7 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 
 	guest_core_init(guest);
 	reset_spintbl(guest);
+	queue_purge(&guest->error_event_queue);
 
 	void *fdt = malloc(guest->dtb_window_len);
 	if (!fdt) {
@@ -2176,7 +2177,10 @@ void do_stop_core(trapframe_t *regs, int restart)
 			if (h && h->ops && h->ops->postreset)
 				h->ops->postreset(h);
 		}
-	
+
+		/* Make sure all activity is done before the state change. */
+		smp_sync();
+
 		if (restart) {
 			guest->state = guest_starting;
 			setgevent(guest->gcpus[0], gev_start_load);

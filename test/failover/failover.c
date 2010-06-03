@@ -436,6 +436,7 @@ static int setup_managed(void)
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	int ret, len, i;
+	int expected_mchecks = 0;
 
 	init(devtree_ptr);
 
@@ -460,10 +461,12 @@ void libos_client_entry(unsigned long devtree_ptr)
 		return;
 	}
 
-	if (mcheck_int != 0) {
-		printf("FAILED: pre-existing mcheck %d\n", mcheck_int);
-		return;
-	}
+	if (*shmem == 1 || *shmem == 2)
+		expected_mchecks = 1;
+
+	printf("%s: expected %d mchecks after claim, got %d\n",
+	       expected_mchecks == mcheck_int ? "PASSED" : "FAILED",
+	       expected_mchecks, mcheck_int);
 
 	crit_int = 0;
 
@@ -473,7 +476,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (ret)
 		return;
 
-	while (mcheck_int < 1);
+	while (mcheck_int < expected_mchecks + 1);
 
 	printf("Received in local error queue:\n");
 	printf("domain: %s, error: %s, path: %s\n", mcheck_err.domain, mcheck_err.error,
@@ -505,18 +508,17 @@ void libos_client_entry(unsigned long devtree_ptr)
 		return;
 	}
 
+	ret = test_dma_memcpy(1, 1);
+	printf("DMA valid access test: %s\n", ret ? "FAILED" : "PASSED");
+	if (ret)
+		return;
+
 	(*shmem)++;
 
 	if (*shmem <= 2) {
-		/* Do one more valid access, but leave it in the queues for
+		/* Do one more invalid access, but leave it in the queues for
 		 * the claiming partition.
 		 */
-
-		ret = test_dma_memcpy(1, 1);
-		printf("DMA valid access test: %s\n", ret ? "FAILED" : "PASSED");
-		if (ret)
-			return;
-	
 		disable_mcheck();
 		disable_critint();
 		ret = test_dma_memcpy(0, 1);
