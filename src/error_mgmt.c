@@ -209,6 +209,10 @@ void dump_domain_error_info(hv_error_t *err, domains_t domain)
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error  : %s\n", err->error);
 
 	switch (domain) {
+	case error_misc:
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
+		break;
+
 	case error_ccf: {
 		ccf_error_t *ccf = &err->ccf;
 

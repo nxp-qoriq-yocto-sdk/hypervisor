@@ -51,6 +51,16 @@
 			device = "/soc/pic";
 		};
 
+		sram {
+			device = "/soc/soc-sram-error";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "misc";
+				error = "internal ram multi-bit ecc";
+				policy = "notify";
+			};
+		};
+
 		iommu {
 			device = "/soc/iommu";
 			error-config@0 {

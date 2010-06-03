@@ -31,6 +31,8 @@
 #include <error_log.h>
 #include <error_mgmt.h>
 
+static const char *sram_err_policy;
+
 static int sram_probe(driver_t *drv, device_t *dev);
 
 static driver_t __driver sram = {
@@ -42,15 +44,13 @@ static int sram_error_isr(void *arg)
 {
 	hv_error_t err = { };
 	device_t *dev = arg;
-	interrupt_t *irq;
+	dt_node_t *sram_node;
 
-	irq = dev->irqs[0];
-	irq->ops->disable(irq);
-
+	sram_node = to_container(dev, dt_node_t, dev);
 	strncpy(err.domain, get_domain_str(error_misc), sizeof(err.domain));
-	strcpy(err.error, get_domain_str(error_misc));
-
-	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	strncpy(err.error, get_error_str(error_misc, internal_ram_multi_bit_ecc), sizeof(err.error));
+	dt_get_path(NULL, sram_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+	error_policy_action(&err, error_misc, sram_err_policy);
 
 	return 0;
 }
@@ -61,8 +61,11 @@ static int sram_probe(driver_t *drv, device_t *dev)
 
 	if (dev->num_irqs >= 1) {
 		interrupt_t *irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq)
-			irq->ops->register_irq(irq, sram_error_isr, dev, TYPE_MCHK);
+		if (irq && irq->ops->register_irq) {
+			sram_err_policy = get_error_policy(error_misc, internal_ram_multi_bit_ecc);
+			if (strcmp(sram_err_policy, "disable"))
+				irq->ops->register_irq(irq, sram_error_isr, dev, TYPE_MCHK);
+		}
 	}
 
 	dev->driver = &sram;
