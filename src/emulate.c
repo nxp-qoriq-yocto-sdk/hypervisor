@@ -391,6 +391,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	mas3 = gcpu->mas3;
 	mas7 = gcpu->mas7;
 
+#ifdef CONFIG_LIBOS_64BIT
+	if (!(regs->srr1 & MSR_CM))
+		mas2 &= 0xffffffffUL;
+#endif
+
 	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
 	       (mas3 >> MAS3_RPN_SHIFT);
 
