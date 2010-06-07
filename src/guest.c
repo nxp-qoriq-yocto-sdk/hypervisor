@@ -64,6 +64,16 @@ uint32_t global_event_cons_lock;
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
+/* active_guests is used as counter of all guests that are not stopped in the
+ * system. Load errors will make a guest stopped but they will not cause a
+ * system reset. The reason is that explicit load operations are done either by
+ * HV using configuration tree or from shell command prompt, and a system reset
+ * will not remove the source of errors. Loads done through memcpy hcalls are
+ * guest's responsibility.
+ * Start errors (e.g. in an hcall to start a partition) have HV internal causes
+ * and a system reset could help.
+ */
+unsigned long active_guests;
 
 int vcpu_to_cpu(const uint32_t *cpulist, unsigned int len, unsigned int vcpu)
 {
@@ -1879,15 +1889,15 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 		         "%s: cannot allocate %llu bytes for dtb window\n",
 		         __func__, (unsigned long long)guest->dtb_window_len);
 
-		return;
+		goto error_block;
 	}
 
 	ret = flatten_dev_tree(guest->devtree, fdt, guest->dtb_window_len);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-		         "%s: cannot unflatten dtb\n", __func__);
+		         "%s: cannot flatten dtb\n", __func__);
 
-		return;
+		goto error_freeandblock;
 	}
 
 	size_t fdtsize = fdt_totalsize(fdt);
@@ -1899,11 +1909,11 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	if (ret != (ssize_t)fdtsize) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 		         "%s: cannot copy device tree to guest\n", __func__);
-		return;
+		goto error_block;
 	}
 
 	if (setup_ima(regs, guest->entry, 0) < 0)
-		return;
+		goto error_block;
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
@@ -1950,6 +1960,27 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
 		guest->stub_ops->vcpu_start(regs);
 #endif
+
+	return;	/* success */
+
+error_freeandblock:
+	free(fdt);
+error_block:
+	/* This guest is not active; keep the test evaluation order.
+	 * This code could collide with that in the do_stop_core: a partition
+	 * starts another and stops itself immediately. The start process
+	 * in the boot CPU gets an error. One of the guests' last core will
+	 * do a system reset.
+	 */
+	if (atomic_add(&active_guests, -1) == 0 && auto_sys_reset_on_stop)
+		system_reset();
+
+	guest->state = guest_stopped;
+	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		 "guest %s could not be started\n", guest->name);
+	prepare_to_block();
+	block();
+	BUG();
 }
 
 static void start_guest_primary(trapframe_t *regs, void *arg)
@@ -1962,13 +1993,27 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 
 	if (!guest->no_auto_load) {
 		ret = load_images(guest);
+		if (ret <= 0) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			         "Guest %s cannot load images\n", guest->name);
+		}
 		
-		if (ret > 0 && load_only)
+		if (ret > 0 && load_only) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			         "Guest %s finished loading\n", guest->name);
+		}
 	}
 
 	if (ret <= 0 || load_only) {
+		/* Do not check for system reset here and accept load errors.
+		 * Load errors can happen when starting partitions at HV init,
+		 * or from shell commands. Either way, system reset most likely
+		 * does not remove the configuration problems.
+		 * However, there is a system reset in case of start errors,
+		 * if no guest is active to recover the situation.
+		 */
+		atomic_add(&active_guests, -1); /* This guest is not active */
+
 		guest->state = guest_stopped;
 
 		/* No hypervisor-loadable image; wait for a manager to start us. */
@@ -2185,6 +2230,10 @@ void do_stop_core(trapframe_t *regs, int restart)
 			guest->state = guest_starting;
 			setgevent(guest->gcpus[0], gev_start_load);
 		} else {
+			/* No more guests; keep the test evaluation order */
+			if (atomic_add(&active_guests, -1) == 0 &&
+			    auto_sys_reset_on_stop)
+				system_reset();
 			guest->state = guest_stopped;
 			send_doorbells(guest->dbell_state_change);
 		}
@@ -2282,10 +2331,13 @@ int start_guest(guest_t *guest, int load)
 	int ret = 0;
 	register_t saved = spin_lock_intsave(&guest->state_lock);
 
-	if (guest->state != guest_stopped)
+	if (guest->state != guest_stopped) {
 		ret = ERR_INVALID;
-	else
+	} else {
 		guest->state = guest_starting;
+
+		atomic_add(&active_guests, 1);
+	}
 
 	spin_unlock_intsave(&guest->state_lock, saved);
 
@@ -2905,6 +2957,12 @@ static void start_partitions(void)
 	for (i = 0; i < last_lpid; i++) {
 		guest_t *guest = &guests[i];
 		gcpu_t *gcpu = guest->gcpus[0];
+
+		/* Add it anyway, as for no-auto this will be decreased
+		 * either in case of load_only property, or in case of load
+		 * errors.
+		 */
+		atomic_add(&active_guests, 1);
 
 		if (dt_get_prop(guest->partition, "no-auto-start", 0))
 			setgevent(gcpu, gev_load);

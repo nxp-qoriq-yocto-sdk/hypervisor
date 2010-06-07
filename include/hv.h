@@ -47,6 +47,7 @@ int resume_guest(struct guest *guest);
 phys_addr_t find_lowest_guest_phys(void *fdt);
 
 extern unsigned long partition_init_counter;
+extern int auto_sys_reset_on_stop;
 
 char *stripspace(const char *str);
 char *nextword(char **str);

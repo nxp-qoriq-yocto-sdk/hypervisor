@@ -190,6 +190,7 @@ typedef struct guest {
 
 extern struct guest guests[MAX_PARTITIONS];
 extern unsigned long last_lpid;
+extern unsigned long active_guests;
 
 /* The following flags correspond to gdbell_pending */
 #define GCPU_PEND_MSGSND   0x00000004 /* Guest OS msgsnd */

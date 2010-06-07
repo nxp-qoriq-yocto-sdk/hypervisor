@@ -88,6 +88,8 @@ uint64_t text_phys, bigmap_phys;
 
 char *displacement_flush_area[MAX_CORES];
 
+int auto_sys_reset_on_stop;
+
 static void exclude_phys(phys_addr_t addr, phys_addr_t end)
 {
 	if (addr < bigmap_phys)
@@ -501,6 +503,9 @@ static void assign_hv_devs(void)
 	dt_read_aliases();
 	dt_assign_devices(hvconfig, NULL);
 	find_hv_console(hvconfig);
+
+	if (dt_get_prop(hvconfig, "sysreset-on-partition-stop", 0))
+		auto_sys_reset_on_stop = 1;
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
