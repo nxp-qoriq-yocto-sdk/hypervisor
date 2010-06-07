@@ -59,7 +59,7 @@ error_policy_t pamu_error_policy[PAMU_ERROR_COUNT] = {
 	[pamu_operation] = {"operation", "notify"},
 	[pamu_single_bit_ecc] = {"single-bit ecc", "disable"},
 	[pamu_multi_bit_ecc] = {"multi-bit ecc", "disable"},
-	[pamu_access_violation] = {"access violation", "disable"},
+	[pamu_access_violation] = {"access violation", "notify"},
 };
 
 error_policy_t ddr_error_policy[DDR_ERROR_COUNT] = {
