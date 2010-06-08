@@ -88,8 +88,9 @@ typedef enum {
 } pamu_errors_t;
 extern error_policy_t pamu_error_policy[];
 
-#define DDR_ERROR_COUNT 6
+#define DDR_ERROR_COUNT 7
 typedef enum {
+	ddr_multiple_errors,
 	ddr_memory_select,
 	ddr_single_bit_ecc,
 	ddr_multi_bit_ecc,

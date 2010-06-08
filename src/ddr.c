@@ -27,10 +27,27 @@
 
 #include <libos/platform_error.h>
 
+#include <p4080.h>
 #include <percpu.h>
 #include <errors.h>
 #include <error_log.h>
 #include <error_mgmt.h>
+#include <ddr.h>
+
+struct ddr_error_info {
+	const char *policy;
+	uint32_t reg_val;
+};
+
+static struct ddr_error_info ddr_err[DDR_ERROR_COUNT] = {
+	[ddr_multiple_errors] = {NULL, DDR_ERR_DET_MME},
+	[ddr_memory_select] = {NULL, DDR_ERR_DET_MSE},
+	[ddr_single_bit_ecc] = {NULL, DDR_ERR_DET_SBE},
+	[ddr_multi_bit_ecc] = {NULL, DDR_ERR_DET_MBE},
+	[ddr_corrupted_data] = {NULL, DDR_ERR_DET_CDE},
+	[ddr_auto_calibration] = {NULL, DDR_ERR_DET_ACE},
+	[ddr_address_parity] = {NULL, DDR_ERR_DET_APE},
+};
 
 static int ddr_probe(driver_t *drv, device_t *dev);
 
@@ -39,35 +56,101 @@ static driver_t __driver ddr = {
 	.probe = ddr_probe
 };
 
+static void ddr_error_attr_cap(ddr_err_reg_t *ddr_err_regs, ddr_error_t *ddr,
+		uint32_t errattr)
+{
+	ddr->ddrerrattr = errattr;
+	ddr->ddrerraddr =
+		((uint64_t) in32(&ddr_err_regs->ddr_ext_err_addr) << 32) |
+		in32(&ddr_err_regs->ddr_err_addr);
+	ddr->ddrcaptecc =
+		in32(&ddr_err_regs->ddr_capt_ecc);
+	ddr->ddrsbeccmgmt =
+		in32(&ddr_err_regs->ddr_sbecc_err_mgmt);
+}
+
 static int ddr_error_isr(void *arg)
 {
 	hv_error_t err = { };
 	device_t *dev = arg;
-	interrupt_t *irq;
+	dt_node_t *ddr_node;
+	ddr_err_reg_t *ddr_err_regs;
+	uint32_t val;
+	uint32_t errattr = 0;
 
-	irq = dev->irqs[0];
-	irq->ops->disable(irq);
+	ddr_err_regs = (ddr_err_reg_t *)((uintptr_t)dev->regs[0].virt + DDR_ERR_CAPT_ECC);
+
+	val = in32(&ddr_err_regs->ddr_err_det);
 
 	strncpy(err.domain, get_domain_str(error_ddr), sizeof(err.domain));
-	strcpy(err.error, get_domain_str(error_ddr));
+	ddr_node = to_container(dev, dt_node_t, dev);
+	dt_get_path(NULL, ddr_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
-	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	for (int i = ddr_multiple_errors; i < DDR_ERROR_COUNT; i++) {
+		const char *policy = ddr_err[i].policy;
+		uint32_t err_val = ddr_err[i].reg_val;
+
+		if (val & err_val) {
+			ddr_error_t *ddr = &err.ddr;
+
+			strncpy(err.error, get_error_str(error_ddr, i), sizeof(err.error));
+
+			ddr->ddrerrdet = val;
+			ddr->ddrerrinten =
+				in32(&ddr_err_regs->ddr_err_int_en);
+			ddr->ddrerrdis =
+				in32(&ddr_err_regs->ddr_err_dis);
+			errattr = in32(&ddr_err_regs->ddr_err_attr);
+			if (errattr & DDR_ERR_ATTR_VALID)
+				ddr_error_attr_cap(ddr_err_regs, ddr, errattr);
+
+			error_policy_action(&err, error_ddr, policy);
+		}
+
+	}
+
+	out32(&ddr_err_regs->ddr_err_det, val);
 
 	return 0;
 }
 
 static int ddr_probe(driver_t *drv, device_t *dev)
 {
+	ddr_err_reg_t *ddr_err_regs;
+
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR,
 				"DDR reg initialization failed\n");
 		return ERR_INVALID;
 	}
 
+	ddr_err_regs = (ddr_err_reg_t *)((uintptr_t)dev->regs[0].virt + DDR_ERR_DET);
+
+	out32(&ddr_err_regs->ddr_err_int_en, 0);
+	out32(&ddr_err_regs->ddr_err_dis, DDR_ERR_MASK);
+
 	if (dev->num_irqs >= 1) {
+		uint32_t val = 0;
+
 		interrupt_t *irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq)
+		if (irq && irq->ops->register_irq) {
+			for (int i = ddr_memory_select; i < DDR_ERROR_COUNT; i++) {
+				ddr_err[i].policy = get_error_policy(error_ddr, i);
+
+				if (!strcmp(ddr_err[i].policy, "disable"))
+					continue;
+
+				val |= ddr_err[i].reg_val;
+			}
+
 			irq->ops->register_irq(irq, ddr_error_isr, dev, TYPE_MCHK);
+
+			/*FIXME : Hard coding the single bit ecc threshold to 128*/
+			out32(&ddr_err_regs->ddr_sbecc_err_mgmt, 0x80 << DDR_SB_THRESH_SHIFT);
+
+			out32(&ddr_err_regs->ddr_err_dis, ~val & DDR_ERR_MASK);
+			out32(&ddr_err_regs->ddr_err_int_en, val);
+		}
 	}
 
 	dev->driver = &ddr;

@@ -128,4 +128,45 @@ typedef struct {
 
 #define CPC_ERRCTL_THRESH_SHIFT 16
 
+/* DDR error registers */
+#define DDR_ERR_CAPT_DATA_HI     0xE20 //Error capture data high
+#define DDR_ERR_CAPT_DATA_LO     0xE24 //Error capture data low
+
+#define DDR_ERR_CAPT_ECC         0xE28 //Data path read capture ECC
+
+#define DDR_ERR_DET              0xE40 //Memory error detect
+#define  DDR_ERR_DET_MME             0x80000000 //Multiple memory errors
+#define  DDR_ERR_DET_APE             0x00000100 //Address parity error
+#define  DDR_ERR_DET_ACE             0x00000080 //Automatic calibration error
+#define  DDR_ERR_DET_CDE             0x00000010 //Corrupted data error
+#define  DDR_ERR_DET_MBE             0x00000008 //Multi bit error
+#define  DDR_ERR_DET_SBE             0x00000004 //Single bit error
+#define  DDR_ERR_DET_MSE             0x00000001 //Memory select error
+#define  DDR_ERR_MASK                (DDR_ERR_DET_APE | DDR_ERR_DET_ACE \
+	 | DDR_ERR_DET_CDE | DDR_ERR_DET_MBE | DDR_ERR_DET_SBE | DDR_ERR_DET_MSE)
+
+#define DDR_ERR_DIS              0xE44 //Memory error dsable
+#define  DDR_ERR_DIS_APED             0x00000100 //Address parity error disable
+#define  DDR_ERR_DIS_ACED             0x00000080 //Automatic calibration error disable
+#define  DDR_ERR_DIS_CDED             0x00000010 //Corrupted data error disable
+#define  DDR_ERR_DIS_MBED             0x00000008 //Multi bit error disable
+#define  DDR_ERR_DIS_SBED             0x00000004 //Single bit error disable
+#define  DDR_ERR_DIS_MSED             0x00000001 //Memory select error disable
+
+#define DDR_ERR_INT_EN           0xE48 //Memory error int enable
+#define  DDR_ERR_INT_EN_APE             0x00000100 //Address parity error int enable
+#define  DDR_ERR_INT_EN_ACE             0x00000080 //Automatic calibration error int enable
+#define  DDR_ERR_INT_EN_CDE             0x00000010 //Corrupted data error int enable
+#define  DDR_ERR_INT_EN_MBE             0x00000008 //Multi bit error int enable
+#define  DDR_ERR_INT_EN_SBE             0x00000004 //Single bit error int enable
+#define  DDR_ERR_INT_EN_MSE             0x00000001 //Memory select error int enable
+
+#define DDR_ERR_ATTR            0xE4C //Error attributes register
+#define DDR_ERR_ATTR_VALID      0x1
+
+#define DDR_ERR_ADDR            0xE50 //Error address register
+#define DDR_ERR_EXT_ADDR        0xE54 //Extended error address register
+#define DDR_ERR_SB_MGMT         0xE58 //Single bit ECC error management
+#define DDR_SB_THRESH_SHIFT 16
+
 #endif

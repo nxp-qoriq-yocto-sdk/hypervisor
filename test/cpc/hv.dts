@@ -89,6 +89,26 @@
 			};
 		};
 
+		memory-controller@8000 {
+			device = "/soc/memory-controller@8000";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "ddr";
+				error = "single-bit ecc";
+				policy = "notify";
+			};
+		};
+
+		memory-controller@9000 {
+			device = "/soc/memory-controller@9000";
+			error-config@0 {
+				compatible = "error-config";
+				domain = "ddr";
+				error = "single-bit ecc";
+				policy = "notify";
+			};
+		};
+
 		corenet-law {
 			device = "/soc/corenet-law";
 		};

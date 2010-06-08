@@ -63,6 +63,7 @@ error_policy_t pamu_error_policy[PAMU_ERROR_COUNT] = {
 };
 
 error_policy_t ddr_error_policy[DDR_ERROR_COUNT] = {
+	[ddr_multiple_errors] = {"multiple errors", "disable"},
 	[ddr_memory_select] = {"memory select", "disable"},
 	[ddr_single_bit_ecc] = {"single-bit ecc", "disable"},
 	[ddr_multi_bit_ecc] = {"multi-bit ecc", "disable"},
@@ -271,6 +272,22 @@ void dump_domain_error_info(hv_error_t *err, domains_t domain)
 			cpc->cpcerrattr, cpc->cpccaptecc);
 		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc erraddr : %llx, cpc errctl : %x\n",
 			cpc->cpcerraddr, cpc->cpcerrctl);
+		break;
+	}
+
+	case error_ddr: {
+		ddr_error_t *ddr = &err->ddr;
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdet : %x, ddr errinten : %x\n",
+			ddr->ddrerrdet, ddr->ddrerrinten);
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdis : %x\n",
+			ddr->ddrerrdis);
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errattr : %x, ddr captecc : %x\n",
+			ddr->ddrerrattr, ddr->ddrcaptecc);
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr singlebit ecc mgmt : %x\n",
+			ddr->ddrsbeccmgmt);
+		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr error address : %llx\n",
+			ddr->ddrerraddr);
 		break;
 	}
 
