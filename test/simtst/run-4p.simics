@@ -22,7 +22,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-add-directory "%script%/../../../sim/p4080ds/RS/hv-4p-lnx-lnx-lwe-lwe" -prepend
+add-directory "%script%/../../../sim/p4080ds/R_PPSXN_0x10/hv-4p-lnx-lnx-lwe-lwe" -prepend
 
 # pick up local HV
 add-directory "%script%/../../output/bin" -prepend
