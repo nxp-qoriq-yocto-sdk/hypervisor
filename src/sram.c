@@ -30,6 +30,7 @@
 #include <percpu.h>
 #include <error_log.h>
 #include <error_mgmt.h>
+#include <guts.h>
 
 static const char *sram_err_policy;
 
@@ -65,6 +66,8 @@ static int sram_probe(driver_t *drv, device_t *dev)
 			sram_err_policy = get_error_policy(error_misc, internal_ram_multi_bit_ecc);
 			if (strcmp(sram_err_policy, "disable"))
 				irq->ops->register_irq(irq, sram_error_isr, dev, TYPE_MCHK);
+			if (strcmp(sram_err_policy, "system-reset"))
+				set_reset_mask(RSTRQMR_MBEE_MSK);
 		}
 	}
 

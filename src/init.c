@@ -416,11 +416,15 @@ static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
 	return 0;
 }
 
-static void early_bind_ccm_law_devices(void)
+static void early_bind_devices(void)
 {
 	dt_prop_t *prop;
 	dt_node_t *node;
-	const char *compat_srch_str[] = {"fsl,corenet-cf", "fsl,corenet-law"};
+	const char *compat_srch_str[] = {
+		"fsl,qoriq-device-config-1.0",
+		 "fsl,corenet-cf",
+		 "fsl,corenet-law"
+	};
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
@@ -428,7 +432,8 @@ static void early_bind_ccm_law_devices(void)
 		if (!prop)
 			continue;
 		if (!strcmp((const char *)prop->data, compat_srch_str[0]) ||
-			!strcmp((const char *)prop->data, compat_srch_str[1])) {
+			!strcmp((const char *)prop->data, compat_srch_str[1]) ||
+			!strcmp((const char *)prop->data, compat_srch_str[2])) {
 
 				dt_lookup_regs(owner->hwnode);
 				dt_lookup_irqs(owner->hwnode);
@@ -513,7 +518,7 @@ static void assign_hv_devs(void)
 		set_error_policy(owner);
 	}
 
-	early_bind_ccm_law_devices();
+	early_bind_devices();
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);

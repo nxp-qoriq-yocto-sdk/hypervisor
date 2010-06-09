@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,8 +25,21 @@
 #ifndef GUTS_H
 #define GUTS_H
 
+/* offsets in guts dev config */
+#define GUTS_RSTCR  0xB0
+#define GUTS_CRSTR0 0x400
+#define GUTS_RSTRQMR 0xC0
+
+#define RSTCR_RESET_REQ 0x2
+
+#define CRSTR0_RST_HRST  0x1
+#define CRSTR0_RST_PORST 0x2
+
+#define RSTRQMR_MBEE_MSK 0x4000
+
 int system_reset(void);
 int get_sys_reset_status(void);
+void set_reset_mask(uint32_t mask);
 
 #define SYS_RESET_STATUS_POR  1
 #define SYS_RESET_STATUS_HARD 2

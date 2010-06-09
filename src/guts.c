@@ -33,17 +33,9 @@
 #include <devtree.h>
 #include <errors.h>
 
-/* offsets in guts dev config */
-#define GUTS_RSTCR  0xB0       
-#define GUTS_CRSTR0 0x400
-
-#define RSTCR_RESET_REQ 0x2
-
-#define CRSTR0_RST_HRST  0x1
-#define CRSTR0_RST_PORST 0x2
-
 static uint32_t *guts_rstcr;  /* reset control register */
 static uint32_t *guts_crstr0;  /* core reset status register */
+static uint32_t *guts_rstrqmr;  /* reset request mask register */
 
 static int guts_devconfig_probe(driver_t *drv, device_t *dev);
 
@@ -62,6 +54,7 @@ static int guts_devconfig_probe(driver_t *drv, device_t *dev)
 
 	guts_rstcr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTCR);
 	guts_crstr0 = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_CRSTR0);
+	guts_rstrqmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTRQMR);
 
 	dev->driver = &guts_devconfig;
 
@@ -107,4 +100,11 @@ int system_reset(void)
 	// FIXME: timeout here if the reset doesn't happen
 	// and return an error
 	while (1);
+}
+
+void set_reset_mask(uint32_t mask)
+{
+	uint32_t val = in32(guts_rstrqmr);
+
+	out32(guts_rstrqmr, val | mask);
 }
