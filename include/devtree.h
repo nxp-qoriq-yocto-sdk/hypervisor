@@ -352,6 +352,7 @@ int open_stdout_bytechan(dt_node_t *node);
 
 typedef struct pma {
 	phys_addr_t start, size;
+	int use_no_law;
 } pma_t;
 
 uint64_t dt_get_timebase_freq(void);

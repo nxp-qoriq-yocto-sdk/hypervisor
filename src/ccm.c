@@ -482,6 +482,9 @@ static pma_t *read_pma(dt_node_t *node)
 		goto out_free;
 	}
 
+	prop = dt_get_prop(node, "use-no-law", 0);
+	if (prop)
+		pma->use_no_law = 1;
 out:
 	node->pma = pma;
 	return pma;
@@ -555,15 +558,19 @@ int setup_pamu_law(dt_node_t *node)
 static int setup_csd(dt_node_t *node, void *arg)
 {
 	pma_t *pma;
-	int ret = ERR_BADTREE;
+	int ret = 0;
 
 	pma = read_pma(node);
-	if (!pma)
+	if (!pma) {
+		ret = ERR_BADTREE;
 		goto fail;
+	}
 
-	ret = setup_csd_law(node);
-	if (ret == 0)
-		pma_setup_cpc(node);
+	if (!pma->use_no_law) {
+		ret = setup_csd_law(node);
+		if (ret == 0)
+			pma_setup_cpc(node);
+	}
 
 fail:
 	return ret;
