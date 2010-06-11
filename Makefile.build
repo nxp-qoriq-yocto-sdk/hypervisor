@@ -79,6 +79,10 @@ HOSTCC_OPTS_C := $(EXTRAWARNINGS) -Wall -O2 -I $(HEADERS_DIR) \
 
 include include/config/auto.conf
 
+ifeq ($(CONFIG_GCOV),y)
+export CC_OPTS_C += -fprofile-arcs -ftest-coverage -ffunction-sections
+endif
+
 ifeq ($(CONFIG_LIBOS_64BIT),y)
 CC_OPTS += -m64
 export LD_OPTS=-m64

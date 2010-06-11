@@ -68,6 +68,11 @@ SECTIONS
 		driver_begin = .;
 		*(.libos.drivers)
 		driver_end = .;
+
+		. = ALIGN(8);
+		__CTOR_LIST__ = .;
+		*(.ctors)
+		__CTOR_END__ = .;
 	}
 
 	. = ALIGN(8);

@@ -23,6 +23,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*******************************************************************************
+ * Target side support for the gcov-extract protocol.
+ * Conforms to gcov architecture/design (v8)
+ ******************************************************************************/
+
 #include <hv.h>
 #include <devtree.h>
 #include <byte_chan.h>
@@ -34,6 +39,8 @@ static struct byte_chan *bc;
 static struct byte_chan_handle *bch;
 static thread_t *gcov_thread;
 
+uint32_t word_size = sizeof(void *); /* The size of a word on the target (this) side. */
+
 struct data_info {
 	uint32_t ea_size;   // size in bytes of effective addresses
 	uint32_t data_size;  // size in bytes of data[]
@@ -44,7 +51,38 @@ typedef struct data_obj {
 	size_t size;   // size in bytes
 } data_obj_t;
 
-data_obj_t *gcov_data;
+static data_obj_t gcov_data = {
+
+	.addr = 0x0,
+	.size = 0
+};
+
+/* gcov_info_list is declared to be of type uint8_t * 'cause we do not know the internal
+ * structure of the gcov_info type.
+ */
+static uint8_t *gcov_info_list;
+
+void __gcov_init (uint8_t *info);
+
+/* Keep __gcov_merge_add() dummy. The gcov_info struct instance emitted by GCC,
+ * contains a pointer to __gcov_merge_add(). This function occurs in libgcov,
+ * which we do not include in the HV build. __gcov_merge_add() isn't needed
+ * until the .gcda's are generated (it's needed for aggregating data from
+ * previous runs). We generate the .gcda's on the host using gcov-extract, which
+ * links in libgcov. So, for now just keep a dummy copy of __gcov_merge_add() to
+ * satisfy the link time dependency.
+ */
+void __gcov_merge_add (long *counters, unsigned n_counters);
+void __gcov_merge_add (long *counters, unsigned n_counters) {}
+
+/* The constructor functions emitted by GCC under -fprofile-arcs are of type
+ * ctor_t below. We create a table pf the ctor_t function pointers in .data
+ * (see hv.lds) whoose ends are marked by the symbols __CTOR_LIST__, __CTOR_END__
+ * At initialization time, gcov_config() will iterate through this table calling
+ * each ctor.
+ */
+typedef void (*ctor_t)(void);
+extern ctor_t __CTOR_LIST__, __CTOR_END__;
 
 #define MAX_CMD_SIZE 16
 
@@ -64,6 +102,7 @@ static void get_command(char *command)
 
 	while (1) {
 		ch = queue_readchar_blocking(bch->rx, 0);
+
 		command[i++] = ch;
 		if (ch == '\0')
 			break;
@@ -84,26 +123,39 @@ static void gcov_rx_thread(trapframe_t *regs, void *arg)
 	while (1) {
 		get_command(command);
 
-		if (!strcmp(command,"get-data-info")) {
+		if (!strcmp(command, "get-data-info")) {
+
 			unknown_cmd_count = 0;
-			queue_write_blocking(bch->tx, (uint8_t *)&data_info,
-			                     sizeof(data_info));
-			queue_write_blocking(bch->tx, (uint8_t *)gcov_data,
-			                     data_info.data_size);
-		} else if (!strcmp(command,"get-data")) {
-			size_t address;
-			uint32_t length;
+			queue_write_blocking(bch->tx, (uint8_t *)&data_info.ea_size, sizeof(data_info.ea_size));
+			queue_write_blocking(bch->tx, (uint8_t *)&data_info.data_size, sizeof(data_info.data_size));
+			queue_write_blocking(bch->tx, (uint8_t *)&gcov_data.addr, word_size);
+			queue_write_blocking(bch->tx, (uint8_t *)&gcov_data.size, word_size);
+
+		} else if (!strncmp(command, "get-data", strlen("get-data"))) {
+
+			void *address = 0x0;
+			uint32_t length = 0;
+			char *p;
 
 			unknown_cmd_count = 0;
 
 			/* get effect addr & size from the host */
-			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&address,
-			                                 sizeof(void *), 0);
-			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&length,
-			                                 sizeof(size_t), 0);
+			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&address, word_size, 0);
+			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&length, word_size, 0);
 
 			/* send the data to the host */
 			queue_write_blocking(bch->tx, (uint8_t *)address, length);
+		} else if (!strncmp(command, "get-str-size", strlen("get-str-size"))) {
+			void *address = 0x0;
+			char *p, *q;
+			uint32_t length = 0;
+			/* get effect addr from the host */
+			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&address, word_size, 0);
+			q = p = (char *) address;
+			while (*q++);
+			length = q - p;
+			/* send the length to the host */
+			queue_write_blocking(bch->tx, (uint8_t *)&length, sizeof(length));
 		} else {
 			unknown_cmd_count++;
 			printlog(LOGTYPE_MISC, LOGLEVEL_WARN,
@@ -167,6 +219,8 @@ nomem:
 
 void gcov_config(dt_node_t *config)
 {
+	ctor_t *ctor;
+
 	if (gcov_byte_chan_init(config, &bc, &bch))
 		return;
 
@@ -177,18 +231,20 @@ void gcov_config(dt_node_t *config)
 		return;
 	}
 
-	data_info.ea_size = sizeof(void *);
-	// FIXME: set correct data_info.size here
-	data_info.data_size = sizeof(data_obj_t) * 1;
+	data_info.ea_size = word_size;
+	/* data_info.ea_size:
+	 * One word for the address.
+	 * One word for the size of the memory pointed to by this address.
+	 * We only pass one such (address, size) pair after the first 8
+	 * bytes in the reponse to a get-data-info command. Hence 2 words.
+	 */
+	data_info.data_size = 2 * word_size;
 
-	gcov_data = malloc(data_info.data_size);
-	if (!gcov_data) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-		         "%s: out of memory\n", __func__);
-		return;
-	}
-
-	// FIXME populate gcov_data here
+	/* Call the constructors. The constructor functions are emitted by GCC
+	 * under -fprofile-arcs
+	 */
+	for (ctor = &__CTOR_LIST__; ctor < &__CTOR_END__; ctor++)
+		(*ctor)();
 
 	/* register the callbacks */
 	smp_lwsync();
@@ -197,3 +253,36 @@ void gcov_config(dt_node_t *config)
 	unblock(gcov_thread);
 }
 
+/* __gcov_init () is invoked by an initializer ("constructor") function emitted
+ * by GCC for each file that is compiled for coverage analysis with gcov by
+ * using the option -fprofile-arcs. A section called .ctors is created, in the
+ * emitted code for each such file, containing a pointer to this emitted
+ * initializer function. If you see the linker script, you will see that a
+ * table of function pointers is created in .data, delimited by the symbols
+ * __CTOR_LIST__ and __CTOR_END__ containing each such initializer function
+ * pointer from each .ctor section.
+ *
+ * The hypervisor initialization sequence calls gcov_config(). In gcov_config(),
+ * we iterate through this table invoking each gcov'ed file's initialization
+ * function, which in turn invokes __gcov_init() with a pointer to the
+ * gcov_info struct instance generated by GCC for that file.
+ *
+ * In __gcov_init(), we chain each gcov_info struct instance that came in, onto
+ * a linked-list (pointed to by the variable gcov_info_list), in order to
+ * retrieve each gcov_info struct instance later on, when it comes time to
+ * generate the .gcda's on the host. Then, we will (in our response to
+ * gcov-extract's get-data-info command) specify gcov_data.addr (maintained here
+ * to always point to the head of gcov_info_list) as the address for gcov-extract
+ * to begin fetching the gcov_info's from.
+ */
+void __gcov_init(uint8_t *info)
+{
+#ifndef CONFIG_LIBOS_64BIT
+	/* Hard coding alert! */
+	memcpy(info + 4, &gcov_info_list, word_size);
+	gcov_info_list = info;
+#else
+#error "Need to port gcov support to 64-bit"
+#endif
+	gcov_data.addr = gcov_info_list;
+}
