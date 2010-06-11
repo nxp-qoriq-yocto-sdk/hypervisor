@@ -131,6 +131,21 @@ static driver_t __driver cpc = {
 	.probe = cpc_probe
 };
 
+static void dump_cpc_error(hv_error_t *err)
+{
+	cpc_error_t *cpc = &err->cpc;
+
+	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdet : %x, cpc errinten : %x\n",
+		cpc->cpcerrdet, cpc->cpcerrinten);
+	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdis : %x\n",
+		cpc->cpcerrdis);
+	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errattr : %x, cpc captecc : %x\n",
+		cpc->cpcerrattr, cpc->cpccaptecc);
+	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc erraddr : %llx, cpc errctl : %x\n",
+		cpc->cpcerraddr, cpc->cpcerrctl);
+}
+
 static int cpc_error_isr(void *arg)
 {
 	hv_error_t err = { };
@@ -279,6 +294,8 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 
 					val |= cpc_err[i].reg_val;
 				}
+
+				register_error_dump_callback(error_cpc, dump_cpc_error);
 
 				irq->ops->register_irq(irq, cpc_error_isr, &cpcs[i], TYPE_MCHK);
 

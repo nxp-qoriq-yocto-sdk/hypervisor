@@ -41,6 +41,12 @@ static driver_t __driver sram = {
 	.probe = sram_probe
 };
 
+static void dump_misc_error(hv_error_t *err)
+{
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path : %s\n",
+		 err->hdev_tree_path);
+}
+
 static int sram_error_isr(void *arg)
 {
 	hv_error_t err = { };
@@ -64,8 +70,10 @@ static int sram_probe(driver_t *drv, device_t *dev)
 		interrupt_t *irq = dev->irqs[0];
 		if (irq && irq->ops->register_irq) {
 			sram_err_policy = get_error_policy(error_misc, internal_ram_multi_bit_ecc);
-			if (strcmp(sram_err_policy, "disable"))
+			if (strcmp(sram_err_policy, "disable")) {
+				register_error_dump_callback(error_misc, dump_misc_error);
 				irq->ops->register_irq(irq, sram_error_isr, dev, TYPE_MCHK);
+			}
 			if (strcmp(sram_err_policy, "system-reset"))
 				set_reset_mask(RSTRQMR_MBEE_MSK);
 		}

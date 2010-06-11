@@ -36,11 +36,14 @@ typedef struct error_policy {
 	const char *policy;
 } error_policy_t;
 
+typedef void (*dump_error_info)(struct hv_error *);
+
 typedef struct error_domain {
 	const char *compatible;
 	const char *domain;
 	error_policy_t *errors;
 	int error_count;
+	dump_error_info error_dump_callback;
 } error_domain_t;
 
 #define ERROR_DOMAIN_COUNT 6
@@ -105,6 +108,7 @@ const char *get_error_policy(domains_t domain, int error);
 const char *get_error_str(domains_t domain,int error);
 const char *get_domain_str(domains_t domain);
 void error_policy_action(struct hv_error *err, domains_t domain, const char *policy);
+void register_error_dump_callback(domains_t domain, dump_error_info err_dump_fn);
 void dump_domain_error_info(struct hv_error *err, domains_t domain);
 
 #endif

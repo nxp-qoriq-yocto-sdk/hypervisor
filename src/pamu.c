@@ -779,6 +779,32 @@ static void pamu_error_log(hv_error_t *err, guest_t *guest)
 		error_log(&guest->error_event_queue, err, &guest->error_log_prod_lock);
 }
 
+static void dump_pamu_error(hv_error_t *err)
+{
+	pamu_error_t *pamu = &err->pamu;
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n",
+		 err->hdev_tree_path);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+		 pamu->avs1, pamu->avs2, pamu->access_violation_addr);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU access violation lpid = %x, handle = %x\n",
+		pamu->lpid, pamu->liodn_handle);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU ecc error eccctl = %x, eccdis = %x, eccinten = %x\n",
+		pamu->eccctl, pamu->eccdis, pamu->eccinten);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU ecc error eccdet  = %x, eccattr = %x\n",
+		pamu->eccdet, pamu->eccattr);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU ecc error addr = %llx, data = %llx\n",
+		pamu->eccaddr, pamu->eccdata);
+	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		"PAMU operation error poes1 = %x, poeaddr = %llx\n",
+		pamu->poes1, pamu->poeaddr);
+}
+
 static int pamu_error_isr(void *arg)
 {
 	device_t *dev = arg;
@@ -1042,6 +1068,9 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 			irq->ops->register_irq(irq, pamu_error_isr, dev, TYPE_MCHK);
 		}
 	}
+
+	if (pamu_enable_ints)
+		register_error_dump_callback(error_pamu, dump_pamu_error);
 
 	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
 	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {

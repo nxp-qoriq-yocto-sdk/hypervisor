@@ -72,13 +72,23 @@ error_policy_t ddr_error_policy[DDR_ERROR_COUNT] = {
 	[ddr_address_parity] = {"address parity", "disable"},
 };
 
+static void dump_mcheck_error(hv_error_t *err)
+{
+	mcheck_error_t *mcheck = &err->mcheck;
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
+		mcheck->mcsr, mcheck->mcar, mcheck->mcsrr0, mcheck->mcsrr1);
+}
+
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
-	[error_mcheck] = { NULL, "machine check", NULL, 0 },
-	[error_cpc] = { "fsl,p4080-l3-cache-controller", "cpc", cpc_error_policy, CPC_ERROR_COUNT },
-	[error_ccf] = { "fsl,corenet-cf", "ccf", ccf_error_policy, CCF_ERROR_COUNT },
-	[error_misc] = { "fsl,soc-sram-error", "misc", misc_error_policy, MISC_ERROR_COUNT },
-	[error_pamu] = { "fsl,p4080-pamu", "pamu", pamu_error_policy, PAMU_ERROR_COUNT },
-	[error_ddr] = { "fsl,p4080-memory-controller", "ddr", ddr_error_policy, DDR_ERROR_COUNT },
+	[error_mcheck] = { NULL, "machine check", NULL, 0, dump_mcheck_error},
+	[error_cpc] = { "fsl,p4080-l3-cache-controller", "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL },
+	[error_ccf] = { "fsl,corenet-cf", "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL },
+	[error_misc] = { "fsl,soc-sram-error", "misc", misc_error_policy, MISC_ERROR_COUNT, NULL },
+	[error_pamu] = { "fsl,p4080-pamu", "pamu", pamu_error_policy, PAMU_ERROR_COUNT, NULL },
+	[error_ddr] = { "fsl,p4080-memory-controller", "ddr", ddr_error_policy, DDR_ERROR_COUNT, NULL },
 };
 
 static int validate_domain(const char *domain, dt_node_t *hwnode)
@@ -204,97 +214,19 @@ const char *get_domain_str(domains_t domain)
 	return error_domains[domain].domain;
 }
 
+void register_error_dump_callback(domains_t domain, dump_error_info err_dump_fn)
+{
+	if ((domain < ERROR_DOMAIN_COUNT) && (error_domains[domain].error_dump_callback == NULL))
+		error_domains[domain].error_dump_callback = err_dump_fn;
+}
+
 void dump_domain_error_info(hv_error_t *err, domains_t domain)
 {
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error domain : %s\n", err->domain);
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error  : %s\n", err->error);
 
-	switch (domain) {
-	case error_misc:
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
-		break;
-
-	case error_ccf: {
-		ccf_error_t *ccf = &err->ccf;
-
-		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
-		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cedr : %x, ccf ceer : %x, ccf cmecar : %x\n",
-					ccf->cedr, ccf->ceer, ccf->cmecar);
-		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cecar : %x, ccf cecaddr : %llx\n",
-					ccf->cecar, ccf->cecaddr);
-		break;
-	}
-
-	case error_mcheck: {
-		mcheck_error_t *mcheck = &err->mcheck;
-
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
-			mcheck->mcsr, mcheck->mcar, mcheck->mcsrr0, mcheck->mcsrr1);
-		break;
-	}
-
-	case error_pamu: {
-		pamu_error_t *pamu = &err->pamu;
-
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
-			 pamu->avs1, pamu->avs2, pamu->access_violation_addr);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU access violation lpid = %x, handle = %x\n",
-			pamu->lpid, pamu->liodn_handle);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU ecc error eccctl = %x, eccdis = %x, eccinten = %x\n",
-			pamu->eccctl, pamu->eccdis, pamu->eccinten);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU ecc error eccdet  = %x, eccattr = %x\n",
-			pamu->eccdet, pamu->eccattr);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU ecc error addr = %llx, data = %llx\n",
-			pamu->eccaddr, pamu->eccdata);
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			"PAMU operation error poes1 = %x, poeaddr = %llx\n",
-			pamu->poes1, pamu->poeaddr);
-		break;
-	}
-
-	case error_cpc: {
-		cpc_error_t *cpc = &err->cpc;
-
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdet : %x, cpc errinten : %x\n",
-			cpc->cpcerrdet, cpc->cpcerrinten);
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdis : %x\n",
-			cpc->cpcerrdis);
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errattr : %x, cpc captecc : %x\n",
-			cpc->cpcerrattr, cpc->cpccaptecc);
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc erraddr : %llx, cpc errctl : %x\n",
-			cpc->cpcerraddr, cpc->cpcerrctl);
-		break;
-	}
-
-	case error_ddr: {
-		ddr_error_t *ddr = &err->ddr;
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdet : %x, ddr errinten : %x\n",
-			ddr->ddrerrdet, ddr->ddrerrinten);
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdis : %x\n",
-			ddr->ddrerrdis);
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errattr : %x, ddr captecc : %x\n",
-			ddr->ddrerrattr, ddr->ddrcaptecc);
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr singlebit ecc mgmt : %x\n",
-			ddr->ddrsbeccmgmt);
-		printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr error address : %llx\n",
-			ddr->ddrerraddr);
-		break;
-	}
-
-	default:
-		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Unsupported error domain\n");
-
-	}
+	if ((domain < ERROR_DOMAIN_COUNT) && (error_domains[domain].error_dump_callback))
+		error_domains[domain].error_dump_callback(err);
 }
 
 void error_policy_action(hv_error_t *err, domains_t domain, const char *policy)

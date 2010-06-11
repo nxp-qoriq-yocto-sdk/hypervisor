@@ -56,6 +56,23 @@ static driver_t __driver ddr = {
 	.probe = ddr_probe
 };
 
+static void dump_ddr_error(hv_error_t *err)
+{
+	ddr_error_t *ddr = &err->ddr;
+
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdet : %x, ddr errinten : %x\n",
+		ddr->ddrerrdet, ddr->ddrerrinten);
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errdis : %x\n",
+		ddr->ddrerrdis);
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr errattr : %x, ddr captecc : %x\n",
+		ddr->ddrerrattr, ddr->ddrcaptecc);
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr singlebit ecc mgmt : %x\n",
+		ddr->ddrsbeccmgmt);
+	printlog(LOGTYPE_DDR, LOGLEVEL_ERROR, "ddr error address : %llx\n",
+		ddr->ddrerraddr);
+}
+
 static void ddr_error_attr_cap(ddr_err_reg_t *ddr_err_regs, ddr_error_t *ddr,
 		uint32_t errattr)
 {
@@ -142,6 +159,8 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 
 				val |= ddr_err[i].reg_val;
 			}
+
+			register_error_dump_callback(error_ddr, dump_ddr_error);
 
 			irq->ops->register_irq(irq, ddr_error_isr, dev, TYPE_MCHK);
 

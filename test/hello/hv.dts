@@ -160,6 +160,13 @@
 			size = <0 0x2000000>;
 			allocate-cpc-ways = <9 10 11 12 13 14 15 16>;
 		};
+
+		pma2: pma2 {
+			compatible = "phys-mem-area";
+			addr = <0xf 0xfe000000>;
+			size = <0 0x1000000>;
+			use-no-law;
+		};
 	};
 
 	// =====================================================
@@ -175,6 +182,12 @@
 			compatible = "guest-phys-mem-area";
 			phys-mem = <&pma1>;
 			guest-addr = <0 0>;
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0xfe000000>;
 		};
 
 		p1bc: byte-channel {

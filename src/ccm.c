@@ -72,6 +72,17 @@ static driver_t __driver law = {
 	.probe = law_probe
 };
 
+static void dump_ccf_error(hv_error_t *err)
+{
+	ccf_error_t *ccf = &err->ccf;
+
+	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cedr : %x, ccf ceer : %x, ccf cmecar : %x\n",
+				ccf->cedr, ccf->ceer, ccf->cmecar);
+	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cecar : %x, ccf cecaddr : %llx\n",
+				ccf->cecar, ccf->cecaddr);
+}
+
 static int ccm_error_isr(void *arg)
 {
 	device_t *dev = arg;
@@ -203,6 +214,8 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 
 				val |= ccf_err[i].reg_val;
 			}
+
+			register_error_dump_callback(error_ccf, dump_ccf_error);
 
 			irq->ops->register_irq(irq, ccm_error_isr, dev, TYPE_MCHK);
 
