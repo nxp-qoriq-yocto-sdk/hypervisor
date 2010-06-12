@@ -141,7 +141,7 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 		return ERR_INVALID;
 	}
 
-	ddr_err_regs = (ddr_err_reg_t *)((uintptr_t)dev->regs[0].virt + DDR_ERR_DET);
+	ddr_err_regs = (ddr_err_reg_t *)((uintptr_t)dev->regs[0].virt + DDR_ERR_CAPT_ECC);
 
 	out32(&ddr_err_regs->ddr_err_int_en, 0);
 	out32(&ddr_err_regs->ddr_err_dis, DDR_ERR_MASK);
