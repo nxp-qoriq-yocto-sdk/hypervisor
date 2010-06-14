@@ -59,6 +59,8 @@ typedef enum claimable {
 
 struct dev_owner;
 
+struct ipi_doorbell;
+
 typedef struct claim_action {
 	/** Perform a subsystem-specific action to claim this device.
 	 * 
@@ -148,6 +150,7 @@ typedef struct dt_node {
 	struct byte_chan *bc;
 	struct byte_chan_handle *bch;
 	struct mux_complex *bcmux;
+	struct ipi_doorbell *dbell;
 
 	list_t aliases;
 

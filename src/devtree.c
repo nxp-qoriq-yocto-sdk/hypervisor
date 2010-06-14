@@ -381,22 +381,6 @@ int dt_get_reg(dt_node_t *node, int res,
 	return xlate_reg(node, &reg[(naddr + nsize) * res], addr, size);
 }
 
-void *ptr_from_node(dt_node_t *node, const char *type)
-{
-	char buf[64];
-	dt_prop_t *prop;
-
-	snprintf(buf, sizeof(buf), "fsl,hv-internal-%s-ptr", type);
-	buf[sizeof(buf) - 1] = 0;
-
-	prop = dt_get_prop(node, buf, 0);
-	if (!prop)
-		return NULL;
-
-	assert(prop->len == 4);
-	return *(void *const *)prop->data;
-}
-
 static chardev_t *cd_console;
 static byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;

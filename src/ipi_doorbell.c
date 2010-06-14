@@ -167,12 +167,9 @@ static int create_doorbell(dt_node_t *node, void *arg)
 		}
 	}
 
-	int ret = dt_set_prop(node, "fsl,hv-internal-doorbell-ptr",
-	                      &dbell, sizeof(dbell));
-	if (ret < 0)
-		destroy_doorbell(dbell);
+	node->dbell = dbell;
 
-	return ret;
+	return 0;
 }
 
 void create_doorbells(void)
@@ -342,8 +339,7 @@ static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
 		return NULL;
 	}
 
-	/* Get the pointer corresponding to hv-internal-doorbell-ptr */
-	dbell = ptr_from_node(gdnode, "doorbell");
+	dbell = gdnode->dbell;
 	if (!dbell) {
 		printf("%s: node %s (global-doorbell from %s) is not a doorbell\n",
 		       __func__, gdnode->name, node->name);
