@@ -32,7 +32,7 @@ set timeout 360
 spawn ../../tools/mux_server/mux_server localhost:9124 9000 9001 9002
 set mux_id $spawn_id
 
-spawn simics ../../test/linux/run-2p.simics
+spawn simics -e \$target=$env(TARGET) ../../test/linux/run-2p.simics
 set simics_id $spawn_id
 
 spawn socat -,raw,echo=0 tcp:localhost:9000

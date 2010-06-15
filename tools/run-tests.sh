@@ -37,6 +37,8 @@ cd output/test
 
 rc=0
 
+export TARGET=4080
+
 # run the .exp scripts
 for test in $tests
 do
