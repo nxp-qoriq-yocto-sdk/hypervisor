@@ -38,6 +38,7 @@
 #include <errors.h>
 #include <byte_chan.h>
 #include <limits.h>
+#include <error_log.h>
 
 int get_addr_format(dt_node_t *node, uint32_t *naddr, uint32_t *nsize)
 {
@@ -949,14 +950,148 @@ void check_compatible_owners(dev_owner_t *new, dev_owner_t *old)
 		new->claimable = claimable_standby;
 	}
 }
+
+uint32_t error_manager_lock;
+
+static int claim_error_manager(claim_action_t *action,
+			       dev_owner_t *owner, dev_owner_t *prev)
+{
+	int ret = 0;
+	dev_owner_t *crt_owner;
+	gcpu_t *gcpu = get_gcpu();
+
+	/* This callback is executed by hcall_claim_device. It does not
+	 * guarantee that once entered its critical region, the claimable
+	 * owner of the error manager remained as in the moment when spin lock
+	 * was acquired. Example: guest 1 is active owner and 2 and 3 are
+	 * standby. When 1 stops, 2 and 3 race towards guest 1's spin lock.
+	 * One will enter and the other will poll but both knows that previous
+	 * owner was 1. Guest 2 will get the ownership and exit the critical
+	 * region made by guest 1 and its own state locks. Guest 3 will enter
+	 * the critical region made by guest 1 and its own state locks. And
+	 * it will test that previous owner as it knows (guest 1) is stopped.
+	 * But the resource is already taken by guest 2.
+	 */
+	spin_lock(&error_manager_lock);
+	crt_owner = owner->hwnode->claimable_owner;
+
+	if (crt_owner && crt_owner->guest->state != guest_stopped)
+		ret = EV_INVALID_STATE;
+	else if (owner->guest && gcpu == owner->guest->err_destcpu)
+		raw_out32(&error_manager_guest_lpid, owner->guest->lpid);
+	else
+		ret = EV_EPERM;
+
+	spin_unlock(&error_manager_lock);
+
+	return ret;
+}
 #endif
+
+/*
+ * Common code that builds ownership information from HV config tree and
+ * device tree
+ */
+static int build_ownership(dt_node_t *cfgnode, dt_node_t *hwnode,
+			   assign_ctx_t *ctx)
+{
+	register_t saved;
+
+	dev_owner_t *owner = alloc_type(dev_owner_t);
+	if (!owner) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: out of memory\n", __func__);
+		return ERR_NOMEM;
+	}
+
+	owner->cfgnode = cfgnode;
+	owner->hwnode = hwnode;
+	owner->guest = ctx->guest;
+	owner->direct = owner;
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	set_claimable(owner);
+	if (dt_node_is_compatible(cfgnode, "error-manager")) {
+		claim_action_t *p_claim = alloc_type(claim_action_t);
+		if (!p_claim) {
+			free(owner);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				"%s: out of memory\n", __func__);
+			return ERR_NOMEM;
+		}
+
+		owner->claim_actions = p_claim;
+		owner->claim_actions->claim = claim_error_manager;
+		/* claim_actions->next = NULL; already set by alloc */
+	}
+#endif
+
+	saved = spin_lock_intsave(&dt_owner_lock);
+
+	list_for_each(&hwnode->owners, i) {
+		dev_owner_t *other = to_container(i, dev_owner_t, dev_node);
+
+		/* Hypervisor ownership of a device is exclusive */
+		if (!other->guest) {
+			spin_unlock_intsave(&dt_owner_lock, saved);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				"%s: device %s in %s already assigned to "
+				"the hypervisor\n",
+			         __func__, hwnode->name, cfgnode->name);
+			free(owner);
+			return 0;
+		}
+
+		if (other->guest == ctx->guest) {
+			spin_unlock_intsave(&dt_owner_lock, saved);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: device %s in %s already assigned to %s\n",
+				__func__, hwnode->name, cfgnode->name,
+				ctx->guest->name);
+			free(owner);
+			return 0;
+		}
+
+#ifndef CONFIG_CLAIMABLE_DEVICES
+		/* In case of non-claimable support, accept at most one
+		 * declaration of error manager.
+		 * In case of claimable support, if non-claimable & claimable
+		 * are mixed, do what check_compatible_owners does, i.e.
+		 * print an error. The trouble is that guests will think
+		 * they each own an active error manager but only one works.
+		 */
+		if (dt_node_is_compatible(cfgnode, "error-manager")) {
+			spin_unlock_intsave(&dt_owner_lock, saved);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: device %s already assigned to %s"
+			         " refused to %s\n",
+				__func__, hwnode->name,
+				other->guest->name, ctx->guest->name);
+			free(owner);
+			return 0;
+		}
+#endif
+
+		check_compatible_owners(owner, other);
+	}
+
+	if (ctx->guest)
+		list_add(&ctx->guest->dev_list, &owner->guest_node);
+	else
+		list_add(&hv_devs, &owner->guest_node);
+
+	cfgnode->endpoint = hwnode;
+
+	list_add(&hwnode->owners, &owner->dev_node);
+	spin_unlock_intsave(&dt_owner_lock, saved);
+
+	return 0;
+}
 
 static int assign_callback(dt_node_t *node, void *arg)
 {
 	assign_ctx_t *ctx = arg;
 	const char *alias;
 	dt_node_t *hwnode;
-	register_t saved;
 
 	/* Only process immediate children */
 	if (node->parent != ctx->tree)
@@ -982,63 +1117,54 @@ static int assign_callback(dt_node_t *node, void *arg)
 	if (!hwnode->parent) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: cannot assign the root node %s from %s\n",
-		         __func__, alias, node->name);
+		         __func__, hwnode->name, node->name);
 		return 0;
 	}
 
-	dev_owner_t *owner = alloc_type(dev_owner_t);
-	if (!owner) {
-		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-		         "%s: out of memory\n", __func__);
-		return ERR_NOMEM;
-	}
+	return build_ownership(node, hwnode, ctx);
+}
 
-	owner->cfgnode = node;
-	owner->hwnode = hwnode;
-	owner->guest = ctx->guest;
-	owner->direct = owner;
-#ifdef CONFIG_CLAIMABLE_DEVICES
-	set_claimable(owner);
-#endif
+static int assign_err_mgr(dt_node_t *cfg_node, void *arg)
+{
+	assign_ctx_t *ctx = arg;
+	const char *prop;
+	dt_node_t *virt_node;
+	int ret = 0;
 
-	saved = spin_lock_intsave(&dt_owner_lock);
+	virt_node = dt_get_subnode(virtual_tree, "error-manager", 0);
 
-	list_for_each(&hwnode->owners, i) {
-		dev_owner_t *other = to_container(i, dev_owner_t, dev_node);
+	if (virt_node) {
+		uint32_t vcpu;
+		dt_prop_t *prop;
 
-		/* Hypervisor ownership of a device is exclusive */
-		if (!other->guest) {
-			spin_unlock_intsave(&dt_owner_lock, saved);
+		/* if there is a node container in virtual tree, then
+		 * parse config tree of each partition to get vcpu
+		 */
+		prop = dt_get_prop(cfg_node, "vcpu", 0);
+		if (!prop || prop->len != 4)
+			return ERR_BADTREE;
+		vcpu = *(const uint32_t *)prop->data;
+
+		/* validate configuration parameter */
+		if (vcpu_to_cpu(ctx->guest->cpulist, ctx->guest->cpulist_len,
+				vcpu) < 0) {
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: device %s in %s already assigned to the hypervisor\n",
-			         __func__, alias, node->name);
-			free(owner);
-			return 0;
+					"%s: invalid vcpu ID in config tree for"
+					" partition %s\n", __func__,
+					ctx->guest->name);
+			return ERR_RANGE;
 		}
 
-		if (other->guest == ctx->guest) {
-			spin_unlock_intsave(&dt_owner_lock, saved);
-			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: device %s in %s already assigned to %s\n",
-			         __func__, alias, node->name, ctx->guest->name);
-			free(owner);
-			return 0;
-		}
+		/* err_destcpu is concurrently read once
+		 * the global error manager lpid is set later in
+		 * assign_child
+		 */
+		ctx->guest->err_destcpu = ctx->guest->gcpus[vcpu];
 
-		check_compatible_owners(owner, other);
+		ret = build_ownership(cfg_node, virt_node, ctx);
 	}
 
-	if (ctx->guest)
-		list_add(&ctx->guest->dev_list, &owner->guest_node);
-	else
-		list_add(&hv_devs, &owner->guest_node);
-
-	node->endpoint = hwnode;
-
-	list_add(&hwnode->owners, &owner->dev_node);
-	spin_unlock_intsave(&dt_owner_lock, saved);
-
-	return 0;
+	return ret;
 }
 
 /** Read aliases and attach them to the nodes they point to. */
@@ -1097,6 +1223,15 @@ void dt_assign_devices(dt_node_t *tree, guest_t *guest)
 	};
 
 	dt_for_each_prop_value(tree, "device", NULL, 0, assign_callback, &ctx);
+
+	if (guest) { /* do not check for hypervisor node */
+		dt_node_t *single_err_node = dt_get_first_compatible(tree,
+							"error-manager");
+		/* TODO: We might check if there are multiple error-manager
+		 * declarations in partition configuration for a warning */
+		if (single_err_node)
+			assign_err_mgr(single_err_node, &ctx);
+	}
 }
 
 /** Read the memory resources of the given node */

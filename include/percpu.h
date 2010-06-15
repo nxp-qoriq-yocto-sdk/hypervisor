@@ -184,6 +184,9 @@ typedef struct guest {
 
 	/** Error queue lock, to synchronize access to the error queue */
 	uint32_t error_queue_lock;
+
+	/** VCPU used for sending critical interrupts to global manager */
+	struct gcpu *err_destcpu;
 } guest_t;
 
 #define MAX_PARTITIONS 8

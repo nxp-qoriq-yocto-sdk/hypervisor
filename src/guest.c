@@ -56,8 +56,8 @@
 #include <error_log.h>
 #include <guts.h>
 
-guest_t *error_manager_guest;
-int error_manager_gcpu;
+uint32_t error_manager_guest_lpid;
+
 queue_t global_event_queue;
 uint32_t global_event_prod_lock;
 uint32_t global_event_cons_lock;
@@ -1539,6 +1539,10 @@ int restart_guest(guest_t *guest, const char *reason, const char *who)
 
 	spin_unlock_intsave(&guest->state_lock, saved);
 
+	if (raw_in32(&error_manager_guest_lpid) == guest->lpid)
+		/* disable global reporting */
+		raw_out32(&error_manager_guest_lpid, 0);
+
 	if (!ret)
 		for (i = 0; i < guest->cpucnt; i++)
 			setgevent(guest->gcpus[i], gev_restart);
@@ -1684,19 +1688,6 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 		if (dt_get_prop(partition, "privileged", 0))
 			guests[i].privileged = 1;
-
-		/* error manager */
-		dt_prop_t *prop = dt_get_prop(partition, "error-manager", 0);
-		if (prop && prop->len == 4) {
-			if (error_manager_guest == NULL) {
-				error_manager_guest = &guests[i];
-				error_manager_gcpu = *(const uint32_t *)prop->data;
-				error_log_init(&global_event_queue);
-			} else {
-				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-					"error-manager exists\n");
-			}
-		}
 
 		guests[i].name = name;
 		guests[i].state = guest_starting;
@@ -1876,6 +1867,7 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	guest_t *guest = gcpu->guest;
 	int ret;
 	unsigned int i;
+	dt_node_t *virt_node;
 
 	assert(guest->state == guest_starting);
 
@@ -1914,6 +1906,21 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 
 	if (setup_ima(regs, guest->entry, 0) < 0)
 		goto error_block;
+
+	virt_node = dt_get_subnode(virtual_tree, "error-manager", 0);
+	if (virt_node && !list_empty(&virt_node->owners)) {
+		dev_owner_t *owner = NULL;
+#ifdef CONFIG_CLAIMABLE_DEVICES
+		owner = virt_node->claimable_owner;
+#else
+		/* Just get the first owner from the list; this list is built
+		 * before starting any guest, so its content is fixed. */
+		owner = to_container(virt_node->owners.next,
+				     dev_owner_t, dev_node);
+#endif
+		if (owner && owner->guest == guest)
+			raw_out32(&error_manager_guest_lpid, owner->guest->lpid);
+	}
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
@@ -2320,6 +2327,10 @@ int stop_guest(guest_t *guest, const char *reason, const char *who)
 	if (ret)
 		return ret;
 
+	if (raw_in32(&error_manager_guest_lpid) == guest->lpid)
+		/* disable global reporting */
+		raw_out32(&error_manager_guest_lpid, 0);
+
 	for (i = 0; i < guest->cpucnt; i++)
 		setgevent(guest->gcpus[i], gev_stop);
 
@@ -2548,8 +2559,12 @@ static int assign_child(dt_node_t *node, void *arg)
 		return handle;
 	}
 
-	ret = dt_set_prop(node, "fsl,hv-device-handle",
-	                  &handle, sizeof(handle));
+	const char *handle_name = "fsl,hv-device-handle";
+	if (dt_node_is_compatible(node, "fsl,hv-error-manager"))
+		/* "reg" is formatted as one uint32_t (addr=1, size=0) */
+		handle_name = "reg";
+
+	ret = dt_set_prop(node, handle_name, &handle, sizeof(handle));
 	if (ret)
 		goto nomem;
 
@@ -2567,7 +2582,7 @@ static int assign_child(dt_node_t *node, void *arg)
 			const char *status = dt_get_prop_string(node, "status");
 			if (!status || !strncmp(status, "ok", 2)) {
 				ret = dt_set_prop_string(node, "status",
-				                         "disabled");
+							 "disabled");
 				if (ret < 0)
 					goto nomem;
 			}
@@ -2611,9 +2626,23 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 	} else {
 		name = owner->cfgnode->name;
 
-		if (dt_node_is_compatible(hwnode->parent, "fsl,dpaa")) {
+		if (dt_node_is_compatible(hwnode, "fsl,hv-error-manager")) {
+			/* Regular devices are built in node from
+			 * guest->devices, "/devices"
+			 * Error manager virtual device is built in
+			 * "/hypervisor/handles" node
+			 */
+			parent = get_handles_node(guest);
+			if (!parent) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					 "%s: could not create %s container node\n",
+					 __func__, hwnode->name);
+				return ERR_NOMEM;
+			}
+		} else if (dt_node_is_compatible(hwnode->parent, "fsl,dpaa")) {
 			// DPAA nodes belong under the fsl,dpaa container node
-			parent = dt_get_subnode(guest->devtree, hwnode->parent->name, 1);
+			parent = dt_get_subnode(guest->devtree,
+						hwnode->parent->name, 1);
 			if (!parent) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 					 "%s: could not create %s container node\n",
@@ -2643,6 +2672,15 @@ static int merge_guest_dev(dt_node_t *hwnode, void *arg)
 	ret = dt_merge_tree(owner->gnode, hwnode, 0);
 	if (ret < 0)
 		goto out_gnode;
+
+	/* For error manager, add a specific property into the node */
+	if (dt_node_is_compatible(hwnode, "fsl,hv-error-manager")) {
+		ret = dt_set_prop(owner->gnode, "fsl,hv-error-manager-cpu",
+				  &owner->guest->err_destcpu->gcpu_num,
+				  sizeof(uint32_t));
+		if (ret < 0)
+			goto out_gnode;
+	}
 
 	dt_record_guest_phandle(owner->gnode, owner->cfgnode);
 
@@ -2733,6 +2771,10 @@ static int init_guest_devs(guest_t *guest)
 	 */
 
 	ret = dt_for_each_node(hw_devtree, guest, merge_guest_dev, NULL);
+	if (ret < 0)
+		return ret;
+
+	ret = dt_for_each_node(virtual_tree, guest, merge_guest_dev, NULL);
 	if (ret < 0)
 		return ret;
 

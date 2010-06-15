@@ -26,8 +26,7 @@
 
 struct hv_error;
 
-extern guest_t *error_manager_guest;
-extern int error_manager_gcpu;
+extern uint32_t error_manager_guest_lpid;
 extern queue_t global_event_queue;
 extern uint32_t global_event_prod_lock;
 extern uint32_t global_event_cons_lock;

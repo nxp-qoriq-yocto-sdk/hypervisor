@@ -80,7 +80,7 @@ static void partition_init(void);
 
 #define UART_OFFSET		0x11c500
 
-dt_node_t *hw_devtree, *config_tree;
+dt_node_t *hw_devtree, *config_tree, *virtual_tree;
 uint32_t hw_devtree_lock;
 void *temp_mapping[2];
 extern char _end, _start;
@@ -540,6 +540,46 @@ static void assign_hv_devs(void)
 }
 
 
+static void setup_error_manager(void)
+{
+	int ret, errmgr_handle;
+	uint32_t propdata;
+	dt_node_t *node;
+
+	error_log_init(&global_event_queue);
+
+	node = dt_get_subnode(virtual_tree, "error-manager", 1);
+	if (!node)
+		goto nomem;
+
+	/* TODO: Clean the addr/len sizes for future usage of the
+	 * virtual tree. For now, only the error-manager node is kept in
+	 * and this will be merged into "/hypervisor/handles" subtree
+	 * which has 1/0 for addr/size. If future virtual devices should
+	 * be merged into "/devices", different pair might have to be
+	 * accomodated.
+	 */
+	propdata = 1;
+	ret = dt_set_prop(virtual_tree, "#address-cells", &propdata, 4);
+	if (ret < 0)
+		goto nomem;
+
+	propdata = 0;
+	ret = dt_set_prop(virtual_tree, "#size-cells", &propdata, 4);
+	if (ret < 0)
+		goto nomem;
+
+	ret = dt_set_prop_string(node, "compatible",
+				 "fsl,hv-error-manager");
+	if (ret < 0)
+		goto nomem;
+
+	return;
+nomem:
+	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR, "%s: out of memory\n",
+		 __func__);
+}
+
 /**
  * get_ccsr_phys_addr - get the CCSR physical address from the device tree
  * @param[out] size returned size of CCSR, in bytes
@@ -665,6 +705,13 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	unmap_fdt();
 
+	virtual_tree = create_dev_tree();
+	if (!virtual_tree) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
+			 "panic: couldn't allocate virtual tree\n");
+		return;
+	}
+
 	hvconfig = dt_get_first_compatible(config_tree, "hv-config");
 	if (!hvconfig) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
@@ -711,6 +758,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 #endif
 
 	create_doorbells();
+
+	setup_error_manager();
 
 	/* Main device tree must be const after this point. */
 	release_secondary_cores();

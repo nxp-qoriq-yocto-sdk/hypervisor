@@ -28,7 +28,7 @@
 #include <libos/types.h>
 
 void init(unsigned long devtree_ptr);
-void release_secondary_cores(void);
+int release_secondary_cores(void);
 
 extern void (*secondary_startp)(void);
 extern void *fdt;
@@ -38,6 +38,13 @@ extern int global_error_queue;
 
 extern phys_addr_t uart_addr;
 extern uint8_t *uart_virt;
+
+/* Simple logging: [0] is a global counter atomically incremented to represent
+ * the ID of the current stamp, [1] is the address where clients will write
+ * their stamp and which is traced from outside (simics or HW tracing).
+ * log_addr is meant to be set in a shared memory across partitions (4K) */
+void init_stamp(phys_addr_t phys_addr, int tlb1_entry);
+void stamp(uint8_t flag);
 
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize);
@@ -65,5 +72,11 @@ struct chardev *test_init_uart(int node);
 int get_vmpic_irq(int node, int irq);
 int set_vmpic_irq_priority(int handle, int prio);
 int init_error_queues(void);
+
+static inline void delay_timebase(unsigned long ticks)
+{
+	unsigned long start = mfspr(SPR_TBL);
+	while (mfspr(SPR_TBL) - start < ticks);
+}
 
 #endif

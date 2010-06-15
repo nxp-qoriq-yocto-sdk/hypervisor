@@ -563,10 +563,10 @@ __attribute__((weak, alias("bad_exception")));
 extern int start_secondary_spin_table(struct boot_spin_table *table, int num,
 				      cpu_t *cpu);
 
-void release_secondary_cores(void)
+int release_secondary_cores(void)
 {
 	int node = fdt_subnode_offset(fdt, 0, "cpus");
-	int depth = 0;
+	int depth = 0, cpucnt = 0;
 	void *map = valloc(PAGE_SIZE, PAGE_SIZE);
 
 	if (node < 0) {
@@ -583,7 +583,7 @@ void release_secondary_cores(void)
 		if (depth > 1)
 			continue;
 		if (depth < 1)
-			return;
+			return cpucnt;
 
 		status = fdt_getprop(fdt, node, "status", &len);
 		if (!status) {
@@ -622,7 +622,7 @@ void release_secondary_cores(void)
 		if (len != 4) {
 			printf("BROKEN: Bad length %d for cpu reg property; core not released\n",
 			       len);
-			return;
+			return ERR_BADTREE;
 		}
 
 		const uint64_t *table =
@@ -652,7 +652,8 @@ void release_secondary_cores(void)
 
 		if (start_secondary_spin_table((void *)table_va, *reg, newcpu))
 			printf("BROKEN: couldn't spin up CPU%u\n", *reg);
-
+		else
+			cpucnt++;
 next_core:
 		;
 	}
@@ -662,13 +663,13 @@ fail:
 	       "secondary cores may not be released.\n",
 	       node, fdt_strerror(node));
 
-	return;
+	return node;
 
 nomem:
 	printf("BROKEN: out of memory reading CPU nodes, "
 	       "secondary cores may not be released.\n");
 
-	return;
+	return ERR_NOMEM;
 
 fail_one:
 	printf("BROKEN: error %d (%s) reading CPU node, "

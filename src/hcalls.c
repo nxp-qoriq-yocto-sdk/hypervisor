@@ -663,7 +663,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 	// after global error queue is node based
 	if (handle == GLOBAL_ERROR_EVENT_QUEUE) {
 		guest = gcpu->guest;
-		if (guest != error_manager_guest) {
+		if (guest->lpid != raw_in32(&error_manager_guest_lpid)) {
 			regs->gpregs[3] = EV_EINVAL;
 			return;
 		}

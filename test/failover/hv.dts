@@ -128,7 +128,12 @@
 		cpus = <2 3>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
-		error-manager = <0>;
+
+		error-manager {
+			compatible = "error-manager";
+			vcpu = <0>;
+			claimable = "active";
+		};
 
 		gpma {
 			compatible = "guest-phys-mem-area";

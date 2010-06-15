@@ -231,7 +231,7 @@ void dump_domain_error_info(hv_error_t *err, domains_t domain)
 
 void error_policy_action(hv_error_t *err, domains_t domain, const char *policy)
 {
-	if (!strcmp(policy, "notify") && error_manager_guest) {
+	if (!strcmp(policy, "notify")) {
 		error_log(&global_event_queue, err, &global_event_prod_lock);
 	} else if (!strcmp(policy, "halt")) {
 		halt_system = 1;

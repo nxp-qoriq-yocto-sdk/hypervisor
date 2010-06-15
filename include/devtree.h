@@ -275,6 +275,9 @@ extern uint32_t hw_devtree_lock;
 /** Hypervisor config tree passed in bootargs */
 extern dt_node_t *config_tree;
 
+/** Virtual tree used for hardware-like virtual devices */
+extern dt_node_t *virtual_tree;
+
 /** #address-cells and #size-cells at root of hv tree */
 extern uint32_t rootnaddr, rootnsize;
 

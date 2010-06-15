@@ -66,6 +66,9 @@ int error_get(queue_t *q, hv_error_t *err, unsigned long *flag,
 
 void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 {
+	if (!q || !q->size)
+		return;
+
 	spin_lock(lock);
 
 	/* Only write whole errors into the queue. */
@@ -85,9 +88,15 @@ void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 	if (q == &hv_global_event_queue) {
 		setevent(get_gcpu(), EV_DUMP_HV_QUEUE);
 	} else if (q == &global_event_queue) {
-		atomic_or(&error_manager_guest->gcpus[error_manager_gcpu]->crit_gdbell_pending,
-				 GCPU_PEND_CRIT_INT);
-		setevent(error_manager_guest->gcpus[error_manager_gcpu], EV_GUEST_CRIT_INT);
+		int lpid = raw_in32(&error_manager_guest_lpid);
+
+		if (lpid > 0 && lpid <= last_lpid) {
+			guest_t *err_mgr = &guests[lpid-1];
+			gcpu_t *vcpu = err_mgr->err_destcpu;
+			atomic_or(&vcpu->crit_gdbell_pending,
+					 GCPU_PEND_CRIT_INT);
+			setevent(vcpu, EV_GUEST_CRIT_INT);
+		}
 	} else {
 		guest_t *guest = to_container(q, guest_t, error_event_queue);
 		gcpu_t *gcpu = guest->gcpus[0];
