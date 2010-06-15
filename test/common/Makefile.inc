@@ -22,6 +22,9 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+# default to 4080, can ovrride from command line
+TARGET=4080
+
 $(test)-src-y := $(dir)$(test).c
 $(test)-dts-y := $(wildcard $(dir)*.dts)
 
@@ -47,7 +50,7 @@ $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 
 # We cannot use $(dir) here because rule evaluation is defered.
 $(test)-run:: $(test)
-	$(SIMICS) $(testdir)$</run.simics
+	$(SIMICS) -e '$$target = $(TARGET)' $(testdir)$</run.simics
 
 $(test)-run-%:: $(test)
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) -e '$$target = $(TARGET)' $(testdir)$</run-$*.simics
