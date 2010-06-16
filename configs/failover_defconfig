@@ -1,9 +1,9 @@
 #
 # Automatically generated make config: don't edit
-# Freescale-Embedded-Hypervisor version: 0.7-003-00015-g3453358-dirty
-# Thu Jun  3 16:52:09 2010
+# Freescale-Embedded-Hypervisor version: 0.7-003-00041-gc916e79
+# Wed Jun 16 17:06:09 2010
 #
-CONFIG_HV_VERSION="0.7-003-00015-g3453358-dirty"
+CONFIG_HV_VERSION="0.7-003-00041-gc916e79"
 CONFIG_HV_MAJOR_VERSION=0
 CONFIG_HV_MINOR_VERSION=7
 CONFIG_LIBOS_INIT=y
@@ -48,6 +48,7 @@ CONFIG_PAMU=y
 CONFIG_TLB_CACHE=y
 CONFIG_DEVICE_VIRT=y
 CONFIG_VIRTUAL_I2C=y
+CONFIG_VIRTUAL_PCIE=y
 # CONFIG_STATISTICS is not set
 CONFIG_ZLIB=y
 CONFIG_DEBUG_STUB=y
