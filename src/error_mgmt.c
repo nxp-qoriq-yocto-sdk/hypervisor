@@ -38,38 +38,38 @@ typedef struct setpolicy_ctx {
 } setpolicy_ctx_t;
 
 error_policy_t cpc_error_policy[CPC_ERROR_COUNT] = {
-	[cpc_multiple_errors] = {"multiple errors", "disable"},
-	[cpc_tag_multi_way_hit] = {"tag multi-way hit", "disable"},
-	[cpc_tag_status_multi_bit_ecc] = {"tag status multi-bit ecc", "disable"},
-	[cpc_tag_status_single_bit_ecc] = {"tag status single-bit ecc",  "disable"},
-	[cpc_data_multi_bit_ecc] = {"data multi-bit ecc", "disable"},
-	[cpc_data_single_bit_ecc] = {"data single-bit ecc", "disable"},
+	[cpc_multiple_errors] = {"multiple errors", "disable", 0},
+	[cpc_tag_multi_way_hit] = {"tag multi-way hit", "disable", 0},
+	[cpc_tag_status_multi_bit_ecc] = {"tag status multi-bit ecc", "disable", 0},
+	[cpc_tag_status_single_bit_ecc] = {"tag status single-bit ecc",  "disable", 0x8},
+	[cpc_data_multi_bit_ecc] = {"data multi-bit ecc", "disable", 0},
+	[cpc_data_single_bit_ecc] = {"data single-bit ecc", "disable", 0x8},
 };
 
 error_policy_t ccf_error_policy[CCF_ERROR_COUNT] = {
-	[ccf_multiple_intervention] = {"multiple intervention", "disable"},
-	[ccf_local_access] = {"local access", "disable"},
+	[ccf_multiple_intervention] = {"multiple intervention", "disable", 0},
+	[ccf_local_access] = {"local access", "disable", 0},
 };
 
 error_policy_t misc_error_policy[MISC_ERROR_COUNT] = {
-	[internal_ram_multi_bit_ecc] = {"internal ram multi-bit ecc", "disable"}
+	[internal_ram_multi_bit_ecc] = {"internal ram multi-bit ecc", "disable", 0}
 };
 
 error_policy_t pamu_error_policy[PAMU_ERROR_COUNT] = {
-	[pamu_operation] = {"operation", "notify"},
-	[pamu_single_bit_ecc] = {"single-bit ecc", "disable"},
-	[pamu_multi_bit_ecc] = {"multi-bit ecc", "disable"},
-	[pamu_access_violation] = {"access violation", "notify"},
+	[pamu_operation] = {"operation", "notify", 0},
+	[pamu_single_bit_ecc] = {"single-bit ecc", "disable", 0x8},
+	[pamu_multi_bit_ecc] = {"multi-bit ecc", "disable", 0},
+	[pamu_access_violation] = {"access violation", "notify", 0},
 };
 
 error_policy_t ddr_error_policy[DDR_ERROR_COUNT] = {
-	[ddr_multiple_errors] = {"multiple errors", "disable"},
-	[ddr_memory_select] = {"memory select", "disable"},
-	[ddr_single_bit_ecc] = {"single-bit ecc", "disable"},
-	[ddr_multi_bit_ecc] = {"multi-bit ecc", "disable"},
-	[ddr_corrupted_data] = {"corrupted data", "disable"},
-	[ddr_auto_calibration] = {"auto calibration", "disable"},
-	[ddr_address_parity] = {"address parity", "disable"},
+	[ddr_multiple_errors] = {"multiple errors", "disable", 0},
+	[ddr_memory_select] = {"memory select", "disable", 0},
+	[ddr_single_bit_ecc] = {"single-bit ecc", "disable", 0x8},
+	[ddr_multi_bit_ecc] = {"multi-bit ecc", "disable", 0},
+	[ddr_corrupted_data] = {"corrupted data", "disable", 0},
+	[ddr_auto_calibration] = {"auto calibration", "disable", 0},
+	[ddr_address_parity] = {"address parity", "disable", 0},
 };
 
 static void dump_mcheck_error(hv_error_t *err)
@@ -137,6 +137,24 @@ static error_policy_t *get_policy_by_str(const char *domain, const char *error)
 	return NULL;  /* policy not found */
 }
 
+static uint32_t get_single_bit_ecc_thresh(dt_node_t *node)
+{
+	uint32_t threshold = 0;
+	dt_prop_t *prop;
+
+	prop = dt_get_prop(node, "single-bit-ecc-threshold", 0);
+	if (prop && prop->len == 4) {
+		if (*(const uint32_t *)prop->data <= 0xff)
+			threshold = *(const uint32_t *)prop->data;
+		else
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Invalid single-bit ecc threshold value %d\n",
+				 *(const uint32_t *)prop->data);
+	}
+
+	return threshold;
+}
+
 static int setpolicy_callback(dt_node_t *node, void *arg)
 {
 	setpolicy_ctx_t *ctx = arg;
@@ -174,12 +192,21 @@ static int setpolicy_callback(dt_node_t *node, void *arg)
 	}
 
 	error_p = get_policy_by_str(domain, error);
-	if (error_p)
+	if (error_p) {
 		error_p->policy = policy; /* override the default */
-	else
+		if (!strcmp(error, "single-bit ecc") ||
+			!strcmp(error, "data single-bit ecc") ||
+			!strcmp(error, "tag status single-bit ecc")) {
+			uint32_t ret = get_single_bit_ecc_thresh(node);
+			if (ret)
+				error_p->threshold = ret;
+		}
+
+	} else {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 		         "%s: error policy configuration error on %s\n",
 		          __func__,node->name);
+	}
 
 	return 0;
 }
@@ -198,7 +225,13 @@ const char *get_error_policy(domains_t domain, int error)
 	error_policy_t *error_p = error_domains[domain].errors;
 
 	return error_p[error].policy;
+}
 
+uint32_t get_error_threshold(domains_t domain, int error)
+{
+	error_policy_t *error_p = error_domains[domain].errors;
+
+	return error_p[error].threshold;
 }
 
 const char *get_error_str(domains_t domain,int error)

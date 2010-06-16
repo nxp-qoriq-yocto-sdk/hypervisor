@@ -67,6 +67,7 @@
 				compatible = "error-config";
 				domain = "pamu";
 				error = "single-bit ecc";
+				single-bit-ecc-threshold = <200>;
 				policy = "notify";
 			};
 			error-config@1 {
@@ -91,6 +92,14 @@
 				error = "tag multi-way hit";
 				policy = "notify";
 			};
+
+			error-config@1 {
+				compatible = "error-config";
+				domain = "cpc";
+				error = "data single-bit ecc";
+				single-bit-ecc-threshold = <200>;
+				policy = "notify";
+			};
 		};
 
 		memory-controller@8000 {
@@ -99,6 +108,7 @@
 				compatible = "error-config";
 				domain = "ddr";
 				error = "single-bit ecc";
+				single-bit-ecc-threshold = <200>;
 				policy = "notify";
 			};
 		};
@@ -109,6 +119,7 @@
 				compatible = "error-config";
 				domain = "ddr";
 				error = "single-bit ecc";
+				single-bit-ecc-threshold = <200>;
 				policy = "notify";
 			};
 		};

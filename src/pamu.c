@@ -983,6 +983,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
 	interrupt_t *irq;
 	uint8_t pamu_enable_ints = 0;
+	uint32_t error_threshold = 0;
 
 	/*
 	 * enumerate all PAMUs and allocate and setup PAMU tables
@@ -1050,6 +1051,10 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 					continue;
 
 				pamu_enable_ints |= 1 << i;
+
+				if (i == pamu_single_bit_ecc) {
+					error_threshold = get_error_threshold(error_pamu, i);
+				}
 			}
 
 			irq->ops->register_irq(irq, pamu_av_isr, dev, TYPE_MCHK);
@@ -1077,7 +1082,8 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 
 		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
 		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off,
-					pamumem, pamumem_size, pamu_enable_ints);
+					pamumem, pamumem_size, pamu_enable_ints,
+					error_threshold);
 		if (ret < 0) {
 			/* This can only fail for the first instance due to
 			 * memory alignment issues, hence this failure

@@ -283,6 +283,7 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 
 		if (dev->num_irqs > i) {
 			uint32_t val = 0;
+			uint32_t threshold = 0;
 
 			interrupt_t *irq = dev->irqs[i];
 			if (irq && irq->ops->register_irq) {
@@ -292,6 +293,10 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 					if (!strcmp(cpc_err[i].policy, "disable"))
 						continue;
 
+					if ((i == cpc_data_single_bit_ecc) ||
+						(i == cpc_tag_status_single_bit_ecc))
+						threshold = get_error_threshold(error_cpc, i);
+
 					val |= cpc_err[i].reg_val;
 				}
 
@@ -299,8 +304,8 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 
 				irq->ops->register_irq(irq, cpc_error_isr, &cpcs[i], TYPE_MCHK);
 
-				/*FIXME : Hard coding the single bit ecc threshold to 128*/
-				out32(errctl, 0x80 << CPC_ERRCTL_THRESH_SHIFT);
+				if (threshold)
+					out32(errctl, threshold << CPC_ERRCTL_THRESH_SHIFT);
 
 				out32(errdis, ~val & CPC_ERR_MASK);
 				out32(errinten, val);

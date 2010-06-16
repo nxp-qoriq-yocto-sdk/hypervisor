@@ -148,6 +148,7 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 
 	if (dev->num_irqs >= 1) {
 		uint32_t val = 0;
+		uint32_t threshold = 0;
 
 		interrupt_t *irq = dev->irqs[0];
 		if (irq && irq->ops->register_irq) {
@@ -157,6 +158,9 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 				if (!strcmp(ddr_err[i].policy, "disable"))
 					continue;
 
+				if (i == ddr_single_bit_ecc)
+					threshold = get_error_threshold(error_ddr, i);
+
 				val |= ddr_err[i].reg_val;
 			}
 
@@ -164,8 +168,8 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 
 			irq->ops->register_irq(irq, ddr_error_isr, dev, TYPE_MCHK);
 
-			/*FIXME : Hard coding the single bit ecc threshold to 128*/
-			out32(&ddr_err_regs->ddr_sbecc_err_mgmt, 0x80 << DDR_SB_THRESH_SHIFT);
+			if (threshold)
+				out32(&ddr_err_regs->ddr_sbecc_err_mgmt, threshold << DDR_SB_THRESH_SHIFT);
 
 			out32(&ddr_err_regs->ddr_err_dis, ~val & DDR_ERR_MASK);
 			out32(&ddr_err_regs->ddr_err_int_en, val);

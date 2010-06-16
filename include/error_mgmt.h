@@ -34,6 +34,7 @@ struct hv_error;
 typedef struct error_policy {
 	const char *error;
 	const char *policy;
+	uint32_t threshold;
 } error_policy_t;
 
 typedef void (*dump_error_info)(struct hv_error *);
@@ -105,6 +106,7 @@ extern error_policy_t ddr_error_policy[];
 
 void set_error_policy(dev_owner_t *owner);
 const char *get_error_policy(domains_t domain, int error);
+uint32_t get_error_threshold(domains_t domain, int error);
 const char *get_error_str(domains_t domain,int error);
 const char *get_domain_str(domains_t domain);
 void error_policy_action(struct hv_error *err, domains_t domain, const char *policy);
