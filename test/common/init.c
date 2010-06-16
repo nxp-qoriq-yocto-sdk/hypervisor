@@ -725,8 +725,17 @@ int init_error_queues(void)
 	}
 	guest_error_queue = *prop;
 
-	// FIXME: need to get global queue from dev tree
-	global_error_queue = 1;
+	global_error_queue = -1;
+	node = fdt_node_offset_by_compatible(fdt, -1, "fsl,hv-error-manager");
+	if (node < 0)
+		return 0;
+
+	prop = fdt_getprop(fdt, node, "reg", &len);
+	if (!prop || len != 4) {
+		printf("BROKEN: missing/bad reg in error queue node\n");
+		return -1;
+	}
+	global_error_queue = *prop;
 
 	return 0;
 }

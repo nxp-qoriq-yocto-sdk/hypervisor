@@ -659,32 +659,26 @@ static void hcall_err_get_info(trapframe_t *regs)
 		return;
 	}
 
-	// FIXME: use handle instead of hardcoded constant
-	// after global error queue is node based
-	if (handle == GLOBAL_ERROR_EVENT_QUEUE) {
-		guest = gcpu->guest;
+	// FIXME: race against handle closure
+	if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
+		regs->gpregs[3] = EV_EINVAL;
+		return;
+	}
+
+	q = guest->handles[handle]->error_queue;
+	if (q == &global_event_queue) {
 		if (guest->lpid != raw_in32(&error_manager_guest_lpid)) {
 			regs->gpregs[3] = EV_EINVAL;
 			return;
 		}
 
-		q = &global_event_queue;
 		flag = &gcpu->crit_gdbell_pending;
 		mask = GCPU_PEND_CRIT_INT;
 		lock = &global_event_cons_lock;
+	} else if (!q) {
+		regs->gpregs[3] = EV_EINVAL;
+		return;
 	} else {
-		// FIXME: race against handle closure
-		if (handle < 0 || handle >= MAX_HANDLES || !guest->handles[handle]) {
-			regs->gpregs[3] = EV_EINVAL;
-			return;
-		}
-
-		q = guest->handles[handle]->error_queue;
-		if (!q) {
-			regs->gpregs[3] = EV_EINVAL;
-			return;
-		}
-
 		lock = &guest->error_queue_lock;
 	}
 

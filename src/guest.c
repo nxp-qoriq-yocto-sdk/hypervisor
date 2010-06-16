@@ -2560,9 +2560,11 @@ static int assign_child(dt_node_t *node, void *arg)
 	}
 
 	const char *handle_name = "fsl,hv-device-handle";
-	if (dt_node_is_compatible(node, "fsl,hv-error-manager"))
+	if (dt_node_is_compatible(node, "fsl,hv-error-manager")) {
 		/* "reg" is formatted as one uint32_t (addr=1, size=0) */
 		handle_name = "reg";
+		owner->handle.error_queue = &global_event_queue;
+	}
 
 	ret = dt_set_prop(node, handle_name, &handle, sizeof(handle));
 	if (ret)
