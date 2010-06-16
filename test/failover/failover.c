@@ -79,7 +79,7 @@ void ext_int_handler(trapframe_t *frameptr)
 		if (status == FH_PARTITION_STOPPED)
 			standby_go = 1;
 	} else if (vector == dma_irq) {
-		printf("DMA interrupt\n");
+		printf("Got DMA interrupt\n");
 
 		uint32_t stat = in32(&dma_virt[1]);
 		out32(&dma_virt[1], stat);
@@ -194,14 +194,12 @@ static int dma_init(void)
 			return -15;
 		}
 
-		printf("Standby waiting...");
+		printf("Came up as standby...waiting for failover\n");
 
 		/* Wait until other guest stops, then claim and continue */
 		while (!standby_go);
 		
-		printf("done\n");
-
-		printf("Failover #%u:\n\n", *shmem);
+		printf("Going active...failover #%u:\n", *shmem);
 
 		prop = fdt_getprop(fdt, node, "fsl,hv-device-handle", &len);
 		if (!prop || len != 4) {
@@ -254,6 +252,9 @@ static int dma_init(void)
 		if (*shmem == 3 || *shmem == 4)
 			wait_for_irq = 1;
 	} else {
+
+		printf("Came up as active...\n");
+
 		str = fdt_getprop(fdt, node, "fsl,hv-claimable", &len);
 		if (!str || strcmp(str, "active")) {
 			printf("FAILED: bad claimable %s in active\n",
@@ -287,9 +288,9 @@ static int dma_init(void)
 		while (!got_dma_irq);
 	
 		if (got_dma_irq > 0)
-			printf("PASSED: previous owner left good irq\n");
+			printf("Previous owner left good irq: PASSED\n");
 		else if (got_dma_irq < 0)
-			printf("FAILED: previous owner left bad irq\n");
+			printf("Previous owner left bad irq: FAILED\n");
 	}
 
 	return 0;
@@ -440,7 +441,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	init(devtree_ptr);
 
-	printf("\nFailover test:\n");
+	printf("-----------------------------------\n");
+	printf("Failover test starting...\n");
 
 	if (init_error_queues() < 0)
 		return;
@@ -464,9 +466,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (*shmem == 1 || *shmem == 2)
 		expected_mchecks = 1;
 
-	printf("%s: expected %d mchecks after claim, got %d\n",
-	       expected_mchecks == mcheck_int ? "PASSED" : "FAILED",
-	       expected_mchecks, mcheck_int);
+	printf("Expected %d mchecks after claim, got %d: %s\n",
+	       expected_mchecks, mcheck_int,
+	       expected_mchecks == mcheck_int ? "PASSED" : "FAILED");
 
 	crit_int = 0;
 
@@ -479,22 +481,22 @@ void libos_client_entry(unsigned long devtree_ptr)
 	while (mcheck_int < expected_mchecks + 1);
 
 	printf("Received in local error queue:\n");
-	printf("domain: %s, error: %s, path: %s\n", mcheck_err.domain, mcheck_err.error,
+	printf("   domain: %s, error: %s, path: %s\n", mcheck_err.domain, mcheck_err.error,
 		 mcheck_err.hdev_tree_path);
-	printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+	printf("   PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
 		 mcheck_err.pamu.avs1, mcheck_err.pamu.avs2, mcheck_err.pamu.access_violation_addr);
-	printf("PAMU access violation lpid = %x, handle = %x\n\n",
+	printf("   PAMU access violation lpid = %x, handle = %x\n",
 		mcheck_err.pamu.lpid, mcheck_err.pamu.liodn_handle);
 
 	if (!((*shmem) & 1)) {
 		while (crit_int < 1);
 	
 		printf("Received in global error queue:\n");
-		printf("domain: %s, error: %s, path: %s\n", crit_err.domain, crit_err.error,
+		printf("   domain: %s, error: %s, path: %s\n", crit_err.domain, crit_err.error,
 			crit_err.hdev_tree_path);
-		printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
+		printf("   PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
 			crit_err.pamu.avs1, crit_err.pamu.avs2, crit_err.pamu.access_violation_addr);
-		printf("PAMU access violation lpid = %x, handle = %x\n\n",
+		printf("   PAMU access violation lpid = %x, handle = %x\n",
 			crit_err.pamu.lpid, crit_err.pamu.liodn_handle);
 	}
 
@@ -534,5 +536,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 		printf("Test Complete\n");
 	}
 
+	printf("Stopping...\n");
 	fh_partition_stop(-1);
 }
