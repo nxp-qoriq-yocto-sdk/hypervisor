@@ -219,6 +219,8 @@ static int attach_fast_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 	vmirq->user.intr = vmirq;
 	vmirq->user.ops = NULL;
 
+	vmpic_set_claimed(vmirq, 1);
+
 	vmirq->handle = dbell->fast_dbell->global_handle;
 	ret = set_guest_global_handle(guest, &vmirq->user, vmirq->handle);
 	if (ret < 0) {
