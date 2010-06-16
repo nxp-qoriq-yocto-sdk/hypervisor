@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 003
-Date: 6/01/2010
+Revsion: 004
+Date: 6/17/2010
 
 -------------------------------------------------------
 Contents
@@ -46,14 +46,38 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.7-003 has been tested with Simics 4.2.41 / pre50
+   -embedded-hv v0.7-004 has been tested with Simics 4.2.41 / pre50
     and the P4080DS board
 
-   -in sync with Embedded Hypervisor Architecture specifciation
-    0.882
+   -in sync with Embedded Hypervisor Reference Manual 0.90
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.7-004 bug fixes and changes
+       -guest watchdog is not emulated with the FIT
+       -guest debug mode is enabled by default
+       -support for PCI when guest phys != true phys
+        is removed
+       -guest error queues is represented with node
+        in guest device tree
+       -migrate access violations in guest error queue
+        on a device claim
+       -support for claim of error manager
+       -error manger is represented with a node in
+        guest device trees
+       -err_get_info hcall now takes a handle to the guest
+        error queue or error manager as argument
+       -64-bit cleanup in fast TLB path
+       -error management support for PAMU operation errors
+        and PAMU ECC errors
+       -error management support for internal SRAM errors
+       -display upper nibble for 36-bit addresses on paact
+        command
+       -error management support for DDR controller errors
+       -add support to reset system if all partitions stop
+       -bug 5589-- set guest dev tree path in error info on
+        access violations
 
    -v0.7-003 bug fixes and changes
        -updated vendor ID for hcalls
