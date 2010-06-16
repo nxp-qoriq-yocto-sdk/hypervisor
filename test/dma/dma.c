@@ -200,6 +200,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	while (!mcheck_int);
 	printf("domain: %s, error: %s, path: %s\n", mcheck_err.domain, mcheck_err.error,
 		 mcheck_err.hdev_tree_path);
+	printf("guest device path: %s\n", mcheck_err.gdev_tree_path);
 	printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
 		 mcheck_err.pamu.avs1, mcheck_err.pamu.avs2, mcheck_err.pamu.access_violation_addr);
 	printf("PAMU access violation lpid = %x, handle = %x\n",
@@ -214,6 +215,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		for(i = 0 ; i < 2 ; i++) {
 			printf("domain: %s, error: %s, path: %s\n", crit_err[i].domain, crit_err[i].error,
 				crit_err[i].hdev_tree_path);
+			printf("guest device path: %s\n", crit_err[i].gdev_tree_path);
 			printf("PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
 				crit_err[i].pamu.avs1, crit_err[i].pamu.avs2, crit_err[i].pamu.access_violation_addr);
 			printf("PAMU access violation lpid = %x, handle = %x\n",

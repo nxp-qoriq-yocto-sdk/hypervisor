@@ -785,6 +785,8 @@ static void dump_pamu_error(hv_error_t *err)
 
 	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path:%s\n",
 		 err->hdev_tree_path);
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "guest device path:%s\n",
+		 err->gdev_tree_path);
 	printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		"PAMU access violation avs1 = %x, avs2 = %x, av_addr = %llx\n",
 		 pamu->avs1, pamu->avs2, pamu->access_violation_addr);
@@ -841,6 +843,26 @@ static int pamu_error_isr(void *arg)
 	return 0;
 }
 
+static int node_found_callback(dt_node_t *node, void *arg)
+{
+	*(dt_node_t **)arg = node;
+
+	return 1;
+}
+
+static dt_node_t *get_dev_node(uint32_t handle, guest_t *guest)
+{
+	dt_node_t *node;
+	int ret;
+
+	ret = dt_for_each_prop_value(guest->devtree, "fsl,hv-dma-handle", &handle,
+					sizeof(dt_node_t *), node_found_callback, &node);
+	if (ret)
+		return node;
+
+	return NULL;
+}
+
 static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pics)
 {
 	uint32_t av_liodn, avs1;
@@ -873,6 +895,10 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	if (guest) {
 		pamu->lpid = guest->lpid;
 		pamu->liodn_handle = liodn_to_handle[av_liodn];
+		dt_node_t *node = get_dev_node(pamu->liodn_handle, guest);
+		if (node)
+			dt_get_path(NULL, node, err.gdev_tree_path, sizeof(err.gdev_tree_path));
+
 	}
 
 	spin_unlock(&pamu_error_lock);
