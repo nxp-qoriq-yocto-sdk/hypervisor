@@ -266,6 +266,11 @@ static void do_illegal_dma(void)
 	phys_addr_t src, dst;
 	const unsigned int trans_size = 0x200;	/* counter of bytes */
 
+	if (in32(&dma_virt[DMA_SR]) & 0x80) {
+		/* Transfer error, perhaps from the previous tests */
+		out32(&dma_virt[DMA_SR], 0x80); /* write 1 to clear */
+	}
+
 	/* Compute arbitrary phys addresses in guest space */
 	src = mem_phys + mem_size - 0x800;
 	dst = mem_phys + mem_size - 0x200;
@@ -386,14 +391,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (why_stopped && !strcmp(why_stopped, "restart")) {
 		printf("Restarted %s\n", label);
 		was_restarted = 1;
-		if (strcmp(label, "/part2") == 0) {
-			if (was_restarted)
-				/* Only clean the barriers */
-				memset(shared_memory, 0, 2*sizeof(long));
-			else
-				/* Init once; only 1 guest runs, with CPU0 */
-				memset(shared_memory, 0, 4096);
-		}
+	} else {
+		if (strcmp(label, "/part2") == 0)
+			/* Init once; only 1 guest runs, with CPU0 */
+			memset(shared_memory, 0, 4096);
 	}
 
 	enable_extint();
@@ -523,9 +524,11 @@ static void execute_tests(register_t pir)
 		test_stat[pir] += test_orig_interrupt(pir);
 
 		test_barrier(0, 4);
-		if (!was_restarted)
+		if (!was_restarted) {
+			memset(shared_memory, 0, 2*sizeof(long));
 			fh_partition_restart(-1);
-
+		}
+		
 		test_stat[pir] += test_claim_its_own(pir);
 	}
 	test_stat[pir] += test_claim_error_manager(pir);

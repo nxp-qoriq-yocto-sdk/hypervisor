@@ -39,13 +39,6 @@ extern int global_error_queue;
 extern phys_addr_t uart_addr;
 extern uint8_t *uart_virt;
 
-/* Simple logging: [0] is a global counter atomically incremented to represent
- * the ID of the current stamp, [1] is the address where clients will write
- * their stamp and which is traced from outside (simics or HW tracing).
- * log_addr is meant to be set in a shared memory across partitions (4K) */
-void init_stamp(phys_addr_t phys_addr, int tlb1_entry);
-void stamp(uint8_t flag);
-
 int get_addr_format(const void *tree, int node,
                     uint32_t *naddr, uint32_t *nsize);
 int get_addr_format_nozero(const void *tree, int node,
