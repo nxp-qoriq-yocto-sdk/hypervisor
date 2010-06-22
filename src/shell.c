@@ -396,8 +396,11 @@ static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
 			decode_wse(sentry->swse, str);
 			qprintf(shell->out, 1, "       ");
 			qprintf(shell->out, 1, " % 4d  ", wcount);
-			qprintf(shell->out, 1, "%08x  ", subwin_base);
-			qprintf(shell->out, 1, "%08x  ",
+			qprintf(shell->out, 1, "%01x_%08x  ",
+				entry->wbah,
+				subwin_base);
+			qprintf(shell->out, 1, "%01x_%08x  ",
+				sentry->twbah,
 				sentry->twbal << PAGE_SHIFT);
 			qprintf(shell->out, 1, "%s", str);
 			qprintf(shell->out, 1, "    - ");
