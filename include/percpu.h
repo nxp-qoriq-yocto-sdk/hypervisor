@@ -72,6 +72,10 @@ typedef enum {
 	guest_resuming = 6,
 
 	/* Internal substates */
+	guest_starting_min,
+	guest_starting_uninit,
+	guest_starting_max,
+
 	guest_stopping_min,
 	guest_stopping_percpu,
 	guest_stopping_max,

@@ -293,6 +293,10 @@ static void hcall_partition_get_status(trapframe_t *regs)
 	regs->gpregs[3] = 0;  
 
 	/* Don't let internal states be public API. */
+	if (guest->state >= guest_starting_min &&
+	    guest->state <= guest_starting_max)
+		regs->gpregs[4] = guest_starting;
+
 	if (guest->state >= guest_stopping_min &&
 	    guest->state <= guest_stopping_max)
 		regs->gpregs[4] = guest_stopping;

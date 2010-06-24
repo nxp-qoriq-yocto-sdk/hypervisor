@@ -1581,7 +1581,7 @@ static int partition_config(guest_t *guest)
 	return 0;
 }
 
-static void get_cpulist(guest_t *guest)
+static int get_cpulist(guest_t *guest)
 {
 	dt_node_t *node = guest->partition;
 	dt_prop_t *prop;
@@ -1593,7 +1593,7 @@ static void get_cpulist(guest_t *guest)
 			         "%s: bad cpus property in %s\n",
 			         __func__, node->name);
 
-			return;
+			return ERR_BADTREE;
 		}
 
 		guest->cpulist = malloc(prop->len);
@@ -1609,11 +1609,12 @@ static void get_cpulist(guest_t *guest)
 		         "%s: No cpus property in guest %s\n",
 		         __func__, node->name);
 
-	return;
+	return 0;
 
 nomem:
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 	         "%s: out of memory\n", __func__);
+	return ERR_NOMEM;
 }
 
 static uint32_t start_guest_lock;
@@ -1690,11 +1691,13 @@ guest_t *node_to_partition(dt_node_t *partition)
 			guests[i].privileged = 1;
 
 		guests[i].name = name;
-		guests[i].state = guest_starting;
+		guests[i].state = guest_starting_uninit;
 		guests[i].partition = partition;
 		guests[i].lpid = ++last_lpid;
 
-		get_cpulist(&guests[i]);
+		ret = get_cpulist(&guests[i]);
+		if (ret < 0)
+			return NULL;
 
 #ifdef CONFIG_DEBUG_STUB
 		init_stubops(&guests[i]);
@@ -3000,6 +3003,9 @@ static void start_partitions(void)
 
 	for (i = 0; i < last_lpid; i++) {
 		guest_t *guest = &guests[i];
+		if (guest->state != guest_starting)
+			continue;
+
 		gcpu_t *gcpu = guest->gcpus[0];
 
 		/* Add it anyway, as for no-auto this will be decreased
