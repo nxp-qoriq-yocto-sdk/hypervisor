@@ -76,29 +76,36 @@ static int rcpm_probe(driver_t *drv, device_t *dev)
 	return 0;
 }
 
-void hcall_get_core_state(trapframe_t *regs)
+int get_vcpu_state(guest_t *guest, unsigned int vcpu)
 {
-	guest_t *guest = handle_to_guest(regs->gpregs[3]);
-	unsigned int vcpu = regs->gpregs[4];
 	gcpu_t *gcpu;
-	int core, state = FH_VCPU_RUN;
-	int i;
+	int core, i;
 
-	if (!rcpm || !guest || vcpu >= guest->cpucnt) {
-		regs->gpregs[3] = EV_EINVAL;
-		return;
-	}
+	if (!rcpm || !guest || vcpu >= guest->cpucnt)
+		return -EV_EINVAL;
 
 	gcpu = guest->gcpus[vcpu];
 	core = gcpu->cpu->coreid;
 
 	assert(core < 32);
 
-	for (i = 0; i < sizeof(sleep_regs) / sizeof(sleep_regs[0]); i++) {
-		if (in32(&rcpm[sleep_regs[i].reg]) & (1 << core)) {
-			state = sleep_regs[i].state;
-			break;
-		}
+	for (i = 0; i < sizeof(sleep_regs) / sizeof(sleep_regs[0]); i++)
+		if (in32(&rcpm[sleep_regs[i].reg]) & (1 << core))
+			return sleep_regs[i].state;
+
+	return FH_VCPU_RUN;
+}
+
+void hcall_get_core_state(trapframe_t *regs)
+{
+	guest_t *guest = handle_to_guest(regs->gpregs[3]);
+	unsigned int vcpu = regs->gpregs[4];
+	int state;
+
+	state = get_vcpu_state(guest, vcpu);
+	if (state < 0) {
+		regs->gpregs[3] = -state;
+		return;
 	}
 
 	regs->gpregs[3] = 0;

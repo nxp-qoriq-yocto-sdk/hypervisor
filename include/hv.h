@@ -74,6 +74,7 @@ __attribute__((noreturn)) void init_guest(void);
 
 struct guest *handle_to_guest(int handle);
 void hcall_get_core_state(trapframe_t *regs);
+int get_vcpu_state(struct guest *guest, unsigned int vcpu);
 void hcall_enter_nap(trapframe_t *regs);
 void hcall_exit_nap(trapframe_t *regs);
 
