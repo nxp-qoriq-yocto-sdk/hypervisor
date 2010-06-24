@@ -73,11 +73,11 @@ bin/$(test)/vmpic1: $(vmpic1-obj)
 $(test): bin/$(test)/$(test) bin/$(test)/vmpic1 $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 $(test)-check-C: $(test)-run-C-batch
 	$(testdir)common/check-results 2

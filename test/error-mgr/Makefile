@@ -25,11 +25,9 @@
 test := error-mgr
 dir := $(testdir)$(test)/
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 4
+$(test)-num-terms := 4
 
 include $(testdir)common/Makefile.inc
 
 $(test)-check: $(test)-run-batch
 	$(testdir)common/check-results 2
-

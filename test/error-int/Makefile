@@ -26,7 +26,3 @@ test := error-int
 dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
-
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
-

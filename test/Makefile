@@ -22,6 +22,11 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+# default to p4080ds, can override from command line
+export TARGET := p4080ds
+
+SIMICS_FLAGS += -e '$$target = $(TARGET)'
+
 testdir := $(src)test/
 
 ifeq ($(wildcard include/config/auto.conf.cmd),)

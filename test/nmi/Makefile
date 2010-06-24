@@ -26,6 +26,3 @@ test := nmi
 dir := $(testdir)$(test)/
 
 include $(testdir)common/Makefile.inc
-
-$(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics

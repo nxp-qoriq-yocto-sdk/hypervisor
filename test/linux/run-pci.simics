@@ -36,8 +36,6 @@ $guest_addr[1]   = 0x00900000
 $guest_image[2]  = "rootfs.ext2.gz"
 $guest_addr[2]   = 0x01300000
 
-$dev_tree_blob = "p4080ds_36b.dtb"
-
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"
 

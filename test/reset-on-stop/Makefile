@@ -25,10 +25,9 @@
 test := reset-on-stop
 dir := $(testdir)$(test)/
 
+$(test)-num-terms := 4
+
 include $(testdir)common/Makefile.inc
 
-$(test)-run-%:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 4
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 # TODO: add an Expect script to monitor the console and finish this
 # test. For now, it runs forever, booting itself repeatedly.

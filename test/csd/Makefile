@@ -25,7 +25,4 @@
 test := csd
 dir := $(testdir)$(test)/
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
-
 include $(testdir)common/Makefile.inc

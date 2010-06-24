@@ -57,7 +57,7 @@ bin/$(test)/$(test): $($(test)-obj)
 $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 
 $(test)-run: $(test)
-	$(SIMICS) $(testdir)$</run.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run.simics
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics

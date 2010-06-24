@@ -90,15 +90,15 @@ bin/$(test)/ipi2: $(ipi2-obj)
 $(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 $(test)-run-B: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(testdir)$</run-B.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-B.simics
 
 $(test)-run-C: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(testdir)$</run-C.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-C.simics
 
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2

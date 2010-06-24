@@ -25,7 +25,6 @@
 test := failover
 dir := $(testdir)$(test)/
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
+$(test)-num-terms := 3
 
 include $(testdir)common/Makefile.inc

@@ -73,7 +73,7 @@ bin/$(test)/fast-doorbell1: $(fast-doorbell1-obj)
 $(test): bin/$(test)/fast-doorbell bin/$(test)/fast-doorbell1 $($(test)-hv-dtb)
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2

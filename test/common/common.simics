@@ -24,13 +24,12 @@
 
 $kernel_image  = "hv.uImage"
 $kernel_cmdline = "config-addr=0xfe8900000"
-$dev_tree_blob = "p4080ds_36b.dtb"
 
 if not defined silicon_rev   {$silicon_rev = "rev2"}
 
 add-directory "%script%/../../../sim" -prepend
-add-directory "%script%/../../../sim/"+p+$target+ds -prepend
-add-directory "%script%/../../../images/"+p+$target -prepend
+add-directory "%script%/../../../sim/"+$target -prepend
+add-directory "%script%/../../../images/"+$target -prepend
 add-directory "%script%/../../../images" -prepend
 add-directory "%script%/../../../images/boot" -prepend
 add-directory "../bin" -prepend

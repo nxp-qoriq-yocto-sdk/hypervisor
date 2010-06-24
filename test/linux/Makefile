@@ -42,7 +42,7 @@ include $(src)tools/partman/Makefile $(src)tools/shmem/Makefile
 $(test): $($(test)-dtb)
 
 $(test)-run-%: $(test)
-	$(SIMICS) $(testdir)$</run-$*.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
 
 define mount
 	$(call show,mount: bin/linux/$(1))
@@ -87,19 +87,19 @@ $(test)-run-partman: bin/$(test)/rootfs-partman.ext2.gz
 
 $(test)-run-hello: $(test) bin/$(test)/rootfs-hello.ext2.gz
 	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(testdir)linux/run-hello.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-hello.simics
 
 $(test)-run-2p: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(testdir)linux/run-2p.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-2p.simics
 
 $(test)-run-partman: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 4
-	$(SIMICS) $(testdir)linux/run-partman.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-partman.simics
 
 $(test)-run-1p: $(test)
-	$(SIMICS) $(testdir)linux/run-1p.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1p.simics
 
 $(test)-run-1core: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
-	$(SIMICS) $(testdir)linux/run-1core.simics
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1core.simics

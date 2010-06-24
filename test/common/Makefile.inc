@@ -22,9 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-# default to 4080, can ovrride from command line
-TARGET=4080
-
 $(test)-src-y := $(dir)$(test).c
 $(test)-dts-y := $(wildcard $(dir)*.dts)
 
@@ -48,9 +45,19 @@ bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 .PHONY: $(test)
 $(test): bin/$(test)/$(test) $($(test)-hv-dtb)
 
-# We cannot use $(dir) here because rule evaluation is defered.
-$(test)-run:: $(test)
-	$(SIMICS) -e '$$target = $(TARGET)' $(testdir)$</run.simics
+$(test)-num-terms ?= 2
 
-$(test)-run-%:: $(test)
-	$(SIMICS) $(SIMICS_FLAGS) -e '$$target = $(TARGET)' $(testdir)$</run-$*.simics
+# We cannot use $(dir) or $(test) in the actions because rule evaluation is
+# deferred and we'd end up with the last test procesed, not the one actually
+# being run.
+$(test)-run: $(test)
+	@if [ $($<-num-terms) != 0 ]; then \
+		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
+	fi
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run.simics
+
+$(test)-run-%: $(test)
+	@if [ $($<-num-terms) != 0 ]; then \
+		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
+	fi
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics

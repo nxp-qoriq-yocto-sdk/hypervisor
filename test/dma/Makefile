@@ -25,11 +25,9 @@
 test := dma
 dir := $(testdir)$(test)/
 
-include $(testdir)common/Makefile.inc
+$(test)-num-terms := 3
 
-$(test)-run-%:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(testdir)$</run-$*.simics
+include $(testdir)common/Makefile.inc
 
 $(test)-check-B: $(test)-run-B-batch
 	$(testdir)common/check-results 2
