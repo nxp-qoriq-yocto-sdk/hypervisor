@@ -39,12 +39,3 @@ run-command-file "common.simics"
 add-directory "bin/error-mgr" -prepend
 
 run-command-file "boot.simics"
-
-#script-branch {
-#	wait-for-hap Core_Magic_Instruction info
-#}
-
-break p:0x8001004 4 -w
-log-setup -time-stamp -no-console -overwrite stamp_logging.txt
-trace-breakpoint 2
-run
