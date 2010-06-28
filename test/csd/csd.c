@@ -73,7 +73,7 @@ static void dump_dev_tree(void)
 }
 
 #define CPUCNT 4
-static int cpus_complete[CPUCNT];
+static volatile int cpus_complete[CPUCNT];
 
 static void secondary_entry(void)
 {
