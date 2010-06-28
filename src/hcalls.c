@@ -85,6 +85,7 @@ int set_guest_global_handle(guest_t *guest, handle_t *handle,
 	}
 
 	handle->id = global_handle;
+	handle->handle_owner = guest;
 	guest->handles[global_handle] = handle;
 
 	return global_handle;
@@ -95,6 +96,7 @@ int set_guest_global_handle(guest_t *guest, handle_t *handle,
 int alloc_guest_handle(guest_t *guest, handle_t *handle)
 {
 	int again;
+	handle->handle_owner = guest;
 
 	do {
 		again = 0;
@@ -822,6 +824,7 @@ static hcallfp_t fsl_hcall_table[] = {
 #else
 	unimplemented,
 #endif
+	hcall_partition_stop_dma,
 };
 
 static hcallfp_t epapr_hcall_table[] = {

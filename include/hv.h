@@ -77,6 +77,7 @@ void hcall_get_core_state(trapframe_t *regs);
 int get_vcpu_state(struct guest *guest, unsigned int vcpu);
 void hcall_enter_nap(trapframe_t *regs);
 void hcall_exit_nap(trapframe_t *regs);
+void hcall_partition_stop_dma(trapframe_t *regs);
 
 #ifdef CONFIG_PM
 void wake_hcall_nap(struct gcpu *gcpu);

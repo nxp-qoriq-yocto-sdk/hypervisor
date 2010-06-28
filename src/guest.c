@@ -2194,7 +2194,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 			handle_t *h = guest->handles[i];
 
 			if (h && h->ops && h->ops->prereset)
-				h->ops->prereset(h);
+				h->ops->prereset(h, !restart);
 		}
 
 		guest->active_cpus = guest->cpucnt;
@@ -2227,7 +2227,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 			handle_t *h = guest->handles[i];
 
 			if (h && h->ops && h->ops->postreset)
-				h->ops->postreset(h);
+				h->ops->postreset(h, !restart);
 		}
 
 		/* Make sure all activity is done before the state change. */
@@ -2901,6 +2901,19 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	ret = create_guest_error_node(guest);
 	if (ret < 0)
 		goto fail;
+
+	prop = dt_get_prop(guest->partition, "no-dma-disable", 0);
+	guest->no_dma_disable = !!prop;
+
+	prop = dt_get_prop(guest->partition, "defer-dma-disable", 0);
+	guest->defer_dma_disable = !!prop;
+
+	if (guest->no_dma_disable && guest->defer_dma_disable) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			 "%s: warning: %s: both no-dma-disable and "
+			 "defer-dma-disable specified\n",
+			 __func__, guest->name);
+	}
 
 	ret = init_guest_devs(guest);
 	if (ret < 0)

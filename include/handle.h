@@ -39,8 +39,12 @@ typedef struct {
 	 * This will happen after all cores have stopped executing in
 	 * the guest, but before per-core cleanup (such as interrupt
 	 * clearing) has taken place.
+	 *
+	 * @param[in] h handle to be prereset
+	 * @param[in] stop non-zero if the partition is being stopped
+	 *            without immediate reset
 	 */
-	void (*prereset)(struct handle *h);
+	void (*prereset)(struct handle *h, int stop);
 
 	/** Reset the handle to partition boot state, after core reset.
 	 *
@@ -51,8 +55,12 @@ typedef struct {
 	 *
 	 * If the handle was dynamically created (we don't do this yet),
 	 * rather than device-tree-originated, then close the handle.
+	 *
+	 * @param[in] h handle to be postreset
+	 * @param[in] stop non-zero if the partition is being stopped
+	 *            without immediate reset
 	 */
-	void (*postreset)(struct handle *h);
+	void (*postreset)(struct handle *h, int stop);
 } handle_ops_t;
 
 /* An extremely crude form of RTTI/multiple interfaces...
@@ -60,6 +68,7 @@ typedef struct {
  */
 typedef struct handle {
 	handle_ops_t *ops;
+	struct guest *handle_owner;
 	int id; /**< Guest handle ID number */
 
 	struct byte_chan_handle *bc;

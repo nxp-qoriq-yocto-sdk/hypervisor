@@ -33,6 +33,7 @@
 typedef struct pamu_handle {
 	unsigned long assigned_liodn;
 	handle_t user;
+	int no_dma_disable; /* on partition stop or cold boot */
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	claim_action_t claim_action;

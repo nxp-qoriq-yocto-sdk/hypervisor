@@ -95,7 +95,7 @@ void ext_int_handler(trapframe_t *frameptr)
 	}
 
 out:
-		ev_int_eoi(vector);
+	ev_int_eoi(vector);
 }
 
 void crit_int_handler(trapframe_t *regs)
@@ -126,6 +126,127 @@ void mcheck_interrupt(trapframe_t *regs)
 static volatile uint32_t *shmem;
 static phys_addr_t shmem_phys;
 
+enum {
+	normal_dma_disable,
+	defer_dma_disable,
+	no_dma_disable
+} dma_disable;
+
+/* wait:
+ *   0 = no wait
+ *   1 = irq
+ *   2 = status reg
+ */
+static int test_dma_memcpy(int valid, int wait)
+{
+	int count = 256;
+	unsigned char *gva_src, *gva_dst;
+	phys_addr_t gpa_src, gpa_dst;
+	uint32_t stat;
+
+	gva_src = (unsigned char *)&shmem[64];
+	gva_dst = (unsigned char *)&shmem[128];
+
+	gpa_src = shmem_phys + 64 * 4;
+
+	if (valid)
+		gpa_dst = shmem_phys + 128 * 4;
+	else
+		gpa_dst = 0xdeadbeef;
+
+	for (int i = 0; i < count; i++)
+		gva_src[i] = i;
+	memset(gva_dst, 0xeb, count);
+
+	got_dma_irq = 0;
+
+	/* basic DMA direct mode test */
+	out32(&dma_virt[1], in32(&dma_virt[1])); /* clear old status */
+	out32(&dma_virt[0], 0x00000644);
+	out32(&dma_virt[8], count); /* count */
+	out32(&dma_virt[4], 0x00050000); /* read,snoop */
+	out32(&dma_virt[6], 0x00050000); /* write,snoop */
+	out32(&dma_virt[5], gpa_src);
+	out32(&dma_virt[7], gpa_dst);
+	in32(&dma_virt[7]);
+
+	switch (wait) {
+	case 0:
+		return 0;
+
+	case 1:
+		while (!got_dma_irq);
+
+		if (got_dma_irq < 0)
+			return valid ? -1 : 0;
+
+		break;
+
+	case 2: {
+		uint32_t stat;
+
+		do {
+			stat = in32(&dma_virt[1]);
+		} while (!(stat & ~DMA_CHAN_BUSY));
+
+		if (stat & ~(DMA_END_OF_SEGMENT | DMA_CHAN_BUSY))
+			return valid ? -1 : 0;
+
+		break;
+	}}
+
+	if (valid)
+		return memcmp(gva_src, gva_dst, count);
+
+	return 0;
+}
+
+static void normal_disable_test(void)
+{
+	int ret = test_dma_memcpy(1, 2);
+	printf("Normal disable DMA test #1: %s\n", ret ? "PASSED" : "FAILED");
+	if (ret)
+		return;
+}
+
+static void defer_disable_test(void)
+{
+	int ret = test_dma_memcpy(1, 2);
+	printf("Deferred disable DMA test #1: %s\n", ret ? "FAILED" : "PASSED");
+	if (ret)
+		return;
+
+	ret = fh_partition_stop_dma(managed_partition);
+	if (ret != 0) {
+		printf("fh_partition_stop_dma FAILED %d\n", ret);
+		return;
+	}
+
+	ret = test_dma_memcpy(1, 2);
+	printf("Deferred disable DMA test #2: %s\n", ret ? "PASSED" : "FAILED");
+	if (ret)
+		return;
+}
+
+static void no_disable_test(void)
+{
+	int ret = test_dma_memcpy(1, 2);
+	printf("No disable DMA test #1: %s\n", ret ? "FAILED" : "PASSED");
+	if (ret)
+		return;
+
+	ret = fh_partition_stop_dma(managed_partition);
+	if (ret != 0) {
+		printf("fh_partition_stop_dma FAILED %d\n", ret);
+		return;
+	}
+
+	ret = test_dma_memcpy(1, 2);
+	printf("No disable DMA test #1: %s\n", ret ? "FAILED" : "PASSED");
+	if (ret)
+		return;
+}
+
 static int dma_init(void)
 {
 	int node, parent, len;
@@ -155,8 +276,6 @@ static int dma_init(void)
 	               TLB_TSIZE_4K, TLB_MAS2_IO,
 	               TLB_MAS3_KERN, 0, 0, 0);
 
-	/* FIXME: reset all channels of DMA block before enabling liodn */
-	
 	prop = fdt_getprop(fdt, parent, "fsl,hv-dma-handle", &len);
 	if (!prop || len != 4) {
 		printf("bad/missing fsl,hv-dma-handle property: %d\n", len);
@@ -198,8 +317,22 @@ static int dma_init(void)
 
 		/* Wait until other guest stops, then claim and continue */
 		while (!standby_go);
-		
+
 		printf("Going active...failover #%u:\n", *shmem);
+
+		if (*shmem == 5 || *shmem == 6) {
+			switch (dma_disable) {
+			case normal_dma_disable:
+				normal_disable_test();
+				break;
+			case defer_dma_disable:
+				defer_disable_test();
+				break;
+			case no_dma_disable:
+				no_disable_test();
+				break;
+			}
+		}
 
 		prop = fdt_getprop(fdt, node, "fsl,hv-device-handle", &len);
 		if (!prop || len != 4) {
@@ -229,7 +362,7 @@ static int dma_init(void)
 			return -12;
 		}
 
-		if (*shmem < 5) {
+		if (*shmem < 7) {
 			ret = fh_partition_start(managed_partition, 0);
 			if (ret) {
 				printf("BROKEN: error %d starting partition\n", ret);
@@ -242,11 +375,12 @@ static int dma_init(void)
 			} while (ret != 0);
 		}
 	
-		/* temporary until queued error migration is implemented */
-		ret = fh_dma_enable(liodn);
-		if (ret) {
-			printf("FAILED: couldn't enable DMA\n");
-			return -16;
+		if (*shmem <= 2 || dma_disable != no_dma_disable) {
+			ret = fh_dma_enable(liodn);
+			if (ret) {
+				printf("FAILED: couldn't enable DMA\n");
+				return -16;
+			}
 		}
 
 		if (*shmem == 3 || *shmem == 4)
@@ -262,10 +396,12 @@ static int dma_init(void)
 			return -7;
 		}
 
-		ret = fh_dma_enable(liodn);
-		if (ret) {
-			printf("FAILED: couldn't enable DMA\n");
-			return -8;
+		if (dma_disable != no_dma_disable) {
+			ret = fh_dma_enable(liodn);
+			if (ret) {
+				printf("FAILED: couldn't enable DMA\n");
+				return -8;
+			}
 		}
 	}
 	
@@ -292,53 +428,6 @@ static int dma_init(void)
 		else if (got_dma_irq < 0)
 			printf("Previous owner left bad irq: FAILED\n");
 	}
-
-	return 0;
-}
-
-static int test_dma_memcpy(int valid, int wait)
-{
-	int count = 256;
-	unsigned char *gva_src, *gva_dst;
-	phys_addr_t gpa_src, gpa_dst;
-	uint32_t stat;
-
-	gva_src = (unsigned char *)&shmem[64];
-	gva_dst = (unsigned char *)&shmem[128];
-
-	gpa_src = shmem_phys + 64 * 4;
-
-	if (valid)
-		gpa_dst = shmem_phys + 128 * 4;
-	else
-		gpa_dst = 0xdeadbeef;
-
-	for (int i = 0; i < count; i++)
-		gva_src[i] = i;
-	memset(gva_dst, 0xeb, count);
-
-	got_dma_irq = 0;
-
-	/* basic DMA direct mode test */
-	out32(&dma_virt[1], in32(&dma_virt[1])); /* clear old status */
-	out32(&dma_virt[0], 0x00000644);
-	out32(&dma_virt[8], count); /* count */
-	out32(&dma_virt[4], 0x00050000); /* read,snoop */
-	out32(&dma_virt[6], 0x00050000); /* write,snoop */
-	out32(&dma_virt[5], gpa_src);
-	out32(&dma_virt[7], gpa_dst);
-
-	if (!wait)
-		return 0;
-
-	while (!got_dma_irq);
-	
-	if (got_dma_irq < 0)
-		return valid ? -1 : 0;
-	
-
-	if (valid)
-		return memcmp(gva_src, gva_dst, count);
 
 	return 0;
 }
@@ -451,6 +540,17 @@ void libos_client_entry(unsigned long devtree_ptr)
 	enable_critint();
 	enable_mcheck();
 
+	if (!fdt_node_check_compatible(fdt, 0, "failover-defer")) {
+		printf("defer-dma-disable mode\n");
+		dma_disable = defer_dma_disable;
+	} else if (!fdt_node_check_compatible(fdt, 0, "failover-no-disable")) {
+		printf("no-dma-disable mode\n");
+		dma_disable = no_dma_disable;
+	} else {
+		printf("normal dma disable mode\n");
+		dma_disable = normal_dma_disable;
+	}
+
 	if (map_shmem() < 0)
 		return;
 
@@ -532,7 +632,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		/* Leave an interrupt pending */
 		disable_extint();
 		test_dma_memcpy(1, 0);
-	} else if (*shmem == 6) {
+	} else if (*shmem == 8) {
 		printf("Test Complete\n");
 	}
 

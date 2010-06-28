@@ -656,17 +656,21 @@ skip_snoop_id:
 
 	lwsync();
 
-	/* PAACE is invalid, validated by enable hcall */
-	ppaace->v = 1; // FIXME: for right now we are leaving PAACE
-	               // entries enabled by default.
-
+	/* PAACE is invalid, validated by enable hcall, unless
+	 * the user has requested dma-continues-after-partition-stop
+	 */
 	return 0;
+}
+
+static void pamu_enable_liodn_raw(unsigned int liodn)
+{
+	pamu_get_ppaace(liodn)->v = 1;
+	sync();
 }
 
 int pamu_enable_liodn(unsigned int handle)
 {
 	guest_t *guest = get_gcpu()->guest;
-	struct ppaace_t *current_ppaace;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
 
@@ -687,16 +691,28 @@ int pamu_enable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
-	current_ppaace = pamu_get_ppaace(liodn);
-	current_ppaace->v = 1;
-
+	pamu_enable_liodn_raw(liodn);
 	return 0;
+}
+
+static void pamu_disable_liodn_raw(unsigned int liodn)
+{
+	pamu_get_ppaace(liodn)->v = 0;
+	sync();
+
+	/*
+	 * FIXME: Need to wait or synchronize with any pending DMA flush
+	 * operations on disabled liodns, as once we disable PAMU
+	 * window here any pending DMA flushes will fail.
+	 *
+	 * Also, is there any way to wait until any transactions which
+	 * the PAMU has already authorized complete before continuing?
+	 */
 }
 
 int pamu_disable_liodn(unsigned int handle)
 {
 	guest_t *guest = get_gcpu()->guest;
-	struct ppaace_t *current_ppaace;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
 
@@ -717,15 +733,7 @@ int pamu_disable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
-	current_ppaace = pamu_get_ppaace(liodn);
-	current_ppaace->v = 0;
-
-	/*
-	 * FIXME : Need to wait or synchronize with any pending DMA flush
-	 * operations on disabled liodn's, as once we disable PAMU
-	 * window here any pending DMA flushes will fail.
-	 */
-
+	pamu_disable_liodn_raw(liodn);
 	return 0;
 }
 
@@ -1300,6 +1308,54 @@ static int configure_liodn(dt_node_t *hwnode, dev_owner_t *owner,
 	return ret;
 }
 
+static void pamu_reset_handle(handle_t *h, int partition_stop)
+{
+	pamu_handle_t *ph = h->pamu;
+	uint32_t liodn = ph->assigned_liodn;
+	guest_t *guest = liodn_to_guest[liodn];
+
+	if (guest == h->handle_owner) {
+		if (ph->no_dma_disable || guest->no_dma_disable)
+			return;
+		if (partition_stop && guest->defer_dma_disable)
+			return;
+	
+		pamu_disable_liodn_raw(liodn);
+	}
+}
+
+static handle_ops_t pamu_handle_ops = {
+	.postreset = pamu_reset_handle,
+};
+
+void hcall_partition_stop_dma(trapframe_t *regs)
+{
+	guest_t *guest = handle_to_guest(regs->gpregs[3]);
+	if (!guest) {
+		regs->gpregs[3] = EV_EINVAL;
+		return;
+	}
+
+	spin_lock_int(&guest->state_lock);
+
+	if (guest->state != guest_stopped) {
+		regs->gpregs[3] = EV_INVALID_STATE;
+		goto out;
+	}
+
+	for (int i = 0; i < MAX_HANDLES; i++) {
+		handle_t *h = guest->handles[i];
+
+		if (h && h->ops == &pamu_handle_ops)
+			pamu_reset_handle(h, 0);
+	}
+
+	regs->gpregs[3] = 0;
+
+out:
+	spin_unlock_int(&guest->state_lock);
+}
+
 int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 {
 	dt_node_t *cfgnode;
@@ -1371,6 +1427,10 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 
 		pamu_handle->assigned_liodn = liodn[i];
 		pamu_handle->user.pamu = pamu_handle;
+		pamu_handle->user.ops = &pamu_handle_ops;
+
+		if (dt_get_prop(ctx.cfgnode, "no-dma-disable", 0))
+			pamu_handle->no_dma_disable = 1;
 
 		ret = alloc_guest_handle(owner->guest, &pamu_handle->user);
 		if (ret < 0) {
@@ -1386,8 +1446,14 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 		owner->claim_actions = &pamu_handle->claim_action;
 #endif
 
-		if (!standby)
+		if (!standby) {
 			liodn_to_handle[liodn[i]] = ret;
+			mbar(1);
+
+			if (pamu_handle->no_dma_disable ||
+			    owner->guest->no_dma_disable)
+				pamu_enable_liodn_raw(liodn[i]);
+		}
 	}
 
 	if (dt_set_prop(owner->gnode, "fsl,hv-dma-handle", dma_handles,

@@ -60,13 +60,13 @@ static void vmpic_init_irq(vmpic_interrupt_t *vmirq)
 		irq->ops->set_delivery_type(irq, TYPE_NORM);
 }
 
-static void vmpic_prereset_handle(handle_t *h)
+static void vmpic_prereset_handle(handle_t *h, int stop)
 {
 	if (vmpic_is_claimed(h->intr))
 		interrupt_reset(h->intr->irq);
 }
 
-static void vmpic_postreset_handle(handle_t *h)
+static void vmpic_postreset_handle(handle_t *h, int stop)
 {
 	if (vmpic_is_claimed(h->intr))
 		vmpic_init_irq(h->intr);

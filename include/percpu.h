@@ -137,6 +137,14 @@ typedef struct guest {
 	/** Watchdog notify manager partition on time-out: 0=no, 1=yes */
 	int wd_notify;
 
+	/** On partition stop, defer DMA disable to manager hcall, but
+	 *  disable as usual on cold boot and partition reset.
+	 */
+	int defer_dma_disable;
+
+	/** Partition-scope -- opt out of the feature completely */
+	int no_dma_disable;
+
 	/** The doorbell handle to use to signal a state change in the
 	 *  this partition.  The receivers are the managers of this partition.
 	 */
