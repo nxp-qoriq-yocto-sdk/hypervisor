@@ -123,7 +123,7 @@ static void dec_wait(unsigned long ticks)
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
-	int prev;
+	int prev, diff;
 
 	// Wait for the HV to stop printing text.  This will reduce byte
 	// channel switching.
@@ -169,18 +169,18 @@ void libos_client_entry(unsigned long devtree_ptr)
 	prev = fit_count;
 	dont_clear = 1;
 	enable_extint();
-	if (fit_count != prev + 2) {
-		printf("FAILED: got %d interrupt(s) instead of two\n",
-		       fit_count - prev);
+	diff = fit_count - prev;
+	if (diff != 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n", diff);
 	}
 
 	printf("Test 6: Wait for one more interrupt and reassertion\n");
 	prev = fit_count;
 	dont_clear = 1;
 	delay_period(63 - FP);
-	if (fit_count != prev + 2) {
-		printf("FAILED: got %d interrupt(s) instead of two\n",
-		       fit_count - prev);
+	diff = fit_count - prev;
+	if (diff != 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n", diff);
 	}
 
 	// Test decrementer
@@ -190,29 +190,43 @@ void libos_client_entry(unsigned long devtree_ptr)
 	mtspr(SPR_DEC, 100000);
 	mtspr(SPR_TCR, TCR_DIE);
 	delay(100000);
-	if (dec_count != prev + 2) {
-		printf("FAILED: got %d interrupt(s) instead of two\n",
-		       dec_count - prev);
+	diff = dec_count - prev;
+	if (diff != 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n", diff);
 	}
 
 	// Test decrementer auto-reload
 	printf("Test 8: Test decrementer auto-reload\n");
-	prev = dec_count;
 	mtspr(SPR_DECAR, 100000);
-	mtspr(SPR_DEC, 1000);
+	// Initialize DEC such that we don't have a race condition with some
+	// non-decrementer interrupt.
+	mtspr(SPR_DEC, 0x7fffffff);
+	mtspr(SPR_TSR, TSR_DIS);
+	prev = dec_count;
 	mtspr(SPR_TCR, TCR_DIE | TCR_ARE);
-	delay(301000);
-	if (dec_count != prev + 4) {
-		printf("FAILED: got %d interrupt(s) instead of four\n",
-		       dec_count - prev);
+	mtspr(SPR_DEC, 1000);
+	delay(3 * 100000 + 1000);
+	diff = dec_count - prev;
+	if (diff != 4) {
+		printf("FAILED: got %d interrupt(s) instead of four\n", diff);
 	}
 
-	wait_for_interrupt(&dec_count, 3);
-
-	printf("Test 9: Disable DIE, wait for DIS to get set\n");
+	printf("Test 9: Disable DIE, wait for DIS to get set, enable DIE, check for interrupt\n");
 	mtspr(SPR_TCR, 0);
+	prev = dec_count;
 	mtspr(SPR_DEC, 100000);
 	dec_wait(100000);
+	diff = dec_count - prev;
+	if (diff) {
+		printf("FAILED: got %d interrupt(s) instead of none with DIE cleared\n", diff);
+	}
+
+	prev = dec_count;
+	mtspr(SPR_TCR, TCR_DIE);
+	diff = dec_count - prev;
+	if (diff != 1) {
+		printf("FAILED: got %d interrupt(s) instead of one with DIE set\n", diff);
+	}
 
 	printf("Test 10: Clear DIS, Enable DIE, disable EE, wait for DIS to get set\n");
 	disable_extint();
@@ -228,9 +242,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	prev = dec_count;
 	dont_clear = 1;
 	enable_extint();
-	if (dec_count != prev + 2) {
-		printf("FAILED: got %d interrupt(s) instead of two\n",
-		       dec_count - prev);
+	diff = dec_count - prev;
+	if (diff != 2) {
+		printf("FAILED: got %d interrupt(s) instead of two\n", diff);
 	}
 
 	// Stop everything

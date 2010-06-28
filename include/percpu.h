@@ -208,6 +208,9 @@ extern unsigned long active_guests;
 #define GCPU_PEND_MSGSNDC  0x00000008 /* Guest OS critical doorbell msgsnd */
 #define GCPU_PEND_CRIT_INT 0x00000100 /* Guest Critical interrupt */
 
+// Bit mask of TCR bits that guest can access directly
+#define GCPU_TCR_HW_BITS   (TCR_DIE | TCR_ARE)
+
 typedef unsigned long tlbmap_t[(TLB1_SIZE + LONG_BITS - 1) / LONG_BITS];
 
 typedef struct gcpu {

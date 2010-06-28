@@ -241,16 +241,11 @@ void watchdog_trap(trapframe_t *regs)
 	// TBD
 }
 
-// Bit mask of the bits that are remembered in gcpu->gtcr
-#define GTCR_FLAGS_MASK (TCR_WRC | TCR_WP_MASK | TCR_FP_MASK | TCR_DIE | TCR_FIE | TCR_WIE)
-
-// Bit mask of the bits that are remembered in gcpu->gtsr
-#define GTSR_FLAGS_MASK (TSR_FIS | TSR_WIS)
-
 void set_tcr(uint32_t val)
 {
 	gcpu_t *gcpu = get_gcpu();
 	unsigned int period;
+	register_t tcr = mfspr(SPR_TCR);
 
 	/* The watchdog is fully emulated by the hypervisor, so we never allow
 	 * the guest to read or modify any of the real watchdog bits in TCR.
@@ -261,35 +256,35 @@ void set_tcr(uint32_t val)
 	if (gcpu->gtcr & TCR_WRC)
 		val = (val & ~TCR_WRC) | (gcpu->gtcr & TCR_WRC);
 
-	gcpu->gtcr = val & GTCR_FLAGS_MASK;
+	// Technically, TCR[ARE] is not emulated, but it's okay to store it in
+	// gtcr.  This way, real TCR[ARE] and gtcr[TCR_ARE] will always be the
+	// same.
+	gcpu->gtcr = val;
 
 	// If the guest re-enables WIE, and there's an interrupt pending, then
 	// create a doorbell so that we can send that pending interrupt.
 	if ((val & TCR_WIE) && (gcpu->gtsr & TSR_WIS))
 		send_local_crit_guest_doorbell();
 
-	// Don't allow the guest to modify the real TCR[WRC] bits or enable
-	// the real watchdog interrupts.
-	val = (val & ~(TCR_WRC | TCR_WIE));
-
 	// If the guest re-enables FIE, and there's an interrupt pending, then
 	// create a doorbell so that we can send that pending interrupt.
 	if ((val & TCR_FIE) && (gcpu->gtsr & TSR_FIS))
 		send_local_guest_doorbell();
 
-	// The hardware FIE is always enabled, so don't let the guest turn it
-	// off. We need FIT interrupts in order to properly emulate guest FIS
-	val |= TCR_FIE;
+	// If the guest re-enables DIE, and there's an interrupt pending, then
+	// create a doorbell so that we can send that pending interrupt.
+	if ((val & TCR_DIE)&&  (gcpu->gtsr & TSR_DIS))
+		send_local_guest_doorbell();
 
 	// Set the actual hardware FIT period to the maximum of the guest
 	// watchdog and guest FIT periods
 	period = max(TCR_FP_TO_INT(gcpu->gtcr), TCR_WP_TO_INT(gcpu->gtcr));
-	val = (val & ~TCR_FP_MASK) | TCR_INT_TO_FP(period);
+	tcr = (tcr & ~TCR_FP_MASK) | TCR_INT_TO_FP(period);
 
-	// Don't let the guest change the actual watchdog period.
-	val = (val & ~TCR_WP_MASK) | (mfspr(SPR_TCR) & TCR_WP_MASK);
+	// Pass on any bits that are not fully emulated
+	tcr = (tcr & ~GCPU_TCR_HW_BITS) | (val & GCPU_TCR_HW_BITS);
 
-	mtspr(SPR_TCR, val);
+	mtspr(SPR_TCR, tcr);
 }
 
 void set_tsr(uint32_t tsr)
@@ -349,12 +344,10 @@ void set_tsr(uint32_t tsr)
 
 uint32_t get_tcr(void)
 {
-	uint32_t val = mfspr(SPR_TCR);
+	gcpu_t *gcpu = get_gcpu();
+	uint32_t tcr = mfspr(SPR_TCR);
 
-	val &= ~GTCR_FLAGS_MASK;
-	val |= get_gcpu()->gtcr;
-
-	return val;
+	return (tcr & GCPU_TCR_HW_BITS) | (gcpu->gtcr & ~GCPU_TCR_HW_BITS);
 }
 
 uint32_t get_tsr(void)
@@ -367,14 +360,33 @@ uint32_t get_tsr(void)
 	if (gcpu->watchdog_tsr)
 		val = (val & ~TSR_WRS) | (gcpu->watchdog_tsr & TSR_WRS);
 
-	// FIS and DIS get cleared by the hypervisor immediately.
-	// The guest has its own virtualized status bits.
-	//
-	// Only FIS keeps running despite the guest clearing the enable
-	// bit, though, so the guest should also see DIS if it is set
-	// in hardware.
-	val &= ~(TSR_FIS | TSR_ENW | TSR_WIS);
-	val |= gcpu->gtsr & (TSR_FIS | TSR_DIS | TSR_ENW | TSR_WIS);
+	/* FIS and DIS get cleared by the hypervisor immediately. The
+	 * guest has its own virtualized status bits.
+	 *
+	 * The watchdog is fully emulated, so we never want to pass the
+	 * hardware ENW and WIS bits to the guest.
+	 *
+	 * Only FIS keeps running despite the guest clearing the enable
+	 * bit, though, so the guest should also see DIS if it is set
+	 * in hardware.
+	 *
+	 * If the guest clears TCR[DIE], then we clear it in hardware
+	 * immediately. This is different than how we treat the other timers.
+	 *
+	 * If the hardware DIS is set, but gtsr[DIS] is cleared, then it means
+	 * that the decrementer expired while TCR[DIE] was cleared, so the HV
+	 * never got the interrupt, so it couldn't update gtsr[DIS].  In this
+	 * case, we want guest DIS to be set.
+	 *
+	 * If the hardware DIS is cleared, but gtsr[DIS] is set, then it means
+	 * that the hypevisor got the decrementer interrupt and cleared the
+	 * hardware DIS, but the guest hasn't cleared gtsr[DIS] yet.  In this
+	 * case, we want guest DIS to be set.
+	 *
+	 * Only the FIS, DIS, WIS, and ENW bits are set in gtsr, so there's no
+	 * need to mask gtsr.
+	 */
+	val = (val & ~(TSR_FIS | TSR_ENW | TSR_WIS)) | gcpu->gtsr;
 
 	return val;
 }

@@ -1713,12 +1713,9 @@ static void guest_core_init(guest_t *guest)
 {
 	register_t msrp = 0;
 
-	/* Reset the timer control register, reset the watchdog state, and
-	 * clear all pending timer interrupts.  This ensures that timers won't
-	 * carry over a partition restart.
-	 */
-	mtspr(SPR_TCR, 0);
-	mtspr(SPR_TSR, TSR_ENW | TSR_DIS | TSR_FIS | TSR_WIS);
+	// Reset the timer control and status bits that are not emulated.
+	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~GCPU_TCR_HW_BITS);
+	mtspr(SPR_TSR, TSR_DIS);
 
 	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
 	mtspr(SPR_PID, 0);
