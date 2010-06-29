@@ -44,6 +44,7 @@
 #define CNAPSRL   (0x014 / 4)	/* Core Nap Status */
 #define CNAPCRL   (0x01c / 4)	/* Core Nap Control */
 #define CWAITSRL  (0x034 / 4)	/* Core Wait Status */
+#define CTBHLTCRL (0x094 / 4)   /* Core Timebase Halt Control */
 
 typedef struct {
 	int reg, state;
@@ -72,6 +73,9 @@ static int rcpm_probe(driver_t *drv, device_t *dev)
 
 	rcpm = (uint32_t *)dev->regs[0].virt;
 	dev->driver = &rcpm_driver;
+
+	/* Make sure timebase runs while napping, to preserve sync */
+	out32(&rcpm[CTBHLTCRL], 0xffffffff);
 
 	return 0;
 }
