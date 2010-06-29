@@ -1695,6 +1695,10 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].partition = partition;
 		guests[i].lpid = ++last_lpid;
 
+		/* Add it anyway, as for no-auto-start this will be decreased.
+		 */
+		atomic_add(&active_guests, 1);
+
 		ret = get_cpulist(&guests[i]);
 		if (ret < 0)
 			return NULL;
@@ -2000,10 +2004,6 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 
 	if (!guest->no_auto_load) {
 		ret = load_images(guest);
-		if (ret <= 0) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
-			         "Guest %s cannot load images\n", guest->name);
-		}
 		
 		if (ret > 0 && load_only) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
@@ -2012,14 +2012,13 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 	}
 
 	if (ret <= 0 || load_only) {
-		/* Do not check for system reset here and accept load errors.
-		 * Load errors can happen when starting partitions at HV init,
-		 * or from shell commands. Either way, system reset most likely
-		 * does not remove the configuration problems.
-		 * However, there is a system reset in case of start errors,
-		 * if no guest is active to recover the situation.
-		 */
-		atomic_add(&active_guests, -1); /* This guest is not active */
+		 /* KISS-type of implementation. It is no longer possible to
+		  * start with all guests stopped. If needed, remove
+		  * sysreset-on-partition-stop from HV configuration tree.
+		  */
+		if (atomic_add(&active_guests, -1) == 0 &&
+		    auto_sys_reset_on_stop)
+			system_reset();
 
 		guest->state = guest_stopped;
 
@@ -3017,12 +3016,6 @@ static void start_partitions(void)
 			continue;
 
 		gcpu_t *gcpu = guest->gcpus[0];
-
-		/* Add it anyway, as for no-auto this will be decreased
-		 * either in case of load_only property, or in case of load
-		 * errors.
-		 */
-		atomic_add(&active_guests, 1);
 
 		if (dt_get_prop(guest->partition, "no-auto-start", 0))
 			setgevent(gcpu, gev_load);
