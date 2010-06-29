@@ -81,6 +81,13 @@ typedef enum {
 	guest_stopping_max,
 } gstate_t;
 
+/** Possible watchdog timeout actions */
+typedef enum {
+	wd_reset = 0, /**< Reset partition on watchdog timeout */
+	wd_notify = 1, /**< Notify manager partition on watchdog timeout */
+	wd_stop = 2, /**< Stop partition on watchdog timeout */
+} wd_action_t;
+
 typedef struct guest {
 	vpic_t vpic;
 	struct pte *gphys;      /**< guest phys to real phys mapping */
@@ -134,8 +141,10 @@ typedef struct guest {
 
 	int privileged;
 
-	/** Watchdog notify manager partition on time-out: 0=no, 1=yes */
-	int wd_notify;
+	/** Action takeon on watchdog expiration.
+	 *See #wd_action_t for possible values.
+	 */
+	wd_action_t wd_action;
 
 	/** On partition stop, defer DMA disable to manager hcall, but
 	 *  disable as usual on cold boot and partition reset.

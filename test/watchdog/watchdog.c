@@ -34,16 +34,59 @@
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
 #include <libos/bitops.h>
+#include <libfdt.h>
 #include <hvtest.h>
 
 static volatile unsigned int watchdog;
+static volatile unsigned int state_change_int;
+static volatile unsigned int wd_notify_int;
 
-#define TIMEOUT		48
+static int num_parts = 0;
+static int parts[8];
+static int wd_dbells[8];
+static int state_dbells[8];
+
+#define TIMEOUT		46
 
 void watchdog_handler(trapframe_t *frameptr)
 {
 	watchdog = 1;
 }
+
+void ext_int_handler(trapframe_t *frameptr)
+{
+	unsigned int irq, status, ret;
+	int i, found = 0;
+
+	if (coreint)
+		irq = mfspr(SPR_EPR);
+	else
+		ev_int_iack(0, &irq);
+
+	for (i = 0; i < num_parts; i++) {
+		if (irq == wd_dbells[i]) {
+			found = 1;
+			wd_notify_int++;
+			// Stopping partition so that it does not flood the 
+			// manager partition with watchdog expired notifications
+			fh_partition_stop(parts[i]);
+
+			break;
+		}
+		if (irq == state_dbells[i]) {
+			found = 1;
+			state_change_int++;
+
+			break;
+		}
+	}
+	if (!found) {
+		printf("Unknown external irq %d\n", irq);
+	}
+
+	ev_int_eoi(irq);
+}
+
 
 static unsigned long period_to_ticks(unsigned int period)
 {
@@ -77,6 +120,21 @@ static void wait_for_timeout(unsigned int wp)
 		while (mfspr(SPR_TBU) & mask);
 		while (!(mfspr(SPR_TBU) & mask));
 	}
+}
+
+static const uint32_t *get_handle(int off, const char *compatible_type,
+                                  const char *prop)
+{
+	int ret;
+	int len;
+
+	ret = fdt_node_offset_by_compatible(fdt, off, compatible_type);
+	if (ret < 0)
+		return NULL;
+
+	off = ret;
+
+	return fdt_getprop(fdt, off, prop, &len);
 }
 
 static int test1(void)
@@ -166,47 +224,155 @@ static int test5(void)
 	return (mfspr(SPR_TSR) & TSR_WRS) == 0;
 }
 
-static int test6(void)
+static int test6_master(void)
 {
-	printf("> set timeout reset, set watchdog, wait thrice, check for reboot.");
+	int ret, node, len, i;
+	const uint32_t *phandle;
 
-	mtspr(SPR_TCR, TCR_WRC_RESET);
+	/* Iterate managed partitions and store partition handles, 
+	 * 'state change doorbell' irqs and 'watchdog expiration doorbell' irqs
+	 */
+	node = fdt_path_offset(fdt, "/hypervisor/handles");
+	if (node < 0) {
+		printf("'hypervisior/handles' node not found\n");
+		return 0;
+	}
+	node = fdt_node_offset_by_compatible(fdt, node, "fsl,hv-partition-handle");
+	while (node >= 0) {
+		// Get partition handle
+		phandle = fdt_getprop(fdt, node, "reg", &len);
+		if (!phandle || len != 4) {
+			printf("\nError reading slave partition's 'reg' property\n");
+			return 0;
+		}
+		parts[num_parts] = *phandle;
 
-	watchdog = 0;
-	enable_critint();
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
-	wait_for_timeout(TIMEOUT);
-	wait_for_timeout(TIMEOUT);
-	wait_for_timeout(TIMEOUT);
+		// Get 'state change doorbell' irq
+		phandle = get_handle(node, "fsl,hv-state-change-doorbell", "interrupts");
+		if (!phandle) {
+			printf("Error retrieving 'fsl,hv-state-change-doorbell'\n");
+			return 0;
+		}
+		ret = ev_int_set_config(*phandle, 1, 15, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		ret = ev_int_set_mask(*phandle, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		state_dbells[num_parts] = *phandle;
 
-	delay(100000);
-	return 0;
+		// Get 'watchdog expiration doorbell' irq
+		phandle = get_handle(node, "fsl,hv-watchdog-expiration-doorbell", "interrupts");
+		if (!phandle) {
+			printf("Error retrieving 'fsl,hv-watchdog-expiration-doorbell'\n");
+			return 0;
+		}
+		ret = ev_int_set_config(*phandle, 1, 15, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		ret = ev_int_set_mask(*phandle, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		wd_dbells[num_parts] = *phandle;
+
+		printf("partition %d reg: %d state-change-irq: %d watchdog-irq: %d\n",
+		       num_parts, parts[num_parts], state_dbells[num_parts],wd_dbells[num_parts]);
+
+		num_parts++;
+
+		node = fdt_node_offset_by_compatible(fdt, node, "fsl,hv-partition-handle");
+	}
+
+	int wd_restart = 0, wd_notify = 0, wd_stop = 0;
+	printf("> [master partition] start slave partitions, wait for watchdog events:\n");
+
+	// Start partitions one by one and wait for watchdog events
+	enable_extint();
+	for (i = 0; i < num_parts; i++) {
+		unsigned int status;
+
+		ret = fh_partition_start(parts[i], 0);
+		if (ret) {
+			printf("Error starting slave partition %d\n", parts[i]);
+			return 0;
+		}
+
+		// Wait for partition to start
+		do {
+			ret = fh_partition_get_status(parts[i], &status);
+			assert(!ret);
+		} while (status != FH_PARTITION_RUNNING);
+
+		// Wait for watchdog event
+		state_change_int = wd_notify_int = 0;
+		wait_for_timeout(TIMEOUT);
+		wait_for_timeout(TIMEOUT);
+		wait_for_timeout(TIMEOUT);
+		wait_for_timeout(TIMEOUT);
+
+		// Find out what type of watchdog action happened
+		ret = fh_partition_get_status(parts[i], &status);
+		assert(!ret);
+		if (wd_notify_int) {
+			// Received a watchdog expiration event
+			wd_notify++;
+			printf("\tpartition %d (reg=%d) watchdog expired notification\n", i, parts[i]);
+		} else if (state_change_int) {
+			// Check for partition reset (state change from RUNNING to STARTING or RUNNING)
+			if (status == FH_PARTITION_RUNNING || status == FH_PARTITION_STARTING) {
+				printf("\tpartition %d (reg=%d) watchdog restart\n", i, parts[i]);
+				wd_restart++;
+			}
+			// Check for partition stop (state change from RUNNING to STOPPED)
+			if (status == FH_PARTITION_STOPPED) {
+				printf("\tpartition %d (reg=%d) watchdog stop\n", i, parts[i]);
+				wd_stop++;
+			}
+		}
+	}
+	disable_extint();
+	printf("> [master partition] test6: ");
+
+	// Test is passed if each possible watchdog event triggered once
+	return (wd_restart == 1 && wd_notify == 1 && wd_stop == 1);
 }
 
-static void secondary_entry(void)
+static int test6_slave(void)
 {
-	// If the WRS bits are set, then it means that we just rebooted from
-	// a watchdog timeout.  If we re-run test6(), then we'll just reboot
-	// again.  So instead, we stop.
 	if (!(mfspr(SPR_TSR) & TSR_WRS)) {
-		unsigned int cpu_index = mfspr(SPR_PIR);
+		printf("> [slave partition] set timeout reset, set watchdog, wait thrice.");
 
-		printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
+		mtspr(SPR_TCR, TCR_WRC_RESET);
 
-		test6();
-		// If we get here, then we didn't reboot.  That's a failure.
-		printf("test6 FAILED\n");
+		watchdog = 0;
+		enable_critint();
 		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+		mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
+		wait_for_timeout(TIMEOUT);
+		wait_for_timeout(TIMEOUT);
+		wait_for_timeout(TIMEOUT);
+
+		delay(100000);
 	} else {
-		printf("test6 PASSED\nTest Complete\n");
+		printf(" reset done.\n");
 	}
+
+	return 0;
 }
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	unsigned int cpu_index = mfspr(SPR_PIR);
+	const char *label;
+	int len;
 
 	init(devtree_ptr);
 
@@ -216,42 +382,55 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	mtspr(SPR_TCR, TCR_WRC_NOP);
 
-	if (test1())
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+	label = fdt_getprop(fdt, 0, "label", &len);
+	if (!label || !len) {
+		printf("Error reading partition label\n");
+		return;
+	}
 
-	if (test2())
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+	if (!strcmp(label, "/manager-part")) {
+		if (test1())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
-	if (test3())
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+		if (test2())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
-	if (test4())
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+		if (test3())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
-	if (test5())
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
-	mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
-	mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+		if (test4())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
 
-	// Finish the test on the second core
-	secondary_startp = secondary_entry;
-	release_secondary_cores();
+		if (test5())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+		mtspr(SPR_TSR, TSR_ENW | TSR_WIS);
+		mtspr(SPR_TCR, TCR_INT_TO_WP(0));
+
+		if (test6_master())
+			printf("PASSED\n");
+		else
+			printf("FAILED\n");
+	} else {
+		test6_slave();
+	}
+
+	printf("Test Complete\n");
 }

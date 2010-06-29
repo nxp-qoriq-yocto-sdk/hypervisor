@@ -25,4 +25,6 @@
 test := watchdog
 dir := $(testdir)$(test)/
 
+$(test)-num-terms := 5
+
 include $(testdir)common/Makefile.inc

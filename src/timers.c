@@ -83,12 +83,23 @@ static void watchdog_timeout(void)
 	if (!(gcpu->gtcr & TCR_WRC))
 		return;
 
-	if (guest->wd_notify) {
+	if (guest->wd_action == wd_notify) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			"Watchdog: notifying manager\n");
 
 		send_doorbells(guest->dbell_watchdog_expiration);
-	} else {
+	} else if (guest->wd_action == wd_stop) {
+		char buf[64];
+		int ret;
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+			 "Watchdog: stopping partition\n");
+
+		ret = snprintf(buf, sizeof(buf), "vcpu-%d", gcpu->gcpu_num);
+		assert(ret < (int)sizeof(buf));
+
+		stop_guest(guest, buf, "watchdog");
+	} else if (guest->wd_action == wd_reset) {
 		char buf[64];
 		int ret;
 

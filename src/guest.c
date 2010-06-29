@@ -2960,8 +2960,21 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 #endif
 
 	// Get the watchdog timeout options
-	prop = dt_get_prop(guest->partition, "wd-mgr-notify", 0);
-	guest->wd_notify = !!prop;
+	const char *str = dt_get_prop_string(guest->partition, "watchdog-timeout");
+	if (!str)
+		guest->wd_action = wd_reset;
+	else if (!strcmp(str, "partition-reset"))
+		guest->wd_action = wd_reset;
+	else if (!strcmp(str, "manager-notify"))
+		guest->wd_action = wd_notify;
+	else if (!strcmp(str, "partition-stop"))
+		guest->wd_action = wd_stop;
+	else {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: invalid watchdog timeout option %s\n",
+			 __func__, str);
+		guest->wd_action = wd_reset;
+	}
 
 	ret = dt_process_node_update(guest, guest->devtree, guest->partition);
 	if (ret < 0)
