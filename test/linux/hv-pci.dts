@@ -50,13 +50,10 @@
 
 	pcie-window {
 		compatible = "dma-window";
-//		subwindow-count = <2>;
+		subwindow-count = <2>;
 		guest-addr = <0 0>;
-		// Simics is currently broken with subwindows
-//		size = <0 0x40000000>; // 1GiB
-		size = <0 0x20000000>; // 512MiB
+		size = <0 0x40000000>; // 1GiB
 
-/*
 		sub-window@0 {
 			compatible = "dma-subwindow";
 			guest-addr = <0 0>;
@@ -66,9 +63,10 @@
 		sub-window@1 {
 			compatible = "dma-subwindow";
 			guest-addr = <0 0x20000000>;
+			size = <0 0x20000000>; // 512 MiB
 			pcie-msi-subwindow;
 		};
-*/
+
 	};
 
 	// =====================================================
@@ -76,14 +74,14 @@
 	// =====================================================
 	hv {
 		compatible = "hv-config";
-		stdout = <&{/hv/serial0}>;
+		stdout = <&hvbc>;
 
 		hv-memory {
 			compatible = "hv-memory";
 			phys-mem = <&{/pma0}>;
 		};
 
-		serial0 {
+		serial0: serial0 {
 			device = "serial0";
 		};
 
@@ -110,6 +108,19 @@
 		guts {
 			device = "/soc/global-utilities@e0000";
 		};
+
+		// Byte channel used as hypervisor's console
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+	};
+
+	// uartmux
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&serial0>;
 	};
 
 	// =====================================================
@@ -130,8 +141,11 @@
 				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
 				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
 
-		serial2 {
-			device = "serial2";
+		// Byte channel used for stdout interface attached to mux-channel 1
+		p1bc: byte-channel@0 {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
 		};
 
 		pci0 {
@@ -139,6 +153,18 @@
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
 			atmu-guest-physical;
+		};
+
+		msi0 {
+			device = "msi0";
+		};
+
+		msi1 {
+			device = "msi1";
+		};
+
+		msi2 {
+			device = "msi2";
 		};
 
 		pci1 {
@@ -314,14 +340,8 @@
 			guest-addr = <0 0>;
 		};
 
-		node-update {
-			chosen {
-				/* We should probably provide fixup for linux,stdout-path
-				 * similar to aliases.
-				 */
-				linux,stdout-path = "/serial2";
-				bootargs = "console=ttyS0,115200";
-			};
+		aliases {
+			stdout = <&p1bc>;
 		};
 	};
 };
