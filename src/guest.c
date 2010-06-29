@@ -64,14 +64,16 @@ uint32_t global_event_cons_lock;
 
 guest_t guests[MAX_PARTITIONS];
 unsigned long last_lpid;
-/* active_guests is used as counter of all guests that are not stopped in the
- * system. Load errors will make a guest stopped but they will not cause a
- * system reset. The reason is that explicit load operations are done either by
- * HV using configuration tree or from shell command prompt, and a system reset
- * will not remove the source of errors. Loads done through memcpy hcalls are
- * guest's responsibility.
- * Start errors (e.g. in an hcall to start a partition) have HV internal causes
- * and a system reset could help.
+
+/* active_guests is used as counter of all guests that are not stopped in
+ * the system.  If the sysreset-on-partition-stop feature is enabled in the
+ * config tree, and this ever drops to zero (not counting the initial zero
+ * state), the system will reset.
+ *
+ * It is not possible to start with all guests stopped (e.g. to be enabled
+ * manually via the shell), or interactively temporarily stop all
+ * partitions, with this feature enabled -- without getting a system
+ * reset, that is.
  */
 unsigned long active_guests;
 
@@ -1695,7 +1697,19 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].partition = partition;
 		guests[i].lpid = ++last_lpid;
 
-		/* Add it anyway, as for no-auto-start this will be decreased.
+		/* A partitions starts non-stopped, always.  If
+		 * initialization fails, it needs images loaded by a
+		 * manager, or it is no-auto-start, the partition will later
+		 * transition to stopped and this will be decremented.
+		 *
+		 * The iteration in init_guest() should ensure that
+		 * each partition has node_to_partition() called, and
+		 * thus is reflected in active_guests, before any
+		 * partition begins (and possibly fails) its initialization.
+		 *
+		 * Thus we should not have a race where one core increments
+		 * then decrements this before it has been incremented at
+		 * all for another partition.
 		 */
 		atomic_add(&active_guests, 1);
 
@@ -2012,10 +2026,6 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 	}
 
 	if (ret <= 0 || load_only) {
-		 /* KISS-type of implementation. It is no longer possible to
-		  * start with all guests stopped. If needed, remove
-		  * sysreset-on-partition-stop from HV configuration tree.
-		  */
 		if (atomic_add(&active_guests, -1) == 0 &&
 		    auto_sys_reset_on_stop)
 			system_reset();
