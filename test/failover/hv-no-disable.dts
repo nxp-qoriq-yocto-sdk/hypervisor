@@ -109,6 +109,7 @@
 			compatible = "phys-mem-area";
 			addr = <0 0x80000000>;
 			size = <0 4096>;
+			zero-pma;
 		};
 	};
 
@@ -148,10 +149,6 @@
 				prepend-stringlist = "compatible",
 				                     "failover-shmem";
 				delete-prop = "device_type";
-				
-				// Can't delete properties, so
-				// it needs a value.
-				initialize-me = <1>;
 			};
 		};
 

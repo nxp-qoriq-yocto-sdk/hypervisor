@@ -1541,6 +1541,42 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
 	return ret;
 }
 
+/** Zero a true physical range
+ *
+ * @param[in] dest Physical address to zero
+ * @param[in] len Bytes to zero
+ * @return number of bytes successfully zeroed
+ */
+phys_addr_t zero_to_phys(phys_addr_t dest, phys_addr_t len)
+{
+	phys_addr_t ret = 0;
+
+	while (len > 0) {
+		size_t chunk = 16 * 1024 * 1024;
+		void *vdest;
+
+		if (chunk > len)
+			chunk = len;
+		if (chunk > PAGE_SIZE)
+			chunk = 1UL << ilog2(chunk);
+
+		vdest = map_phys(TEMPTLB1, dest, temp_mapping[0],
+		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
+		if (!vdest)
+			break;
+
+		assert (chunk <= len);
+		memset(vdest, 0, chunk);
+
+		dest += chunk;
+		ret += chunk;
+		len -= chunk;
+	}
+
+	tlb1_clear_entry(TEMPTLB1);
+	return ret;
+}
+
 /** Copy from a true physical address to a guest physical address
  *
  * @param[in] dtbl Guest physical page table of the destination

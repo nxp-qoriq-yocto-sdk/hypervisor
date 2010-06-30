@@ -159,6 +159,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len,
                      int cache_sync);
 size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len, int cache_sync);
+phys_addr_t zero_to_phys(phys_addr_t dest, phys_addr_t len);
 size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len);
 size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
                            pte_t *stbl, phys_addr_t src, size_t len);

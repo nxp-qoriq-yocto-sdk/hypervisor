@@ -455,29 +455,6 @@ static int map_shmem(void)
 	               TLB_TSIZE_4K, TLB_MAS2_MEM,
 	               TLB_MAS3_KERN, 0, 0, 0);
 
-	prop = fdt_getprop(fdt, node, "initialize-me", &len);
-	if (prop && len == 4 && *prop == 1) {
-		static char shmem_path[256];
-		uint32_t zero = 0;
-		int ret;
-
-		memset((void *)shmem, 0, 4096);
-
-		ret = fdt_get_path(fdt, node, shmem_path, sizeof(shmem_path));
-		if (ret) {
-			printf("BROKEN: can't get shmem path\n");
-			return -1;
-		}
-
-		ret = fh_partition_set_dtprop(-1, tophys(shmem_path),
-		                              tophys("initialize-me"),
-		                              tophys(&zero), 4);
-		if (ret) {
-			printf("BROKEN: can't set initialize-me\n");
-			return -1;
-		}
-	}
-
 	return 0;
 }
 

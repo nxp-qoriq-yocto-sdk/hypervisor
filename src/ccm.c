@@ -495,9 +495,20 @@ static pma_t *read_pma(dt_node_t *node)
 		goto out_free;
 	}
 
-	prop = dt_get_prop(node, "use-no-law", 0);
-	if (prop)
+	if (dt_get_prop(node, "use-no-law", 0))
 		pma->use_no_law = 1;
+
+	if (dt_get_prop(node, "zero-pma", 0)) {
+		phys_addr_t ret = zero_to_phys(pma->start, pma->size);
+		if (ret != pma->size) {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: could not zero pma %s: "
+			         "zeroed %llu bytes\n",
+			         __func__, node->name,
+			         (unsigned long long)ret);
+		}
+	}
+
 out:
 	node->pma = pma;
 	return pma;
