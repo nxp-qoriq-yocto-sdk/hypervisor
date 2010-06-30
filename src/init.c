@@ -580,6 +580,50 @@ nomem:
 		 __func__);
 }
 
+#ifdef CONFIG_HV_WATCHDOG
+/**
+ * watchdog_init - enable and initialize the watchdog, if requested
+ *
+ * This function looks for a watchdog-enable property in the HV config tree,
+ * and if found, enables and initializes the watchdog.
+ */
+static void watchdog_init(void)
+{
+	const dt_prop_t *prop;
+	unsigned int period;
+	uint32_t tcr = 0;
+
+	prop = dt_get_prop(hvconfig, "watchdog-enable", 0);
+	if (!prop) {
+		// No watchdog-enable property?  Just exit quietly
+		return;
+	}
+
+	if (prop->len != sizeof(uint32_t)) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			 "watchdog: invalid watchdog-enable property\n");
+		return;
+	}
+
+	period = *(const uint32_t *)prop->data;
+	if (period > TCR_WP_TO_INT(TCR_WP_MASK)) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			 "watchdog: period must be between 0 and %u\n",
+			 TCR_WP_TO_INT(TCR_WP_MASK));
+		return;
+	}
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		 "watchdog enabled with period %u\n", period);
+
+	// Set the TCR bits
+	tcr = mfspr(SPR_TCR);
+	tcr &= ~(TCR_WP_MASK | TCR_WRC);
+	tcr |= TCR_WIE | TCR_INT_TO_WP(period) | TCR_WRC_RESET;
+	mtspr(SPR_TCR, tcr);
+}
+#endif
+
 /**
  * get_ccsr_phys_addr - get the CCSR physical address from the device tree
  * @param[out] size returned size of CCSR, in bytes
@@ -752,6 +796,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 #endif
 
 	vmpic_global_init();
+
+#ifdef CONFIG_HV_WATCHDOG
+	watchdog_init();
+#endif
 
 #ifdef CONFIG_SHELL
 	shell_init();

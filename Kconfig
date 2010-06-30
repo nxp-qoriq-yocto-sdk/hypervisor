@@ -264,3 +264,11 @@ config CLAIMABLE_DEVICES
 		
 		See the documentation for the "claimable" property
 		in the hypervisor manual.
+
+config HV_WATCHDOG
+	bool "Hypervisor watchdog support"
+	help
+		Enable watchdog support for the hypervisor.  If enabled, and
+		the "watchdog-enable" property is defined in the hypervisor's
+		configuration node, the hypervisor can use the core watchdog to
+		guard against some crashes and hangs.

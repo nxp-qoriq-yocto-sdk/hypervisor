@@ -249,7 +249,8 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
  */
 void watchdog_trap(trapframe_t *regs)
 {
-	// TBD
+	// Ping the watchdog
+	mtspr(SPR_TSR, TSR_WIS);
 }
 
 void set_tcr(uint32_t val)
