@@ -25,10 +25,6 @@
 test := error-inj
 dir := $(testdir)$(test)/
 
-$(test)-run:: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
-
-$(test)-check: $(test)-run-batch
-	$(testdir)common/check-results 0
+$(test)-num-terms := 3
 
 include $(testdir)common/Makefile.inc
