@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2008 Freescale Semiconductor, Inc.
+ * Freescale hypervisor ioctl interface
+ *
+ * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -9,6 +11,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ *
+ * ALTERNATIVELY, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") as published by the Free Software
+ * Foundation, either version 2 of that License or (at your option) any
+ * later version.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -20,6 +27,10 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * This file is used by the Freescale hypervisor management driver.  It can
+ * also be included by applications that need to communicate with the driver
+ * via the ioctl interface.
  */
 
 #ifndef FSL_HYPERVISOR_H
@@ -78,6 +89,7 @@ union fsl_hv_ioctl_param {
 	 * @ret: return error code from the hypervisor
 	 * @partition: the ID of the partition to control
 	 * @entry_point: The offset within the guest IMA to start execution
+	 * @load: If non-zero, reload the partition's images before starting
 	 *
 	 * Used by FSL_HV_IOCTL_PARTITION_START
 	 */
@@ -85,6 +97,7 @@ union fsl_hv_ioctl_param {
 		__u32 ret;
 		__u32 partition;
 		__u32 entry_point;
+		__u32 load;
 	} start;
 
 	/**
@@ -185,10 +198,10 @@ enum {
 	FSL_HV_IOCTL_DOORBELL = 6, /* Ring a doorbell */
 
 	/* Get a property from another guest's device tree */
-	FSL_HV_IOCTL_GETPROP = 7, 
+	FSL_HV_IOCTL_GETPROP = 7,
 
 	/* Set a property in another guest's device tree */
-	FSL_HV_IOCTL_SETPROP = 8, 
+	FSL_HV_IOCTL_SETPROP = 8,
 };
 
 #endif

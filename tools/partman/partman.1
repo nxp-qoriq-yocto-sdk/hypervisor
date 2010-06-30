@@ -7,7 +7,7 @@ partman \- manage a Freescale Embedded Hypervisor partition
 .br
 \fBpartman\fR [ \fB\-v\fR ] \fBload\fR \fB\-h\fR handle \fB\-f\fR file [ \fB\-a\fR address ]
 .br
-\fBpartman\fR [ \fB\-v\fR ] \fBstart\fR \fB\-h\fR handle [ \fB\-f\fR file ] [ \fB\-e\fR address ] [ \fB\-a\fR address ]
+\fBpartman\fR [ \fB\-v\fR ] \fBstart\fR \fB\-h\fR handle [ \fB\-l\fR ] [ \fB\-f\fR file ] [ \fB\-e\fR address ] [ \fB\-a\fR address ]
 .br
 \fBpartman\fR [ \fB\-v\fR ] \fBstop\fR \fB\-h\fR handle
 .br
@@ -33,7 +33,8 @@ byte channels.
 Load an image into a partition's memory.
 .TP
 \fBstart\fR
-Start a partition.
+Start a partition.  Optionally load a file with \fB\-f\fR, or use
+\fB\-l\fR to tell the hypervisor to reload the images itself.
 .TP
 \fBstop\fR
 Stop a partition.

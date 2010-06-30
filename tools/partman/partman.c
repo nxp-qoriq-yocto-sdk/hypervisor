@@ -43,7 +43,7 @@
 #include "parse_dt.h"
 
 /*
- * fsl_hypervisor.h is copied from drivers/misc in the Linux kernel source
+ * fsl_hypervisor.h is copied from include/linux in the Linux kernel source
  * tree.  So every time that file is updated, you need to copy it here.
  */
 #include "fsl_hypervisor.h"
@@ -68,6 +68,7 @@ struct parameters {
 	unsigned int h_specified:1;
 	unsigned int a_specified:1;
 	unsigned int e_specified:1;
+	unsigned int l_specified:1;
 };
 
 /* Elf file types that we support */
@@ -155,8 +156,10 @@ static void usage(void)
 	printf("   partman load -h <handle> -f <file> [-a <address>]\n"
 	       "      Load an image.\n");
 
-	printf("   partman start -h <handle> [-f <file>] [-e <addr>] [-a <addr>]\n"
-	       "     Start a partition.\n");
+	printf("   partman start -h <handle> [-l] [-f <file>] [-e <addr>] [-a <addr>]\n"
+	       "     Start a partition.\n"
+	       "     Optionally load a file with -f, or use -l to tell\n"
+	       "     the hypervisor to reload the images itself.\n");
 
 	printf("   partman stop -h <handle>\n");
 	printf("      Stop a partition.\n");
@@ -768,6 +771,7 @@ static int cmd_start(struct parameters *p)
 
 	im.partition = p->h;
 	im.entry_point = p->e;
+	im.load = p->l_specified;
 
 	if (verbose)
 		printf("Starting partition at entry point 0x%lx\n", p->e);
@@ -1111,7 +1115,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "-:vqh:f:a:e:n:p:t:")) != -1) {
+	while ((c = getopt(argc, argv, "-:vqh:f:a:e:n:p:t:l")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose = 1;
@@ -1141,6 +1145,9 @@ int main(int argc, char *argv[])
 			break;
 		case 't':
 			add_to_prop(&p, optarg);
+			break;
+		case 'l':
+			p.l_specified = 1;
 			break;
 		case 1:
 			if (cmdstr) {
