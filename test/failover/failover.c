@@ -363,16 +363,11 @@ static int dma_init(void)
 		}
 
 		if (*shmem < 7) {
-			ret = fh_partition_start(managed_partition, 0);
+			ret = fh_partition_start(managed_partition, 0, 1);
 			if (ret) {
 				printf("BROKEN: error %d starting partition\n", ret);
 				return -13;
 			}
-
-			/* expected to fail until partition has started. */
-			do {
-				ret = fh_partition_restart(managed_partition);
-			} while (ret != 0);
 		}
 	
 		if (*shmem <= 2 || dma_disable != no_dma_disable) {

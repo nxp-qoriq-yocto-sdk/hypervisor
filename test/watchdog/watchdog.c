@@ -299,7 +299,7 @@ static int test6_master(void)
 	for (i = 0; i < num_parts; i++) {
 		unsigned int status;
 
-		ret = fh_partition_start(parts[i], 0);
+		ret = fh_partition_start(parts[i], 0, 0);
 		if (ret) {
 			printf("Error starting slave partition %d\n", parts[i]);
 			return 0;

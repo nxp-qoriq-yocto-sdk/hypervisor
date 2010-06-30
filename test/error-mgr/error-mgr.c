@@ -600,7 +600,7 @@ static int test_orig_interrupt(register_t pir)
 		assert(slave_part_handle[0] && slave_part_handle[1]);
 
 		/* Whichever core is first */
-		ret = fh_partition_start(slave_part_handle[0], 0);
+		ret = fh_partition_start(slave_part_handle[0], 0, 0);
 		if (!ret) {/* This colision between cores is expected */
 			printf("[%ld] Started partition %d\n", pir,
 			       slave_part_handle[0]);
@@ -717,7 +717,7 @@ static int test_claim_error_manager(register_t pir)
 		assert(slave_part_handle[0] && slave_part_handle[1]);
 
 		/* Whichever core is first */
-		ret = fh_partition_start(slave_part_handle[1], 0);
+		ret = fh_partition_start(slave_part_handle[1], 0, 0);
 		if (!ret) {/* This colision between cores is expected */
 			printf("[%ld] Started partition %d\n", pir,
 			       slave_part_handle[1]);

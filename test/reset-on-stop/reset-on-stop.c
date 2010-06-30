@@ -94,7 +94,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 			}
 
 			if (status == FH_PARTITION_STOPPED) {
-				ret = fh_partition_start(slave_part_handle, 0);
+				ret = fh_partition_start(slave_part_handle,
+				                         0, 0);
 				if (ret) {
 					printf("Error starting partition: %d\n",
 					       ret);
