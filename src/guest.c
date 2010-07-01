@@ -1645,10 +1645,9 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 	if (i == last_lpid) {
 		if (last_lpid >= MAX_PARTITIONS) {
-			spin_unlock_intsave(&start_guest_lock, saved);
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "node_to_partition: too many partitions\n");
-			return NULL;
+			goto err;
 		}
 
 		// We create the special doorbells here, instead of in
@@ -1656,20 +1655,17 @@ guest_t *node_to_partition(dt_node_t *partition)
 		// doorbells will be created for all partitions before the
 		// managers start looking for their managed partitions.
 		ret = create_guest_special_doorbells(&guests[i]);
-		if (ret < 0) {
-			spin_unlock_intsave(&start_guest_lock, saved);
-			return NULL;
-		}
+		if (ret < 0)
+			goto err;
 
 		name = dt_get_prop_string(partition, "label");
 		if (!name) {
 			/* If no label, use the partition node path. */
 			name = malloc(MAX_DT_PATH);
 			if (!name) {
-				spin_unlock_intsave(&start_guest_lock, saved);
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "node_to_partition: out of memory\n");
-				return NULL;
+				goto err;
 			}
 
 			ret = dt_get_path(NULL, partition, name, MAX_DT_PATH);
@@ -1715,7 +1711,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 		ret = get_cpulist(&guests[i]);
 		if (ret < 0)
-			return NULL;
+			goto err;
 
 #ifdef CONFIG_DEBUG_STUB
 		init_stubops(&guests[i]);
@@ -1725,6 +1721,10 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 	spin_unlock_intsave(&start_guest_lock, saved);
 	return &guests[i];
+
+err:
+	spin_unlock_intsave(&start_guest_lock, saved);
+	return NULL;
 }
 
 static void guest_core_init(guest_t *guest)
