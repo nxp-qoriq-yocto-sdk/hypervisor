@@ -396,28 +396,48 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 			if (phdr[i].memsz > phdr[i].filesz) {
 				void *buffer;
+				unsigned int rem_size;
+				unsigned int copy_offset;
 
 				if (verbose)
 					printf("%s: writing 0x%x null bytes to guest physical address 0x%lx\n",
 					       __func__, phdr[i].memsz - phdr[i].filesz, seg_target + phdr[i].filesz);
 
-				buffer = malloc(phdr[i].memsz - phdr[i].filesz);
+#define CHUNK_SIZE	65536
+	
+				buffer = malloc(CHUNK_SIZE);
 				if (!buffer) {
 					if (!quiet)
-						printf("could not allocate %u bytes\n",
-						       phdr[i].memsz - phdr[i].filesz);
+						printf("could not allocate %d bytes\n", CHUNK_SIZE);
 					return 0;
 				}
-				memset(buffer, 0, phdr[i].memsz - phdr[i].filesz);
-				ret = copy_to_partition(partition, buffer,
-				                        seg_target + phdr[i].filesz,
-				                        phdr[i].memsz - phdr[i].filesz);
+				memset(buffer, 0, CHUNK_SIZE);
+
+				rem_size = phdr[i].memsz - phdr[i].filesz;
+				copy_offset = phdr[i].filesz;
+				while (rem_size) {
+					int copy_size;
+
+					if (rem_size > CHUNK_SIZE) 
+						copy_size = CHUNK_SIZE;
+					else
+						copy_size = rem_size;
+
+
+					ret = copy_to_partition(partition, buffer,
+				                        seg_target + copy_offset,
+				                        copy_size);
+					if (ret) {
+						if (!quiet)
+							printf("Copy failed, error=%i\n", ret);
+						return 0;
+					}
+
+					rem_size = rem_size - copy_size;
+					copy_offset = copy_offset + copy_size;
+				}
+
 				free(buffer);
-				if (ret) {
-					if (!quiet)
-						printf("Copy failed, error=%i\n", ret);
-					return 0;
-				}
 			}
 		}
 	}
