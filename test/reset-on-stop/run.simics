@@ -29,7 +29,7 @@ $use_uart0_net = 1
 $guest_image[0] = "reset-on-stop"
 $guest_addr[0]  = 0x00a00000
 
-$guest_image[1] = "hv-A.dtb"
+$guest_image[1] = "hv.dtb"
 $guest_addr[1]  = 0x00900000
 
 add-directory "%script%/../common" -prepend
@@ -38,5 +38,3 @@ run-command-file "common.simics"
 add-directory "bin/reset-on-stop" -prepend
 
 run-command-file "boot.simics"
-
-run

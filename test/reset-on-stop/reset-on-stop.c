@@ -31,11 +31,8 @@
 /* Handler for Libos client function of secondary cores */
 void secondary_core_handler(void);
 
-/* Test configurations:
- * A) All guests are configured with no-auto-start; and the result is that there
- *    should be no system reset at HV initialization. Manual test, no automatic
- *    verdict.
- * B) Two guests are configured with no-auto-start; and one of them is slave to
+/* Test configuration:
+ * Two guests are configured with no-auto-start; and one of them is slave to
  *    a manager partition automatically started. This starts its slave which
  *    ends itself while the manager waits for it to become stopped again.
  */
