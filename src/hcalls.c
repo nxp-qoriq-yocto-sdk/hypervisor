@@ -728,6 +728,7 @@ static void hcall_claim_device(trapframe_t *regs)
 	if (!owner)
 		goto out;
 
+again:
 	prev = owner->hwnode->claimable_owner;
 	if (!prev)
 		goto out;
@@ -742,6 +743,14 @@ static void hcall_claim_device(trapframe_t *regs)
 	if (prev->guest->state != guest_stopped) {
 		ret = EV_INVALID_STATE;
 		goto out_onelock;
+	}
+
+	/* Double-check that another partition didn't claim it while
+	 * we waited for the lock.
+	 */
+	if (owner->hwnode->claimable_owner != prev) {
+		spin_unlock_int(&prev->guest->state_lock);
+		goto again;
 	}
 
 	/* Allowable nesting for state_lock is a non-stopped partition's
