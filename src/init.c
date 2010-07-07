@@ -823,6 +823,9 @@ void secondary_init(void)
 	mpic_reset_core();
 	enable_int();
 	enable_mcheck();
+#ifdef CONFIG_HV_WATCHDOG
+	watchdog_init();
+#endif
 	partition_init();
 }
 

@@ -117,7 +117,7 @@ void hcall_get_core_state(trapframe_t *regs)
 }
 
 typedef struct nap_state {
-	uint32_t tsr, tcr;
+	uint32_t tcr;
 	uint32_t l1csr0, l1csr1, l2csr0;
 } nap_state_t;
 
@@ -253,14 +253,20 @@ void idle_loop(void)
 	while (1) {
 		disable_int();
 
-		/* Disable decrementer, FIT, watchdog */
-		ns.tcr = mfspr(SPR_TCR);
-		mtspr(SPR_TCR, ns.tcr & ~(TCR_DIE | TCR_FIE | TCR_WIE));
-
-		/* Remember watchdog status, so that we don't get confused when
-		 * the watchdog expires during nap.
+		/* Disable decrementer, FIT, and watchdog interrupts.  Reset
+		 * the watchdog timer to avoid a timeout.  This should prevent
+		 * any of the watchdog TSR bits from changing while we're
+		 * napping.
 		 */
-		ns.tsr = mfspr(SPR_TSR);
+		ns.tcr = mfspr(SPR_TCR);
+		mtspr(SPR_TCR, ns.tcr & ~(TCR_DIE | TCR_FIE | TCR_WIE | TCR_WP_MASK));
+
+		/* There is a small possibility that the that the watchdog
+		 * expired after we disabled (critical) interrupts, but before
+		 * we changed the period to 0.  To handle that situation, ping
+		 * the watchdog.
+		 */
+		mtspr(SPR_TSR, TSR_WIS);
 
 		if (flush_disable_caches(&ns))
 			goto out_timers;
@@ -300,10 +306,7 @@ void idle_loop(void)
 
 		restore_caches(&ns);
 
-		/* Restore decrementer, FIT, watchdog.  Make sure any watchdog
-		 * status bits that were clear before are still clear.
-		 */
-		mtspr(SPR_TSR, ~ns.tsr & (TSR_ENW | TSR_WIS));
+		/* Restore decrementer, FIT, and watchdog. */
 		mtspr(SPR_TCR, ns.tcr);
 
 		enable_int();
@@ -328,7 +331,6 @@ void idle_loop(void)
 	}
 
 out_timers:
-	mtspr(SPR_TSR, ~ns.tsr & (TSR_ENW | TSR_WIS));
 	mtspr(SPR_TCR, ns.tcr);
 
 	enable_int();
