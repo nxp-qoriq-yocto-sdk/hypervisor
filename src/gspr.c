@@ -750,8 +750,8 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 			return 1;
 		}
  
- 		/* we don't want guest access to DBCR0[RST,RET,IRPT,FT] */
-		val &= ~(DBCR0_RST | DBCR0_RET | DBCR0_IRPT | DBCR0_FT);
+		/* we don't want guest access to DBCR0[RST,RET,IRPT,FT,EDM] */
+		val &= ~(DBCR0_RST | DBCR0_RET | DBCR0_IRPT | DBCR0_FT | DBCR0_EDM);
 		mtspr(SPR_DBCR0, val);
 		break;
 
