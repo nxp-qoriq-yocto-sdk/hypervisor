@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 004
-Date: 6/17/2010
+Revsion: 005
+Date: 7/7/2010
 
 -------------------------------------------------------
 Contents
@@ -35,24 +35,60 @@ Contents
 1. Introduction
 2. Compatibility/Dependencies
 3. Detailed List of Changes
-4. Limitations
 
 -------------------------------------------------------
 1.  Introduction
 
    This document identifies changes between Embedded
-   Hypervisor releases and a list of limitations.
+   Hypervisor releases.
 
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.7-004 has been tested with Simics 4.2.41 / pre50
+   -embedded-hv v0.7-005 has been tested with Simics 4.2.44 / pre58
     and the P4080DS board
 
-   -in sync with Embedded Hypervisor Reference Manual 0.90
+   -in sync with Embedded Hypervisor Reference Manual 0.90,
+    plus updates not yet formally documented (see mailing lists).
+
+   -for proper operation of "partman start" and watchdog notification, the
+    following patches to sim.git and linux are required, which have not been
+    applied to their repositories as of the time of this writing:
+
+     http://linux.freescale.net/patchwork/patch/3807/
+     http://linux.freescale.net/patchwork/patch/3743/
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.7-005 bug fixes and changes
+       -DMA is now disabled by default, to be enabled with
+        an hcall when the driver is ready (especially important
+        after a partition reset).  For compatibility, a partition
+        can specify no-dma-disable and get the old behavior.
+        no-dma-disable can also be specified on a specific
+        device when it targets shared memory.  defer-dma-disable
+        can be specified on a partition, in which case when
+        a partition is stopped, DMA is not disabled until a manager
+        issues the new FH_PARTITION_STOP_DMA hcall.
+       -added support for resetting hv if all partitions become stopped
+       -hv watchdog support, and misc timer fixes/cleanup
+       -added zero-pma property, allowing shared memory regions to
+        be set to a known state on hv boot
+       -added load parameter to partition start hcall, matching
+        the shell's "start load" command
+       -timebase now runs while napping, keeping the clocks
+        in sync
+       -partman no longer needs to malloc the entire BSS for the
+        file it's loading
+       -expose get_vcpu_state() for debug stub API
+       -fix race in claim hcall if there are multiple partitions
+        trying to claim at once
+       -don't let guests set DBCR0[EDM]
+       -improve robustness with certain classes of partition
+        config errors
+       -unit test updates
+       -updated for sim.git changes
 
    -v0.7-004 bug fixes and changes
        -guest watchdog is not emulated with the FIT
