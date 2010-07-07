@@ -39,6 +39,7 @@
 #include <byte_chan.h>
 #include <limits.h>
 #include <error_log.h>
+#include <events.h>
 
 int get_addr_format(dt_node_t *node, uint32_t *naddr, uint32_t *nsize)
 {
@@ -951,40 +952,28 @@ void check_compatible_owners(dev_owner_t *new, dev_owner_t *old)
 	}
 }
 
-uint32_t error_manager_lock;
-
 static int claim_error_manager(claim_action_t *action,
 			       dev_owner_t *owner, dev_owner_t *prev)
 {
-	int ret = 0;
-	dev_owner_t *crt_owner;
-	gcpu_t *gcpu = get_gcpu();
+	error_manager_guest = owner->guest;
 
-	/* This callback is executed by hcall_claim_device. It does not
-	 * guarantee that once entered its critical region, the claimable
-	 * owner of the error manager remained as in the moment when spin lock
-	 * was acquired. Example: guest 1 is active owner and 2 and 3 are
-	 * standby. When 1 stops, 2 and 3 race towards guest 1's spin lock.
-	 * One will enter and the other will poll but both knows that previous
-	 * owner was 1. Guest 2 will get the ownership and exit the critical
-	 * region made by guest 1 and its own state locks. Guest 3 will enter
-	 * the critical region made by guest 1 and its own state locks. And
-	 * it will test that previous owner as it knows (guest 1) is stopped.
-	 * But the resource is already taken by guest 2.
-	 */
-	spin_lock(&error_manager_lock);
-	crt_owner = owner->hwnode->claimable_owner;
+	/* Notify the new guest of past events */
+	if (queue_get_avail(&global_event_queue) > 0) {
+		gcpu_t *vcpu = error_manager_guest->err_destcpu;
+		atomic_or(&vcpu->crit_gdbell_pending, GCPU_PEND_CRIT_INT);
+		setevent(vcpu, EV_GUEST_CRIT_INT);
 
-	if (crt_owner && crt_owner->guest->state != guest_stopped)
-		ret = EV_INVALID_STATE;
-	else if (owner->guest && gcpu == owner->guest->err_destcpu)
-		raw_out32(&error_manager_guest_lpid, owner->guest->lpid);
-	else
-		ret = EV_EPERM;
+		if (prev) {
+			/* If there was a previous error manager, clear
+			 * its possibly unhandled yet critical int,
+			 * while it is stopped. */
+			vcpu = prev->guest->err_destcpu;
+			atomic_and(&vcpu->crit_gdbell_pending,
+				   ~GCPU_PEND_CRIT_INT);
+		}
+	}
 
-	spin_unlock(&error_manager_lock);
-
-	return ret;
+	return 0;
 }
 #endif
 
@@ -1051,25 +1040,25 @@ static int build_ownership(dt_node_t *cfgnode, dt_node_t *hwnode,
 			return 0;
 		}
 
-#ifndef CONFIG_CLAIMABLE_DEVICES
-		/* In case of non-claimable support, accept at most one
-		 * declaration of error manager.
-		 * In case of claimable support, if non-claimable & claimable
+		/* Accept at most one declaration of non-claimable error manager.
+		 * In case of claimable support, if 1 non-claimable & claimable
 		 * are mixed, do what check_compatible_owners does, i.e.
 		 * print an error. The trouble is that guests will think
 		 * they each own an active error manager but only one works.
+		 * It is undefined which one, out of 1 non-claimable and 1
+		 * active claimable, gets the resource.
 		 */
-		if (dt_node_is_compatible(cfgnode, "error-manager")) {
+		if (dt_node_is_compatible(cfgnode, "error-manager") &&
+		    get_claimable(owner) == not_claimable &&
+		    get_claimable(other) == not_claimable) {
 			spin_unlock_intsave(&dt_owner_lock, saved);
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: device %s already assigned to %s"
-			         " refused to %s\n",
-				__func__, hwnode->name,
-				other->guest->name, ctx->guest->name);
+			         "%s: device %s already declared by %s, "
+			         "refused to %s\n", __func__, hwnode->name,
+				 other->guest->name, ctx->guest->name);
 			free(owner);
 			return 0;
 		}
-#endif
 
 		check_compatible_owners(owner, other);
 	}
@@ -1080,6 +1069,12 @@ static int build_ownership(dt_node_t *cfgnode, dt_node_t *hwnode,
 		list_add(&hv_devs, &owner->guest_node);
 
 	cfgnode->endpoint = hwnode;
+
+	/* A winner of the error manager, either private or active claimer */
+	if (!error_manager_guest && get_claimable(owner) != claimable_standby &&
+	    dt_node_is_compatible(cfgnode, "error-manager"))
+		/* no concurrent reads, so no explicit atomic write */
+		error_manager_guest = owner->guest;
 
 	list_add(&hwnode->owners, &owner->dev_node);
 	spin_unlock_intsave(&dt_owner_lock, saved);

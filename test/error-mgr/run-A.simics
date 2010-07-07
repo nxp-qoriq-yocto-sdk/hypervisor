@@ -28,7 +28,7 @@ $use_uart0_net = 1
 $guest_image[0] = "error-mgr"
 $guest_addr[0]  = 0x00a00000
 
-$guest_image[1] = "hv.dtb"
+$guest_image[1] = "hv-A.dtb"
 $guest_addr[1]  = 0x00900000
 
 enable-magic-breakpoint

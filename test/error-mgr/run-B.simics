@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,12 +22,20 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-$console_capture = 1
+$use_uart0 = 0
+$use_uart0_net = 1
 
-add-directory "%script%/" -prepend
+$guest_image[0] = "error-mgr"
+$guest_addr[0]  = 0x00a00000
 
-run-command-file "run-A.simics"
-run-command-file "run-B.simics"
+$guest_image[1] = "hv-B.dtb"
+$guest_addr[1]  = 0x00900000
 
-$test_con = ($con0:con) # uart 0
-run-command-file "%script%/../common/test-done.simics"
+enable-magic-breakpoint
+
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
+add-directory "bin/error-mgr" -prepend
+
+run-command-file "boot.simics"

@@ -88,13 +88,10 @@ void error_log(queue_t *q, hv_error_t *err, uint32_t *lock)
 	if (q == &hv_global_event_queue) {
 		setevent(get_gcpu(), EV_DUMP_HV_QUEUE);
 	} else if (q == &global_event_queue) {
-		int lpid = raw_in32(&error_manager_guest_lpid);
-
-		if (lpid > 0 && lpid <= last_lpid) {
-			guest_t *err_mgr = &guests[lpid-1];
-			gcpu_t *vcpu = err_mgr->err_destcpu;
+		if (error_manager_guest) {
+			gcpu_t *vcpu = error_manager_guest->err_destcpu;
 			atomic_or(&vcpu->crit_gdbell_pending,
-					 GCPU_PEND_CRIT_INT);
+				  GCPU_PEND_CRIT_INT);
 			setevent(vcpu, EV_GUEST_CRIT_INT);
 		}
 	} else {

@@ -56,7 +56,7 @@
 #include <error_log.h>
 #include <guts.h>
 
-uint32_t error_manager_guest_lpid;
+guest_t *error_manager_guest;
 
 queue_t global_event_queue;
 uint32_t global_event_prod_lock;
@@ -1541,10 +1541,6 @@ int restart_guest(guest_t *guest, const char *reason, const char *who)
 
 	spin_unlock_intsave(&guest->state_lock, saved);
 
-	if (raw_in32(&error_manager_guest_lpid) == guest->lpid)
-		/* disable global reporting */
-		raw_out32(&error_manager_guest_lpid, 0);
-
 	if (!ret)
 		for (i = 0; i < guest->cpucnt; i++)
 			setgevent(guest->gcpus[i], gev_restart);
@@ -1885,7 +1881,6 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	guest_t *guest = gcpu->guest;
 	int ret;
 	unsigned int i;
-	dt_node_t *virt_node;
 
 	assert(guest->state == guest_starting);
 
@@ -1924,21 +1919,6 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 
 	if (setup_ima(regs, guest->entry, 0) < 0)
 		goto error_block;
-
-	virt_node = dt_get_subnode(virtual_tree, "error-manager", 0);
-	if (virt_node && !list_empty(&virt_node->owners)) {
-		dev_owner_t *owner = NULL;
-#ifdef CONFIG_CLAIMABLE_DEVICES
-		owner = virt_node->claimable_owner;
-#else
-		/* Just get the first owner from the list; this list is built
-		 * before starting any guest, so its content is fixed. */
-		owner = to_container(virt_node->owners.next,
-				     dev_owner_t, dev_node);
-#endif
-		if (owner && owner->guest == guest)
-			raw_out32(&error_manager_guest_lpid, owner->guest->lpid);
-	}
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 	         "branching to guest %s, %d cpus\n", guest->name, guest->cpucnt);
@@ -2335,10 +2315,6 @@ int stop_guest(guest_t *guest, const char *reason, const char *who)
 
 	if (ret)
 		return ret;
-
-	if (raw_in32(&error_manager_guest_lpid) == guest->lpid)
-		/* disable global reporting */
-		raw_out32(&error_manager_guest_lpid, 0);
 
 	for (i = 0; i < guest->cpucnt; i++)
 		setgevent(guest->gcpus[i], gev_stop);

@@ -673,7 +673,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 
 	q = guest->handles[handle]->error_queue;
 	if (q == &global_event_queue) {
-		if (guest->lpid != raw_in32(&error_manager_guest_lpid)) {
+		if (guest != error_manager_guest) {
 			regs->gpregs[3] = EV_EINVAL;
 			return;
 		}

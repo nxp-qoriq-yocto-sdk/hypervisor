@@ -131,12 +131,11 @@
 	// =====================================================
 	// Partition 1
 	// =====================================================
-	slave1: part1 {
+	slave1: part1-A {
 		compatible = "partition";
 		cpus = <0 2>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
-		no-auto-start;
 /* TODO: save a new dts without any error manager or with 2 */
 
 		gpma {
@@ -166,21 +165,21 @@
 			stdout = <&p1bc>;
 		};
 
-		error-manager {
-			compatible = "error-manager";
-			vcpu = <1>;
-			claimable = "standby";
+		slave-part@0 {
+			compatible = "managed-partition";
+			partition = <&slave2>;
 		};
 	};
 
 	// =====================================================
 	// Partition 2
 	// =====================================================
-	part2 {
+	slave2: part2-A {
 		compatible = "partition";
 		cpus = <3 2>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
+		no-auto-start;
 
 		gpma {
 			compatible = "guest-phys-mem-area";
@@ -209,59 +208,10 @@
 			partition = <&slave1>;
 		};
 
-		slave-part@1 {
-			compatible = "managed-partition";
-			partition = <&slave3>;
-		};
-
 		error-manager {
 			compatible = "error-manager";
 			vcpu = <1>;
-			claimable = "active";
-		};
-	};
-
-	// =====================================================
-	// Partition 3
-	// =====================================================
-	slave3: part3 {
-		compatible = "partition";
-		cpus = <2 1 6 1>;
-		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
-		dtb-window = <0 0x01000000 0 0x10000>;
-		no-auto-start;
-
-		gpma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma3>;
-			guest-addr = <0 0>;
-		};
-
-		gshma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&shmem>;
-			guest-addr = <0 0x2000000>;
-		};
-
-		dma {
-			device = "dma1";
-			dma-window = <&dmawind>;
-		};
-
-		p3bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <3>;
-		};
-
-		aliases {
-			stdout = <&p3bc>;
-		};
-
-		error-manager {
-			compatible = "error-manager";
-			vcpu = <1>;
-			claimable = "standby";
+			/* non-claimable */
 		};
 	};
 
