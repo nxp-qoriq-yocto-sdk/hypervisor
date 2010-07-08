@@ -642,6 +642,9 @@ static int cmd_status(void)
 			case 1: printf("running\n"); break;
 			case 2: printf("starting\n"); break;
 			case 3: printf("stopping\n"); break;
+			case 4: printf("pausing\n"); break;
+			case 5: printf("paused\n"); break;
+			case 6: printf("resuming\n"); break;
 			default: printf("unknown %i\n", status.status); break;
 			}
 		}
