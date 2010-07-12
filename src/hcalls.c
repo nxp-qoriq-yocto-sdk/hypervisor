@@ -833,7 +833,11 @@ static hcallfp_t fsl_hcall_table[] = {
 #else
 	unimplemented,
 #endif
+#ifdef CONFIG_PAMU
 	hcall_partition_stop_dma,
+#else
+	unimplemented,
+#endif
 };
 
 static hcallfp_t epapr_hcall_table[] = {
