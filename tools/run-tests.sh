@@ -37,7 +37,7 @@ cd output/test
 
 rc=0
 
-export TARGET=p4080
+export TARGET=p4080ds
 
 # run the .exp scripts
 for test in $tests
