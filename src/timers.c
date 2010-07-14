@@ -249,8 +249,9 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
  */
 void watchdog_trap(trapframe_t *regs)
 {
-	// Ping the watchdog
-	mtspr(SPR_TSR, TSR_WIS);
+	if (!system_health_check())
+		// Ping the watchdog
+		mtspr(SPR_TSR, TSR_WIS);
 }
 
 void set_tcr(uint32_t val)
@@ -401,4 +402,16 @@ uint32_t get_tsr(void)
 	val = (val & ~(TSR_FIS | TSR_ENW | TSR_WIS)) | gcpu->gtsr;
 
 	return val;
+}
+
+
+int system_health_check(void) __attribute__ ((weak));
+/**
+ * check the health of the system
+ *
+ * @return non-zero if an error was detected 
+ */
+int system_health_check(void)
+{
+	return 0;
 }

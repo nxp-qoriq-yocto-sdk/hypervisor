@@ -38,5 +38,6 @@ void set_tcr(uint32_t val);
 void set_tsr(uint32_t val);
 uint32_t get_tcr(void);
 uint32_t get_tsr(void);
+int system_health_check(void);
 
 #endif
