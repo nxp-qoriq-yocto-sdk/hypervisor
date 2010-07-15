@@ -2882,11 +2882,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	list_init(&guest->vf_list);
 #endif
 
-	// create the guest error queue node
-	ret = create_guest_error_node(guest);
-	if (ret < 0)
-		goto fail;
-
 	prop = dt_get_prop(guest->partition, "no-dma-disable", 0);
 	guest->no_dma_disable = !!prop;
 
@@ -2901,6 +2896,11 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	}
 
 	ret = init_guest_devs(guest);
+	if (ret < 0)
+		goto fail;
+
+	// create the guest error queue node
+	ret = create_guest_error_node(guest);
 	if (ret < 0)
 		goto fail;
 
