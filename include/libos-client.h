@@ -166,5 +166,6 @@ void perfmon_int(struct trapframe *regs);
 #define LOGTYPE_GUTS         (CLIENT_BASE_LOGTYPE + 11)
 #define LOGTYPE_PM           (CLIENT_BASE_LOGTYPE + 12)
 #define LOGTYPE_DDR          (CLIENT_BASE_LOGTYPE + 13)
+#define LOGTYPE_ERRORQ       (CLIENT_BASE_LOGTYPE + 14)
 
 #endif

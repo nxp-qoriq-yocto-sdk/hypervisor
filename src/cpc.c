@@ -135,15 +135,17 @@ static void dump_cpc_error(hv_error_t *err)
 {
 	cpc_error_t *cpc = &err->cpc;
 
-	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
-	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdet : %x, cpc errinten : %x\n",
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "cpc %s error address : %llx\n",
+		err->error, cpc->cpcerraddr);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "device path:%s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "cpc errdet : %x, cpc errinten : %x\n",
 		cpc->cpcerrdet, cpc->cpcerrinten);
-	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errdis : %x\n",
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "cpc errdis : %x\n",
 		cpc->cpcerrdis);
-	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc errattr : %x, cpc captecc : %x\n",
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "cpc errattr : %x, cpc captecc : %x\n",
 		cpc->cpcerrattr, cpc->cpccaptecc);
-	printlog(LOGTYPE_CPC, LOGLEVEL_ERROR, "cpc erraddr : %llx, cpc errctl : %x\n",
-		cpc->cpcerraddr, cpc->cpcerrctl);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "cpc errctl : %x\n",
+		cpc->cpcerrctl);
 }
 
 static int cpc_error_isr(void *arg)

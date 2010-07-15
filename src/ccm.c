@@ -76,11 +76,11 @@ static void dump_ccf_error(hv_error_t *err)
 {
 	ccf_error_t *ccf = &err->ccf;
 
-	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
-	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cedr : %x, ccf ceer : %x, ccf cmecar : %x\n",
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "ccf cedr : %x, ccf ceer : %x, ccf cmecar : %x\n",
 				ccf->cedr, ccf->ceer, ccf->cmecar);
-	printlog(LOGTYPE_CCM, LOGLEVEL_ERROR, "ccf cecar : %x, ccf cecaddr : %llx\n",
-				ccf->cecar, ccf->cecaddr);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "ccf %s cecar : %x, ccf cecaddr : %llx\n",
+				err->error, ccf->cecar, ccf->cecaddr);
 }
 
 static int ccm_error_isr(void *arg)

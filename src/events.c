@@ -261,6 +261,13 @@ void deliver_pend_vint(trapframe_t *regs)
 
 	while (queue_read(&pend_virq, (uint8_t *) &virq,
 			sizeof(vpic_interrupt_t *), 0)) {
+		error_sub_int_t *errint =
+			to_container(virq->irq.parent, error_sub_int_t, dev_err_irq);
+
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				"Error interrupt reflected, error-int=%d, guest=%s\n",
+		                 errint->subintnum,
+		                 virq->guest->name);
 		vpic_assert_vint(virq);
 	}
 }

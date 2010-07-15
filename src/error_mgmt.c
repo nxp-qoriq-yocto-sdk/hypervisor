@@ -76,10 +76,10 @@ static void dump_mcheck_error(hv_error_t *err)
 {
 	mcheck_error_t *mcheck = &err->mcheck;
 
-	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "Machine check interrupt\n");
-	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-		"mcsr = %x, mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
-		mcheck->mcsr, mcheck->mcar, mcheck->mcsrr0, mcheck->mcsrr1);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "Machine check interrupt, mcsr = %x\n", mcheck->mcsr);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR,
+		"mcar = %llx, mcssr0 = %llx, mcsrr1 = %x\n",
+		mcheck->mcar, mcheck->mcsrr0, mcheck->mcsrr1);
 }
 
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
@@ -255,8 +255,8 @@ void register_error_dump_callback(domains_t domain, dump_error_info err_dump_fn)
 
 void dump_domain_error_info(hv_error_t *err, domains_t domain)
 {
-	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error domain : %s\n", err->domain);
-	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "error  : %s\n", err->error);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_EXTRA, "error domain : %s\n", err->domain);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_EXTRA, "error  : %s\n", err->error);
 
 	if ((domain < ERROR_DOMAIN_COUNT) && (error_domains[domain].error_dump_callback))
 		error_domains[domain].error_dump_callback(err);

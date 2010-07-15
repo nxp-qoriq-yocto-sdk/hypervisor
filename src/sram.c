@@ -43,7 +43,8 @@ static driver_t __driver sram = {
 
 static void dump_misc_error(hv_error_t *err)
 {
-	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR, "device path : %s\n",
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "SRAM Error\n");
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "device path : %s\n",
 		 err->hdev_tree_path);
 }
 

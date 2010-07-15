@@ -177,13 +177,16 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 	if (!recoverable || halt_system)
 		dump_and_halt(mcsr, frameptr);
 
-	strncpy(err.domain, get_domain_str(error_mcheck), sizeof(err.domain));
-	strcpy(err.error, get_domain_str(error_mcheck));
-	err.mcheck.mcsr = mcsr;
-	err.mcheck.mcar = mcsr & MCSR_MAV ? mfspr(SPR_MCAR) : 0;
-	err.mcheck.mcsrr0 = mfspr(SPR_MCSRR0);
-	err.mcheck.mcsrr1 = mfspr(SPR_MCSRR1);
-	error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	if (mcsr & ~MCSR_MCP) {
+		strncpy(err.domain, get_domain_str(error_mcheck), sizeof(err.domain));
+		strcpy(err.error, get_domain_str(error_mcheck));
+		err.mcheck.mcsr = mcsr;
+		err.mcheck.mcar = mcsr & MCSR_MAV ? mfspr(SPR_MCAR) : 0;
+		err.mcheck.mcsrr0 = mfspr(SPR_MCSRR0);
+		err.mcheck.mcsrr1 = mfspr(SPR_MCSRR1);
+		error_log(&hv_global_event_queue, &err, &hv_queue_prod_lock);
+	}
+
 	/* MCP machine checks would have been already reflected */
 	if (guest_state && (mcsr & ~MCSR_MCP))
 		reflect_mcheck(frameptr, (err.mcheck.mcsr & ~MCSR_MCP), err.mcheck.mcar);
