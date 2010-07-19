@@ -136,11 +136,6 @@
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
-		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
-				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
-				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
-				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
-
 		// Byte channel used for stdout interface attached to mux-channel 1
 		p1bc: byte-channel@0 {
 			compatible = "byte-channel";
@@ -152,7 +147,6 @@
 			device = "pci0";
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
-			atmu-guest-physical;
 		};
 
 		msi0 {
@@ -167,18 +161,10 @@
 			device = "msi2";
 		};
 
-		pci1 {
-			device = "pci1";
-			map-ranges;
-			dma-window = <&{/pcie-window}>;
-			atmu-guest-physical;
-		};
-
 		pci2 {
 			device = "pci2";
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
-			atmu-guest-physical;
 		};
 
 		qman {

@@ -103,3 +103,11 @@ $(test)-run-1p: $(test)
 $(test)-run-1core: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1core.simics
+
+$(test)-run-e1000: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-e1000.simics
+
+$(test)-run-scsi: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-scsi.simics
