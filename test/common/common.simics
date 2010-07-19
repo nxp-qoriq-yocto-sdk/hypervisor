@@ -27,6 +27,11 @@ $kernel_cmdline = "config-addr=0xfe8900000"
 
 if not defined silicon_rev   {$silicon_rev = "rev2"}
 
+if ($target == "p4080ds") {
+	$rcw_image = rcw_13g_rev2_R_PPSXN_0x10.bin
+	add-directory "%script%/../../../images/boot/p4080ds/R_PPSXN_0x10" -prepend
+}
+
 add-directory "%script%/../../../sim" -prepend
 add-directory "%script%/../../../sim/"+$target -prepend
 add-directory "%script%/../../../images/"+$target -prepend
