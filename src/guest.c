@@ -892,7 +892,7 @@ static int map_device_to_guest(dt_node_t *node, void *arg)
 
 	configure_qman_portal(guest, owner->cfgnode, hwnode, node);
 #ifdef CONFIG_PAMU
-	configure_dma(node, owner);
+	configure_dma(hwnode, owner);
 #endif
 
 	return 0;

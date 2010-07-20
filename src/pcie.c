@@ -262,7 +262,7 @@ int virtualize_pcie_node(dev_owner_t *owner, dt_node_t *node)
 
 	node->vf = vf;
 	lwsync();
-	configure_dma(node, owner);
+	configure_dma(hwnode, owner);
 
 	priv->guest = guest;
 

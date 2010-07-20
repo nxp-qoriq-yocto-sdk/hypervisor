@@ -164,6 +164,7 @@ typedef struct dt_node {
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	/** Current active owner of a claimable device */
 	dev_owner_t *claimable_owner;
+	struct dt_node *dma_window; /* ptr to dma config node for reconfig */
 #endif
 
 	intmap_entry_t *intmap;

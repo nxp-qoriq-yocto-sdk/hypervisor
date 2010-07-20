@@ -346,6 +346,127 @@ nomem:
 
 #define MAX_SUBWIN_CNT 16
 
+#ifdef CONFIG_CLAIMABLE_DEVICES
+
+static int reconfig_subwins(guest_t *guest, dt_node_t *parent,
+                            uint32_t liodn,
+                            phys_addr_t primary_base,
+                            phys_addr_t primary_size,
+                            uint32_t subwindow_cnt,
+                            ppaace_t *ppaace)
+{
+	unsigned long fspi = ppaace->fspi; /* re-use spaace(s) */
+	phys_addr_t subwindow_size = primary_size / subwindow_cnt;
+	int subwin;
+	uint64_t gaddr = primary_base;
+	uint64_t size = subwindow_size;
+	list_t *ele = parent->children.next;
+
+	for (subwin = 0;
+	     subwin < subwindow_cnt;
+	     ++subwin, gaddr += size, ele = ele->next) {
+		unsigned long rpn;
+		dt_node_t *node = to_container(ele, dt_node_t, child_node);
+
+		/*
+		 * Ignore PCIe MSI subwindows as their RPN should be constant,
+		 * even if primary/standby partitions are mapped to different
+		 * MSI banks, as MSI banks exist in the same physical page.
+		 */
+		if (dt_get_prop(node, "pcie-msi-subwindow", 0))
+			continue;
+
+		rpn = get_rpn(guest, gaddr >> PAGE_SHIFT, size >> PAGE_SHIFT);
+
+		if (rpn == ULONG_MAX)
+			continue;
+
+		if (subwin == 0) {
+			unsigned long curr_rpn = ppaace->twbah << 20 |
+					ppaace->twbal;
+			if (curr_rpn == rpn)
+				continue;
+			ppaace->ap = PAACE_AP_PERMS_DENIED;
+			lwsync();
+			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+			ppaace->twbah = rpn >> 20;
+			ppaace->twbal = rpn & 0xfffff;
+			lwsync();
+			ppaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
+		} else {
+			spaace_t *spaace = pamu_get_spaace(fspi, subwin - 1);
+			unsigned long curr_rpn = spaace->twbah << 20 |
+					spaace->twbal;
+			if (curr_rpn == rpn)
+				continue;
+			spaace->ap = PAACE_AP_PERMS_DENIED;
+			lwsync();
+			spaace->atm = PAACE_ATM_WINDOW_XLATE;
+			spaace->twbah = rpn >> 20;
+			spaace->twbal = rpn & 0xfffff;
+			lwsync();
+			spaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
+		}
+	}
+
+	return 0;
+}
+
+int pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
+{
+	struct ppaace_t *ppaace;
+	unsigned long rpn;
+	dt_node_t *dma_window;
+	phys_addr_t window_addr = ~(phys_addr_t)0;
+	phys_addr_t window_size = 0;
+	uint32_t subwindow_cnt = 0;
+	int ret = 0;
+
+	ppaace = pamu_get_ppaace(liodn);
+
+	subwindow_cnt = 1 << (ppaace->wce + 1);
+	window_addr = ((phys_addr_t) ppaace->wbah << 32) |
+			ppaace->wbal;
+	window_addr <<= PAGE_SHIFT;
+	window_size = 1 << (ppaace->wse + 1);
+
+	dma_window = hwnode->dma_window;
+	if (!dma_window) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: bad dma-window phandle ref during reconfig\n",
+		         __func__);
+		return ERR_BADTREE;
+	}
+
+	if (ppaace->mw)
+		ret = reconfig_subwins(guest, dma_window, liodn,
+		                       window_addr, window_size, subwindow_cnt,
+		                       ppaace);
+	else {
+		unsigned long curr_rpn = ppaace->twbah << 20 |
+					ppaace->twbal;
+
+		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT,
+		              window_size >> PAGE_SHIFT);
+		if (rpn == ULONG_MAX)
+			return ERR_NOTRANS;
+
+		if (curr_rpn != rpn) {
+			ppaace->ap = PAACE_AP_PERMS_DENIED;
+			lwsync();
+			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
+			ppaace->twbah = rpn >> 20;
+			ppaace->twbal = rpn;
+			lwsync();
+			/* FIXME read-only gpmas */
+			ppaace->ap = PAACE_AP_PERMS_ALL;
+		}
+	}
+
+	return ret;
+}
+#endif
+
 static int setup_subwins(guest_t *guest, dt_node_t *parent,
                          uint32_t liodn, phys_addr_t primary_base,
                          phys_addr_t primary_size,
@@ -510,6 +631,10 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		         __func__, cfgnode->name);
 		return ERR_BADTREE;
 	}
+
+#ifdef CONFIG_CLAIMABLE_DEVICES
+	hwnode->dma_window = dma_window;
+#endif
 	gaddr = dt_get_prop(dma_window, "guest-addr", 0);
 	if (!gaddr || gaddr->len != 8) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
@@ -1215,6 +1340,21 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	liodn_to_guest[liodn] = owner->guest;
 
 	spin_unlock_mchksave(&pamu_error_lock, saved);
+
+	/*
+	 * PAMU maintains coherent copies of PAACT/SPAACT in it's lookup
+	 * cache with snoopy invalidations, but in-flight DMA operations will
+	 * be an issue with regard to re-configuration. In such a case the
+	 * guest is responsible for quiescing i/o devices, and HV disables
+	 * access to the device's PAMU entry till re-configuration is done.
+	 */
+
+	int ret = pamu_reconfig_liodn(owner->guest, liodn, owner->hwnode);
+	if (ret < 0) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+                         "%s: re-config of liodn failed (rc=%d)\n",
+                         __func__, ret);
+	}
 
 	migrate_access_violations(owner->guest, &oldguest->error_event_queue,
 	                          oldhandle, ph->user.id);
