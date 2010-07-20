@@ -619,7 +619,7 @@ static void watchdog_init(void)
 	// Set the TCR bits
 	tcr = mfspr(SPR_TCR);
 	tcr &= ~(TCR_WP_MASK | TCR_WRC);
-	tcr |= TCR_WIE | TCR_INT_TO_WP(period) | TCR_WRC_RESET;
+	tcr |= TCR_WIE | TCR_INT_TO_WP(period) | TCR_WRC_REQ;
 	mtspr(SPR_TCR, tcr);
 }
 #endif
