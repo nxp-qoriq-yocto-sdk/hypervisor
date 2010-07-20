@@ -33,6 +33,7 @@
 	hv: hv-config {
 		compatible = "hv-config";
 		stdout = <&hvbc>;
+		watchdog-enable = <38>;
 		
 		memory {
 			compatible = "hv-memory";

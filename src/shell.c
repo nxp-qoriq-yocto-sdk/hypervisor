@@ -1020,3 +1020,16 @@ static command_t build_config = {
 shell_cmd(build_config);
 #endif
 
+#ifdef CONFIG_HV_WATCHDOG
+static void crash_fn(shell_t *shell, char *args)
+{
+	*(volatile unsigned int *)0 = 1;   /* null pointer dereference */
+}
+
+static command_t crash = {
+	.name = "crash",
+	.action = crash_fn,
+	.shorthelp = "Crash the hypervisor.  Used for testing.",
+};
+shell_cmd(crash);
+#endif
