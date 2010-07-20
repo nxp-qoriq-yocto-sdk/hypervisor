@@ -132,6 +132,8 @@ enum {
 	no_dma_disable
 } dma_disable;
 
+static int privmem;
+
 /* wait:
  *   0 = no wait
  *   1 = irq
@@ -144,15 +146,29 @@ static int test_dma_memcpy(int valid, int wait)
 	phys_addr_t gpa_src, gpa_dst;
 	uint32_t stat;
 
-	gva_src = (unsigned char *)&shmem[64];
-	gva_dst = (unsigned char *)&shmem[128];
+	if (!privmem) {
+		gva_src = (unsigned char *)&shmem[64];
+		gva_dst = (unsigned char *)&shmem[128];
 
-	gpa_src = shmem_phys + 64 * 4;
+		gpa_src = shmem_phys + 64 * 4;
 
-	if (valid)
-		gpa_dst = shmem_phys + 128 * 4;
-	else
-		gpa_dst = 0xdeadbeef;
+		if (valid)
+			gpa_dst = shmem_phys + 128 * 4;
+		else
+			gpa_dst = 0xdeadbeef;
+	} else {
+		static unsigned char src[256], dst[256];
+
+		gva_src = src;
+		gva_dst = dst;
+
+		gpa_src = virt_to_phys(src);
+
+		if (valid)
+			gpa_dst = virt_to_phys(dst);
+		else
+			gpa_dst = 0xdeadbeef;
+	}
 
 	for (int i = 0; i < count; i++)
 		gva_src[i] = i;
@@ -521,6 +537,11 @@ void libos_client_entry(unsigned long devtree_ptr)
 	} else {
 		printf("normal dma disable mode\n");
 		dma_disable = normal_dma_disable;
+	}
+
+	if (!fdt_node_check_compatible(fdt, 0, "failover-priv")) {
+		printf("using private memory\n");
+		privmem = 1;
 	}
 
 	if (map_shmem() < 0)
