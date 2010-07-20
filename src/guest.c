@@ -56,6 +56,8 @@
 #include <error_log.h>
 #include <guts.h>
 
+#include <malloc.h>
+
 guest_t *error_manager_guest;
 
 queue_t global_event_queue;
@@ -2773,15 +2775,52 @@ static int init_guest_devs(guest_t *guest)
 	                        map_device_to_guest, NULL);
 }
 
+static int create_compat_bus_strings(dt_prop_t *prop, char **buffer, int *compat_len)
+{
+	char hv_str[] = "-hv";
+	int total_len = prop->len;
+	const char *compat_str;
+	int ret;
+	size_t pos = 0;
+	char *buf = NULL;
+	int current_len = 0;
+
+	while ((compat_str = strlist_iterate(prop->data, prop->len, &pos))) {
+			total_len += strlen(hv_str);
+			buf = realloc(buf, total_len);
+			if (buf == NULL) {
+				current_len = 0;
+				return ERR_NOMEM;
+			}
+
+			 /* skip past null of the previous compatible
+			  * if there are more than one */
+			if (current_len > 0) {
+				current_len++;
+			}
+
+			ret = snprintf((char *)buf + current_len, total_len - current_len,
+					"%s%s", compat_str, hv_str);
+			current_len += ret;
+	}
+
+	*buffer = buf;
+	*compat_len = current_len;
+
+	return 0;
+}
+
 /* Don't inline this inside init_guest, to isolate its stack usage. */
 static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 {
 	int ret, status;
-	dt_prop_t *prop;
+	dt_prop_t *prop, *compat_prop;
 	dt_node_t *node;
 	const uint32_t *propdata;
 	int gpir;
 	char buf[64];
+	int compat_len;
+	char *compat_buf;
 
 	/* count number of cpus for this partition and alloc data struct */
 	guest->cpucnt = count_cpus(guest->cpulist, guest->cpulist_len);
@@ -2818,13 +2857,20 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
-	/* FIXME: hardcoded p4080 */
-	ret = snprintf(buf, sizeof(buf), "fsl,hv-platform-p4080%csimple-bus", 0);
-	assert(ret < (int)sizeof(buf));
+	compat_prop = dt_get_prop(hw_devtree, "compatible", 0);
+	if (!compat_prop) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "%s: warning: unable to set guest root compatible\n",
+		         __func__);
+	}
 
-	ret = dt_set_prop(guest->devtree, "compatible", buf, ret + 1);
+	if (create_compat_bus_strings(compat_prop, &compat_buf, &compat_len))
+		goto nomem;
+
+	ret = dt_set_prop(guest->devtree, "compatible", compat_buf, compat_len + 1);
+	free(compat_buf);
 	if (ret < 0)
-		goto fail;
+		goto nomem;
 
 	// Set the ePAPR version string.
 	ret = snprintf(buf, sizeof(buf), "ePAPR-%u.%u", 1, 0);
