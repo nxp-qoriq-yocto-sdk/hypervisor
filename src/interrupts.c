@@ -41,8 +41,8 @@
 
 /* queue for pending reflected (virtual) interrupts */
 
-#define MAX_PEND_VIRQ 64
-DECLARE_QUEUE(pend_virq, MAX_PEND_VIRQ * sizeof(vpic_interrupt_t *));
+#define MAX_MPIC_ERRINT 64
+DECLARE_QUEUE(mpic_errint_q, MAX_MPIC_ERRINT * sizeof(vpic_interrupt_t *));
 
 int halt_system;
 
@@ -204,10 +204,10 @@ int reflect_errint(void *arg)
 
 	interrupt_mask(irq);
 
-	ret = queue_write(&pend_virq, (const uint8_t *) &virq,
+	ret = queue_write(&mpic_errint_q, (const uint8_t *) &virq,
 			sizeof(vpic_interrupt_t *));
 	if (ret)
-		setevent(cpu->client.gcpu, EV_DELIVER_PEND_VINT);
+		setevent(cpu->client.gcpu, EV_DELIVER_MPIC_ERRINT);
 
 	return 0;
 }

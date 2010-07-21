@@ -47,7 +47,7 @@ static eventfp_t event_table[] = {
 	&dbell_to_mcgdbell_glue,         /* EV_MCP */
 	&dbell_to_cgdbell_glue,          /* EV_GUEST_CRIT_INT */
 	&dump_hv_queue,                  /* EV_DUMP_HV_QUEUE */
-	&deliver_pend_vint,              /* EV_DELIVER_PEND_VINT */
+	&deliver_mpic_errint,            /* EV_DELIVER_MPIC_ERR_INT */
 #ifdef CONFIG_PM
 	&sync_nap,                       /* EV_SYNC_NAP */
 #else
@@ -255,12 +255,13 @@ void dump_hv_queue(trapframe_t *regs)
 	spin_unlock(&hv_queue_cons_lock);
 }
 
-void deliver_pend_vint(trapframe_t *regs)
+void deliver_mpic_errint(trapframe_t *regs)
 {
 	vpic_interrupt_t *virq;
 
-	while (queue_read(&pend_virq, (uint8_t *) &virq,
-			sizeof(vpic_interrupt_t *), 0)) {
+	while (queue_read(&mpic_errint_q, (uint8_t *) &virq,
+	       sizeof(vpic_interrupt_t *), 0)) {
+
 		error_sub_int_t *errint =
 			to_container(virq->irq.parent, error_sub_int_t, dev_err_irq);
 
@@ -268,6 +269,7 @@ void deliver_pend_vint(trapframe_t *regs)
 				"Error interrupt reflected, error-int=%d, guest=%s\n",
 		                 errint->subintnum,
 		                 virq->guest->name);
+
 		vpic_assert_vint(virq);
 	}
 }
