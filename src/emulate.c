@@ -40,10 +40,19 @@
 
 static unsigned long get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
+	unsigned long ret;
+
 	int ra = (insn >> 16) & 31;
 	int rb = (insn >> 11) & 31;
 	
-	return regs->gpregs[rb] + (ra ? regs->gpregs[ra] : 0);
+	ret = regs->gpregs[rb] + (ra ? regs->gpregs[ra] : 0);
+
+#ifdef CONFIG_LIBOS_64BIT
+	if (!(regs->srr1 & MSR_CM))
+		ret &= 0xffffffffUL;
+#endif
+
+	return ret;
 }
 
 /**
