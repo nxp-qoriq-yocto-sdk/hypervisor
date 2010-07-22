@@ -355,57 +355,62 @@ shell_cmd(cdt);
 
 static void decode_wse(unsigned int wse, char *str)
 {
-	unsigned int i = 0;
-
-	i = wse - 10;
+	unsigned int i = wse - 9;
 
 	if (i >= BIT_SHIFT_1P)
-		sprintf(str, "%04d EB", 1<<(i-BIT_SHIFT_1P+1));
+		sprintf(str, "%3d EiB", 1 << (i - BIT_SHIFT_1P));
 	else if (i >= BIT_SHIFT_1T)
-		sprintf(str, "%04d PB", 1<<(i-BIT_SHIFT_1T+1));
+		sprintf(str, "%3d PiB", 1 << (i - BIT_SHIFT_1T));
 	else if (i >= BIT_SHIFT_1G)
-		sprintf(str, "%04d TB", 1<<(i-BIT_SHIFT_1G+1));
+		sprintf(str, "%3d TiB", 1 << (i - BIT_SHIFT_1G));
 	else if (i >= BIT_SHIFT_1M)
-		sprintf(str, "%04d GB", 1<<(i-BIT_SHIFT_1M+1));
+		sprintf(str, "%3d GiB", 1 << (i - BIT_SHIFT_1M));
 	else if (i >= BIT_SHIFT_1K)
-		sprintf(str, "%04d MB", 1<<(i-BIT_SHIFT_1K+1));
+		sprintf(str, "%3d MiB", 1 << (i - BIT_SHIFT_1K));
 	else
-		sprintf(str, "%04d KB", 1<<(i+1));
-}
-
-static void ppaace_entry_dump_fn(shell_t *shell, ppaace_t *entry)
-{
-	qprintf(shell->out, 1, "  %03d  ", entry->impl_attr.cid);
-	qprintf(shell->out, 1, "    %2d\n", entry->otm);
+		sprintf(str, "%3d KiB", 1 << i);
 }
 
 static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
 {
 	int wcount = 0;
 	spaace_t *sentry;
-	int wce;
+	int wce = 1 << (entry->wce + 1);
 	char str[BUFF_SIZE];
-	uint32_t subwin_base = entry->wbal << PAGE_SHIFT;
+	phys_addr_t subwin_base =
+		((phys_addr_t)entry->wbah << 32) | (entry->wbal << PAGE_SHIFT);
+	phys_addr_t subwin_len =
+		(1ULL << (entry->wse + 1)) >> (entry->wce + 1);
 
-	wce = 2 * (1 << entry->wce) - 1;
-	for (int i = 0; i < wce; i++) {
-		sentry = pamu_get_spaace(entry->fspi, i);
+	/* The first subwindow is embedded in the primary paace entry.
+	 * This would be easier if we used the same struct for both.
+	 */
+	if (entry->ap != PAACE_AP_PERMS_DENIED) {
+		decode_wse(entry->swse, str);
+		qprintf(shell->out, 1, "           %2d   ", 0);
+		qprintf(shell->out, 1, "%09llx  ",
+		        (unsigned long long)subwin_base);
+		qprintf(shell->out, 1, "%01x%08x  ",
+			entry->twbah,
+			entry->twbal << PAGE_SHIFT);
+		qprintf(shell->out, 1, "%s    -      %2d      %d\n",
+		        str, entry->impl_attr.cid, entry->otm);
+	}
+
+	for (int i = 1; i < wce; i++) {
+		subwin_base += subwin_len;
+
+		sentry = pamu_get_spaace(entry->fspi, i - 1);
 		if (sentry->v) {
-			wcount++;
-			memset(str, 0, BUFF_SIZE);
 			decode_wse(sentry->swse, str);
-			qprintf(shell->out, 1, "       ");
-			qprintf(shell->out, 1, " % 4d  ", wcount);
-			qprintf(shell->out, 1, "%01x_%08x  ",
-				entry->wbah,
-				subwin_base);
-			qprintf(shell->out, 1, "%01x_%08x  ",
+			qprintf(shell->out, 1, "           %2d   ", i);
+			qprintf(shell->out, 1, "%09llx  ",
+			        (unsigned long long)subwin_base);
+			qprintf(shell->out, 1, "%01x%08x  ",
 				sentry->twbah,
 				sentry->twbal << PAGE_SHIFT);
-			qprintf(shell->out, 1, "%s", str);
-			qprintf(shell->out, 1, "    - ");
-			ppaace_entry_dump_fn(shell, entry);
-			subwin_base += 1 << (sentry->swse + 1);
+			qprintf(shell->out, 1, "%s    -      %2d      %d\n",
+			        str, sentry->impl_attr.cid, sentry->otm);
 		}
 	}
 }
@@ -422,33 +427,43 @@ static void paact_dump_fn(shell_t *shell, char *args)
 	 * Currently all PAMUs in the platform share the same PAACT(s), hence,
 	 * this command does not support a PAMU#
 	 */
-	qprintf(shell->out, 1, "          sub                                  sub   stash   \n");
-	qprintf(shell->out, 1, "      val win   base         xlate             win   cache   OMT\n");
-	qprintf(shell->out, 1, "liodn bit  #    addr          addr    size     cnt   id      mode\n");
+	qprintf(shell->out, 1, "          sub                                  sub   stash  oper.\n");
+	qprintf(shell->out, 1, "      val win   base       xlate               win   cache  trans\n");
+	qprintf(shell->out, 1, "liodn bit  #    addr       addr       size     cnt   id     mode\n");
 	qprintf(shell->out, 1, "-----------------------------------------------------------------\n");
 
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
 		entry = pamu_get_ppaace(liodn);
-		wce = 0;
 		if (entry && entry->wse) {
 			is_table_empty = 0;
 			memset(str, 0, BUFF_SIZE);
 			decode_wse(entry->wse, str);
-			if (entry->mw)
-				wce = 2 * (1 << entry->wce) - 1;
 
-			qprintf(shell->out, 1, " %03d ", liodn);
-			qprintf(shell->out, 1, " % 2d ", entry->v);
-			qprintf(shell->out, 1, "  -  ");
-			qprintf(shell->out, 1, "%01x_%08x  ", entry->wbah,
+			qprintf(shell->out, 1, "%5d ", liodn);
+			qprintf(shell->out, 1, "  %1d", entry->v);
+
+			qprintf(shell->out, 1, "   -   %01x%08x  ",
+				entry->wbah,
 				entry->wbal << PAGE_SHIFT);
-			qprintf(shell->out, 1, "%01x_%08x  ", entry->twbah,
-				entry->twbal << PAGE_SHIFT);
-			qprintf(shell->out, 1, "%s", str);
-			qprintf(shell->out, 1, "  %04d", wce);
-			ppaace_entry_dump_fn(shell, entry);
+
 			if (entry->mw)
+				qprintf(shell->out, 1, "        -  ");
+			else
+				qprintf(shell->out, 1, "%01x%08x  ",
+					entry->twbah,
+					entry->twbal << PAGE_SHIFT);
+
+			qprintf(shell->out, 1, "%s   ", str);
+
+			if (entry->mw) {
+				wce = 1 << (entry->wce + 1);
+				qprintf(shell->out, 1, "%2d       -      -\n",
+				        wce);
 				spaact_dump_fn(shell, entry);
+			} else {
+				qprintf(shell->out, 1, " 0      %2d      %d\n",
+				        entry->impl_attr.cid, entry->otm);
+			}
 		}
 	}
 	if (is_table_empty)
