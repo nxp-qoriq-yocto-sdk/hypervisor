@@ -32,9 +32,10 @@
 void secondary_core_handler(void);
 
 /* Test configuration:
- * Two guests are configured with no-auto-start; and one of them is slave to
- *    a manager partition automatically started. This starts its slave which
- *    ends itself while the manager waits for it to become stopped again.
+ * Three guests are configured, two having no-auto-start, one not being started
+ * for this test, and the other is slave to a manager partition automatically
+ * started. This starts its slave which ends itself while the manager waits for
+ * it to become stopped again.
  */
 
 void libos_client_entry(unsigned long devtree_ptr)
@@ -42,7 +43,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	register_t pir;
 	int ret, node, len;
 	uint32_t slave_part_handle = 0;
-	const void * p_handle = NULL;
+	const void *p_handle = NULL;
 
 	pir = mfspr(SPR_PIR);
 
@@ -54,32 +55,26 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if (node < 0)
 		printf("[%ld] 'handles' node not found\n", pir);
 	else {
-		for (int i = 0; i < 2; i++) {
-			node = fdt_node_offset_by_compatible(fdt, node,
-						"fsl,hv-partition-handle");
-			if (node > 0) {
-				p_handle = fdt_getprop(fdt, node, "reg", &len);
-				if (!p_handle || len != 4) {
-					printf("[%ld] Error getting slave "
-						"partition handle: %d\n", pir,
-						len);
-					return;
-				}
-				slave_part_handle = *(uint32_t*)p_handle;
-				printf("[%ld] Found the slave partition handle: %d\n",
-				       pir, slave_part_handle);
+		node = fdt_node_offset_by_compatible(fdt, node,
+						     "fsl,hv-partition-handle");
+		if (node > 0) {
+			p_handle = fdt_getprop(fdt, node, "reg", &len);
+			if (!p_handle || len != 4) {
+				printf("[%ld] Error getting slave "
+				       "partition handle: %d\n", pir, len);
+				return;
 			}
+			slave_part_handle = *(uint32_t*)p_handle;
+			printf("[%ld] Found the slave partition handle: %d\n",
+			       pir, slave_part_handle);
 		}
 	}
 
-	if (!p_handle) {
-		fh_partition_stop(-1);
-	} else {
-		/* See bug 5745 regarding why this fails for counter > 2 */
-		unsigned int status, exec_cnt = 1; /* it works for exec_cnt=1 */
+	if (p_handle) {
+		unsigned int status;
 		unsigned long wait_iterations = 5000000; /* Experimental value */
 
-		while(exec_cnt && wait_iterations--) {
+		while(--wait_iterations) {
 			int ret;
 
 			ret = fh_partition_get_status(slave_part_handle,
@@ -99,18 +94,22 @@ void libos_client_entry(unsigned long devtree_ptr)
 					continue;
 				} else {
 					puts("Started slave partition");
-					exec_cnt--;
+					break;
 				}
 
-			} else {
 			}
 		}
 
-		if (exec_cnt)
+		if (wait_iterations == 0) {
 			puts("Test Failed");
-		else
-			puts("PASSED\nTest Complete");
-
-		fh_partition_stop(-1);
+			return;
+		}
 	}
+
+	/* Delay ending the test to allow visual confirmation of HV */
+	puts("Delaying ...");
+	delay_timebase(100000000);
+	puts("PASSED\nTest Complete");
+
+	fh_partition_stop(-1);
 }
