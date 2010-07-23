@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 005
-Date: 7/7/2010
+Revsion: 006
+Date: 7/23/2010
 
 -------------------------------------------------------
 Contents
@@ -45,21 +45,28 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.7-005 has been tested with Simics 4.2.44 / pre58
+   -embedded-hv v0.7-006 has been tested with Simics 4.2.44 / pre58
     and the P4080DS board
 
    -in sync with Embedded Hypervisor Reference Manual 0.90,
     plus updates not yet formally documented (see mailing lists).
 
-   -for proper operation of "partman start" and watchdog notification, the
-    following patches to sim.git and linux are required, which have not been
-    applied to their repositories as of the time of this writing:
-
-     http://linux.freescale.net/patchwork/patch/3807/
-     http://linux.freescale.net/patchwork/patch/3743/
-
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.7-006 bug fixes and changes
+       -bug 5840: DMA window RPN reconfigure on device claim
+       -PCIE virtualization support is removed-- PCIE is only
+        supported in configurations where guest-phys == true-phys
+       -unit test cleanup
+       -support for customizable system_health_check function
+       -bug fix to paact command display for spaace entries
+       -partman recognizes the paused,pausing,resuming states
+       -bug 5924: make error interrupt logs less verbose
+       -fix wrc action for hypervisor watchdog to reset board
+       -bug 5734: set root node compatible by appending "-hv"
+       -bug 5827: doorbells get created with no interrupt controller
+        parent
 
    -v0.7-005 bug fixes and changes
        -DMA is now disabled by default, to be enabled with
