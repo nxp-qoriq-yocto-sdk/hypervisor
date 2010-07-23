@@ -281,11 +281,12 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		}
 
 		size_t len = 0x1000;
-#ifndef CONFIG_DEVICE_VIRT
+#if 1
 		pci_ctrl = map_gphys(TEMPTLB1, guest->gphys, pcie_addr,
 		                     temp_mapping[0], &len, TLB_TSIZE_4K,
 		                     TLB_MAS2_IO, 0);
 #else
+/* Needed if PCIe virtualization is enabled */
 		if (node->vf)
 			pci_ctrl = node->vf->vaddr;
 #endif
@@ -323,9 +324,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 			}
 		}
 
-#ifndef CONFIG_DEVICE_VIRT
 		tlb1_clear_entry(TEMPTLB1);
-#endif
 
 		if (i > 2) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
