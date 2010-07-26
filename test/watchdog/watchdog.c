@@ -318,14 +318,19 @@ static int test6_master(void)
 		wait_for_timeout(TIMEOUT);
 		wait_for_timeout(TIMEOUT);
 
+		// Wait for HV to finish performing the watchdog action.
+		// For the 'restart' case this takes a significant
+		// amount of time because the guest image is reloaded.
+		while (!state_change_int && !wd_notify_int) ;
+
 		// Find out what type of watchdog action happened
-		ret = fh_partition_get_status(parts[i], &status);
-		assert(!ret);
 		if (wd_notify_int) {
 			// Received a watchdog expiration event
 			wd_notify++;
 			printf("\tpartition %d (reg=%d) watchdog expired notification\n", i, parts[i]);
 		} else if (state_change_int) {
+			ret = fh_partition_get_status(parts[i], &status);
+			assert(!ret);
 			// Check for partition reset (state change from RUNNING to STARTING or RUNNING)
 			if (status == FH_PARTITION_RUNNING || status == FH_PARTITION_STARTING) {
 				printf("\tpartition %d (reg=%d) watchdog restart\n", i, parts[i]);
