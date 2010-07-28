@@ -2900,7 +2900,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 		         "%s: unknown hw reset status\n",__func__);
 	}
 
-	// FIXME: not in spec
 	ret = dt_set_prop(node, "fsl,hv-version", hv_version, sizeof(hv_version));
 	if (ret < 0)
 		goto fail;
