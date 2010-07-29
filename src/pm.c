@@ -118,7 +118,7 @@ void hcall_get_core_state(trapframe_t *regs)
 
 typedef struct nap_state {
 	uint32_t tcr;
-	uint32_t l1csr0, l1csr1, l2csr0;
+	uint32_t l1csr0, l1csr1, l1csr2, l2csr0;
 } nap_state_t;
 
 static void restore_caches(nap_state_t *ns)
@@ -126,6 +126,7 @@ static void restore_caches(nap_state_t *ns)
 	set_cache_reg(SPR_L2CSR0, ns->l2csr0);
 	set_cache_reg(SPR_L1CSR0, ns->l1csr0);
 	set_cache_reg(SPR_L1CSR1, ns->l1csr1);
+	set_cache_reg(SPR_L1CSR2, ns->l1csr2);
 }
 
 /* No snooping during nap, so flush core caches, and stop allocation */
@@ -137,6 +138,7 @@ static int flush_disable_caches(nap_state_t *ns)
 
 	ns->l1csr0 = mfspr(SPR_L1CSR0);
 	ns->l1csr1 = mfspr(SPR_L1CSR1);
+	ns->l1csr2 = mfspr(SPR_L1CSR2);
 
 	ret = flush_disable_l2_cache(timeout, 0, &ns->l2csr0);
 	if (ret < 0)
