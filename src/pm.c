@@ -123,7 +123,20 @@ typedef struct nap_state {
 
 static void restore_caches(nap_state_t *ns)
 {
+	uint32_t timeout = dt_get_timebase_freq() / 10;
+	uint32_t tb = mfspr(SPR_TBL);
+
 	set_cache_reg(SPR_L2CSR0, ns->l2csr0);
+
+	while (mfspr(SPR_L2CSR0) != ns->l2csr0) {
+		if (mfspr(SPR_TBL) - tb > timeout) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			         "%s: L2 cache enable timeout\n",
+			         __func__);
+			break;
+		}
+	}
+	
 	set_cache_reg(SPR_L1CSR0, ns->l1csr0);
 	set_cache_reg(SPR_L1CSR1, ns->l1csr1);
 	set_cache_reg(SPR_L1CSR2, ns->l1csr2);

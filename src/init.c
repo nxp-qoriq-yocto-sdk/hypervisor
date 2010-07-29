@@ -1023,7 +1023,16 @@ int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
 		 * to ensure completion, before requesting a flush.
 		 */
 		set_cache_reg(SPR_L2CSR0, l2csr0 | lock);
-		mfspr(SPR_L2CSR0);
+
+		while ((mfspr(SPR_L2CSR0) & lock) != lock) {
+			if (mfspr(SPR_TBL) - tb > timeout) {
+				mtspr(SPR_L2CSR0, l2csr0);
+				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				         "%s: L2 cache flush timeout\n",
+				         __func__);
+				return ERR_HARDWARE;
+			}
+		}
 
 		set_cache_reg(SPR_L2CSR0, l2csr0 | L2CSR0_L2FL | lock);
 
