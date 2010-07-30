@@ -36,6 +36,7 @@
 #include <libos/trap_booke.h>
 #include <libos/thread.h>
 #include <libos/alloc.h>
+#include <libos/fsl_hcalls.h>
 
 #include <hv.h>
 #include <paging.h>

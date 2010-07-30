@@ -29,9 +29,6 @@
 #include <libos/thread.h>
 #include <libos/trapframe.h>
 
-#define FH_API_VERSION 1
-#define FH_API_COMPAT_VERSION 1
-
 #define MAX_CORES 8
 
 struct guest;
