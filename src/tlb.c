@@ -657,9 +657,10 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		int real_entry = alloc_tlb1(entry, 0);
 		if (real_entry < 0) {
-			printf("Out of TLB1 entries!\n");
-			printf("entry %d, base 0x%lx, size 0x%llx\n",
-			       entry, epn << PAGE_SHIFT, ((uint64_t)size) << PAGE_SHIFT);
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ALWAYS, "Out of TLB1 entries!\n");
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ALWAYS,
+			         "entry %d, base 0x%lx, size 0x%llx\n",
+			         entry, epn << PAGE_SHIFT, ((uint64_t)size) << PAGE_SHIFT);
 
 			// FIXME: reflect machine check
 			BUG();
@@ -1600,8 +1601,9 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
 			                &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
 			if (!vsrc) {
-				printf("%s: cannot map src %llx, %zu bytes\n",
-				       __func__, src, schunk);
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+				         "%s: cannot map src %llx, %zu bytes\n",
+				         __func__, src, schunk);
 				break;
 			}
 		}
@@ -1610,8 +1612,9 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
 			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest) {
-				printf("%s: cannot map dest %llx, %zu bytes\n",
-				       __func__, dest, dchunk);
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+				         "%s: cannot map dest %llx, %zu bytes\n",
+				         __func__, dest, dchunk);
 				break;
 			}
 		}
