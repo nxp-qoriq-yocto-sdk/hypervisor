@@ -1,9 +1,9 @@
 #
 # Automatically generated make config: don't edit
-# Freescale-Embedded-Hypervisor version: 0.7-003-00041-gc916e79
-# Wed Jun 16 17:06:09 2010
+# Freescale-Embedded-Hypervisor version: 0.7-006-00013-g2158774-dirty
+# Fri Jul 30 13:10:26 2010
 #
-CONFIG_HV_VERSION="0.7-003-00041-gc916e79"
+CONFIG_HV_VERSION="0.7-006-00013-g2158774-dirty"
 CONFIG_HV_MAJOR_VERSION=0
 CONFIG_HV_MINOR_VERSION=7
 CONFIG_LIBOS_INIT=y
@@ -58,3 +58,4 @@ CONFIG_PM=y
 # CONFIG_GCOV is not set
 CONFIG_BUILD_CONFIG=y
 CONFIG_CLAIMABLE_DEVICES=y
+CONFIG_HV_WATCHDOG=y
