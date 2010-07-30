@@ -1524,8 +1524,11 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	if (!cfgnode)
 		return 0;
 
-	/* get the liodn property on the hw node */
-	liodn_prop = dt_get_prop(hwnode, "fsl,liodn", 0);
+	/* Get the liodn property from the gnode, so that
+	 * we honor its removal via node-update if this guest
+	 * isn't supposed to own DMA for this device.
+	 */
+	liodn_prop = dt_get_prop(owner->gnode, "fsl,liodn", 0);
 	if (!liodn_prop)
 		return 0;  /* continue */
 
