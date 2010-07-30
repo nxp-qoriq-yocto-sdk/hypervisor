@@ -1985,6 +1985,8 @@ error_block:
 	guest->state = guest_stopped;
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 		 "guest %s could not be started\n", guest->name);
+
+	atomic_or(&gcpu->napping, GCPU_NAPPING_STATE);
 	prepare_to_block();
 	block();
 	BUG();
@@ -2022,6 +2024,8 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 		// start this guest.
 		send_doorbells(guest->dbell_restart_request);
 		send_doorbells(guest->dbell_state_change);
+
+		atomic_or(&get_gcpu()->napping, GCPU_NAPPING_STATE);
 		prepare_to_block();
 		block();
 		BUG();
