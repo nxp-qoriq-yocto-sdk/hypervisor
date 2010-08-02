@@ -184,14 +184,14 @@ nomem:
 
 static void map_guest_addr_range(guest_t *guest, phys_addr_t gaddr,
 				phys_addr_t addr, phys_addr_t size,
-				uint32_t exc_flags)
+				uint32_t exclude_flags)
 {
 	unsigned long grpn = gaddr >> PAGE_SHIFT;
 	unsigned long rpn = addr >> PAGE_SHIFT;
 	unsigned long pages = (gaddr + size -
 	                       ((phys_addr_t)grpn << PAGE_SHIFT) +
 	                       (PAGE_SIZE - 1)) >> PAGE_SHIFT;
-	uint32_t flags = PTE_ALL & ~exc_flags;
+	uint32_t flags = PTE_ALL & ~exclude_flags;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 	         "mapping guest %lx to real %lx, %lx pages\n",
@@ -258,7 +258,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	phys_addr_t gaddr;
 	uint32_t reg[4];
 	char buf[32];
-	uint32_t exc_flags = 0;
+	uint32_t exclude_flags = 0;
 
 	pma_node = get_pma_node(node);
 	if (!pma_node || !pma_node->pma)
@@ -274,7 +274,7 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 	pma = pma_node->pma;
 
 	if (dt_get_prop(node, "dma-only", 0))
-		exc_flags |= PTE_VALID;
+		exclude_flags |= PTE_VALID;
 
 	prop = dt_get_prop(node, "guest-addr", 0);
 	if (prop) {
@@ -297,9 +297,9 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		gaddr = pma->start;
 	}
 
-	map_guest_addr_range(guest, gaddr, pma->start, pma->size, exc_flags);
+	map_guest_addr_range(guest, gaddr, pma->start, pma->size, exclude_flags);
 
-	if (!(exc_flags & PTE_VALID)) {
+	if (!(exclude_flags & PTE_VALID)) {
 		add_cpus_to_csd(guest, pma_node);
 
 		snprintf(buf, sizeof(buf), "memory@%llx", gaddr);
