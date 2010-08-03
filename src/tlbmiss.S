@@ -197,7 +197,9 @@ tlb_miss_fast_common:
 	add	%r6, %r3, %r4		   // r6 = "entry" offset
 	lwz	%r11, LONGBYTES*4 + 0(%r6) // r11 = mas3
 	lwz	%r12, LONGBYTES*4 + 4(%r6) // r12 = mas2/mas7/etc. union
+#ifndef CONFIG_LIBOS_64BIT
 	rlwinm	%r4, %r4, 31, 15	   // r4 = tag offset
+#endif
 	LOADX	%r5, %r3, %r4		   // r5 = tag from TLB cache
 
 	mfspr	%r6, SPR_MAS1
