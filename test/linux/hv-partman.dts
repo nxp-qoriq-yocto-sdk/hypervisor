@@ -80,6 +80,7 @@
 	hv:hypervisor-config {
 		compatible = "hv-config";
 		stdout = <&hvbc>;
+		sysreset-on-partition-stop;
 
 		hvbc: byte-channel {
 			compatible = "byte-channel";
