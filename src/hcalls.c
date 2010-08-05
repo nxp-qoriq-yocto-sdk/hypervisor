@@ -884,7 +884,8 @@ void hcall(trapframe_t *regs)
 	vendor_id = HCALL_GET_VENDOR_ID(token);
 	hcall_number = HCALL_GET_NUMBER(token);
 
-	if (vendor_id == EV_VENDOR_ID) {
+	/* FIXME: we support ePAPR vendor id == 0 for temporary backwards compatibility */
+	if (vendor_id == EV_VENDOR_ID || !vendor_id) {
 		if (unlikely(hcall_number >= sizeof(epapr_hcall_table) / sizeof(hcallfp_t))) {
 			regs->gpregs[3] = EV_UNIMPLEMENTED;
 			return;
