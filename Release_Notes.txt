@@ -26,8 +26,8 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 006
-Date: 7/23/2010
+Revsion: 007
+Date: 8/5/2010
 
 -------------------------------------------------------
 Contents
@@ -45,14 +45,28 @@ Contents
 -------------------------------------------------------
 2.  Compatibility/Dependencies
 
-   -embedded-hv v0.7-006 has been tested with Simics 4.2.44 / pre58
+   -embedded-hv v0.7-007 has been tested with Simics 4.2.44 / pre58
     and the P4080DS board
 
-   -in sync with Embedded Hypervisor Reference Manual 0.90,
-    plus updates not yet formally documented (see mailing lists).
+   -in sync with Embedded Hypervisor Reference Manual 0.91
 
 -------------------------------------------------------
 3.  Detailed List of Changes
+
+   -v0.7-007 bug fixes and changes
+       -bug 6049: recursive machine check in HV during Linux boot
+       -bug 5968: NAP-related performance issues on networking tests
+       -bug 6051: perf tools not working under HV
+       -fixed issue where a liodn was deleted, but still use in
+        DMA setup, resulting in a pamu_config_liodn error
+       -rev'ed the ePAPR vendor ID for hcalls to 1 to sync with spec,
+        but still to continue to support 0 for backwards compatibility
+       -64-bit HV: honor MSR[CM] when emulating instructions
+       -paact command fixes and output cleanup
+       -ePAPR hcall vendor ID is now 1, not zero
+       -MSI fixes
+       -watchdog unit test fixes
+       -cleanup
 
    -v0.7-006 bug fixes and changes
        -bug 5840: DMA window RPN reconfigure on device claim
