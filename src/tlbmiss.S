@@ -73,7 +73,7 @@
 	STORE	%r4, LONGBYTES*1(%r2)
 	STORE	%r5, LONGBYTES*2(%r2)
 	STORE	%r6, LONGBYTES*3(%r2)
-	li	%r5, MSR_ME
+	li	%r5, MSR_ME | MSR_RI
 #ifdef CONFIG_LIBOS_64BIT
 	oris	%r5, %r5, MSR_CM@h
 #endif
