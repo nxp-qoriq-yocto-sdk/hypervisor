@@ -97,12 +97,12 @@ static int get_base(queue_t *out, const char *numstr, int *skip)
 		if (numstr[1] == 0 || numstr[1] == ' ')
 			return 10;
 	
-		if (numstr[1] == 'x') {
+		if (numstr[1] == 'x' || numstr[1] == 'X') {
 			*skip = 2;
 			return 16;
 		}
 
-		if (numstr[1] == 'b') {
+		if (numstr[1] == 'b' || numstr[1] == 'B') {
 			*skip = 2;
 			return 2;
 		}
