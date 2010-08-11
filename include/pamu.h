@@ -47,8 +47,6 @@ typedef struct pamu_handle {
 #define OMI_CAAM        0x03
 #define OMI_MAX         0x03  /* define the max index defined */
 
-extern uint32_t liodn_to_handle[];
-
 void pamu_global_init(void);
 void pamu_partition_init(guest_t *guest);
 

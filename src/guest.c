@@ -2746,6 +2746,133 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
+typedef struct {
+	dt_node_t *first;
+	dt_node_t *portal;
+} qman_ctx_t;
+
+/* For each child of a portal, find the corresponding
+ * child of the first portal and copy the liodns.
+ */
+static int qman_portal_fixup_one(dt_node_t *node, void *arg)
+{
+	qman_ctx_t *ctx = arg;
+	dt_node_t *first_child = dt_get_subnode(ctx->first, node->name, 0);
+	dt_prop_t *liodn, *first_liodn;
+
+	/* We only want the children, not the portal itself. */
+	if (ctx->portal == node)
+		return 0;
+
+	if (!first_child) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s/%s has no corresponding child in %s\n",
+		         __func__, node->parent->name, node->name,
+		         ctx->first->name);
+		return 0;
+	}
+
+	liodn = dt_get_prop(node, "fsl,liodn", 0);
+	if (!liodn)
+		return 0;
+	
+	first_liodn = dt_get_prop(first_child, "fsl,liodn", 0);
+	if (!first_liodn) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s/%s has an liodn but %s/%s doesn't\n",
+		         __func__, node->parent->name, node->name,
+		         ctx->first->name, first_child->name);
+		return 0;
+	}
+
+	if (liodn->len != first_liodn->len) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s/%s has %zu liodn bytes but %s/%s has %zu\n",
+		         __func__, node->parent->name, node->name, liodn->len,
+		         ctx->first->name, first_child->name, first_liodn->len);
+		return 0;
+	}
+
+	memcpy(liodn->data, first_liodn->data, liodn->len);
+	return 0;
+}
+
+/* Make sure all owned QMan portals have the same LIODN index. */
+static void qman_portal_liodn_fixup(guest_t *guest)
+{
+	register_t saved;
+	dt_node_t *node;
+	dt_prop_t *prop;
+	dt_node_t *first = NULL;
+	uint32_t *qmanreg;
+	uint32_t liodn_offset;
+	uint32_t mask = 0x03ff0000;
+
+	node = dt_get_first_compatible(hw_devtree, "fsl,qman");
+	if (!node)
+		return;
+
+	dt_lookup_regs(node);
+
+	if (node->dev.num_regs == 0 || node->dev.regs[0].size < 0xbfc) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Couldn't get QMan CCSR regs\n", __func__);
+		return;
+	}
+
+	qmanreg = map(node->dev.regs[0].start, node->dev.regs[0].size,
+	              TLB_MAS2_IO, TLB_MAS3_KERN);
+	if (!qmanreg) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: Couldn't map QMan CCSR regs\n", __func__);
+		return;
+	}
+
+	/* If this is p4080 rev 1, liodn offsets are only 6 bits,
+	 * and SDEST overlaps.
+	 */
+	if (in32(&qmanreg[0xbf8/4]) == 0x0a010100)
+		mask = 0x003f0000;
+
+	saved = spin_lock_intsave(&dt_owner_lock);
+
+	list_for_each(&guest->dev_list, i) {
+		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+		node = owner->hwnode;
+
+		if (!dt_node_is_compatible(node, "fsl,qman-portal"))
+			continue;
+
+		prop = dt_get_prop(node, "cell-index", 0);
+		if (!prop || prop->len < 4) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: no cell-index in %s\n",
+			         __func__, node->name);
+			continue;
+		}
+
+		int portal = *(const uint32_t *)prop->data;
+
+		if (!first) {
+			first = node;
+			liodn_offset = in32(&qmanreg[portal * 4]) & mask;
+			continue;
+		}
+
+		out32(&qmanreg[portal * 4],
+		      (in32(&qmanreg[portal * 4]) & ~mask) | liodn_offset);
+
+		qman_ctx_t ctx = {
+			.first = first,
+			.portal = node
+		};
+
+		dt_for_each_node(node, &ctx, qman_portal_fixup_one, NULL);
+	}
+
+	spin_unlock_intsave(&dt_owner_lock, saved);
+}
+
 static int init_guest_devs(guest_t *guest)
 {
 	int ret;
@@ -2755,6 +2882,7 @@ static int init_guest_devs(guest_t *guest)
 	vmpic_partition_init(guest);
 
 	dt_assign_devices(guest->partition, guest);
+	qman_portal_liodn_fixup(guest);
 
 	/* First, merge each assigned device and its sub-tree, and
 	 * apply node-update.  It is done with dt_for_each_node rather

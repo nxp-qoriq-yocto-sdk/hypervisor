@@ -208,6 +208,9 @@ typedef struct guest {
 
 	/** VCPU used for sending critical interrupts to global manager */
 	struct gcpu *err_destcpu;
+
+	/** portal-devices node under partition config node */
+	dt_node_t *portal_devs;
 } guest_t;
 
 #define MAX_PARTITIONS 8

@@ -152,9 +152,7 @@
 			device = "/bman-portals/buffer-pool@0";
 		};
 
-		qman-portalA {
-			device = "/qman-portals/qman-portal@0";
-			vcpu = <0>;
+		portal-devices {
 			fman0 {
 				device = "fman0";
 				dma-window = <&window0>;
@@ -171,12 +169,19 @@
 				device = "pme";
 				dma-window = <&window0>;
 			};
+		};
+
+		qman-portalA {
+			device = "/qman-portals/qman-portal@0";
+			vcpu = <0>;
+
 			stash-mem {
 				liodn-index = <0>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 			};
+
 			stash-dqrr {
 				liodn-index = <1>;
 				dma-window = <&window0>;
@@ -184,7 +189,6 @@
 				stash-dest = <1>;
 				snoop-cpu-only;
 			};
-
 		};
 
 		qman-pool@1 {

@@ -53,7 +53,7 @@ static const char *pamu_err_policy[PAMU_ERROR_COUNT];
 /* mcheck-safe lock, used to ensure atomicity of reassignment */
 static uint32_t pamu_error_lock;
 
-uint32_t liodn_to_handle[PAACE_NUMBER_ENTRIES];
+static pamu_handle_t *liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
 static uint32_t pamu_lock;
 
@@ -675,6 +675,13 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 
 	if (ppaace->wse) {
 		spin_unlock_intsave(&pamu_lock, saved);
+
+		/* QMan portal devices have multiple nodes sharing
+		 * an liodn.
+		 */
+		if (dt_node_is_compatible(hwnode->parent, "fsl,qman-portal"))
+			return 0;
+
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: liodn %d or device in use\n", __func__, liodn);
 		return ERR_BUSY;
@@ -1045,7 +1052,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	guest_t *guest = liodn_to_guest[av_liodn];
 	if (guest) {
 		pamu->lpid = guest->lpid;
-		pamu->liodn_handle = liodn_to_handle[av_liodn];
+		pamu->liodn_handle = liodn_to_handle[av_liodn]->user.id;
 		dt_node_t *node = get_dev_node(pamu->liodn_handle, guest);
 		if (node)
 			dt_get_path(NULL, node, err.gdev_tree_path, sizeof(err.gdev_tree_path));
@@ -1279,10 +1286,6 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 
 	/* Enable all relevant PAMU(s) */
 	out32(pamubypenr_ptr, pamubypenr);
-
-	for (int i = 0; i < PAACE_NUMBER_ENTRIES; i++)
-		liodn_to_handle[i] = -1;
-
 	return 0;
 
 fail_pma:
@@ -1330,12 +1333,12 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	pamu_handle_t *ph = to_container(action, pamu_handle_t, claim_action);
 	uint32_t liodn = ph->assigned_liodn;
 	guest_t *oldguest = liodn_to_guest[liodn];
-	uint32_t oldhandle = liodn_to_handle[liodn];
+	pamu_handle_t *oldhandle = liodn_to_handle[liodn];
 	uint32_t saved;
 	
 	saved = spin_lock_mchksave(&pamu_error_lock);
 
-	liodn_to_handle[liodn] = ph->user.id;
+	liodn_to_handle[liodn] = ph;
 	liodn_to_guest[liodn] = owner->guest;
 
 	spin_unlock_mchksave(&pamu_error_lock, saved);
@@ -1356,7 +1359,7 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	}
 
 	migrate_access_violations(owner->guest, &oldguest->error_event_queue,
-	                          oldhandle, ph->user.id);
+	                          oldhandle->user.id, ph->user.id);
 
 	return 0;
 }
@@ -1364,16 +1367,46 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 
 static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 {
+	guest_t *guest = owner->guest;
 	dt_prop_t *prop;
 
 	if (!dt_node_is_compatible(hwnode->parent, "fsl,qman-portal")) {
 		return owner->cfgnode;  /* normal case */
 	}
 
-	/* if parent of hwnode is fsl,qman-portal it's a special case */
+	/* If parent of hwnode is fsl,qman-portal it's a special case.
+	 *
+	 * DMA config for portal devices should be described in the
+	 * children of the partition's portal-devices node.  This config
+	 * is shared among all the partition's portals.
+	 *
+	 * For legacy transition, if portal-devices is not present,
+	 * we use the first set of children of the qman device config
+	 * node that we find.  Regardless of whether portal-devices is
+	 * present, if any portal has child device config nodes, warn.
+	 */
+	list_for_each(&owner->cfgnode->children, i) {
+		dt_node_t *config_child = to_container(i, dt_node_t, child_node);
+
+		/* look for nodes with a "device" property */
+		const char *s = dt_get_prop_string(config_child, "device");
+		if (!s)
+			continue;
+
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_WARN, "%s: warning: "
+		         "%s/%s should go under portal-devices node\n",
+		         __func__, owner->cfgnode->name, config_child->name);
+	}
+
+	if (!guest->portal_devs) {
+		guest->portal_devs =
+			dt_get_subnode(guest->partition, "portal-devices", 0);
+		if (!guest->portal_devs)
+			guest->portal_devs = owner->cfgnode;
+	}
 
 	/* iterate over all children of the config node */
-	list_for_each(&owner->cfgnode->children, i) {
+	list_for_each(&owner->guest->portal_devs->children, i) {
 		dt_node_t *config_child = to_container(i, dt_node_t, child_node);
 
 		/* look for nodes with a "device" property */
@@ -1406,7 +1439,7 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 	}
 
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-	         "%s: no config node found for %s\n",
+	         "%s: no config node found for %s, check portal-devices\n",
 	         __func__, owner->hwnode->name);
 
 	return NULL;
@@ -1562,6 +1595,9 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 				         "should not have a DMA config\n",
 				         __func__, cfgnode->name);
 			}
+
+			/* We want a separate handle for each partition */
+			pamu_handle = NULL;
 		} else {
 			if (!ctx.cfgnode) { /* error */
 				free(dma_handles);
@@ -1573,26 +1609,36 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 				free(dma_handles);
 				return 0;
 			}
+
+			/* Don't allocate a new handle if it's a QMan
+			 * portal device that's already been configured.
+			 */
+			pamu_handle = liodn_to_handle[liodn[i]];
 		}
 
-		pamu_handle = alloc_type(pamu_handle_t);
-		if (!pamu_handle)
-			goto nomem;
+		if (!pamu_handle) {
+			pamu_handle = alloc_type(pamu_handle_t);
+			if (!pamu_handle)
+				goto nomem;
 
-		pamu_handle->assigned_liodn = liodn[i];
-		pamu_handle->user.pamu = pamu_handle;
-		pamu_handle->user.ops = &pamu_handle_ops;
+			pamu_handle->assigned_liodn = liodn[i];
+			pamu_handle->user.pamu = pamu_handle;
+			pamu_handle->user.ops = &pamu_handle_ops;
 
-		if (dt_get_prop(ctx.cfgnode, "no-dma-disable", 0))
-			pamu_handle->no_dma_disable = 1;
+			if (dt_get_prop(ctx.cfgnode, "no-dma-disable", 0))
+				pamu_handle->no_dma_disable = 1;
 
-		ret = alloc_guest_handle(owner->guest, &pamu_handle->user);
-		if (ret < 0) {
-			free(dma_handles);
-			return ret;
+			ret = alloc_guest_handle(owner->guest,
+			                         &pamu_handle->user);
+			if (ret < 0) {
+				free(dma_handles);
+				return ret;
+			}
+		} else {	
+			assert(pamu_handle->user.handle_owner == owner->guest);
 		}
 
-		dma_handles[i] = ret;
+		dma_handles[i] = pamu_handle->user.id;
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 		pamu_handle->claim_action.claim = claim_dma;
@@ -1601,7 +1647,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 #endif
 
 		if (!standby) {
-			liodn_to_handle[liodn[i]] = ret;
+			liodn_to_handle[liodn[i]] = pamu_handle;
 			mbar(1);
 
 			if (pamu_handle->no_dma_disable ||
