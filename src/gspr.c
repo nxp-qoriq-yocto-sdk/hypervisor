@@ -730,8 +730,12 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		break;
 
 	case SPR_L2CSR0:
-		if (gcpu->guest->guest_cache_lock)
-			mask = L2CSR0_L2LFC | L2CSR0_L2FCID | L2CSR0_L2SLC | L2CSR0_L2LO;
+		if (gcpu->guest->guest_cache_lock) {
+			mask = L2CSR0_L2LFC | L2CSR0_L2FCID |
+			       L2CSR0_L2SLC | L2CSR0_L2LO |
+			       L2CSR0_L2WP | L2CSR0_L2IO | L2CSR0_L2DO;
+		}
+
 		set_spr_val(SPR_L2CSR0, val, mask);
 		break;
 
