@@ -26,32 +26,20 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 007
-Date: 8/5/2010
+Revsion: 008
+Date: 8/13/2010
 
--------------------------------------------------------
-Contents
+This document identifies changes between Embedded
+Hypervisor releases.
 
-1. Introduction
-2. Compatibility/Dependencies
-3. Detailed List of Changes
+Detailed List of Changes
 
--------------------------------------------------------
-1.  Introduction
-
-   This document identifies changes between Embedded
-   Hypervisor releases.
-
--------------------------------------------------------
-2.  Compatibility/Dependencies
-
-   -embedded-hv v0.7-007 has been tested with Simics 4.2.44 / pre58
-    and the P4080DS board
-
-   -in sync with Embedded Hypervisor Reference Manual 0.91
-
--------------------------------------------------------
-3.  Detailed List of Changes
+   -v0.7-008 bug fixes and changes
+       -bug 6052: use same liodn offset for all Qman portals within
+        a partition
+       -bug 6096: allow guests to partition L2 cache
+       -bug 5975: failure in cache-A unit test
+       -Fix build with make 3.82
 
    -v0.7-007 bug fixes and changes
        -bug 6049: recursive machine check in HV during Linux boot
