@@ -103,16 +103,19 @@ static void cache_lock_perf_test(void)
 
 	/* Following function call ensures that the function is in instruction cache */
 	i = get_diff();
-
+	sync();
 	evict_cache();
-
+	sync();
+	isync();
 	diff = get_diff();
 
 	for (i = 0; i< 4096; i += 64)
 		asm volatile("dcblc %0, 0, %1" : : "i" (ct),"r" (&arr[i]): "memory");
 
+	sync();
 	evict_cache();
-
+	sync();
+	isync();
 	diff1  = get_diff();
 
 	printf("Cache locking performance test -- %s\n", (diff1 > diff)? "PASSED" : "FAILED");
