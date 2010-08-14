@@ -45,13 +45,18 @@ $(O).config $(O)include/config/auto.conf.cmd: ;
 
 -include $(O)include/config/auto.conf.cmd
 
-CONFIGS := config xconfig gconfig menuconfig oldconfig silentoldconfig randconfig defconfig allyesconfig allnoconfig %_defconfig
+CONFIGS1 := config xconfig gconfig menuconfig oldconfig silentoldconfig randconfig defconfig allyesconfig allnoconfig
+CONFIGS2 := %_defconfig
+CONFIGS   = $(CONFIGS1) $(CONFIGS2)
 
 $(O)include/config/auto.conf: $(O).config $(O)include/config/auto.conf.cmd Kconfig $(LIBOS_DIR)/Kconfig
 	@$(MAKE) silentoldconfig
 
 .PHONY: FORCE
-help $(CONFIGS): FORCE
+help $(CONFIGS1): FORCE
+	@$(MKDIR) $(O)bin/
+	@$(MAKE) -C $(O) -f $(src)kconfig/Makefile $@
+$(CONFIGS2): FORCE
 	@$(MKDIR) $(O)bin/
 	@$(MAKE) -C $(O) -f $(src)kconfig/Makefile $@
 
