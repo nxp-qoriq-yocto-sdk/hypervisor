@@ -242,6 +242,10 @@ void reflect_watchdog(gcpu_t *gcpu, trapframe_t *regs)
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_WDOG];
 	regs->srr1 &= MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI;
+#ifdef CONFIG_LIBOS_64BIT
+	if (mfspr(SPR_EPCR) & EPCR_GICM)
+		regs->srr1 |= MSR_CM;
+#endif
 }
 
 /**

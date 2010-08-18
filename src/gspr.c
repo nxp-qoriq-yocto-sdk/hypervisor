@@ -425,12 +425,21 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val = mfspr(SPR_DEVENT);
 		break;
 
+	case SPR_EPCR:
+#ifdef CONFIG_LIBOS_64BIT
+		*val = 0;
+		if (mfspr(SPR_EPCR) & EPCR_GICM)
+			*val = EPCR_ICM;
+		break;
+#else
+		return 1;
+#endif
+
 	/* Removed Registers are not part of the vcpu and should fail. */
 	case SPR_MSRP:
 	case SPR_MAS5:
 	case SPR_MAS8:
 	case SPR_DBSRWR:
-	case SPR_EPCR:
 	case SPR_LPIDR:
 	case SPR_IVOR0:
 	case SPR_IVOR38:
@@ -577,6 +586,10 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 
 	case SPR_EPCR:
 		/* no-op on 32-bit */
+#ifdef CONFIG_LIBOS_64BIT
+		if (val & EPCR_ICM)
+			mtspr(SPR_EPCR, mfspr(SPR_EPCR) | EPCR_GICM);
+#endif
 		break;
 
 	case SPR_TSR:

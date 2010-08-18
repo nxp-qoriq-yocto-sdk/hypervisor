@@ -100,6 +100,10 @@ void reflect_trap(trapframe_t *regs)
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[regs->exc];
 	regs->srr1 &= MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI;
+#ifdef CONFIG_LIBOS_64BIT
+	if (mfspr(SPR_EPCR) & EPCR_GICM)
+		regs->srr1 |= MSR_CM;
+#endif
 }
 
 void debug_trap(trapframe_t *regs)
@@ -127,6 +131,10 @@ void debug_trap(trapframe_t *regs)
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DEBUG];
 	regs->srr1 &= MSR_GS | MSR_UCLE | MSR_RI;
+#ifdef CONFIG_LIBOS_64BIT
+	if (mfspr(SPR_EPCR) & EPCR_GICM)
+		regs->srr1 |= MSR_CM;
+#endif
 }
 
 void guest_doorbell(trapframe_t *regs)
@@ -157,6 +165,10 @@ void guest_doorbell(trapframe_t *regs)
 		
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_EXT_INT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+#ifdef CONFIG_LIBOS_64BIT
+		if (mfspr(SPR_EPCR) & EPCR_GICM)
+			regs->srr1 |= MSR_CM;
+#endif
 		goto check_flags;
 	}
 no_virq:
@@ -170,7 +182,10 @@ no_virq:
 		 */
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_FIT];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
-
+#ifdef CONFIG_LIBOS_64BIT
+		if (mfspr(SPR_EPCR) & EPCR_GICM)
+			regs->srr1 |= MSR_CM;
+#endif
 		goto check_flags;
 	}
 
@@ -178,6 +193,10 @@ no_virq:
 	if ((gcpu->gtcr & TCR_DIE) && (gcpu->gtsr & TSR_DIS)) {
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DECR];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+#ifdef CONFIG_LIBOS_64BIT
+		if (mfspr(SPR_EPCR) & EPCR_GICM)
+			regs->srr1 |= MSR_CM;
+#endif
 		goto check_flags;
 	}
 
@@ -185,6 +204,10 @@ no_virq:
 		atomic_and(&gcpu->gdbell_pending, ~GCPU_PEND_MSGSND);
 		regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_DOORBELL];
 		regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+#ifdef CONFIG_LIBOS_64BIT
+		if (mfspr(SPR_EPCR) & EPCR_GICM)
+			regs->srr1 |= MSR_CM;
+#endif
 		goto check_flags;
 	}
 
@@ -198,6 +221,10 @@ no_virq:
 			regs->srr0 = gcpu->ivpr | gcpu->ivor[EXC_PERFMON];
 			regs->srr1 = gsrr1 & (MSR_CE | MSR_ME | MSR_DE |
 			                      MSR_GS | MSR_UCLE | MSR_RI);
+#ifdef CONFIG_LIBOS_64BIT
+			if (mfspr(SPR_EPCR) & EPCR_GICM)
+				regs->srr1 |= MSR_CM;
+#endif
 			goto check_flags;
 		}
 	}
@@ -261,6 +288,10 @@ void reflect_crit_int(trapframe_t *regs, int trap_type)
 
 	regs->srr0 = gcpu->ivpr | gcpu->ivor[trap_type];
 	regs->srr1 &= (MSR_ME | MSR_DE | MSR_GS | MSR_UCLE | MSR_RI);
+#ifdef CONFIG_LIBOS_64BIT
+	if (mfspr(SPR_EPCR) & EPCR_GICM)
+		regs->srr1 |= MSR_CM;
+#endif
 }
 
 static int check_crit_int_event(gcpu_t *gcpu, trapframe_t *regs)
