@@ -282,9 +282,9 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 
 		size_t len = 0x1000;
 #if 1
-		pci_ctrl = map_gphys(TEMPTLB1, guest->gphys, pcie_addr,
-		                     temp_mapping[0], &len, TLB_TSIZE_4K,
-		                     TLB_MAS2_IO, 0);
+		pci_ctrl = map_phys(TEMPTLB1, pcie_addr, temp_mapping[0],
+		                    &len, TLB_TSIZE_4K, TLB_MAS2_IO,
+		                    TLB_MAS3_KDATA);
 #else
 /* Needed if PCIe virtualization is enabled */
 		if (node->vf)
@@ -1218,7 +1218,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	pamu_node->pma->size = pamumem_size;
 
 	pamubypenr_ptr = map(guts_addr + PAMUBYPENR, 4,
-	                     TLB_MAS2_IO, TLB_MAS3_KERN);
+	                     TLB_MAS2_IO, TLB_MAS3_KDATA);
 	pamubypenr = in32(pamubypenr_ptr);
 
 

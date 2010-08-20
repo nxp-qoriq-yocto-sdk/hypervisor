@@ -230,7 +230,7 @@ vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start,
 	vf->callback = callback;
 
 	// Get a permanent hypervisor virtual address
-	vf->vaddr = map(phys_start, size, TLB_MAS2_IO, TLB_MAS3_KERN);
+	vf->vaddr = map(phys_start, size, TLB_MAS2_IO, TLB_MAS3_KDATA);
 	vf->data = priv;
 
 	// Each guest has its own list

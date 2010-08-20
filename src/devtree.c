@@ -1283,7 +1283,8 @@ void dt_lookup_regs(dt_node_t *node)
 		/* Create virtual mappings for HV-owned devices */
 		if (dt_owned_by_nolock(node, NULL))
 			node->dev.regs[i].virt = map(addr, size,
-			                             TLB_MAS2_IO, TLB_MAS3_KERN);
+			                             TLB_MAS2_IO,
+			                             TLB_MAS3_KDATA);
 	}
 
 out:

@@ -2821,7 +2821,7 @@ static void qman_portal_liodn_fixup(guest_t *guest)
 	}
 
 	qmanreg = map(node->dev.regs[0].start, node->dev.regs[0].size,
-	              TLB_MAS2_IO, TLB_MAS3_KERN);
+	              TLB_MAS2_IO, TLB_MAS3_KDATA);
 	if (!qmanreg) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
 		         "%s: Couldn't map QMan CCSR regs\n", __func__);

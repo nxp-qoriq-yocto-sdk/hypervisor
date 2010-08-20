@@ -1486,11 +1486,14 @@ ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
  * @param[in] paddr Guest physical address to map
  * @param[in] vpage Virtual base of window to hold mapping
  * @param[inout] len Length of the actual mapping
+ * @param[in] maxtsize tsize of virtual address window
  * @param[in] mas2flags WIMGE bits, typically TLB_MAS2_IO or TLB_MAS2_MEM
+ * @param[in] mas3flags permissions, typically TLB_MAS3_KERN or TLB_MAS3_KDATA
  * @return the virtual address that corresponds to paddr.
  */
 void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
-               size_t *len, int maxtsize, register_t mas2flags)
+               size_t *len, int maxtsize, register_t mas2flags,
+               register_t mas3flags)
 {
 	size_t offset, bytesize;
 	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
@@ -1504,7 +1507,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 
 	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
 	                    paddr & ~((phys_addr_t)bytesize - 1),
-	                    tsize, mas2flags, TLB_MAS3_KERN, 0, 0, TLB_MAS8_HV);
+	                    tsize, mas2flags, mas3flags, 0, 0, TLB_MAS8_HV);
 
 	*len = min(bytesize - offset, *len);
 	return vpage + offset;
@@ -1526,7 +1529,8 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
 		void *vsrc;
 
 		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-		                &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
+		                &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
+		                TLB_MAS3_KERN);
 		if (!vsrc)
 			break;
 
@@ -1562,7 +1566,8 @@ phys_addr_t zero_to_phys(phys_addr_t dest, phys_addr_t len)
 			chunk = 1UL << ilog2(chunk);
 
 		vdest = map_phys(TEMPTLB1, dest, temp_mapping[0],
-		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
+		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
+		                 TLB_MAS3_KERN);
 		if (!vdest)
 			break;
 
@@ -1599,7 +1604,8 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 		if (!schunk) {
 			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
 			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
-			                &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM);
+			                &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
+			                TLB_MAS3_KERN);
 			if (!vsrc) {
 				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
 				         "%s: cannot map src %llx, %zu bytes\n",

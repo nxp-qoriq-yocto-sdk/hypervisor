@@ -154,7 +154,8 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
                 void *vpage, size_t *len, int maxtsize, register_t mas2flags,
                 int write);
 void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
-               size_t *len, int maxtsize, register_t mas2flags);
+               size_t *len, int maxtsize, register_t mas2flags,
+               register_t mas3flags);
 
 size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len,
                      int cache_sync);

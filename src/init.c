@@ -187,9 +187,9 @@ static void *map_fdt(phys_addr_t devtree_ptr)
 
 	/* Map guarded, as we don't know where the end of memory is yet. */
 	vaddr = map_phys(TEMPTLB1, mapaddr, temp_mapping[0], &len,
-	                 TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G);
+	                 TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G, TLB_MAS3_KDATA);
 	map_phys(TEMPTLB2, mapaddr + mapsize, temp_mapping[0] + mapsize,
-	         &len, TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G);
+	         &len, TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G, TLB_MAS3_KDATA);
 
 	vaddr += devtree_ptr & (mapsize - 1);
 
@@ -759,7 +759,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	CCSRBAR_PA = get_ccsr_phys_addr(&ccsr_size);
 	if (CCSRBAR_PA)
 		CCSRBAR_VA = (unsigned long)map(CCSRBAR_PA, ccsr_size,
-                                                TLB_MAS2_IO, TLB_MAS3_KERN);
+                                                TLB_MAS2_IO, TLB_MAS3_KDATA);
 
 	get_addr_format_nozero(hw_devtree, &rootnaddr, &rootnsize);
 
@@ -874,7 +874,8 @@ static int release_secondary(dt_node_t *node, void *arg)
 
 	size_t len = sizeof(struct boot_spin_table);
 	void *table_va = map_phys(TEMPTLB1, table, temp_mapping[0],
-	                          &len, TLB_TSIZE_16M, TLB_MAS2_IO);
+	                          &len, TLB_TSIZE_16M, TLB_MAS2_IO,
+	                          TLB_MAS3_KDATA);
 
 	if (len != sizeof(struct boot_spin_table)) {
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
