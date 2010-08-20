@@ -1051,13 +1051,13 @@ static int print_pre(dt_node_t *tree, void *arg)
 			    strstr(prop->name, "-speed") ||
 			    strstr(prop->name, "-len") ||
 			    strstr(prop->name, "-index") ||
-			    strstr(prop->name, "num-")) {
+			    strstr(prop->name, "num-") ||
+			    strstr(prop->name, "handle")) {
 				print_cells(ctx, prop, 1);
 				goto done;
 			}
 
-			if (strstr(prop->name, "handle") ||
-			    !strcmp(prop->name, "reg") ||
+			if (!strcmp(prop->name, "reg") ||
 			    strstr(prop->name, "ranges") ||
 			    strstr(prop->name, "interrupt")) {
 				print_cells(ctx, prop, 0);
