@@ -180,31 +180,24 @@ uint32_t rootnaddr, rootnsize;
 static void *map_fdt(phys_addr_t devtree_ptr)
 {
 	const size_t mapsize = 4 * 1024 * 1024;
+	phys_addr_t mapaddr = devtree_ptr & ~((phys_addr_t)mapsize - 1);
 	size_t len = mapsize;
+	size_t total = 0;
 	void *vaddr;
 
 	/* Map guarded, as we don't know where the end of memory is yet. */
-	vaddr = map_phys(TEMPTLB1, devtree_ptr & ~((phys_addr_t)mapsize - 1),
-	                 temp_mapping[0], &len, TLB_TSIZE_16M,
-	                 TLB_MAS2_MEM | MAS2_G);
+	vaddr = map_phys(TEMPTLB1, mapaddr, temp_mapping[0], &len,
+	                 TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G);
+	map_phys(TEMPTLB2, mapaddr + mapsize, temp_mapping[0] + mapsize,
+	         &len, TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G);
 
 	vaddr += devtree_ptr & (mapsize - 1);
 
-	/* If the fdt was near the end of a 4MiB page, then we need
-	 * another mapping.
+	/* We handle trees that straddle one 4MiB boundary, but we
+	 * don't support trees larger than 4MiB.
 	 */
-	if (len < sizeof(struct fdt_header) ||
-	    len < fdt_totalsize(vaddr)) {
-		devtree_ptr += len;
-		len = mapsize;
-
-		map_phys(TEMPTLB2, devtree_ptr, temp_mapping[0] + mapsize,
-		         &len, TLB_TSIZE_16M, TLB_MAS2_MEM | MAS2_G);
-
-		/* We don't handle flat trees larger than 4MiB. */
-		assert (len >= sizeof(struct fdt_header));
-		assert (len >= fdt_totalsize(vaddr));
-	}
+	assert(mapsize * 2 - (devtree_ptr & (mapsize - 1)) >
+	       fdt_totalsize(vaddr));
 
 	return vaddr;
 }
