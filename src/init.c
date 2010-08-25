@@ -396,10 +396,9 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 
 	unmap_fdt();
 
-	malloc_init();
-
 	if (reloc_hv) {
-		void *new_text = memalign(hv_text_size, hv_text_size);
+		void *new_text = malloc_alloc_segment(&_end - &_start,
+		                                      hv_text_size);
 		if (!new_text) {
 			printf("Cannot relocate hypervisor\n");
 			return ERR_NOMEM;
@@ -412,6 +411,7 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 		                text_phys >> 32);
 	}
 
+	malloc_init();
 	return 0;
 }
 
