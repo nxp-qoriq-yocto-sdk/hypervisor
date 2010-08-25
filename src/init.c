@@ -36,6 +36,7 @@
 #include <libos/ns16550.h>
 #include <libos/interrupts.h>
 #include <libos/alloc.h>
+#include <libos/queue.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -57,6 +58,7 @@
 queue_t hv_global_event_queue;
 uint32_t hv_queue_prod_lock;
 uint32_t hv_queue_cons_lock;
+static phys_addr_t devtree_ptr;
 
 static gcpu_t noguest[MAX_CORES] = {
 	{
@@ -177,10 +179,10 @@ static int mpic_probe(driver_t *drv, device_t *dev)
 
 uint32_t rootnaddr, rootnsize;
 
-static void *map_fdt(phys_addr_t devtree_ptr)
+static void *map_fdt(phys_addr_t treephys)
 {
 	const size_t mapsize = 4 * 1024 * 1024;
-	phys_addr_t mapaddr = devtree_ptr & ~((phys_addr_t)mapsize - 1);
+	phys_addr_t mapaddr = treephys & ~((phys_addr_t)mapsize - 1);
 	size_t len = mapsize;
 	size_t total = 0;
 	void *vaddr;
@@ -191,13 +193,17 @@ static void *map_fdt(phys_addr_t devtree_ptr)
 	map_phys(TEMPTLB2, mapaddr + mapsize, temp_mapping[0] + mapsize,
 	         &len, TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G, TLB_MAS3_KDATA);
 
-	vaddr += devtree_ptr & (mapsize - 1);
+	vaddr += treephys & (mapsize - 1);
 
 	/* We handle trees that straddle one 4MiB boundary, but we
 	 * don't support trees larger than 4MiB.
 	 */
-	assert(mapsize * 2 - (devtree_ptr & (mapsize - 1)) >
-	       fdt_totalsize(vaddr));
+	if (mapsize * 2 - (treephys & (mapsize - 1)) < fdt_totalsize(vaddr)) {
+		if (cpu->crashing)
+			return NULL;
+
+		panic("fdt too large: %zu bytes\n", fdt_totalsize(vaddr));
+	}
 
 	return vaddr;
 }
@@ -213,7 +219,7 @@ static void unmap_fdt(void)
 
 extern queue_t early_console;
 
-static int get_cfg_addr(phys_addr_t devtree_ptr, phys_addr_t *cfg_addr)
+static int get_cfg_addr(phys_addr_t *cfg_addr)
 {
 	void *fdt;
 	char *str, *numstr;
@@ -362,7 +368,7 @@ static void process_hv_mem(void *fdt, int offset, int add)
 /* Note that we do not verify that a PMA is covered by a hw memory node,
  * or that guest PMAs are not covered by memreserve areas.
  */
-static int init_hv_mem(phys_addr_t devtree_ptr, phys_addr_t cfg_addr)
+static int init_hv_mem(phys_addr_t cfg_addr)
 {
 	void *fdt;
 	int offset;
@@ -692,12 +698,91 @@ phys_addr_t get_ccsr_phys_addr(size_t *ccsr_size)
 	return addr;
 }
 
-void libos_client_entry(unsigned long devtree_ptr)
+/* Push output directly through a serial port if the configured
+ * console is not set up yet.  Once a real console is configured,
+ * set_crashing()
+ */
+void __attribute__((noreturn)) panic_flush(void)
+{
+	phys_addr_t phys, size;
+	uint8_t *addr;
+	int len;
+	size_t mapsize = 8;
+	int ret;
+
+	set_crashing(1);
+
+	void *fdt = map_fdt(devtree_ptr);
+	if (!fdt)
+		goto guess;
+
+	/* stdout alias? */
+	int node = fdt_path_offset(fdt, "stdout");
+	if (node >= 0)
+		goto gotnode;
+
+	/* linux,stdout-path? */
+	node = fdt_path_offset(fdt, "/chosen");
+	if (node >= 0) {
+		const char *path = fdt_getprop(fdt, node, "linux,stdout-path",
+		                               &len);
+		if (path) {
+			node = fdt_path_offset(fdt, path);
+			if (node >= 0)
+				goto gotnode;
+		}
+	}
+
+	/* Any 16550 at all? */
+	node = fdt_node_offset_by_compatible(fdt, -1, "ns16550");
+	if (node < 0)
+		goto guess;
+
+gotnode:
+	if (!fdt_get_reg(fdt, node, 0, &phys, &size))
+		goto gotphys;
+
+guess:
+	/* It's worth a shot... */
+	phys = 0xffe11c500ULL;
+gotphys:
+	addr = map_phys(TEMPTLB1, phys, temp_mapping[0], &mapsize,
+	                TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KDATA);
+
+	int ch;
+	while ((ch = queue_readchar(&consolebuf, 0)) >= 0) {
+		while (!(in8(&addr[NS16550_LSR]) & NS16550_LSR_THRE))
+			;
+
+		out8(&addr[NS16550_THR], ch);
+	}
+
+die:
+	for (;;)
+		;
+}
+
+void __attribute__((noreturn)) panic(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+
+	printf("panic: ");
+	int ret = vprintf(fmt, args);
+
+	va_end(args);
+
+	panic_flush();
+}
+
+void libos_client_entry(unsigned long treephys)
 {
 	phys_addr_t cfg_addr = 0;
 	size_t ccsr_size;
 	void *fdt;
 	int ret;
+
+	devtree_ptr = treephys;
 
 	sched_init();
 	sched_core_init(cpu);
@@ -711,50 +796,38 @@ void libos_client_entry(unsigned long devtree_ptr)
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
-	ret = get_cfg_addr(devtree_ptr, &cfg_addr);
+	ret = get_cfg_addr(&cfg_addr);
 	if (ret < 0)
-		return;
+		panic("couldn't get config tree address\n");
 
-	ret = init_hv_mem(devtree_ptr, cfg_addr);
+	ret = init_hv_mem(cfg_addr);
 	if (ret < 0)
-		return;
+		panic("init_hv_mem failed\n");
 
 	cpu->console_ok = 1;
 	core_init();
 
 	fdt = map_fdt(devtree_ptr);
 	hw_devtree = unflatten_dev_tree(fdt);
-	if (!hw_devtree) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
-		         "panic: couldn't unflatten hardware device tree.\n");
-		return;
-	}
+	if (!hw_devtree)
+		panic("couldn't unflatten hardware device tree.\n");
 
 	unmap_fdt();
 
 	fdt = map_fdt(cfg_addr);
 	config_tree = unflatten_dev_tree(fdt);
-	if (!config_tree) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
-		         "panic: couldn't unflatten config device tree.\n");
-		return;
-	}
+	if (!config_tree)
+		panic("couldn't unflatten config device tree.\n");
 
 	unmap_fdt();
 
 	virtual_tree = create_dev_tree();
-	if (!virtual_tree) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
-			 "panic: couldn't allocate virtual tree\n");
-		return;
-	}
+	if (!virtual_tree)
+		panic("couldn't allocate virtual tree\n");
 
 	hvconfig = dt_get_first_compatible(config_tree, "hv-config");
-	if (!hvconfig) {
-		printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,
-		         "panic: no hv-config node.\n");
-		return;
-	}
+	if (!hvconfig)
+		panic("no hv-config node.\n");
 
 	CCSRBAR_PA = get_ccsr_phys_addr(&ccsr_size);
 	if (CCSRBAR_PA)

@@ -371,4 +371,13 @@ typedef struct pma {
 
 uint64_t dt_get_timebase_freq(void);
 
+int fdt_xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
+                      uint32_t *addrbuf, phys_addr_t *size,
+                      uint32_t naddr, uint32_t nsize);
+int fdt_xlate_reg(const void *tree, int node, const uint32_t *reg,
+                  phys_addr_t *addr, phys_addr_t *size);
+int fdt_get_reg(const void *tree, int node, int res,
+                phys_addr_t *addr, phys_addr_t *size);
+
+
 #endif

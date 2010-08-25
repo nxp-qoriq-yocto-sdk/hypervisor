@@ -383,6 +383,117 @@ int dt_get_reg(dt_node_t *node, int res,
 	return xlate_reg(node, &reg[(naddr + nsize) * res], addr, size);
 }
 
+int fdt_xlate_reg_raw(const void *tree, int node, const uint32_t *reg,
+                      uint32_t *addrbuf, phys_addr_t *size,
+                      uint32_t naddr, uint32_t nsize)
+{
+	uint32_t prev_naddr, prev_nsize;
+	const uint32_t *ranges;
+	int len, ret;
+
+	int parent = fdt_parent_offset(tree, node);
+	if (parent < 0)
+		return parent;
+
+	copy_val(addrbuf, reg, naddr);
+
+	if (size) {
+		*size = reg[naddr];
+		if (nsize == 2) {
+			*size <<= 32;
+			*size |= reg[naddr + 1];
+		}
+	}
+
+	for (;;) {
+		prev_naddr = naddr;
+		prev_nsize = nsize;
+		node = parent;
+
+		parent = fdt_parent_offset(tree, node);
+		if (parent == -FDT_ERR_NOTFOUND)
+			break;
+		if (parent < 0)
+			return parent;
+
+		ret = fdt_get_addr_format(tree, parent, &naddr, &nsize);
+		if (ret < 0)
+			return ret;
+
+		ranges = fdt_getprop(tree, node, "ranges", &len);
+		if (!ranges) {
+			if (len == -FDT_ERR_NOTFOUND)
+				return ERR_NOTRANS;
+
+			return len;
+		}
+
+		if (len == 0)
+			continue;
+		if (len % 4)
+			return ERR_BADTREE;
+
+		ret = xlate_one(addrbuf, ranges, len, naddr, nsize,
+		                prev_naddr, prev_nsize, NULL);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+int fdt_xlate_reg(const void *tree, int node, const uint32_t *reg,
+                  phys_addr_t *addr, phys_addr_t *size)
+{
+	uint32_t addrbuf[MAX_ADDR_CELLS];
+	uint32_t naddr, nsize;
+
+	int parent = fdt_parent_offset(tree, node);
+	if (parent < 0)
+		return parent;
+
+	int ret = fdt_get_addr_format(tree, parent, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	ret = fdt_xlate_reg_raw(tree, node, reg, addrbuf, size, naddr, nsize);
+	if (ret < 0)
+		return ret;
+
+	if (addrbuf[0] || addrbuf[1])
+		return ERR_BADTREE;
+
+	*addr = ((uint64_t)addrbuf[2] << 32) | addrbuf[3];
+	return 0;
+}
+
+int fdt_get_reg(const void *tree, int node, int res,
+                phys_addr_t *addr, phys_addr_t *size)
+{
+	int ret, len;
+	uint32_t naddr, nsize;
+	const uint32_t *reg = fdt_getprop(tree, node, "reg", &len);
+	if (!reg)
+		return len;
+
+	int parent = fdt_parent_offset(tree, node);
+	if (parent < 0)
+		return parent;
+
+	ret = fdt_get_addr_format(tree, parent, &naddr, &nsize);
+	if (ret < 0)
+		return ret;
+
+	if (naddr == 0 || nsize == 0)
+		return ERR_NOTRANS;
+
+	if ((unsigned int)len < (naddr + nsize) * 4 * (res + 1))
+		return ERR_BADTREE;
+
+	return fdt_xlate_reg(tree, node, &reg[(naddr + nsize) * res],
+	                     addr, size);
+}
+
 static chardev_t *cd_console;
 static byte_chan_handle_t *bc_console;
 queue_t *stdout, *stdin;

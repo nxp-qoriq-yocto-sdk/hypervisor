@@ -99,5 +99,7 @@ extern char *displacement_flush_area[MAX_CORES];
 } while (0)
 
 void flush_caches(void);
+void panic_flush(void) __attribute__((noreturn));
+void panic(const char *fmt, ...) __attribute__((noreturn));
 
 #endif
