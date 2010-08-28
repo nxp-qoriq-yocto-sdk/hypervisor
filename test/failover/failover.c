@@ -302,7 +302,7 @@ static int dma_init(void)
 
 	dma_irq = get_vmpic_irq(node, 0);
 	if (dma_irq < 0) {
-		printf("BROKEN: no state change irq\n");
+		printf("BROKEN: no dma irq\n");
 		return -1;
 	}
 
