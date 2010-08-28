@@ -620,7 +620,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		printlog(LOGTYPE_PAMU, LOGLEVEL_WARN,
 		         "%s: warning: missing dma-window at %s\n",
 		         __func__, cfgnode->name);
-		return 0;
+		return ERR_BADTREE;
 	}
 
 	dma_window = dt_lookup_phandle(config_tree, *(const uint32_t *)prop->data);
