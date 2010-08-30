@@ -207,7 +207,7 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 #define PEXI_IWS 0x3F
 
 static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
-                             dt_node_t *node, uint64_t gaddr,
+                             dt_node_t *node, dt_node_t *gnode, uint64_t gaddr,
                              uint64_t *size)
 {
 	int ret;
@@ -269,7 +269,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		// FIXME: This needs to be done via u-boot
 		reg[1] += 0x140;
 
-		ret = dt_set_prop(node, "msi-address-64", reg, rootnaddr * 4);
+		ret = dt_set_prop(gnode, "msi-address-64", reg, rootnaddr * 4);
 		if (ret < 0)
 			goto nomem;
 
@@ -472,7 +472,7 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
                          uint32_t subwindow_cnt,
                          uint32_t omi, uint32_t stash_dest,
                          ppaace_t *ppaace, dt_node_t *cfgnode,
-                         dt_node_t *hwnode)
+                         dt_node_t *hwnode, dt_node_t *gnode)
 {
 	unsigned long fspi;
 	phys_addr_t subwindow_size = primary_size / subwindow_cnt;
@@ -547,7 +547,7 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 				size >> PAGE_SHIFT);
 		else
 			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
-					gaddr, &size);
+					gnode, gaddr, &size);
 
 		if (rpn == ULONG_MAX)
 			continue;
@@ -599,7 +599,7 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
  * established whether there is an associated dma-window
  * so it is an error if a dma-window prop is not found.
  */
-int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode)
+int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode)
 {
 	struct ppaace_t *ppaace;
 	unsigned long rpn;
@@ -769,7 +769,7 @@ skip_snoop_id:
 
 		ret = setup_subwins(guest, dma_window, liodn, window_addr,
 		                    window_size, subwindow_cnt, omi,
-		                    stash_dest, ppaace, cfgnode, hwnode);
+		                    stash_dest, ppaace, cfgnode, hwnode, gnode);
 		if (ret < 0)
 			return ret;
 	} else {
@@ -1477,7 +1477,7 @@ static int configure_liodn(dt_node_t *hwnode, dev_owner_t *owner,
                            uint32_t liodn, dt_node_t *cfgnode)
 {
 	int ret = pamu_config_liodn(owner->guest, liodn,
-	                            hwnode, cfgnode);
+	                            hwnode, cfgnode, owner->gnode);
 	if (ret < 0) {
 		if (ret == ERR_NOMEM)
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
