@@ -308,7 +308,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case 3: /* Invalidate address */
-		guest_inv_tlb(va, pid, INV_TLB0 | INV_TLB1);
+		guest_inv_tlb(va & TLBIVAX_VA, pid, INV_TLB0 | INV_TLB1);
 		break;
 	}
 
