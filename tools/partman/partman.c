@@ -183,7 +183,25 @@ static void usage(void)
 	printf("   -q for quiet mode (errors reported via return status only)\n");
 }
 
-#define FH_ERR_INVALID_STATE 1026
+/* epapr error codes */
+#define EV_EPERM		1	/* Operation not permitted */
+#define EV_ENOENT		2	/*  Entry Not Found */
+#define EV_EIO			3	/* I/O error occured */
+#define EV_EAGAIN		4	/* The operation had insufficient
+					 * resources to complete and should be
+					 * retried
+					 */
+#define EV_ENOMEM		5	/* There was insufficient memory to
+					 * complete the operation */
+#define EV_EFAULT		6	/* Bad guest address */
+#define EV_ENODEV		7	/* No such device */
+#define EV_EINVAL		8	/* An argument supplied to the hcall
+					   was out of range or invalid */
+#define EV_INTERNAL		9	/* An internal error occured */
+#define EV_CONFIG		10	/* A configuration error was detected */
+#define EV_INVALID_STATE	11	/* The object is in an invalid state */
+#define EV_UNIMPLEMENTED	12	/* Unimplemented hypercall */
+#define EV_BUFFER_OVERFLOW	13	/* Caller-supplied buffer too small */
 
 /**
  * Call the hypervisor management driver.
@@ -214,13 +232,13 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 		if (ret) {
 			const char *err_str;
 			switch (ret) {
-			case EINVAL:
+			case EV_EINVAL:
 				err_str = "invalid handle";
 				break;
-			case EFAULT:
+			case EV_EFAULT:
 				err_str = "bad address";
 				break;
-			case FH_ERR_INVALID_STATE:
+			case EV_INVALID_STATE:
 				err_str = "target partition state invalid";
 				break;
 			default:
@@ -618,7 +636,7 @@ static int cmd_status(void)
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "reg", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		reg = * ((uint32_t *) prop->data);
 
@@ -626,7 +644,7 @@ static int cmd_status(void)
 		if (!prop || !prop->len) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "label", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		label = prop->data;
 
@@ -664,7 +682,7 @@ static int cmd_status(void)
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "reg", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		reg = * ((uint32_t *) prop->data);
 
@@ -672,7 +690,7 @@ static int cmd_status(void)
 		if (!prop ||(prop->len != 4 * sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "interrupts", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		irq = prop->data;
 
@@ -693,7 +711,7 @@ static int cmd_status(void)
 		if (!prop ||(prop->len != 2 * sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "interrupts", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		irq = prop->data;
 
@@ -711,7 +729,7 @@ static int cmd_status(void)
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
 			       __func__, "reg", node->name);
-			return -ENOENT;
+			return EV_ENOENT;
 		}
 		reg = * ((uint32_t *) prop->data);
 
@@ -735,7 +753,7 @@ static int cmd_load_image(struct parameters *p)
 		fprintf(stderr, "partman load: requires a handle (-h) "
 		                "and file (-f).\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
@@ -746,7 +764,7 @@ static int cmd_load_image(struct parameters *p)
 	ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
 	if (!ret && !quiet) {
 		printf("Could not load and copy file %s\n", p->f);
-		return EIO;
+		return EV_EIO;
 	}
 
 	if (verbose)
@@ -762,7 +780,7 @@ static int cmd_start(struct parameters *p)
 	if (!p->h_specified) {
 		fprintf(stderr, "partman start: requires a handle (-h).\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
@@ -786,7 +804,7 @@ static int cmd_start(struct parameters *p)
 
 		ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
 		if (!ret)
-			return EIO;
+			return EV_EIO;
 
 		if (!p->e_specified)
 			p->e = entry_address;
@@ -809,7 +827,7 @@ static int cmd_stop(struct parameters *p)
 	if (!p->h_specified) {
 		fprintf(stderr, "partman stop: requires a handle (-h).\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
@@ -827,7 +845,7 @@ static int cmd_restart(struct parameters *p)
 	if (!p->h_specified) {
 		fprintf(stderr, "partman restart: requires a handle (-h).\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
@@ -851,7 +869,7 @@ static int cmd_doorbells(struct parameters *p)
 		fprintf(stderr, "partman doorbell: requires a handle (-h) "
 		                "*or* file (-f), but not both.\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	// If -h is specified, user wants to send a doorbell
@@ -869,7 +887,7 @@ static int cmd_doorbells(struct parameters *p)
 	if (system(command)) {
 		if (!quiet)
 			printf("%s is not a executable file\n", p->f);
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	int f = open("/dev/fsl-hv", O_RDONLY);
@@ -1068,7 +1086,7 @@ static int cmd_getprop(struct parameters *p)
 		fprintf(stderr, "partman getprop: requires a handle (-h), "
 		                "a path (-p) and a property name (-n)\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
@@ -1099,7 +1117,7 @@ static int cmd_setprop(struct parameters *p)
 		fprintf(stderr, "partman setprop: requires a handle (-h), "
 		                "a path (-p) and a property name (-n)\n");
 		usage();
-		return EINVAL;
+		return EV_EINVAL;
 	}
 
 	if (verbose)
