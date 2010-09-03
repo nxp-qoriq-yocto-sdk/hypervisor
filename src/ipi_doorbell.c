@@ -273,7 +273,7 @@ static int attach_normal_doorbell(guest_t *guest, struct ipi_doorbell *dbell,
 		goto error;
 	}
 
-	ret = vpic_alloc_handle(virq, irq);
+	ret = vpic_alloc_handle(virq, irq, 0);
 	if (ret < 0)
 		goto error;
 

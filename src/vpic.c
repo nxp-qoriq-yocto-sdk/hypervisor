@@ -453,10 +453,10 @@ vpic_interrupt_t *vpic_alloc_irq(guest_t *guest, int config)
 	return virq;
 }
 
-int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec)
+int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec, int standby)
 {
-	vmpic_interrupt_t *vmirq =
-		vmpic_alloc_handle(vpic->guest, &vpic->irq, vpic->config, 0);
+	vmpic_interrupt_t *vmirq = vmpic_alloc_handle(vpic->guest, &vpic->irq,
+	                                              vpic->config, standby);
 	if (!vmirq)
 		return ERR_NORESOURCE;
 

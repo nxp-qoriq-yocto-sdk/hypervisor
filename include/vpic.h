@@ -55,7 +55,7 @@ typedef struct vpic_cpu {
 } vpic_cpu_t;
 
 vpic_interrupt_t *vpic_alloc_irq(struct guest *guest, int config);
-int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec);
+int vpic_alloc_handle(vpic_interrupt_t *vpic, uint32_t *intspec, int standby);
 
 void vpic_assert_vint_rxq(struct queue *q, int blocking);
 void vpic_assert_vint_txq(struct queue *q);

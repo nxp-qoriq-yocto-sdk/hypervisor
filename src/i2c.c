@@ -185,6 +185,7 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 	int ret;
 	phys_addr_t paddr;
 	int ncells;
+	dev_owner_t *owner;
 
 	// Find out what the interrupt parent for this node is.  The return
 	// value is the offset of the interrupt controller node, which should be
@@ -219,8 +220,11 @@ int virtualize_device_interrupt(guest_t *guest, dt_node_t *node, vf_range_t *vf,
 	if (!virq)
 		return ERR_NOMEM;
 
+	owner = dt_owned_by(node, guest);
+
 	// Now we need a guest handle for this virq.
-	ret = vpic_alloc_handle(virq, irq_prop);
+	ret = vpic_alloc_handle(virq, irq_prop,
+	                        get_claimable(owner) == claimable_standby);
 	if (ret < 0)
 		return ret;
 

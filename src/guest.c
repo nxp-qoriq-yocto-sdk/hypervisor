@@ -561,7 +561,7 @@ bad:
 			vpic_interrupt_t *virq = vpic_alloc_irq(owner->guest, IRQ_EDGE);
 			if (!virq)
 				goto bad;
-			ret = vpic_alloc_handle(virq, &intspec[i * 2]);
+			ret = vpic_alloc_handle(virq, &intspec[i * 2], standby);
 			if (ret < 0)
 				/* FIXME : Free the allocated virq */
 				goto bad;
@@ -569,7 +569,7 @@ bad:
 			virq->eoi_callback = vpic_unmask_parent;
 
 			/* Register the reflecting interrupt handler */
-			if (get_claimable(owner) != claimable_standby) {
+			if (!standby) {
 				irq->priv = virq;
 				irq->ops->register_irq(irq, reflect_errint,
 				                       irq, TYPE_MCHK);

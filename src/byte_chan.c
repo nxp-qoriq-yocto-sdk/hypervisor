@@ -220,8 +220,8 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 	if (!rxirq || !txirq)
 		goto nomem;
 
-	if (vpic_alloc_handle(rxirq, &intspec[0]) < 0||
-	    vpic_alloc_handle(txirq, &intspec[2]) < 0)
+	if (vpic_alloc_handle(rxirq, &intspec[0], 0) < 0||
+	    vpic_alloc_handle(txirq, &intspec[2], 0) < 0)
 		return ERR_NORESOURCE;
 
 	ghandle = alloc_guest_handle(guest, &handle->user);
