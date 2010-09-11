@@ -424,9 +424,8 @@ int pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
 	ppaace = pamu_get_ppaace(liodn);
 
 	subwindow_cnt = 1 << (ppaace->wce + 1);
-	window_addr = ((phys_addr_t) ppaace->wbah << 32) |
-			ppaace->wbal;
-	window_addr <<= PAGE_SHIFT;
+	window_addr = ((phys_addr_t)ppaace->wbah << 32) |
+	              ((uint32_t)ppaace->wbal << PAGE_SHIFT);
 	window_size = 1 << (ppaace->wse + 1);
 
 	dma_window = hwnode->dma_window;
