@@ -509,7 +509,7 @@ void tlb_miss(trapframe_t *regs)
 			set_stat(bm_stat_tlb_miss_reflect, regs);
 
 			mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
-			asm volatile("tlbsx 0, %0" : : "r" (vaddr));
+			asm volatile("isync; tlbsx 0, %0" : : "r" (vaddr));
 		
 			mas1 = mfspr(SPR_MAS1);
 			assert(!(mas1 & MAS1_VALID));

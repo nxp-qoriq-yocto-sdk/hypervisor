@@ -590,14 +590,14 @@ static void tlbilx_inv_all(int tlb_mask)
 static void tlbilx_inv_pid(int pid)
 {
 	mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT));
-	asm volatile("tlbilxpid; isync" : : : "memory");
+	asm volatile("isync; tlbilxpid; isync" : : : "memory");
 }
 
 static void tlbilx_inv(void *addr, int tlb_mask, int pid)
 {
 	register_t ea = ((register_t)addr) & ~4095;
 	mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT));
-	asm volatile("tlbilxva 0, %0; isync" : : "r" (ea) : "memory");
+	asm volatile("isync; tlbilxva 0, %0; isync" : : "r" (ea) : "memory");
 }
 
 static void tlbilx_test(int secondary)

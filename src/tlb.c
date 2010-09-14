@@ -465,7 +465,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) | mas3flags);
 	mtspr(SPR_MAS8, mas8);
-	asm volatile("tlbwe" : : : "memory");
+	asm volatile("isync; tlbwe" : : : "memory");
 
 	return 0;
 }
@@ -579,7 +579,7 @@ int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid)
 	save_mas(gcpu);
 
 	mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
-	asm volatile("tlbsx 0, %0" : : "r" (vaddr));
+	asm volatile("isync; tlbsx 0, %0" : : "r" (vaddr));
 
 	if ((mfspr(SPR_MAS1) & MAS1_VALID) &&
 	    (mfspr(SPR_MAS8) & MAS8_VF)) {
@@ -749,7 +749,7 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 
 				for (way = 0; way < ways; way++) {
 					mtspr(SPR_MAS0, MAS0_TLBSEL0 | MAS0_ESEL(way));
-					asm volatile("tlbre");
+					asm volatile("isync; tlbre" : : : "memory");
 					mas1 = mfspr(SPR_MAS1);
 
 					if (mas1 & MAS1_VALID) {
@@ -780,7 +780,7 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) | mas3flags);
 	mtspr(SPR_MAS8, mas8);
-	asm volatile("tlbwe" : : : "memory");
+	asm volatile("isync; tlbwe" : : : "memory");
 	return 0;
 #else
 	return guest_set_tlbcache(mas0, mas1, mas2, mas3flags,
@@ -791,6 +791,7 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 void guest_reset_tlb(void)
 {
 	mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
+	isync();
 	guest_inv_tlb(TLBIVAX_INV_ALL, -1, INV_TLB0 | INV_TLB1 | INV_IPROT);
 	isync();
 }
@@ -904,7 +905,7 @@ int guest_tlb_search_mas(uintptr_t va)
 	}
 #endif
 
-	asm volatile("tlbsx 0, %0" : : "r" (va) : "memory");
+	asm volatile("isync; tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
 
 	return 0;
@@ -1714,7 +1715,7 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 #ifndef CONFIG_TLB_CACHE
 		mtspr(SPR_MAS0, MAS0_ESEL(way));
 		mtspr(SPR_MAS2, tlb_index << PAGE_SHIFT);
-		asm volatile ("tlbre" : : : "memory");
+		asm volatile("isync; tlbre" : : : "memory");
 		fixup_tlb_sx_re();
 #else
 		gtlb0_to_mas(tlb_index, way, gcpu);

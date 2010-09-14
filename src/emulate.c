@@ -533,7 +533,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			unsigned long sx_mas0;
 		
 			mtspr(SPR_MAS2, i << PAGE_SHIFT);
-			asm volatile("tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
+			asm volatile("isync; tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
 			sx_mas0 = mfspr(SPR_MAS0);
 
 			if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
