@@ -71,7 +71,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
  * This follows the recommended sequence in the EREF for
  * self modifying code.
  */
-static int icache_range_sync(void *ptr, size_t len)
+int icache_range_sync(void *ptr, size_t len)
 {
 	uintptr_t start, end, addr;
 

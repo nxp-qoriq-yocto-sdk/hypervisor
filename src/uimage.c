@@ -176,6 +176,9 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 
 		if (d_stream.avail_out == 0) {
 			size_t chunk;
+
+			icache_range_sync(uncompr, uncomprlen);
+
 			target += uncomprlen;
 			uncompr = map_gphys(TEMPTLB1, guest_gphys, target,
 					    temp_mapping[0], &chunk,
@@ -201,8 +204,10 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 			comprlen = tsize;
 		}
 
-		if (err == Z_STREAM_END)
+		if (err == Z_STREAM_END) {
+			icache_range_sync(uncompr, uncomprlen);
 			break;
+		}
 
 		if (err < 0) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
