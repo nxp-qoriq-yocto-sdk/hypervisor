@@ -65,6 +65,8 @@ struct chardev *test_init_uart(int node);
 int get_vmpic_irq(int node, int irq);
 int set_vmpic_irq_priority(int handle, int prio);
 int init_error_queues(void);
+int get_number32(const char *numstr, uint32_t *num);
+char *nextword(char **str);
 
 static inline void delay_timebase(unsigned long ticks)
 {

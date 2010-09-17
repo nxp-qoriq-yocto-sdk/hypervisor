@@ -73,7 +73,7 @@ static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
 
 static int is_subwindow_count_valid(int subwindow_cnt)
 {
-	if (subwindow_cnt <= 1 || subwindow_cnt > 16)
+	if (subwindow_cnt <= 1 || subwindow_cnt > pamu_get_max_subwindow_count())
 		return 0;
 	if (subwindow_cnt & (subwindow_cnt - 1))
 		return 0;

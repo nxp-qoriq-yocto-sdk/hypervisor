@@ -32,6 +32,7 @@
 #include <libos/platform_error.h>
 #include <libfdt.h>
 #include <hvtest.h>
+#include <libos/pamu.h>
 
 #define DMA_CHAN_BUSY 0x00000004
 #define DMA_END_OF_SEGMENT 0x00000002
@@ -45,6 +46,10 @@ static uint32_t liodn;
 static int window_test, sub_window_test;
 static volatile int mcheck_int, crit_int;
 static hv_error_t mcheck_err, crit_err[2];
+struct {
+	uint32_t start;
+	uint32_t end;
+} win_map[256];
 
 void crit_int_handler(trapframe_t *regs)
 {
@@ -106,7 +111,7 @@ static int dma_init(void)
 
 	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
 
-	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
+	tlb1_set_entry(3, (uintptr_t)dma_virt, dma_phys,
 	               TLB_TSIZE_4K, TLB_MAS2_IO,
 	               TLB_MAS3_KERN, 0, 0, 0);
 
@@ -170,9 +175,92 @@ static int test_dma_memcpy(phys_addr_t gpa_src, phys_addr_t gpa_dst,
 	return (!memcmp(gva_src, gva_dst, count));
 }
 
+static void read_memory_map(void)
+{
+	int node, len;
+	char *mem_str, *num_str;
+	uint32_t start, size, i = 0;
+
+	node = fdt_node_offset_by_compatible(fdt, 0, "subwindow");
+	if (node < 0)
+		return;
+
+	mem_str = (char *)fdt_getprop(fdt, node, "dma-map", &len);
+	if (!mem_str)
+		return;
+
+	while ((num_str = nextword(&mem_str))) {
+		if (!get_number32(num_str, &start))
+			return;
+
+		num_str = nextword(&mem_str);
+		if (!num_str || !get_number32(num_str, &size))
+			return;
+
+		win_map[i].start = start;
+		win_map[i].end = start + size;
+
+		i++;
+	}
+}
+
+/*
+ * Get a string from GDT in format 0x<start_addr> 0x<size> ...
+ * and find the first gap where start1+size1 < start2
+ */
+static int find_unmapped_memory(uint32_t *begin, uint32_t *end)
+{
+	int i;
+
+	for (i = 0; i < 255; i++) {
+		if (win_map[i].end < win_map[i+1].start) {
+			printf("found unmapped memory @ 0x%x .. 0x%x\n",
+			       win_map[i].start, win_map[i].end);
+			*begin = win_map[i].end;
+			*end = win_map[i+1].start;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/* The memory area from VADDR PHYSBASE to _end is the application; skip it */
+extern int _end;
+/*
+ * Get a string from GDT in format 0x<start_addr> 0x<size> ...
+ * and find the next start. It is not reentrant and neither multicore savvy.
+ */
+static int find_next_mapped_memory(uint32_t *begin, uint32_t *end)
+{
+	static int i;
+	int max_subw;
+
+	if ((mfspr(SPR_PVR) & 0xf0) == 0x20)
+		max_subw = 256;
+	else
+		max_subw = 16;
+
+	if (i == max_subw)
+		i = 0;	/* wrap around */
+
+	for (; i < max_subw; i++) {
+		if (win_map[i].start < win_map[i].end &&
+		    win_map[i].start >= (uint32_t)&_end - PHYSBASE) {
+			*begin = win_map[i].start;
+			*end = win_map[i].end;
+			i++;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	int ret, len, i, node;
+	uint32_t addr_beg = 0, addr_end = 0;
 
 	init(devtree_ptr);
 
@@ -191,8 +279,16 @@ void libos_client_entry(unsigned long devtree_ptr)
 		return;
 	}
 
+	const char *label = fdt_getprop(fdt, 0, "label", &len);
+	if(!strcmp("/part1", label)) {
+		read_memory_map();
+		find_unmapped_memory(&addr_beg, &addr_end);
+	} else {
+		addr_beg = 0x0e000000;
+	}
+
 	/* test access violation failure and pass cases */
-	if (!test_dma_memcpy(0, 0x0e000000, 0))
+	if (!test_dma_memcpy(0, addr_beg, 0))
 		printf("DMA access violation test#1 : PASSED\n");
 	else
 		printf("DMA access violation test#1 : FAILED\n");
@@ -209,7 +305,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Access violation test : PASSED\n");
 	printf("\n");
 
-	const char *label = fdt_getprop(fdt, 0, "label", &len);
 	if(!strcmp("/part1", label)) {
 		while (crit_int < 2 );
 		for(i = 0 ; i < 2 ; i++) {
@@ -236,25 +331,54 @@ void libos_client_entry(unsigned long devtree_ptr)
 		}
 		/*
 		 * create a hard-coded TLB1 entry for PAMU address-translation
-		 * verification test
+		 * verification test; the default entry for Libos is set from
+		 * the start of the physical memory for 256M and is defined
+		 * in head.S. Map all the guest physical memory just in case
+		 * the DSA windows are redefined in the HV config files.
 		 */
 
-		tlb1_set_entry(3, (unsigned long)(0x20000000 + PHYSBASE),
-			(phys_addr_t)0x20000000, TLB_TSIZE_4K, 0,
+		tlb1_set_entry(4, (unsigned long)(0x20000000 + PHYSBASE),
+			(phys_addr_t)0x20000000, TLB_TSIZE_256M, 0,
 			TLB_MAS3_KERN, 0, 0, 0);
+		tlb1_set_entry(5, (unsigned long)(0x30000000 + PHYSBASE),
+			(phys_addr_t)0x30000000, TLB_TSIZE_256M, 0,
+			TLB_MAS3_KERN, 0, 0, 0);
+		tlb1_set_entry(6, (unsigned long)(0x40000000 + PHYSBASE),
+			(phys_addr_t)0x40000000, TLB_TSIZE_256M, 0,
+			TLB_MAS3_KERN, 0, 0, 0);
+
 		if (window_test) {
-			if (test_dma_memcpy(0x04000115, 0x05000127, 1))
+			uint32_t start;
+
+			if (!find_next_mapped_memory(&start, &addr_end))
+				return;
+			
+			if (!find_next_mapped_memory(&addr_beg, &addr_end))
+				return;
+	
+			if (test_dma_memcpy(start, addr_beg, 1))
 				printf("DMA access test : PASSED\n");
 			else
 				printf("DMA access test : FAILED\n");
 		}
 
 		if (sub_window_test) {
-			if (test_dma_memcpy(0x04000115, 0x0c00012e, 1) &&
-				test_dma_memcpy(0x04000130, 0x20000111, 1))
-				printf("DMA access test : PASSED\n");
-			else
-				printf("DMA access test : FAILED\n");
+			int i;
+			uint32_t start;
+
+			if (!find_next_mapped_memory(&start, &addr_end))
+				return;
+
+			for (i = 0; i < 256; i++) {
+				if (!find_next_mapped_memory(&addr_beg, &addr_end))
+					return;
+				printf("DMA xfer from %08x to %08x -> ",
+				       start, addr_beg);
+				if (test_dma_memcpy(start, addr_beg, 1))
+					printf("DMA access test : PASSED\n");
+				else
+					printf("DMA access test : FAILED\n");
+			}
 		}
 	}
 	printf("Test Complete\n");

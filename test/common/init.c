@@ -775,3 +775,107 @@ int init_error_queues(void)
 
 	return 0;
 }
+
+/*
+ * A string in DT can contain \n separator
+ */
+static char *stripseparator(const char *str)
+{
+	if (!str)
+		return NULL;
+
+	while (*str && (*str == ' ' || *str == '\n'))
+		str++;
+
+	if (!*str)
+		return NULL;
+
+	return (char *)str;
+}
+
+static char *strchr2(const char *s, int c1, int c2)
+{
+        while (*s && *s != c1 && *s != c2)
+                s++;
+
+        if (*s == c1 || *s == c2)
+                return (char *)s;
+
+        return NULL;
+}
+
+char *nextword(char **str)
+{
+	char *ret;
+	
+	if (!*str)
+		return NULL;
+	
+	ret = stripseparator(*str);
+	if (!ret)
+		return NULL;
+	
+	/* find whichever is the first a space or \n */
+	*str = strchr2(ret, ' ', '\n');
+
+	if (*str) {
+		**str = 0;
+		(*str)++;
+	}
+	
+	return ret;
+}
+
+static int get_base(const char *numstr, int *skip)
+{
+	*skip = 0;
+
+	if (numstr[0] == '0') {
+		if (numstr[1] == 0 || numstr[1] == ' ')
+			return 10;
+
+		if (numstr[1] == 'x' || numstr[1] == 'X') {
+			*skip = 2;
+			return 16;
+		}
+
+		if (numstr[1] == 'b' || numstr[1] == 'B') {
+			*skip = 2;
+			return 2;
+		}
+
+		if (numstr[1] >= '0' && numstr[1] <= '7') {
+			*skip = 1;
+			return 8;
+		}
+
+		printf("Unrecognized number format: %s\n", numstr);
+		return 0;
+	}
+
+	return 10;
+}
+
+int get_number32(const char *numstr, uint32_t *num)
+{
+	uint64_t ret;
+	char *endp;
+	int skip, base;
+	
+	if (numstr[0] == '-')
+		return 0;
+	
+	base = get_base(numstr, &skip);
+	if (!base)
+		return 0;
+	
+	ret = strtoull(&numstr[skip], &endp, base);
+	
+	if (ret >= 0x100000000ULL) {
+		printf("Number exceeds range: %s\n", numstr);
+		return 0;
+	}
+
+	*num = ret;
+	return 1;
+}

@@ -144,7 +144,7 @@
 		window2: window2 {
 			compatible = "dma-window";
 			guest-addr = <0 0x0>;
-/include/ "subwindows_256.inc"
+/include/ "subwindows_16.inc"
 		};
 	};
 
@@ -173,7 +173,7 @@
 			device = "dma0";
 			dma-window = <&window2>;
 			node-update {
-/include/ "dma_map_256.inc"
+/include/ "dma_map_16.inc"
 			};
 		};
 
