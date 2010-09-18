@@ -1031,10 +1031,20 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 
 	avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
 	av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
+
 	ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
-	/* We may get access violations for invalid LIODNs, just ignore them */
-	if (!ppaace->v)
-		return -1;
+
+	/* if we get access violations for invalid LIODNs, just clear interrupt */
+	if (!ppaace->v) {
+		/* Clear the write one to clear bits in AVS1, mask out the LIODN */
+		out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
+		/* De-assert access violation pin */
+#ifdef CONFIG_P4080_ERRATUM_PAMU3
+		/* erratum -- do it twice */
+		out32((uint32_t *)(reg + PAMU_PICS), pics);
+#endif
+		return 0;
+	}
 
 	strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
 			sizeof(err.error));
