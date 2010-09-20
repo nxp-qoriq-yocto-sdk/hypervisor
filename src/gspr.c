@@ -240,6 +240,9 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	case SPR_TLB0CFG:
 		*val = mfspr(SPR_TLB0CFG);
+#ifdef CONFIG_TLB_CACHE
+		*val &= ~TLBCFG_NENTRY_MASK; 
+#endif		
 		break;
 
 	case SPR_TLB1CFG:
