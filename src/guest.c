@@ -3017,12 +3017,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (!node)
 		goto nomem;
 
-	if (!mpic_coreint) {
-		ret = dt_set_prop(node, "fsl,hv-pic-legacy", NULL, 0);
-		if (ret < 0)
-			goto fail;
-	}
-
 	status = get_sys_reset_status();
 	if (status == SYS_RESET_STATUS_POR) {
 		set_hypervisor_strprop(guest, "fsl,hv-sys-reset-status", "power-on-reset");

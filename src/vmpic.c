@@ -282,6 +282,17 @@ void vmpic_partition_init(guest_t *guest)
 	if (dt_set_prop(vmpic, "interrupt-controller", NULL, 0) < 0)
 		goto nomem;
 
+	if (mpic_coreint) 
+		if (dt_set_prop(vmpic, "has-external-proxy", NULL, 0) < 0)
+			goto nomem;
+	
+	/* The virtual interrupt controller does not implement interrupt priority
+	 * between hardware and virtual interrupts. However, a priority of 0-15 
+	 * among the hardware interrupts is supported 
+	 */
+	 if (dt_set_prop(vmpic, "no-priority", NULL, 0) < 0)
+	 	goto nomem;
+
 	/* FIXME: properly allocate a phandle */
 	propdata = guest->vmpic_phandle = 0x564d5043;
 	if (dt_set_prop(vmpic, "phandle",

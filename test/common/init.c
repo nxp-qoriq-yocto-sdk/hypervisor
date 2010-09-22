@@ -476,9 +476,12 @@ void init(unsigned long devtree_ptr)
 		printf("No stdout found.\n");
 	}
 
-	node = fdt_subnode_offset(fdt, 0, "hypervisor");
-	if (node >= 0)
-		coreint = !fdt_get_property(fdt, node, "fsl,hv-pic-legacy", NULL);
+	node = fdt_node_offset_by_compatible(fdt, -1, "epapr,hv-pic");
+	if (node < 0)
+		printf("No vmpic node in guest device tree\n");
+	
+	if (node >= 0) 
+		coreint = fdt_get_property(fdt, node, "has-external-proxy", NULL) != NULL;
 }
 
 static void core_init(void)
