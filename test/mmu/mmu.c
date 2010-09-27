@@ -614,6 +614,58 @@ static void secondary_entry(void)
 	tlbilx_test(SECONDARY_NOINVAL);
 }
 
+/*
+ * Handler defined by test/common/libos_client.h
+ */
+void program_handler(trapframe_t *regs)
+{
+	register_t esr;
+	
+	/* Read Exception Syndrome Reg */
+	esr = mfspr(SPR_ESR);
+	
+	/* HV raises an illegal program exception in case of TLB collision */
+	if (!(esr & ESR_PIL))
+		BUG();
+ 
+	/* Remove the troublemaking 4k entry to allow current TLBWE to finish */
+	tlbilx_inv(tlb0 - 4096/4, 0, 0);
+	
+	/* No need to clear the cause in ESR */
+	fail = 0;	/* This test passed */
+}
+
+
+/*
+ * This test maps two overlapping virtual spaces, tbl1 of 64K and tlb0 as
+ * the last 4K page. We are not using HID0[EN_L2MMU_MHD] to trigger a machine
+ * check in case of overlapping TLB entries as the HV generates illegal program
+ * exception before allowing the conflicting entries to be set in the HW TLB.
+ */
+static void tlb_conflict_test(void)
+{
+
+	fail = 1;
+
+	create_mapping(0, 0, tlb0 - 4096/4, virt_to_phys(paddrs[0]),
+	               TLB_TSIZE_4K, 0, 0);
+	create_mapping(1, 3, tlb1, virt_to_phys(paddrs[1]),
+	               TLB_TSIZE_64K, 0, 0);
+
+	/* Do some accesses to test the mappings */
+	tlb1[1024] = 0;		/* No conflicting entries */
+	barrier();
+	tlb1[65536/4-1] = 0;	/* Conflicting entries */
+
+	/* Clean the ground for the remaining tests */
+	tlbilx_inv(tlb1, 0, 0);
+
+	if (fail) {
+		tlbilx_inv(tlb0 - 4096/4, 0, 0);
+		puts("Unexpected permission to setup multiple matching TLB entries");
+	}
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
@@ -636,10 +688,12 @@ void libos_client_entry(unsigned long devtree_ptr)
 	addrs[2] = tlb1 + 4096 / 4;
 	addrs[3] = addrs[4] = addrs[5] = addrs[6] = epidva;
 
+	printf("MMU test:\n");
+	
+	tlb_conflict_test();
+
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
-
-	printf("MMU test:\n");
 
 	mmucsr_test(PRIMARY);
 	tlbivax_test(PRIMARY);

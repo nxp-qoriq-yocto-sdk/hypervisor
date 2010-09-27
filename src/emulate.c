@@ -528,12 +528,13 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 #else
 		mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
 		                ((mas1 >> MAS1_TS_SHIFT) & 1));
+		isync();
 
 		for (unsigned long i = epn; i < epn + pages; i++) {
 			unsigned long sx_mas0;
 		
 			mtspr(SPR_MAS2, i << PAGE_SHIFT);
-			asm volatile("isync; tlbsx 0, %0" : : "r" (mas2 & MAS2_EPN) : "memory");
+			asm volatile("isync; tlbsx 0, %0" : : "r" (i << PAGE_SHIFT) : "memory");
 			sx_mas0 = mfspr(SPR_MAS0);
 
 			if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))

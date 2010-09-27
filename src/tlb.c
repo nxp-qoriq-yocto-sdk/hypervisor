@@ -241,7 +241,7 @@ int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
 {
  	uintptr_t pages = tsize_to_pages(tsize);
  	int mask = (1 << cpu->client.tlbcache_bits) - 1;
-	unsigned int cache_entries = min(pages, cpu->client.tlbcache_bits);
+	unsigned int cache_entries = min(pages, 1 << cpu->client.tlbcache_bits);
 	unsigned int index = epn & mask;
 	unsigned int end = index + cache_entries;
 
