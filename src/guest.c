@@ -3031,6 +3031,12 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
+	uint32_t hcall_opcode = 0x44000022;
+	ret = dt_set_prop(node, "hcall-instructions", &hcall_opcode,
+			  sizeof(hcall_opcode));
+	if (ret < 0)
+		goto fail;
+
 	propdata = prop->data;
 	guest->dtb_gphys = int_from_tree(&propdata, rootnaddr);
 	guest->dtb_window_len = int_from_tree(&propdata, rootnsize);

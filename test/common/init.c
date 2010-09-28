@@ -444,7 +444,9 @@ static chardev_t *test_init_byte_chan(int node)
 void init(unsigned long devtree_ptr)
 {
 	chardev_t *stdout;
-	int node;
+	int node, size, ret, i;
+	uint32_t hcall_opcode[4] = {};
+	const struct fdt_property *pdata;
 
 	/* alloc the heap */
 	fdt = (void *)(devtree_ptr + PHYSBASE);
@@ -477,11 +479,42 @@ void init(unsigned long devtree_ptr)
 	}
 
 	node = fdt_node_offset_by_compatible(fdt, -1, "epapr,hv-pic");
-	if (node < 0)
-		printf("No vmpic node in guest device tree\n");
-	
-	if (node >= 0) 
+	if (node >= 0)
 		coreint = fdt_get_property(fdt, node, "has-external-proxy", NULL) != NULL;
+	else
+		printf("No vmpic node in guest device tree\n");
+
+	node = fdt_subnode_offset(fdt, 0, "hypervisor");
+	if (node < 0)
+		return;
+
+	pdata = fdt_get_property(fdt, node, "hcall-instructions", &size);
+	if (!pdata || size > 4 * CELL_SIZE || size % CELL_SIZE) {
+		printf("Invalid guest DT, missing/invalid hcall-instructions\n");
+		return;
+	}
+	/* Read all opcodes, at most 4 */
+	for (i = 0; i < size / CELL_SIZE; i++)
+		hcall_opcode[i] = *((uint32_t *)pdata->data + i);
+
+	if (size / CELL_SIZE != 1 || hcall_opcode[0] != 0x44000022) {
+		printf("Info: hcall-instructions =");
+		for (i = 0; i < size / CELL_SIZE; i++)
+			printf(" %#08x", hcall_opcode[i]);
+		puts("");
+	}
+
+	ret = setup_hcall_instructions((uint8_t *)hcall_opcode, size);
+
+#ifdef CONFIG_LIBOS_HCALL_INSTRUCTIONS
+	if (ret)
+		printf("Error setting HCALL trampoline: %d\n", ret);
+#else
+	if (ret != ERR_INVALID) {
+		printf("Unexpected error code setting HCALL trampoline: %d\n",
+			ret);
+	}
+#endif
 }
 
 static void core_init(void)

@@ -66,6 +66,7 @@ config LIBOS_DEPS
 	select LIBOS_CRITICAL_INTS
 	select LIBOS_NO_BARE_SPINLOCKS
 	select LIBOS_QUEUE
+	select LIBOS_HCALL_INSTRUCTIONS
 
 config GCC_CPU_FLAG
 	string "Processor specific compiler optimizations"
