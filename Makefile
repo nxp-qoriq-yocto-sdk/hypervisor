@@ -71,7 +71,8 @@ $(non-config): $(O)include/config/auto.conf FORCE
 
 clean:
 	rm -rf $(O)bin/
-	rm -rf $(O)test/
+	rm -rf $(O)test32/
+	rm -rf $(O)test64/
 	rm -rf $(O)include/config
 
 setup:

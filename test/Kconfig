@@ -24,6 +24,10 @@
 
 source "libos/lib/Kconfig"
 
+config GUEST64
+	bool
+	option env="GUEST64"
+
 config LIBOS_DEPS
 	bool
 	default y
@@ -39,3 +43,4 @@ config LIBOS_DEPS
 	select LIBOS_NS16550
 	select LIBOS_QUEUE
 	select LIBOS_BYTE_CHAN
+	select LIBOS_64BIT if GUEST64

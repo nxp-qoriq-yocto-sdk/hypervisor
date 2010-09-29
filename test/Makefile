@@ -54,16 +54,26 @@ include $(libos)lib/Makefile.libos
 LIBOS_BIN := bin/libos
 LIBOS_CLIENT_H := $(testdir)common/libos-client.h
 
-CC_OPTS=-m32 -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
-        -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
-        -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H) \
-        -I$(testdir)common
+ifeq ($(CONFIG_LIBOS_64BIT),y)
+CC_OPTS = -m64
+LD_OPTS = -m64
+LD_SCRIPT = $(testdir)common/tests64.lds
+else
+CC_OPTS = -m32
+LD_OPTS = -m32 -msoft-float
+LD_SCRIPT = $(testdir)common/tests.lds
+endif
 
-LD_OPTS=-m32 -msoft-float -static -nostdlib
+CC_OPTS += -Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
+           -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
+           -I$(LIBOS)/include-libc -std=gnu99  -include $(LIBOS_CLIENT_H) \
+           -I$(testdir)common
 
-CC_OPTS_C=-fno-strict-aliasing -fno-common -O2 -g3 \
-          -msoft-float -pipe -ffixed-r2 -mmultiple \
-          -mno-altivec -funit-at-a-time \
+LD_OPTS += -static -nostdlib
+
+CC_OPTS_C = -fno-strict-aliasing -fno-common -O2 -g3 \
+            -msoft-float -pipe -ffixed-r2 -mmultiple \
+            -mno-altivec -funit-at-a-time \
 
 include $(SUBMAKES)
 

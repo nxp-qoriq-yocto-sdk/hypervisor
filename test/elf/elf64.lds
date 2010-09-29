@@ -1,6 +1,5 @@
-
 /*
- * Copyright (C) 2009, 2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,41 +22,44 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <libos/libos.h>
-#include <libos/epapr_hcalls.h>
-#include <libos/fsl_hcalls.h>
-#include <libos/core-regs.h>
-#include <libos/trapframe.h>
-#include <libos/bitops.h>
-#include <libfdt.h>
-#include <hvtest.h>
+ENTRY(_start)
 
-extern uint32_t text_start;
+OUTPUT_ARCH(powerpc:common64)
 
-static inline uintptr_t get_pc(void)
+SECTIONS
 {
-	register uint32_t retval asm("r3") = 0;
+    . = 0x20000000;
 
-	asm ("mflr %%r0;"
-	     "bl 1f;"
-	     "1: mflr %0;"
-	     "mtlr %%r0;" : "=r" (retval) : :"r0","memory" );
+    .text (. + 4M): AT(4M) {
+	text_start = .;
+        *(.text)
+    }
 
-	return retval;
-}
+    . = ALIGN(4096);
+    .rodata : {
+        *(.rodata)
+        *(.rodata.*)
+    }
 
-void libos_client_entry(unsigned long devtree_ptr)
-{
-	init(devtree_ptr);
+    . = ALIGN(4096);
+    .data : {
+        *(.data)
+        *(.sdata)
+    }
 
-	printf("elf non zero load address test\n");
-#ifdef DEBUG
-	printf("pc = %x\n", get_pc());
-#endif
-	if (get_pc() > (uintptr_t)&text_start)
-		printf("PASSED\n");
-	else
-		printf("FAILED\n");
+    . = ALIGN(8);
+    toc_start = .;
+    .got : {
+        *(.got)
+        *(.toc)
+    }
 
-	printf("Test Complete\n");
+    bss_start = .;
+    .bss : {
+        *(.sbss)
+        *(.bss)
+    }
+    bss_end = .;
+    _end = .;
+
 }

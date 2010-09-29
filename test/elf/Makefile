@@ -47,11 +47,16 @@ $(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
 $($(test)-hv-dts): $($(test)-part-dtb)
 
+ifeq ($(CONFIG_LIBOS_64BIT),y)
+$(test)-LD_SCRIPT := $(testdir)elf/elf64.lds
+else
+$(test)-LD_SCRIPT := $(testdir)elf/elf.lds
+endif
 
 bin/$(test)/$(test): $($(test)-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)elf/elf.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$($(notdir $@)-LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
 $(test): bin/$(test)/$(test) $($(test)-hv-dtb)

@@ -40,7 +40,7 @@ $(test)-hv-dtb := $($(test)-dts-y:$(dir)%.dts=bin/$(test)/%.dtb)
 bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
 $(test): bin/$(test)/$(test) $($(test)-hv-dtb)

@@ -74,17 +74,17 @@ $($(test)-hv-dts): $($(test)-part-dtb)
 bin/$(test)/gdb: $(gdb-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 bin/$(test)/gdb-hello: $(gdb-hello-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 bin/$(test)/gdb-whoami: $(gdb-whoami-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
 $(test): bin/$(test)/gdb bin/$(test)/gdb-hello bin/$(test)/gdb-whoami $($(test)-hv-dtb)

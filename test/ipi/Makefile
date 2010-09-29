@@ -74,17 +74,17 @@ $($(test)-hv-dts): $($(test)-part-dtb)
 bin/$(test)/ipi: $(ipi-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 bin/$(test)/ipi1: $(ipi1-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 bin/$(test)/ipi2: $(ipi2-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
 $(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb)

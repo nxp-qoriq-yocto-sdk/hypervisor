@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,12 +62,12 @@ $($(test)-hv-dts): $($(test)-part-dtb)
 bin/$(test)/$(test): $($(test)-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 bin/$(test)/vmpic1: $(vmpic1-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
-	$(V)$(CC) $(LD_OPTS) -Wl,-T$(testdir)common/tests.lds -o $@ $^ -lgcc
+	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
 $(test): bin/$(test)/$(test) bin/$(test)/vmpic1 $($(test)-hv-dtb)

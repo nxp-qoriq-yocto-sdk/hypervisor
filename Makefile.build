@@ -77,6 +77,14 @@ HOSTCC_OPTS=-g -std=gnu99
 HOSTCC_OPTS_C := $(EXTRAWARNINGS) -Wall -O2 -I $(HEADERS_DIR) \
                  -I $(GEN_HEADERS_DIR) -I $(LIBOS_INC)
 
+ifeq "$(GUEST64)" "y"
+OUTPUTTEST := test64
+else ifndef GUEST64
+OUTPUTTEST := test32
+else
+$(error Unsupported value (y/<undef>) for GUEST64=$(GUEST64))
+endif
+
 include include/config/auto.conf
 
 ifeq ($(CONFIG_GCOV),y)
@@ -222,12 +230,12 @@ bin/hv.map: bin/hv
 FORCE:
 
 test-%: bin/hv.uImage FORCE
-	@$(MKDIR) test
-	@$(MAKE) -C test -f $(src)test/Makefile $*
+	@$(MKDIR) $(OUTPUTTEST)
+	@$(MAKE) -C $(OUTPUTTEST) -f $(src)test/Makefile $*
 
 test: FORCE
-	@$(MKDIR) test
-	$(MAKE) -C test -f $(src)test/Makefile
+	@$(MKDIR) $(OUTPUTTEST)
+	$(MAKE) -C $(OUTPUTTEST) -f $(src)test/Makefile
 
 lib:
 	$(SIMICS) -q -e 'echo (resolve-file "%simics%" + sim->host_arch + "-" + sim->host_os + "/lib"); quit' | tail -1
