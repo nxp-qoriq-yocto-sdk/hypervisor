@@ -141,7 +141,7 @@ typedef struct dt_node {
 
 	struct csd_info *csd;
 
-	struct cpc_part_reg *cpc_reg[num_mem_tgts];
+	struct cpc_part_reg *cpc_reg[max_num_mem_tgts];
 
 #ifdef CONFIG_DEVICE_VIRT
 	struct vf_range *vf;

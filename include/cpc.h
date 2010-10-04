@@ -54,7 +54,7 @@ typedef struct cpc_dev {
 typedef enum mem_tgts {
 	mem_tgt_ddr1,
 	mem_tgt_ddr2,
-	num_mem_tgts
+	max_num_mem_tgts
 } mem_tgts_t;
 
 void allocate_cpc_ways(struct dt_prop *prop, uint32_t tgt, uint32_t csdid, struct dt_node *node);

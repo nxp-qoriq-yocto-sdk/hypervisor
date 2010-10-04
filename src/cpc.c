@@ -51,12 +51,13 @@ static struct cpc_error_info cpc_err[CPC_ERROR_COUNT] = {
 	[cpc_data_single_bit_ecc] = {NULL, CPC_ERRDET_DSBECCERR},
 };
 
-static cpc_dev_t cpcs[num_mem_tgts];
+static cpc_dev_t cpcs[max_num_mem_tgts];
 static uint32_t num_cpc_ways;
+static uint32_t num_cpcs;
 
 int cpcs_enabled(void)
 {
-	for (int i = 0; i < num_mem_tgts; i++){
+	for (int i = 0; i < num_cpcs; i++){
 		if (!cpcs[i].cpccsr0 ||
 			!(in32(cpcs[i].cpccsr0) & CPCCSR0_CPCE))
 				return 0;
@@ -213,14 +214,14 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 	uint32_t num_sets, cache_size, block_size;
 
 	/* The hardware device tree has a single l3-cache node.
-	 * This node would contain reg properties corresponding
-	 *  to both cpc0 and cpc1.
-	 *  Number of CPCs should be equal to number of associated
-	 *  memory targets, excluding the interleaved target.
-	 *  In case of P4080 we have two targets in form of
+	 * The reg properties contains register ranges for the
+	 * number of actual CPC controllers.
+	 * The number of CPCs should be equal to the number of
+	 * associated memory targets, excluding the interleaved target.
 	 */
 
-	if (dev->num_regs != num_mem_tgts || !dev->regs[0].virt) {
+	num_cpcs = dev->num_regs;
+	if (num_cpcs == 0 || !dev->regs[0].virt || num_cpcs > max_num_mem_tgts) {
 		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
 				"CPC reg initialization failed\n");
 		return ERR_INVALID;
@@ -385,15 +386,27 @@ void allocate_cpc_ways(dt_prop_t *prop, uint32_t tgt, uint32_t csdid, dt_node_t 
 		node->cpc_reg[mem_tgt_ddr2] = NULL;
 		break;
 	case LAW_TRGT_DDR2:
-		node->cpc_reg[mem_tgt_ddr1] = NULL;
-		node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+		if (num_cpcs > 1) {
+			node->cpc_reg[mem_tgt_ddr1] = NULL;
+			node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+		} else {
+			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			         "%s: ERROR: only 1 CPC available\n",
+			         __func__);
+		}
 		break;
 	case LAW_TRGT_INTLV:
-		node->cpc_reg[mem_tgt_ddr1] = allocate_ways(mem_tgt_ddr1, prop, csdid);
-		node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+		if (num_cpcs > 1) {
+			node->cpc_reg[mem_tgt_ddr1] = allocate_ways(mem_tgt_ddr1, prop, csdid);
+			node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+		} else {
+			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			         "%s: ERROR: only 1 CPC available\n",
+			         __func__);
+		}
 		break;
 	default:
 		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
-				"Invalid target for CPC\n");
+		        "Invalid target for CPC\n");
 	}
 }
