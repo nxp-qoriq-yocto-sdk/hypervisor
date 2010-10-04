@@ -1048,3 +1048,91 @@ static command_t crash = {
 };
 shell_cmd(crash);
 #endif
+
+typedef struct log_type {
+	const char *namestr;
+	int id;
+} log_type_t;
+
+static struct log_type groups[] =
+{
+	{"misc", LOGTYPE_MISC},
+	{"mmu", LOGTYPE_MMU},
+	{"irq", LOGTYPE_IRQ},
+	{"mp", LOGTYPE_MP},
+	{"malloc", LOGTYPE_MALLOC},
+	{"dev", LOGTYPE_DEV},
+	{"guest-mmu", LOGTYPE_GUEST_MMU},
+	{"emu", LOGTYPE_EMU},
+	{"partition", LOGTYPE_PARTITION},
+	{"debug-stub", LOGTYPE_DEBUG_STUB},
+	{"byte-chan", LOGTYPE_BYTE_CHAN},
+	{"doorbell", LOGTYPE_DOORBELL},
+	{"bcmux", LOGTYPE_BCMUX},
+	{"devtree", LOGTYPE_DEVTREE},
+	{"pamu", LOGTYPE_PAMU},
+	{"ccm", LOGTYPE_CCM},
+	{"cpc", LOGTYPE_CPC},
+	{"guts", LOGTYPE_GUTS},
+	{"pm", LOGTYPE_PM},
+	{"ddr", LOGTYPE_DDR},
+	{"errorq", LOGTYPE_ERRORQ}
+};
+#define GROUPS_COUNT (sizeof(groups)/sizeof(struct log_type))
+
+static int str_to_loggroup(const char *groupstr)
+{
+	int index;
+
+	for (index = 0; index < GROUPS_COUNT; index++)
+		if (!strcmp(groups[index].namestr, groupstr))
+			return groups[index].id;
+
+	return -1;
+}
+
+static void set_loglevel(shell_t *shell, char *args)
+{
+	char *groupstr, *levelstr;
+	int group, index;
+	uint32_t level;
+
+	args = stripspace(args);
+	groupstr = nextword(&args);
+	levelstr = nextword(&args);
+
+	if (!groupstr) {
+		qprintf(shell->out, 1, "Group             Loglevel\n");
+		qprintf(shell->out, 1, "---------------------------------\n");
+		for (index = 0; index < GROUPS_COUNT; index++)
+			qprintf(shell->out, 1, "%-20s %d\n", groups[index].namestr, loglevels[groups[index].id]);
+		return;
+	}
+	group = str_to_loggroup(groupstr);
+	if (group < 0) {
+		qprintf(shell->out, 1, "Invalid log group\n");
+		return;
+	}
+	if (!levelstr) {
+		qprintf(shell->out, 1, "Level for group %s: %d\n", groupstr, loglevels[group]);
+		return;
+	}
+
+	level = get_number32(shell->out, levelstr);
+	if ((cpu->errno) || (level > CONFIG_LIBOS_MAX_BUILD_LOGLEVEL)) {
+		qprintf(shell->out, 1, "Invalid log level (valid values: 0-%d)\n", CONFIG_LIBOS_MAX_BUILD_LOGLEVEL);
+		return;
+	}
+	loglevels[group] = level;
+}
+
+static command_t loglevel = {
+	.name = "loglevel",
+	.action = set_loglevel,
+	.aliases = (const char *[]){"ll", NULL },
+	.shorthelp = "Control the log level for a specific log type",
+	.longhelp = "Usage: loglevel [<group>] [<level>] \n"
+	            "Setting higher levels may be dangerous (e.g enabling "
+	            "debug on bcmux when HV console is on mux)"
+};
+shell_cmd(loglevel);
