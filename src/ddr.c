@@ -51,8 +51,13 @@ static struct ddr_error_info ddr_err[DDR_ERROR_COUNT] = {
 
 static int ddr_probe(driver_t *drv, device_t *dev);
 
-static driver_t __driver ddr = {
+static driver_t __driver ddr_4080 = {
 	.compatible = "fsl,p4080-memory-controller",
+	.probe = ddr_probe
+};
+
+static driver_t __driver ddr = {
+	.compatible = "fsl,qoriq-memory-controller",
 	.probe = ddr_probe
 };
 

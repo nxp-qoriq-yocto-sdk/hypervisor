@@ -1158,8 +1158,13 @@ static int pamu_av_isr(void *arg)
 
 static int pamu_probe(driver_t *drv, device_t *dev);
 
-static driver_t __driver pamu = {
+static driver_t __driver pamu_4080 = {
 	.compatible = "fsl,p4080-pamu",
+	.probe = pamu_probe
+};
+
+static driver_t __driver pamu = {
+	.compatible = "fsl,pamu",
 	.probe = pamu_probe
 };
 
