@@ -50,8 +50,6 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
 };
 
-#define HV_CPUS         (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
-
 static law_t *laws;
 static uint32_t *csdids;
 static uint32_t *err_det_reg, *err_enb_reg;
@@ -306,7 +304,7 @@ void add_all_cpus_to_csd(dt_node_t *node)
 	if (!node->csd)
 		return;
 
-	set_csd_cpus(node->csd, HV_CPUS);
+	set_csd_cpus(node->csd, cpus_mask);
 }
 
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)

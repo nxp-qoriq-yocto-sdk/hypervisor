@@ -623,6 +623,33 @@ static void watchdog_init(void)
 }
 #endif
 
+/* partition_init_counter is atomically decremented each time a core
+ * completes its partition init (or lack thereof if it has no
+ * partition).  Once this reaches zero, gevents will be sent
+ * to start the partitions.
+ */
+unsigned long partition_init_counter;
+
+/* For each core found in the device tree a bit is set starting
+ * with the most significant one
+ */
+uint32_t cpus_mask;
+
+static int count_cores(dt_node_t *node, void *arg)
+{
+	dt_prop_t *prop = dt_get_prop(node, "reg", 0);
+	if (prop && prop->len == 4) {
+		uint32_t reg = *(const uint32_t *)prop->data;
+
+		if (reg <= MAX_CORES) {
+			partition_init_counter++;
+			cpus_mask |= 1 << (31 - reg);
+		}
+	}
+
+	return 0;
+}
+
 /**
  * get_ccsr_phys_addr - get the CCSR physical address from the device tree
  * @param[out] size returned size of CCSR, in bytes
@@ -847,6 +874,8 @@ void libos_client_entry(unsigned long treephys)
 
 	ccm_init();
 
+	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4, count_cores, NULL);
+
 	dt_for_each_compatible(hvconfig, "hv-memory", claim_hv_pma, NULL);
 
 #ifdef CONFIG_BYTE_CHAN
@@ -977,30 +1006,9 @@ static int release_secondary(dt_node_t *node, void *arg)
 	return 0;
 }
 
-/* partition_init_done is atomically decremented each time a core
- * completes its partition init (or lack thereof if it has no
- * partition).  Once this reaches zero, gevents will be sent
- * to start the partitions.
- */
-unsigned long partition_init_counter;
-
-static int count_cores(dt_node_t *node, void *arg)
-{
-	dt_prop_t *prop = dt_get_prop(node, "reg", 0);
-	if (prop && prop->len == 4) {
-		uint32_t reg = *(const uint32_t *)prop->data;
-
-		if (reg <= MAX_CORES)
-			partition_init_counter++;
-	}
-
-	return 0;
-}
 
 static void release_secondary_cores(void)
 {
-	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
-	                       count_cores, NULL);
 	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
 	                       release_secondary, NULL);
 }

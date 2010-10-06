@@ -28,6 +28,8 @@
 struct guest;
 struct dt_node;
 
+extern uint32_t cpus_mask;
+
 typedef struct csd_info {
 	uint32_t law_id, csd_id, csd_lock;
 } csd_info_t;
