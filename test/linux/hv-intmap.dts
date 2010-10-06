@@ -102,7 +102,7 @@
 		label = "p1-linux";
 		cpus = <0 2>;
 		guest-image = <0xf 0xe8100000 0 0 0 0x00e00000>;
-		linux-rootfs = <0xf 0xe9000000 0 0x01300000 0 0x01800000>;
+		linux-rootfs = <0xf 0xe9000000 0 0x01300000 0 0x02800000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
