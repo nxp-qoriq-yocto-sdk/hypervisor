@@ -51,7 +51,6 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 };
 
 #define HV_CPUS         (((1 << MAX_CORES) - 1) << (32 - MAX_CORES))
-#define PAMU_CSD_PORTS  0xfff80000
 
 static law_t *laws;
 static uint32_t *csdids;
@@ -572,8 +571,10 @@ int setup_pamu_law(dt_node_t *node)
 
 	ret = setup_csd_law(node);
 	if (ret == 0)
-		/* CSD contains all the cores and PAMUs */
-		set_csd_cpus(node->csd, PAMU_CSD_PORTS);
+		/* CSDID0 reset value defines a mask of all corenet ports
+		 * which includes all the cores and CHBs with PAMU enabled.
+		 */
+		set_csd_cpus(node->csd, in32(&csdids[0]));
 
 	return ret;
 }
