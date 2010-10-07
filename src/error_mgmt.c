@@ -83,18 +83,21 @@ static void dump_mcheck_error(hv_error_t *err)
 }
 
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
-	[error_mcheck] = { NULL, "machine check", NULL, 0, dump_mcheck_error},
-	[error_cpc] = { "fsl,p4080-l3-cache-controller", "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL },
-	[error_ccf] = { "fsl,corenet-cf", "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL },
-	[error_misc] = { "fsl,soc-sram-error", "misc", misc_error_policy, MISC_ERROR_COUNT, NULL },
-	[error_pamu] = { "fsl,p4080-pamu", "pamu", pamu_error_policy, PAMU_ERROR_COUNT, NULL },
-	[error_ddr] = { "fsl,p4080-memory-controller", "ddr", ddr_error_policy, DDR_ERROR_COUNT, NULL },
+	[error_mcheck] = {(const char *[]){NULL}, "machine check", NULL, 0, dump_mcheck_error},
+	[error_cpc] = {(const char *[]){"fsl,p4080-l3-cache-controller", NULL}, "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL},
+	[error_ccf] = {(const char *[]){"fsl,corenet-cf", NULL}, "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL},
+	[error_misc] = {(const char *[]){"fsl,soc-sram-error", NULL}, "misc", misc_error_policy, MISC_ERROR_COUNT, NULL},
+	[error_pamu] = {(const char *[]){"fsl,pamu", "fsl,p4080-pamu", NULL}, "pamu", pamu_error_policy, PAMU_ERROR_COUNT, NULL},
+	[error_ddr] = {(const char *[]){"fsl,qoriq-memory-controller", "fsl,p4080-memory-controller", NULL}, "ddr", ddr_error_policy, DDR_ERROR_COUNT, NULL},
 };
 
 static int validate_domain(const char *domain, dt_node_t *hwnode)
 {
-	int i;
-	const char *compat = dt_get_prop_string(hwnode, "compatible");
+	int i, j;
+	char *compat_strlist;
+	const char *end_compat;
+	dt_prop_t *compat = dt_get_prop(hwnode, "compatible", 0);
+
 	if (!compat) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 		         "%s: error: missing compatible on %s",
@@ -102,14 +105,18 @@ static int validate_domain(const char *domain, dt_node_t *hwnode)
 		return 1;
 	}
 
+	compat_strlist = compat->data;
+	end_compat = compat_strlist + compat->len;
+
 	/* validate the the hwnode compatible corresponds to
            the domain */
 	for (i = 0; i < ERROR_DOMAIN_COUNT; i++) {
-		if (!error_domains[i].compatible)
+		if (strcmp(domain, error_domains[i].domain)) /* domain matches? */
 			continue;
-		if (!strcmp(compat, error_domains[i].compatible) &&
-		    !strcmp(domain, error_domains[i].domain))
-			return 0;  /* found it */
+		for (j = 0; error_domains[i].compatibles[j]; j++) { /* for each supported compatible */
+			if (dt_node_is_compatible(hwnode, error_domains[i].compatibles[j]))
+				return 0;  /* found it */
+		}
 	}
 
 	return 1;  /* domain/compatible mismatch */

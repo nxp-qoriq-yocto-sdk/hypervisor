@@ -40,7 +40,7 @@ typedef struct error_policy {
 typedef void (*dump_error_info)(struct hv_error *);
 
 typedef struct error_domain {
-	const char *compatible;
+	const char **compatibles;
 	const char *domain;
 	error_policy_t *errors;
 	int error_count;
