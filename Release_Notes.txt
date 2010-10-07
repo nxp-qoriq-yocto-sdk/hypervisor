@@ -26,13 +26,20 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.7
-Revsion: 010
-Date: 9/10/2010
+Revision: 012
+Date: 10/07/2010
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+
+   -v0.7-012 bug fixes and changes
+       -bug 6415: fixed assumption that there are two DDR controllers
+       -bug 6426: support 3041/5020 compatible strings
+       -bug 6333: fixed assumption that there are 8 CPUs
+       -bug 6434: fixed assumption about # of CCM ports
+       -added gcov support
 
    -v0.7-011 bug fixes and changes
        -bug 6339: partition start failure. Patch syncs icache
