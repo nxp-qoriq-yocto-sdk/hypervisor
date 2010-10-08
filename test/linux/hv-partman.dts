@@ -452,7 +452,7 @@
 		node-update {
 			chosen {
 				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x02B00000>;
+				linux,initrd-end = <0x03B00000>;
 			};
 		};
 	};
@@ -534,7 +534,7 @@
 		node-update {
 			chosen {
 				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x02B00000>;
+				linux,initrd-end = <0x0BB00000>;
 			};
 		};
 	};
