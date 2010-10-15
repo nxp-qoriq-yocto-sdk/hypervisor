@@ -235,4 +235,7 @@ lib:
 docs:
 	doxygen $(src)doc/Doxyfile
 
+gcov:
+	cd bin; gcov *.gcda; cd -
+
 .SECONDARY:
