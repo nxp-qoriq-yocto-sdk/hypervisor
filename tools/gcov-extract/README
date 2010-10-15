@@ -1,0 +1,50 @@
+#
+#  Copyright (C) 2010 Freescale Semiconductor, Inc.
+#
+#  This file is distributed under the GNU LGPL.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+#  NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+#  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+
+To run code coverage on HV compile with gcov enabled in menuconfig
+and follow the steps below:
+
+----------------------------------------------------------
+Running on hardware
+
+1. Start gcov enabled HV and run your tests to completion.
+2. Run mux_server connecting directly to serial port (/dev/tty...).
+   Make sure skermit was not left running.
+
+     mux_server -s 115200 /dev/ttyQ06e2 8000 8001 8002 8003 8004 8005 \
+     8006 8007 8008 8009 8010 8011 8012 8013 8014 8015 8016 8017 8018 \
+     8019 8020 8021 8022 8023 8024 8025 8026 8027 8028 8029 8030 8031
+
+3. Run gcov-extract tool. If you get version mismatch errors, update the
+   '--host-libgcov-version' parameter to the version mentioned in the errors
+   and re-run.
+
+    gcov-extract --host-libgcov-version=401p -v localhost:8031
+
+4. Run 'make gcov' on the HV directory. The .gcov files will be extracted in 'output/bin'.
+
+----------------------------------------------------------
+Running on simics
+
+1. Before starting the simulation make sure that the simics 'net console'
+   is in raw mode.
+
+    p4080ds.net_console0.con->raw = TRUE
+
+2. Start gcov enabled HV and run your tests to completion.
+3. Follow steps 2 - 4 from 'Running on hardware'.

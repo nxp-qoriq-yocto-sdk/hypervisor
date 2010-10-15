@@ -219,6 +219,7 @@ static int connect_to_target(char *host, int port)
 #endif /* #ifndef __linux__ */
 		/* Enable TCP keep alive process. */
 		set_socket_flag(tgt_fd, SOL_SOCKET, SO_KEEPALIVE);
+		set_socket_flag(tgt_fd, IPPROTO_TCP, TCP_NODELAY);
 
 		sockaddr.sin_family = PF_INET;
 		sockaddr.sin_port = htons(port);
@@ -374,7 +375,8 @@ static void fetch_tgt_gi_field64(int tgt_fd, unsigned int tgt_addr, unsigned int
 	memcpy(field, gd_rsp, len_hst);
 	/* What got memcpy()'ied is in target endianness,
 	 * so convert it to host endianness */
-	*(uint64_t *)field = byte_reverse64(*(uint64_t *)field);
+	for (int i = 0; i < len_hst / sizeof (uint64_t); i++)
+		((uint64_t *)field)[i] = byte_reverse64(((uint64_t *)field)[i]);
 }
 
 static void gcov_extract(int tgt_fd)
@@ -479,7 +481,6 @@ static void gcov_extract(int tgt_fd)
 
 		unsigned int tgt_gi_filename_addr_hst;
 		unsigned int tgt_gi_functions_addr_hst;
-		unsigned int tgt_gi_function_addr_hst;
 		unsigned int tgt_gci_values_addr_hst;
 		/* +Hard coding alert!+ */
 		const int TGT_FILENAME_MAX_LEN = 256;
@@ -562,24 +563,38 @@ static void gcov_extract(int tgt_fd)
 		                   tgt_word_size_hst, &tgt_gi_functions_addr_hst);
 
 		struct gcov_fn_info *fi;
-		for (index = 0, fi = hst_gcov_info->functions; index < hst_gcov_info->n_functions;
-		     index++, fi = (struct gcov_fn_info *) ((char *) hst_gcov_info->functions +
-		                                                     index * tgt_info.gcov_fn_info_size)) {
+		char fn_info_tmp[tgt_info.gcov_fn_info_size * 8];
+		int left = hst_gcov_info->n_functions;
+		int amount;
 
-			tgt_gi_function_addr_hst = tgt_gi_functions_addr_hst + index * tgt_info.gcov_fn_info_size;
+		index = 0;
+		while (left > 0) {
+			amount = left < 8 ? left : 8;
 
-			/* gcov_info.functions[index].ident */
-			fetch_tgt_gi_field(tgt_fd, tgt_gi_function_addr_hst + tgt_info.gfi_ident_offst,
-			                   tgt_info.unsigned_size, &fi->ident);
+			fetch_tgt_data(tgt_fd,
+				       tgt_gi_functions_addr_hst + index * tgt_info.gcov_fn_info_size,
+				       amount * tgt_info.gcov_fn_info_size,
+				       fn_info_tmp);
 
-			/* gcov_info.functions[index].checksum */
-			fetch_tgt_gi_field(tgt_fd, tgt_gi_function_addr_hst + tgt_info.gfi_checksum_offst,
-			                   tgt_info.unsigned_size, &fi->checksum);
+			for (int i = 0; i < amount; i++) {
+				fi = (struct gcov_fn_info *) ((char *) hst_gcov_info->functions +
+                                                                    (index + i) * tgt_info.gcov_fn_info_size);
 
-			/* gcov_info.functions[index].n_ctrs[0] */
-			fetch_tgt_gi_field(tgt_fd, tgt_gi_function_addr_hst + tgt_info.gfi_n_ctrs_offst,
-			                   tgt_info.unsigned_size, &fi->n_ctrs[0]);
+				fi->ident = byte_reverse(*(int *)(fn_info_tmp + i * tgt_info.gcov_fn_info_size + tgt_info.gfi_ident_offst));
+				fi->checksum = byte_reverse(*(int *)(fn_info_tmp + i * tgt_info.gcov_fn_info_size + tgt_info.gfi_checksum_offst));
+				fi->n_ctrs[0] =  byte_reverse(*(int *)(fn_info_tmp + i * tgt_info.gcov_fn_info_size + tgt_info.gfi_n_ctrs_offst));
+
+				DLOG("fi->ident = %d fi->checksum = %x fi->n_ctrs = %x\n",
+					fi->ident, fi->checksum, fi->n_ctrs[0]);
+			}
+
+			left -= amount;
+			index += amount;
+
+			VLOG("\tExtracting functions... %d/%d\r", index, hst_gcov_info->n_functions);
+			fflush(stdout);
 		}
+		VLOG("\n");
 
 		/* gcov_info.ctr_mask */
 		fetch_tgt_gi_field(tgt_fd, tgt_gcov_info_addr_hst + tgt_info.gi_ctr_mask_offst,
@@ -596,13 +611,20 @@ static void gcov_extract(int tgt_fd)
 		fetch_tgt_gi_field(tgt_fd, tgt_gcov_info_addr_hst + tgt_info.gi_counts_offst + tgt_info.gci_values_offst,
 		                   tgt_word_size_hst, &tgt_gci_values_addr_hst);
 
-		for (index = 0; index < hst_gcov_info->counts[0].num; index++) {
+		int n = (sizeof (uint64_t) / sizeof (tgt_info.long_size)) * sizeof (tgt_info.long_size);
+		left =  hst_gcov_info->counts[0].num;
+		index = 0;
+		while (left > 0) {
+			amount = left < 16 ? left : 16;
+			fetch_tgt_gi_field64(tgt_fd, tgt_gci_values_addr_hst + index * n, amount * n,
+					     &hst_gcov_info->counts[0].values[index]);
+			left -= amount;
+			index += amount;
 
-			int n = (sizeof (uint64_t)/sizeof (tgt_info.long_size)) * sizeof (tgt_info.long_size);
-			fetch_tgt_gi_field64(tgt_fd, tgt_gci_values_addr_hst + index * n, n,
-			                     &hst_gcov_info->counts[0].values[index]);
-
+			VLOG("\tExtracting counters... %d/%d\r", index, hst_gcov_info->counts[0].num);
+			fflush(stdout);
 		}
+		VLOG("\n");
 
 		/* gcov_info.counts[0].merge */
 		hst_gcov_info->counts[0].merge = (gcov_merge_fn) &__gcov_merge_add;
@@ -623,5 +645,6 @@ static void gcov_extract(int tgt_fd)
 		hst_gcov_info = hst_gcov_info_next;
 	}
 	VLOG("Done creating .gcda files.\n");
+
 	exit(0);
 }
