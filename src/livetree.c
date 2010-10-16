@@ -465,7 +465,7 @@ char *dt_get_prop_string(dt_node_t *node, const char *name)
 		return NULL;
 
 	char *str = prop->data;
-	if (!str || str[prop->len - 1] != 0)
+	if (!str || prop->len == 0 || str[prop->len - 1] != 0)
 		return NULL;
 
 	return str;
