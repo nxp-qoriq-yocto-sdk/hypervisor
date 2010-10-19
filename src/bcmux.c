@@ -149,8 +149,6 @@ static int mux_tx_switch(mux_complex_t *mux, connected_bc_t *cbc)
 
 	if (mux->current_tx_bc == cbc)
 		return 0;
-	if (queue_get_space(mux->byte_chan->tx) < 2)
-		return -1;
 
 	printlog(LOGTYPE_BCMUX, LOGLEVEL_DEBUG,
 		"mux_tx_switch: switched to channel '%d' (%p)\n",
@@ -174,9 +172,10 @@ static int __mux_send_data(mux_complex_t *mux, connected_bc_t *cbc)
 	if (queue_empty(cbc->byte_chan->rx))
 		return 0;
 
-	sent = mux_tx_switch(mux, cbc);
-	if (sent < 0)
+	if (queue_get_space(mux->byte_chan->tx) < 2)
 		return -1;
+
+	sent = mux_tx_switch(mux, cbc);
 
 	while (queue_get_space(mux->byte_chan->tx) >= 2) {
 		c = queue_readchar(cbc->byte_chan->rx, 0);
@@ -227,16 +226,15 @@ static void mux_send_data_pull(queue_t *q)
 		if (ret > 0)
 			queue_notify_producer(cbc->byte_chan->rx);
 
-		cbc = cbc->next;
-		if (!cbc)
-			cbc = mux->first_bc;
-
-		/* If we filled the output queue with this channel, start
-		 * with the next one on the next pull.  It's not perfectly
-		 * fair, but it avoids starvation.
+		/* If the output queue is full, the current channel did not have
+		 * the chance to send any data, so start with this channel next time
 		 */
 		if (ret < 0) /* no more room */
 			break;
+
+		cbc = cbc->next;
+		if (!cbc)
+			cbc = mux->first_bc;
 
 		/* Limit total work per invocation to limit latency. */
 		total += ret;
