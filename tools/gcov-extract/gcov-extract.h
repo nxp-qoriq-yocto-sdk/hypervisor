@@ -93,3 +93,36 @@ typedef struct tgt_info {
 	int gcov_ctr_info_size;
 
 } tgt_info_t;
+
+tgt_info_t tgt_info = {
+
+	/* gcov_info (denoted by gi_ prefixes) */
+	.gi_version_offst = 0,
+	.gi_next_offst = 4,
+	.gi_stamp_offst = 8,
+	.gi_filename_offst = 12,
+	.gi_n_functions_offst = 16,
+	.gi_functions_offst = 20,
+	.gi_ctr_mask_offst = 24,
+	.gi_counts_offst = 28,
+
+	/* gcov_ctr_info (denoted by gci_ prefixes) */
+	.gci_num_offst = 0,
+	.gci_values_offst = 4,
+	.gci_merge_offst = 8,
+
+	/* gcov_fn_info (denoted by gfi_ prefixes) */
+	.gfi_ident_offst = 0,
+	.gfi_checksum_offst = 4,
+	.gfi_n_ctrs_offst = 8,
+
+	/* type sizes */
+#define UNSIGNED_SIZE 4
+	.unsigned_size = UNSIGNED_SIZE,
+	.long_size = 4,
+	.word_size = 4, /* We do override this based on get-data-info. */
+	.gcov_fn_info_size = 8 + UNSIGNED_SIZE, /* add an unsigned's worth of storage for n_ctrs[0] */
+	.gcov_ctr_info_size = 12,
+};
+
+#endif
