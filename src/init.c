@@ -1143,19 +1143,21 @@ void flush_caches(void)
 {
 	/* Arbitrary 100ms timeout for cache to flush */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	uint32_t l2csr0, l1csr0, l1csr1;
+	uint32_t l2csr0, l1csr0, l1csr1, l1csr2;
 	int ret;
 
 	flush_disable_l2_cache(timeout, 1, &l2csr0);
 
 	l1csr0 = mfspr(SPR_L1CSR0);
 	l1csr1 = mfspr(SPR_L1CSR1);
+	l1csr2 = mfspr(SPR_L1CSR2);
 
 	ret = flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
 	                             timeout);
 
 	set_cache_reg(SPR_L1CSR0, l1csr0);
 	set_cache_reg(SPR_L1CSR1, l1csr1);
+	set_cache_reg(SPR_L1CSR2, l1csr2);
 	set_cache_reg(SPR_L2CSR0, l2csr0);
 
 	if (ret < 0)
