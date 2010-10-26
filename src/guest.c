@@ -2805,7 +2805,7 @@ static void qman_portal_liodn_fixup(guest_t *guest)
 	dt_prop_t *prop;
 	dt_node_t *first = NULL;
 	uint32_t *qmanreg;
-	uint32_t liodn_offset;
+	uint32_t liodn_offset = 0; /* shut up GCC */
 	uint32_t mask = 0x03ff0000;
 
 	node = dt_get_first_compatible(hw_devtree, "fsl,qman");
