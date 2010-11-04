@@ -67,7 +67,7 @@ static void process_rx_intr(uint32_t handle_num)
 	uint32_t rxavail;
 	uint32_t txavail;
 	int ret;
-	char buf[BC_INT_Q_SIZE*2];
+	static char buf[BC_INT_Q_SIZE*2];
 	unsigned int cnt, count = 0;
 
 
