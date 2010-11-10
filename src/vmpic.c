@@ -365,6 +365,7 @@ void hcall_int_set_config(trapframe_t *regs)
 	uint32_t lcpu_dest = regs->gpregs[6];
 	uint32_t lcpu_mask = 1 << lcpu_dest;
 	interrupt_t *irq;
+	int ret = 0;
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -392,18 +393,31 @@ void hcall_int_set_config(trapframe_t *regs)
 	irq = vmirq->irq;
 
 	if (irq->ops->set_priority)
-		irq->ops->set_priority(irq, priority);
+		if (irq->ops->set_priority(irq, priority) < 0)
+			goto out_err;
 
 	if (irq->ops == &vpic_ops)
-		irq->ops->set_cpu_dest_mask(irq, lcpu_mask);
+		ret = irq->ops->set_cpu_dest_mask(irq, lcpu_mask);
 	else if (irq->ops->set_cpu_dest_mask)
-		irq->ops->set_cpu_dest_mask(irq, 1 << guest->gcpus[lcpu_dest]->cpu->coreid);
+		ret = irq->ops->set_cpu_dest_mask(irq, 1 << guest->gcpus[lcpu_dest]->cpu->coreid);
+
+	if (ret < 0)
+		goto out_err;
 
 	if (irq->ops->set_config)
-		irq->ops->set_config(irq, config);
+		if (irq->ops->set_config(irq, config) < 0)
+			goto out_err;
+
 	if (irq->ops->set_delivery_type)
-		irq->ops->set_delivery_type(irq, TYPE_NORM);
+		if (irq->ops->set_delivery_type(irq, TYPE_NORM))
+			goto out_err;
+	
 	regs->gpregs[3] = 0;  /* success */
+
+	return;
+
+out_err:
+	regs->gpregs[3] = EV_INVALID_STATE;
 }
 
 void hcall_int_get_config(trapframe_t *regs)
@@ -584,33 +598,6 @@ void hcall_int_iack(trapframe_t *regs)
 	printlog(LOGTYPE_IRQ, LOGLEVEL_VERBOSE,
 	         "iack %x %s\n", vector, v ? "HW" : "Virt");
 	regs->gpregs[4] = vector;
-	regs->gpregs[3] = 0;  /* success */
-}
-
-void hcall_int_get_activity(trapframe_t *regs)
-{
-	guest_t *guest = get_gcpu()->guest;
-	unsigned int handle = regs->gpregs[3];
-
-	// FIXME: race against handle closure
-	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
-		regs->gpregs[3] = EV_EINVAL;
-		return;
-	}
-
-	vmpic_interrupt_t *vmirq = guest->handles[handle]->intr;
-	if (!vmirq) {
-		regs->gpregs[3] = EV_EINVAL;
-		return;
-	}
-
-	if (!vmpic_is_claimed(vmirq)) {
-		regs->gpregs[3] = EV_INVALID_STATE;
-		return;
-	}
-
-	interrupt_t *irq = vmirq->irq;
-	regs->gpregs[4] = irq->ops->is_active(irq);
 	regs->gpregs[3] = 0;  /* success */
 }
 

@@ -347,7 +347,7 @@ static int vpic_irq_is_disabled(interrupt_t *irq)
 	return !virq->enable;
 }
 
-static void vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
+static int vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
 {
 	vpic_interrupt_t *virq = to_container(irq, vpic_interrupt_t, irq);
 	guest_t *guest = virq->guest;
@@ -358,6 +358,8 @@ static void vpic_irq_set_destcpu(interrupt_t *irq, uint32_t destcpu)
 	save = spin_lock_intsave(&guest->vpic.lock);
 	virq->destcpu = destcpu;
 	spin_unlock_intsave(&guest->vpic.lock, save);
+
+	return 0;
 }
 
 /* EOI callback routine */
@@ -414,7 +416,7 @@ static int vpic_irq_is_active(interrupt_t *irq)
 	int ret;
 
 	save = spin_lock_intsave(&guest->vpic.lock);
-	ret = virq->pending || virq->active;
+	ret = (virq->pending && virq->enable) || virq->active;
 	spin_unlock_intsave(&guest->vpic.lock, save);
 
 	return ret;

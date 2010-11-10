@@ -849,7 +849,7 @@ static hcallfp_t epapr_hcall_table[] = {
 	hcall_int_get_config,
 	hcall_int_set_mask,
 	hcall_int_get_mask,
-	hcall_int_get_activity,             /* 8 */
+	unimplemented,                      /* 8 */
 	hcall_int_iack,
 	hcall_int_eoi,
 	unimplemented,

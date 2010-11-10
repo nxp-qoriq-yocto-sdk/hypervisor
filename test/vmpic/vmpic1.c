@@ -48,7 +48,7 @@ void ext_int_handler(trapframe_t *frameptr)
 {
 	unsigned int vector;
 	int rc;
-	unsigned int mask, active;
+	unsigned int mask;
 
 	rc = ev_int_iack(0, &vector);
 
@@ -74,11 +74,6 @@ void ext_int_handler(trapframe_t *frameptr)
 	}
 
 	out32(((uint32_t *)((uint32_t)addr + MPIC_EOI)), 0);
-
-	/* Make sure that eoi has made the interrupt inactive */
-	ev_int_get_activity(*handle_p, &active);
-	if (active == 1)
-		printf("Unexpected behavior : Interrupt in-service @eoi\n");
 }
 
 static void dump_dev_tree(void)
