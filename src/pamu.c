@@ -207,8 +207,8 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 #define PEXI_IWS 0x3F
 
 static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
-                             dt_node_t *node, dt_node_t *gnode, uint64_t gaddr,
-                             uint64_t *size)
+					   dt_node_t *node, dt_node_t *gnode,
+					   uint64_t gaddr, uint64_t *size)
 {
 	int ret;
 	dt_prop_t *prop;
@@ -260,6 +260,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		ret = dt_set_prop(msi_gnode, "compatible", buf, ret + 1);
 		if (ret < 0)
 			return ULONG_MAX;
+
 		regprop = dt_get_prop(msi_gnode, "reg", 0);
 		dt_delete_prop(regprop);
 
@@ -348,24 +349,26 @@ nomem:
 #ifdef CONFIG_CLAIMABLE_DEVICES
 
 static int reconfig_subwins(guest_t *guest, dt_node_t *parent,
-                            uint32_t liodn,
-                            phys_addr_t primary_base,
-                            phys_addr_t primary_size,
-                            uint32_t subwindow_cnt,
-                            ppaace_t *ppaace)
+			    uint32_t liodn,
+			    phys_addr_t primary_base,
+			    phys_addr_t primary_size,
+			    uint32_t subwindow_cnt)
 {
-	unsigned long fspi = ppaace->fspi; /* re-use spaace(s) */
-	phys_addr_t subwindow_size = primary_size / subwindow_cnt;
-	int subwin;
-	uint64_t gaddr = primary_base;
-	uint64_t size = subwindow_size;
+	paace_t *ppaace;
 	list_t *ele = parent->children.next;
+	dt_node_t *node;
+	uint64_t gaddr = primary_base;
+	uint64_t size = primary_size / subwindow_cnt;
+	unsigned long rpn;
+	int subwin;
+	int ret = 0;
+
+	ppaace = pamu_get_ppaace(liodn);
 
 	for (subwin = 0;
 	     subwin < subwindow_cnt;
 	     ++subwin, gaddr += size, ele = ele->next) {
-		unsigned long rpn;
-		dt_node_t *node = to_container(ele, dt_node_t, child_node);
+		node = to_container(ele, dt_node_t, child_node);
 
 		/*
 		 * Ignore PCIe MSI subwindows as their RPN should be constant,
@@ -380,54 +383,30 @@ static int reconfig_subwins(guest_t *guest, dt_node_t *parent,
 		if (rpn == ULONG_MAX)
 			continue;
 
-		if (subwin == 0) {
-			unsigned long curr_rpn = ppaace->twbah << 20 |
-					ppaace->twbal;
-			if (curr_rpn == rpn)
-				continue;
-			ppaace->ap = PAACE_AP_PERMS_DENIED;
-			lwsync();
-			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
-			ppaace->twbah = rpn >> 20;
-			ppaace->twbal = rpn & 0xfffff;
-			lwsync();
-			ppaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
-		} else {
-			spaace_t *spaace = pamu_get_spaace(fspi, subwin - 1);
-			unsigned long curr_rpn = spaace->twbah << 20 |
-					spaace->twbal;
-			if (curr_rpn == rpn)
-				continue;
-			spaace->ap = PAACE_AP_PERMS_DENIED;
-			lwsync();
-			spaace->atm = PAACE_ATM_WINDOW_XLATE;
-			spaace->twbah = rpn >> 20;
-			spaace->twbal = rpn & 0xfffff;
-			lwsync();
-			spaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
-		}
+		ret = pamu_reconfig_subwin(liodn, subwin, rpn);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
 }
 
-int pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
+int hv_pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
 {
-	struct ppaace_t *ppaace;
+	paace_t *ppaace;
 	unsigned long rpn;
 	dt_node_t *dma_window;
 	phys_addr_t window_addr = ~(phys_addr_t)0;
 	phys_addr_t window_size = 0;
-	uint32_t subwindow_cnt = 0;
+	uint32_t subwindow_cnt;
 	int ret = 0;
 
 	ppaace = pamu_get_ppaace(liodn);
-
-	subwindow_cnt = 1 << (ppaace->wce + 1);
-	window_addr = ((phys_addr_t)ppaace->wbah << 32) |
-	              ((uint32_t)ppaace->wbal << PAGE_SHIFT);
-	window_size = 1 << (ppaace->wse + 1);
-
+	subwindow_cnt = 1 << (get_bf(ppaace->impl_attr, PAACE_IA_WCE) + 1);
+	window_addr = ((phys_addr_t) ppaace->wbah << 32) |
+		       ((uint32_t) get_bf(ppaace->addr_bitfields, PPAACE_AF_WBAL)
+				<< PAGE_SHIFT);
+	window_size = 1 << (get_bf(ppaace->addr_bitfields, PPAACE_AF_WSE) + 1);
 	dma_window = hwnode->dma_window;
 	if (!dma_window) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
@@ -436,61 +415,37 @@ int pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
 		return ERR_BADTREE;
 	}
 
-	if (ppaace->mw)
+	if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
 		ret = reconfig_subwins(guest, dma_window, liodn,
-		                       window_addr, window_size, subwindow_cnt,
-		                       ppaace);
-	else {
-		unsigned long curr_rpn = ppaace->twbah << 20 |
-					ppaace->twbal;
-
-		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT,
-		              window_size >> PAGE_SHIFT);
+				       window_addr, window_size, subwindow_cnt);
+	} else {
+		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size >> PAGE_SHIFT);
 		if (rpn == ULONG_MAX)
 			return ERR_NOTRANS;
 
-		if (curr_rpn != rpn) {
-			ppaace->ap = PAACE_AP_PERMS_DENIED;
-			lwsync();
-			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
-			ppaace->twbah = rpn >> 20;
-			ppaace->twbal = rpn;
-			lwsync();
-			/* FIXME read-only gpmas */
-			ppaace->ap = PAACE_AP_PERMS_ALL;
-		}
+		ret = pamu_reconfig_liodn(liodn, rpn);
 	}
+
 
 	return ret;
 }
 #endif
 
 static int setup_subwins(guest_t *guest, dt_node_t *parent,
-                         uint32_t liodn, phys_addr_t primary_base,
-                         phys_addr_t primary_size,
-                         uint32_t subwindow_cnt,
-                         uint32_t omi, uint32_t stash_dest,
-                         ppaace_t *ppaace, dt_node_t *cfgnode,
-                         dt_node_t *hwnode, dt_node_t *gnode)
+			 uint32_t liodn, phys_addr_t primary_base,
+			 phys_addr_t primary_size, uint32_t subwindow_cnt,
+			 uint32_t omi, uint32_t snoopid, uint32_t stash_dest,
+			 dt_node_t *cfgnode, dt_node_t *hwnode, dt_node_t *gnode)
 {
-	unsigned long fspi;
 	phys_addr_t subwindow_size = primary_size / subwindow_cnt;
-
-	/* The first entry is in the primary PAACE instead */
-	fspi = get_fspi_and_increment(subwindow_cnt - 1);
-	if (fspi == ULONG_MAX) {
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-		         "%s: spaace indexes exhausted %s\n",
-		         __func__, parent->name);
-		return ERR_BUSY;
-	}
+	int32_t ret;
 
 	list_for_each(&parent->children, i) {
 		dt_node_t *node = to_container(i, dt_node_t, child_node);
 		dt_prop_t *prop;
 		uint64_t gaddr, size;
 		unsigned long rpn;
-		int subwin, swse;
+		int subwin;
 
 		prop = dt_get_prop(node, "guest-addr", 0);
 		if (!prop || prop->len != 8) {
@@ -541,52 +496,22 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			continue;
 		}
 
-		if (!dt_get_prop(node, "pcie-msi-subwindow", 0))
+		if (!dt_get_prop(node, "pcie-msi-subwindow", 0)) {
 			rpn = get_rpn(guest, gaddr >> PAGE_SHIFT,
 				size >> PAGE_SHIFT);
-		else
+		} else {
 			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
 					gnode, gaddr, &size);
-
+		}
 		if (rpn == ULONG_MAX)
 			continue;
 
-		swse = map_addrspace_size_to_wse(size);
-
-		/* If we merge ppaace_t and spaace_t, we could
-		 * simplify this a bit.
-		 */
-		if (subwin == 0) {
-			ppaace->swse = swse;
-			ppaace->atm = PAACE_ATM_WINDOW_XLATE;
-			ppaace->twbah = rpn >> 20;
-			ppaace->twbal = rpn & 0xfffff;
-			ppaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
-		} else {
-			spaace_t *spaace = pamu_get_spaace(fspi, subwin - 1);
-			setup_default_xfer_to_host_spaace(spaace);
-
-			spaace->swse = swse;
-			spaace->atm = PAACE_ATM_WINDOW_XLATE;
-			spaace->twbah = rpn >> 20;
-			spaace->twbal = rpn & 0xfffff;
-			spaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
-			spaace->liodn = liodn;
-
-			if (~omi != 0) {
-				spaace->otm = PAACE_OTM_INDEXED;
-				spaace->op_encode.index_ot.omi = omi;
-				spaace->impl_attr.cid = stash_dest;
-			}
-
-			lwsync();
-			spaace->v = 1;
-		}
+		ret = pamu_config_spaace(liodn, subwindow_cnt, subwin, size, omi,
+					 rpn, snoopid, stash_dest);
+		if (ret < 0)
+			return ret;
 	}
 
-	ppaace->wce = map_subwindow_cnt_to_wce(subwindow_cnt);
-	ppaace->mw = 1;
-	ppaace->fspi = fspi;
 	return 0;
 }
 
@@ -598,10 +523,9 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
  * established whether there is an associated dma-window
  * so it is an error if a dma-window prop is not found.
  */
-int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode)
+int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode)
 {
-	struct ppaace_t *ppaace;
-	unsigned long rpn;
+	uint32_t snpid = ~(uint32_t)0;
 	dt_prop_t *prop, *stash_prop;
 	dt_prop_t *gaddr;
 	dt_prop_t *size;
@@ -611,8 +535,8 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	uint32_t stash_dest = ~(uint32_t)0;
 	uint32_t omi = ~(uint32_t)0;
 	uint32_t subwindow_cnt = 0;
-	register_t saved;
-	int ret;
+	unsigned long rpn = ULONG_MAX;
+	int32_t ret;
 
 	prop = dt_get_prop(cfgnode, "dma-window", 0);
 	if (!prop || prop->len != 4) {
@@ -633,6 +557,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	hwnode->dma_window = dma_window;
 #endif
+
 	gaddr = dt_get_prop(dma_window, "guest-addr", 0);
 	if (!gaddr || gaddr->len != 8) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
@@ -640,6 +565,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		         __func__, dma_window->name);
 		return ERR_BADTREE;
 	}
+
 	window_addr = *(const uint64_t *)gaddr->data;
 
 	size = dt_get_prop(dma_window, "size", 0);
@@ -649,8 +575,8 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		         __func__, dma_window->name);
 		return ERR_BADTREE;
 	}
-	window_size = *(const uint64_t *)size->data;
 
+	window_size = *(const uint64_t *)size->data;
 	if ((window_size & (window_size - 1)) || window_size < PAGE_SIZE) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: %s size too small or not a power of two\n",
@@ -665,46 +591,14 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 		return ERR_BADTREE;
 	}
 
-	saved = spin_lock_intsave(&pamu_lock);
-	ppaace = pamu_get_ppaace(liodn);
-	if (!ppaace) {
-		spin_unlock_intsave(&pamu_lock, saved);
-		return ERR_NOMEM;
-	}
-
-	if (ppaace->wse) {
-		spin_unlock_intsave(&pamu_lock, saved);
-
-		/* QMan portal devices have multiple nodes sharing
-		 * an liodn.
-		 */
-		if (dt_node_is_compatible(hwnode->parent, "fsl,qman-portal"))
-			return 0;
-
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-		         "%s: liodn %d or device in use\n", __func__, liodn);
-		return ERR_BUSY;
-	}
-
-	ppaace->wse = map_addrspace_size_to_wse(window_size);
-	spin_unlock_intsave(&pamu_lock, saved);
-
 	liodn_to_guest[liodn] = guest;
-
-	setup_default_xfer_to_host_ppaace(ppaace);
-
-	ppaace->wbah = window_addr >> (PAGE_SHIFT + 20);
-	ppaace->wbal = (window_addr >> PAGE_SHIFT) & 0xfffff;
 
 	/* set up operation mapping if it's configured */
 	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
 	if (prop) {
 		if (prop->len == 4) {
 			omi = *(const uint32_t *)prop->data;
-			if (omi <= OMI_MAX) {
-				ppaace->otm = PAACE_OTM_INDEXED;
-				ppaace->op_encode.index_ot.omi = omi;
-			} else {
+			if (omi > OMI_MAX) {
 				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				         "%s: bad operation mapping index at %s\n",
 				         __func__, cfgnode->name);
@@ -721,9 +615,6 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 	if (stash_prop && stash_prop->len == 4) {
 		stash_dest = get_stash_dest( *(const uint32_t *)
 				stash_prop->data , hwnode);
-
-		if (~stash_dest != 0)
-			ppaace->impl_attr.cid = stash_dest;
 	}
 
 	/* configure snoop-id if needed */
@@ -743,8 +634,7 @@ int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node
 			goto skip_snoop_id;
 		}
 
-		ppaace->domain_attr.to_host.snpid =
-				get_snoop_id(hwnode, guest) + 1;
+		snpid = get_snoop_id(hwnode, guest) + 1;
 	}
 skip_snoop_id:
 
@@ -765,24 +655,35 @@ skip_snoop_id:
 				 __func__, subwindow_cnt, cfgnode->name);
 			return ERR_BADTREE;
 		}
-
-		ret = setup_subwins(guest, dma_window, liodn, window_addr,
-		                    window_size, subwindow_cnt, omi,
-		                    stash_dest, ppaace, cfgnode, hwnode, gnode);
-		if (ret < 0)
-			return ret;
-	} else {
-		/* No subwindows */
-		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT,
-		              window_size >> PAGE_SHIFT);
-		if (rpn == ULONG_MAX)
-			return ERR_NOTRANS;
-
-		ppaace->atm = PAACE_ATM_WINDOW_XLATE;
-		ppaace->twbah = rpn >> 20;
-		ppaace->twbal = rpn;
-		ppaace->ap = PAACE_AP_PERMS_ALL; /* FIXME read-only gpmas */
 	}
+
+	if (!subwindow_cnt) {
+		rpn = get_rpn(guest, window_addr >> PAGE_SHIFT, window_size >> PAGE_SHIFT);
+		if (rpn == ULONG_MAX) {
+			return ERR_NOTRANS;
+		}
+	}
+
+	ret = pamu_config_ppaace(liodn, window_addr, window_size, omi, rpn, snpid,
+				 stash_dest, subwindow_cnt);
+	if (ret < 0) {
+		if (ret == ERR_BUSY) {
+			/* QMan portal devices have multiple nodes sharing
+			 * an liodn.
+			 */
+			if (dt_node_is_compatible(hwnode->parent, "fsl,qman-portal"))
+				return 0;
+		}
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+	             "%s: liodn %d or device in use\n", __func__, liodn);
+	        return ret;
+	}
+
+	ret = setup_subwins(guest, dma_window, liodn, window_addr,
+			    window_size, subwindow_cnt, omi,
+			    snpid, stash_dest, cfgnode, hwnode, gnode);
+	if (ret < 0)
+		return ret;
 
 	lwsync();
 
@@ -792,27 +693,19 @@ skip_snoop_id:
 	return 0;
 }
 
-static void pamu_enable_liodn_raw(unsigned int liodn)
-{
-	pamu_get_ppaace(liodn)->v = 1;
-	sync();
-}
-
-int pamu_enable_liodn(unsigned int handle)
+int hv_pamu_enable_liodn(unsigned int handle)
 {
 	guest_t *guest = get_gcpu()->guest;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
 
 	// FIXME: race against handle closure
-	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+	if (handle >= MAX_HANDLES || !guest->handles[handle])
 		return EV_EINVAL;
-	}
 
 	pamu_handle = guest->handles[handle]->pamu;
-	if (!pamu_handle) {
+	if (!pamu_handle)
 		return EV_EINVAL;
-	}
 
 	liodn = pamu_handle->assigned_liodn;
 
@@ -821,40 +714,25 @@ int pamu_enable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
-	pamu_enable_liodn_raw(liodn);
+	if (pamu_enable_liodn(liodn) != 0)
+		return EV_EINVAL;
+
 	return 0;
 }
 
-static void pamu_disable_liodn_raw(unsigned int liodn)
-{
-	pamu_get_ppaace(liodn)->v = 0;
-	sync();
-
-	/*
-	 * FIXME: Need to wait or synchronize with any pending DMA flush
-	 * operations on disabled liodns, as once we disable PAMU
-	 * window here any pending DMA flushes will fail.
-	 *
-	 * Also, is there any way to wait until any transactions which
-	 * the PAMU has already authorized complete before continuing?
-	 */
-}
-
-int pamu_disable_liodn(unsigned int handle)
+int hv_pamu_disable_liodn(unsigned int handle)
 {
 	guest_t *guest = get_gcpu()->guest;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
 
 	// FIXME: race against handle closure
-	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
+	if (handle >= MAX_HANDLES || !guest->handles[handle])
 		return EV_EINVAL;
-	}
 
 	pamu_handle = guest->handles[handle]->pamu;
-	if (!pamu_handle) {
+	if (!pamu_handle)
 		return EV_EINVAL;
-	}
 
 	liodn = pamu_handle->assigned_liodn;
 
@@ -863,7 +741,9 @@ int pamu_disable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
-	pamu_disable_liodn_raw(liodn);
+	if (pamu_disable_liodn(liodn) != 0)
+		return EV_EINVAL;
+
 	return 0;
 }
 
@@ -981,17 +861,21 @@ static int pamu_error_isr(void *arg)
 
 		pics = in32((uint32_t *)(reg + PAMU_PICS));
 		if (pics & PAMU_OPERATION_ERROR_INT_STAT) {
-			strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+			strncpy(err.domain, get_domain_str(error_pamu),
+				sizeof(err.domain));
 			strncpy(err.error, get_error_str(error_pamu, pamu_operation),
 				sizeof(err.error));
-			dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+			dt_get_path(NULL, pamu_node, err.hdev_tree_path,
+				    sizeof(err.hdev_tree_path));
 			poes1 = in32((uint32_t *)(reg + PAMU_POES1));
 			if (poes1 & PAMU_POES1_POED) {
 				err.pamu.poes1 = poes1;
-				err.pamu.poeaddr = (((phys_addr_t)in32((uint32_t *)(reg + PAMU_POEAH))) << 32) |
-							in32((uint32_t *)(reg + PAMU_POEAL));
+				err.pamu.poeaddr = (((phys_addr_t)in32((uint32_t *)
+					(reg + PAMU_POEAH))) << 32) |
+					in32((uint32_t *)(reg + PAMU_POEAL));
 			}
-			error_policy_action(&err, error_pamu, pamu_err_policy[pamu_operation]);
+			error_policy_action(&err, error_pamu,
+					    pamu_err_policy[pamu_operation]);
 			out32((uint32_t *)(reg + PAMU_POES1), PAMU_POES1_POED);
 			out32((uint32_t *)(reg + PAMU_PICS), pics);
 		}
@@ -1013,7 +897,8 @@ static dt_node_t *get_dev_node(uint32_t handle, guest_t *guest)
 	int ret;
 
 	ret = dt_for_each_prop_value(guest->devtree, "fsl,hv-dma-handle", &handle,
-					sizeof(dt_node_t *), node_found_callback, &node);
+				     sizeof(dt_node_t *), node_found_callback,
+				     &node);
 	if (ret)
 		return node;
 
@@ -1023,19 +908,21 @@ static dt_node_t *get_dev_node(uint32_t handle, guest_t *guest)
 static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pics)
 {
 	uint32_t av_liodn, avs1;
+	paace_t *ppaace;
 	hv_error_t err = { };
 	pamu_error_t *pamu = &err.pamu;
 
 	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
-	dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
+		    sizeof(err.hdev_tree_path));
 
 	avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
 	av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
 
-	ppaace_t *ppaace = pamu_get_ppaace(av_liodn);
-
-	/* if we get access violations for invalid LIODNs, just clear interrupt */
-	if (!ppaace->v) {
+	ppaace = pamu_get_ppaace(av_liodn);
+	/* We may get access violations for invalid LIODNs, just ignore them */
+	if (!get_bf(ppaace->addr_bitfields, PAACE_AF_V))
+	{
 		/* Clear the write one to clear bits in AVS1, mask out the LIODN */
 		out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
 		/* De-assert access violation pin */
@@ -1043,14 +930,15 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 		/* erratum -- do it twice */
 		out32((uint32_t *)(reg + PAMU_PICS), pics);
 #endif
-		return 0;
+		return -1;
 	}
 
 	strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
 			sizeof(err.error));
 	pamu->avs1 = avs1;
-	pamu->access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) (reg + PAMU_AVAH)))
-						 << 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
+	pamu->access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) 
+				(reg + PAMU_AVAH))) 
+				<< 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
 	pamu->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
 
 	/*FIXME : LIODN index not in PPAACT table*/
@@ -1064,15 +952,17 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 		pamu->liodn_handle = liodn_to_handle[av_liodn]->user.id;
 		dt_node_t *node = get_dev_node(pamu->liodn_handle, guest);
 		if (node)
-			dt_get_path(NULL, node, err.gdev_tree_path, sizeof(err.gdev_tree_path));
+			dt_get_path(NULL, node, err.gdev_tree_path,
+				    sizeof(err.gdev_tree_path));
 
 	}
 
 	spin_unlock(&pamu_error_lock);
 
-	ppaace->v = 0;
+	ppaace->addr_bitfields |= PAACE_V_VALID;
 	pamu_error_log(&err, guest);
-	error_policy_action(&err, error_pamu, pamu_err_policy[pamu_access_violation]);
+	error_policy_action(&err, error_pamu,
+			    pamu_err_policy[pamu_access_violation]);
 
 	/* Clear the write one to clear bits in AVS1, mask out the LIODN */
 	out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
@@ -1095,7 +985,8 @@ static int handle_ecc_error(pamu_ecc_err_reg_t *ecc_regs, dt_node_t *pamu_node)
 	pamu_error_t *pamu = &err.pamu;
 
 	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
-	dt_get_path(NULL, pamu_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
+		    sizeof(err.hdev_tree_path));
 
 	ctlval = pamu->eccctl = in32(&ecc_regs->eccctl);
 	pamu->eccdis = in32(&ecc_regs->eccdis);
@@ -1114,13 +1005,15 @@ static int handle_ecc_error(pamu_ecc_err_reg_t *ecc_regs, dt_node_t *pamu_node)
 		strncpy(err.error, get_error_str(error_pamu, pamu_single_bit_ecc),
 				sizeof(err.error));
 		out32(&ecc_regs->eccctl, ctlval & ~PAMU_EECTL_CNT_MASK);
-		error_policy_action(&err, error_pamu, pamu_err_policy[pamu_single_bit_ecc]);
+		error_policy_action(&err, error_pamu,
+				    pamu_err_policy[pamu_single_bit_ecc]);
 	}
 
 	if (val & PAMU_MB_ECC_ERR) {
 		strncpy(err.error, get_error_str(error_pamu, pamu_multi_bit_ecc),
 				sizeof(err.error));
-		error_policy_action(&err, error_pamu, pamu_err_policy[pamu_multi_bit_ecc]);
+		error_policy_action(&err, error_pamu,
+				    pamu_err_policy[pamu_multi_bit_ecc]);
 	}
 
 	out32(&ecc_regs->eccattr, PAMU_ECC_ERR_ATTR_VAL);
@@ -1172,13 +1065,14 @@ static driver_t __driver pamu = {
 static int pamu_probe(driver_t *drv, device_t *dev)
 {
 	int ret;
-	phys_addr_t addr, size;
+	void *vaddr;
+	phys_addr_t size;
 	unsigned long pamu_reg_base, pamu_reg_off;
 	unsigned long pamumem_size;
 	void *pamumem;
 	dt_node_t *guts_node, *pamu_node;
 	phys_addr_t guts_addr, guts_size;
-	uint32_t pamubypenr, pamu_counter, *pamubypenr_ptr;
+	uint32_t *pamubypenr_ptr;
 	interrupt_t *irq;
 	uint8_t pamu_enable_ints = 0;
 	uint32_t error_threshold = 0;
@@ -1193,8 +1087,9 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 			"%s: PAMU reg initialization failed\n", __func__);
 		return ERR_INVALID;
 	}
+
 	pamu_node = to_container(dev, dt_node_t, dev);
-	addr = dev->regs[0].start;
+	vaddr = dev->regs[0].virt;
 	size = dev->regs[0].size;
 
 	guts_node = dt_get_first_compatible(hw_devtree, "fsl,qoriq-device-config-1.0");
@@ -1211,7 +1106,7 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 		return ERR_UNHANDLED;
 	}
 
-	pamumem_size = align(PAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) +
+	pamumem_size = align(PPAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) +
 			 align(SPAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) + OMT_SIZE;
 
 	pamumem_size = 1 << ilog2_roundup(pamumem_size);
@@ -1233,8 +1128,6 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 
 	pamubypenr_ptr = map(guts_addr + PAMUBYPENR, 4,
 	                     TLB_MAS2_IO, TLB_MAS3_KDATA);
-	pamubypenr = in32(pamubypenr_ptr);
-
 
 	if (dev->num_irqs >= 1 && dev->irqs[0]) {
 		const char *policy;
@@ -1272,34 +1165,18 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 		}
 	}
 
-	if (pamu_enable_ints)
+	ret = pamu_hw_init(vaddr, size, pamubypenr_ptr, pamumem, pamumem_size);
+	if (ret < 0)
+		goto fail_pma;
+
+	if (pamu_enable_ints) {
 		register_error_dump_callback(error_pamu, dump_pamu_error);
-
-	for (pamu_reg_off = 0, pamu_counter = 0x80000000; pamu_reg_off < size;
-	     pamu_reg_off += PAMU_OFFSET, pamu_counter >>= 1) {
-
-		pamu_reg_base = (unsigned long) addr + pamu_reg_off;
-		ret = pamu_hw_init(pamu_reg_base - CCSRBAR_PA, pamu_reg_off,
-					pamumem, pamumem_size, pamu_enable_ints,
-					error_threshold);
-		if (ret < 0) {
-			/* This can only fail for the first instance due to
-			 * memory alignment issues, hence this failure
-			 * implies global pamu init failure and let all
-			 * PAMU(s) remain in bypass mode.
-			 */
-			goto fail_pma;
-		}
-
-		/* Disable PAMU bypass for this PAMU */
-		pamubypenr &= ~pamu_counter;
+		pamu_enable_interrupts(vaddr, pamu_enable_ints, error_threshold);
 	}
 
 	setup_pamu_law(pamu_node);
 	setup_omt();
 
-	/* Enable all relevant PAMU(s) */
-	out32(pamubypenr_ptr, pamubypenr);
 	return 0;
 
 fail_pma:
@@ -1312,13 +1189,13 @@ fail_mem:
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 /* At this point, nothing else should be popping errors from the source
- * queue (we can only claim one thing at a time from the same partition). 
+ * queue (we can only claim one thing at a time from the same partition).
  * The producer side can still be active.  We shouldn't receive any
  * additional errors from this liodn, though, because we've already switched
  * ownership.
  */
 static void migrate_access_violations(guest_t *guest, queue_t *src,
-                                      uint32_t oldhandle, uint32_t newhandle)
+				      uint32_t oldhandle, uint32_t newhandle)
 {
 	hv_error_t err;
 
@@ -1342,7 +1219,7 @@ static void migrate_access_violations(guest_t *guest, queue_t *src,
 }
 
 static int claim_dma(claim_action_t *action, dev_owner_t *owner,
-                     dev_owner_t *prev)
+		     dev_owner_t *prev)
 {
 	pamu_handle_t *ph = to_container(action, pamu_handle_t, claim_action);
 	uint32_t liodn = ph->assigned_liodn;
@@ -1365,11 +1242,11 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	 * access to the device's PAMU entry till re-configuration is done.
 	 */
 
-	int ret = pamu_reconfig_liodn(owner->guest, liodn, owner->hwnode);
+	int ret = hv_pamu_reconfig_liodn(owner->guest, liodn, owner->hwnode);
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-                         "%s: re-config of liodn failed (rc=%d)\n",
-                         __func__, ret);
+			 "%s: re-config of liodn failed (rc=%d)\n",
+			 __func__, ret);
 	}
 
 	migrate_access_violations(owner->guest, &oldguest->error_event_queue,
@@ -1408,8 +1285,8 @@ static dt_node_t *find_cfgnode(dt_node_t *hwnode, dev_owner_t *owner)
 			continue;
 
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_WARN, "%s: warning: "
-		         "%s/%s should go under portal-devices node\n",
-		         __func__, owner->cfgnode->name, config_child->name);
+			"%s/%s should go under portal-devices node\n",
+			 __func__, owner->cfgnode->name, config_child->name);
 	}
 
 	if (!guest->portal_devs) {
@@ -1488,10 +1365,10 @@ static int search_liodn_index(dt_node_t *cfgnode, void *arg)
 }
 
 static int configure_liodn(dt_node_t *hwnode, dev_owner_t *owner,
-                           uint32_t liodn, dt_node_t *cfgnode)
+			   uint32_t liodn, dt_node_t *cfgnode)
 {
-	int ret = pamu_config_liodn(owner->guest, liodn,
-	                            hwnode, cfgnode, owner->gnode);
+	int ret = hv_pamu_config_liodn(owner->guest, liodn,
+				       hwnode, cfgnode, owner->gnode);
 	if (ret < 0) {
 		if (ret == ERR_NOMEM)
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -1517,8 +1394,8 @@ static void pamu_reset_handle(handle_t *h, int partition_stop)
 			return;
 		if (partition_stop && guest->defer_dma_disable)
 			return;
-	
-		pamu_disable_liodn_raw(liodn);
+
+		pamu_disable_liodn(liodn);
 	}
 }
 
@@ -1643,12 +1520,12 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 				pamu_handle->no_dma_disable = 1;
 
 			ret = alloc_guest_handle(owner->guest,
-			                         &pamu_handle->user);
+						 &pamu_handle->user);
 			if (ret < 0) {
 				free(dma_handles);
 				return ret;
 			}
-		} else {	
+		} else {
 			assert(pamu_handle->user.handle_owner == owner->guest);
 		}
 
@@ -1666,7 +1543,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 
 			if (pamu_handle->no_dma_disable ||
 			    owner->guest->no_dma_disable)
-				pamu_enable_liodn_raw(liodn[i]);
+				pamu_enable_liodn(liodn[i]);
 		}
 	}
 
@@ -1680,6 +1557,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 nomem:
 	free(dma_handles);
 	printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-        	 "%s: out of memory\n", __func__);
+		 "%s: out of memory\n", __func__);
 	return ERR_NOMEM;
 }
+

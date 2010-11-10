@@ -420,13 +420,13 @@ static void hcall_partition_memcpy(trapframe_t *regs)
 static void hcall_dma_enable(trapframe_t *regs)
 {
 	unsigned int liodn = regs->gpregs[3];
-	regs->gpregs[3] =  pamu_enable_liodn(liodn);
+	regs->gpregs[3] =  hv_pamu_enable_liodn(liodn);
 }
 
 static void hcall_dma_disable(trapframe_t *regs)
 {
 	unsigned int liodn = regs->gpregs[3];
-	regs->gpregs[3] = pamu_disable_liodn(liodn);
+	regs->gpregs[3] = hv_pamu_disable_liodn(liodn);
 }
 #else
 #define hcall_dma_enable unimplemented

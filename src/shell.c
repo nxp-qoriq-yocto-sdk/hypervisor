@@ -371,46 +371,54 @@ static void decode_wse(unsigned int wse, char *str)
 		sprintf(str, "%3d KiB", 1 << i);
 }
 
-static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
+static void spaact_dump_fn(shell_t *shell, paace_t *entry)
 {
 	int wcount = 0;
-	spaace_t *sentry;
-	int wce = 1 << (entry->wce + 1);
+	paace_t *sentry;
+	int wce = 1 << (get_bf(entry->impl_attr, PAACE_IA_WCE) + 1);
 	char str[BUFF_SIZE];
 	phys_addr_t subwin_base =
-		((phys_addr_t)entry->wbah << 32) | (entry->wbal << PAGE_SHIFT);
+		((phys_addr_t)entry->wbah << 32) | 
+		 (get_bf(entry->addr_bitfields, PPAACE_AF_WBAL) << 
+		 PAGE_SHIFT);
 	phys_addr_t subwin_len =
-		(1ULL << (entry->wse + 1)) >> (entry->wce + 1);
+		(1ULL << (get_bf(entry->addr_bitfields, PPAACE_AF_WSE) + 1)) >> 
+		(get_bf(entry->impl_attr, PAACE_IA_WCE) + 1);
 
 	/* The first subwindow is embedded in the primary paace entry.
 	 * This would be easier if we used the same struct for both.
 	 */
-	if (entry->ap != PAACE_AP_PERMS_DENIED) {
-		decode_wse(entry->swse, str);
+	if (get_bf(entry->addr_bitfields, PAACE_AF_AP) != 
+	    PAACE_AP_PERMS_DENIED) {
+		decode_wse(get_bf(entry->win_bitfields, PAACE_WIN_SWSE), str);
 		qprintf(shell->out, 1, "           %2d   ", 0);
 		qprintf(shell->out, 1, "%09llx  ",
 		        (unsigned long long)subwin_base);
 		qprintf(shell->out, 1, "%01x%08x  ",
 			entry->twbah,
-			entry->twbal << PAGE_SHIFT);
+			get_bf(entry->win_bitfields, PAACE_WIN_TWBAL) <<
+				PAGE_SHIFT);
 		qprintf(shell->out, 1, "%s    -      %2d      %d\n",
-		        str, entry->impl_attr.cid, entry->otm);
+		        str, get_bf(entry->impl_attr, PAACE_IA_CID),
+			get_bf(entry->impl_attr, PAACE_IA_OTM));
 	}
 
 	for (int i = 1; i < wce; i++) {
 		subwin_base += subwin_len;
 
 		sentry = pamu_get_spaace(entry->fspi, i - 1);
-		if (sentry->v) {
-			decode_wse(sentry->swse, str);
+		if (get_bf(sentry->addr_bitfields, PAACE_AF_V)) {
+			decode_wse(get_bf(sentry->win_bitfields, PAACE_WIN_SWSE), str);
 			qprintf(shell->out, 1, "           %2d   ", i);
 			qprintf(shell->out, 1, "%09llx  ",
 			        (unsigned long long)subwin_base);
 			qprintf(shell->out, 1, "%01x%08x  ",
 				sentry->twbah,
-				sentry->twbal << PAGE_SHIFT);
+				get_bf(sentry->win_bitfields, PAACE_WIN_TWBAL) 
+					<< PAGE_SHIFT);
 			qprintf(shell->out, 1, "%s    -      %2d      %d\n",
-			        str, sentry->impl_attr.cid, sentry->otm);
+			        str, get_bf(sentry->impl_attr, PAACE_IA_CID),
+				get_bf(sentry->impl_attr, PAACE_IA_OTM));
 		}
 	}
 }
@@ -418,7 +426,7 @@ static void spaact_dump_fn(shell_t *shell, ppaace_t *entry)
 static void paact_dump_fn(shell_t *shell, char *args)
 {
 	int liodn;
-	ppaace_t *entry;
+	paace_t *entry;
 	char str[BUFF_SIZE];
 	int wce;
 	int is_table_empty = 1;
@@ -434,35 +442,39 @@ static void paact_dump_fn(shell_t *shell, char *args)
 
 	for (liodn = 0; liodn < PAACE_NUMBER_ENTRIES; liodn++) {
 		entry = pamu_get_ppaace(liodn);
-		if (entry && entry->wse) {
+		if (entry && get_bf(entry->addr_bitfields, PPAACE_AF_WSE)) {
 			is_table_empty = 0;
 			memset(str, 0, BUFF_SIZE);
-			decode_wse(entry->wse, str);
+			decode_wse(get_bf(entry->addr_bitfields, PPAACE_AF_WSE), str);
 
 			qprintf(shell->out, 1, "%5d ", liodn);
-			qprintf(shell->out, 1, "  %1d", entry->v);
+			qprintf(shell->out, 1, "  %1d", 
+				get_bf(entry->addr_bitfields, PAACE_AF_V));
 
 			qprintf(shell->out, 1, "   -   %01x%08x  ",
 				entry->wbah,
-				entry->wbal << PAGE_SHIFT);
+				get_bf(entry->addr_bitfields, PPAACE_AF_WBAL) 
+					<< PAGE_SHIFT);
 
-			if (entry->mw)
+			if (get_bf(entry->addr_bitfields, PPAACE_AF_MW))
 				qprintf(shell->out, 1, "        -  ");
 			else
 				qprintf(shell->out, 1, "%01x%08x  ",
 					entry->twbah,
-					entry->twbal << PAGE_SHIFT);
+					get_bf(entry->win_bitfields, PAACE_WIN_TWBAL)
+						<< PAGE_SHIFT);
 
 			qprintf(shell->out, 1, "%s   ", str);
 
-			if (entry->mw) {
-				wce = 1 << (entry->wce + 1);
+			if (get_bf(entry->addr_bitfields, PPAACE_AF_MW)) {
+				wce = 1 << (get_bf(entry->impl_attr, PAACE_IA_WCE) + 1);
 				qprintf(shell->out, 1, "%2d       -      -\n",
 				        wce);
 				spaact_dump_fn(shell, entry);
 			} else {
 				qprintf(shell->out, 1, " 0      %2d      %d\n",
-				        entry->impl_attr.cid, entry->otm);
+				        get_bf(entry->impl_attr, PAACE_IA_CID),
+					get_bf(entry->impl_attr, PAACE_IA_OTM));
 			}
 		}
 	}

@@ -47,11 +47,12 @@ typedef struct pamu_handle {
 #define OMI_CAAM        0x03
 #define OMI_MAX         0x03  /* define the max index defined */
 
-void pamu_global_init(void);
-void pamu_partition_init(guest_t *guest);
+void hv_pamu_global_init(void);
+void hv_pamu_partition_init(guest_t *guest);
 
-int pamu_enable_liodn(unsigned int liodn);
-int pamu_disable_liodn(unsigned int liodn);
-int pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode);
-int pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode);
+int hv_pamu_enable_liodn(unsigned int liodn);
+int hv_pamu_disable_liodn(unsigned int liodn);
+int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode);
+int hv_pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode);
 #endif
+
