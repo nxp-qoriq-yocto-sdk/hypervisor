@@ -721,7 +721,7 @@ static void dump_tlb(shell_t *shell, gcpu_t *gcpu)
 
 			paddr = ((uint64_t) gmas.mas7 << 32) |
 				(gmas.mas3 & ~(PAGE_SIZE - 1));
-			vaddr = gmas.mas2 & ~(PAGE_SIZE - 1);
+			vaddr = gmas.mas2 & ~((register_t)PAGE_SIZE - 1);
 			size = (tsize_to_pages(MAS1_GETTSIZE(gmas.mas1)) << PAGE_SHIFT) - 1;
 
 			qprintf(shell->out, 1, "%02u  ",

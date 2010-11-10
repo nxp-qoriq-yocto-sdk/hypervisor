@@ -28,7 +28,7 @@ OUTPUT_ARCH(powerpc:common64)
 
 SECTIONS
 {
-    . = 0x20000000;
+    . = 0x420000000;
 
     .text : {
         *(.text)

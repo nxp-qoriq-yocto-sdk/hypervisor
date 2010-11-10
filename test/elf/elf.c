@@ -28,15 +28,17 @@
 #include <libos/fsl_hcalls.h>
 #include <libos/core-regs.h>
 #include <libos/trapframe.h>
+#include <libos/fsl-booke-tlb.h>
 #include <libos/bitops.h>
 #include <libfdt.h>
 #include <hvtest.h>
 
 extern uint32_t text_start;
+int failed;
 
 static inline uintptr_t get_pc(void)
 {
-	register uint32_t retval asm("r3") = 0;
+	register uintptr_t retval asm("r3") = 0;
 
 	asm ("mflr %%r0;"
 	     "bl 1f;"
@@ -46,15 +48,54 @@ static inline uintptr_t get_pc(void)
 	return retval;
 }
 
+static void far_call(void) __attribute__ ((section (".faraway")));
+static void far_call(void)
+{
+	printf("call @ %#lx\n", get_pc());
+}
+
+static void very_far_call(void) __attribute__ ((section (".veryfaraway")));
+static void very_far_call(void)
+{
+	printf("call @ %#lx\n", get_pc());
+}
+
+static void call_function(void (*f)(void), int positive)
+{
+	uintptr_t pfunc;
+
+#ifndef CONFIG_LIBOS_64BIT
+	pfunc = (uintptr_t)f;
+#else
+	pfunc = *(uint64_t *)f;
+#endif
+
+	/* Use tlbsx to locate the TLB entry that maps the function w/ AS=0. */
+	mtspr(SPR_MAS6, (mfspr(SPR_PID) << MAS6_SPID_SHIFT) | 0);
+	isync();
+	asm volatile("tlbsx 0, %0" : : "r" (pfunc));
+
+	if (mfspr(SPR_MAS1) & MAS1_VALID) {
+		f();
+		return;
+	}
+
+	if (positive) {
+		printf("FAILED to find a proper TLB entry\n");
+		failed = 1;
+	}
+}
+
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	init(devtree_ptr);
 
 	printf("elf non zero load address test\n");
-#ifdef DEBUG
-	printf("pc = %x\n", get_pc());
-#endif
-	if (get_pc() > (uintptr_t)&text_start)
+
+	call_function(far_call, 1);
+	call_function(very_far_call, 0);	/* should fail to load, being outside memory */
+
+	if (!failed && get_pc() > (uintptr_t)&text_start)
 		printf("PASSED\n");
 	else
 		printf("FAILED\n");

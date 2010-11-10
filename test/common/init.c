@@ -455,7 +455,7 @@ void init(unsigned long devtree_ptr)
 	heap = (heap + 15) & ~15;
 
 	simple_alloc_init((void *)heap, 0x100000); // FIXME: hardcoded 1MB heap
-	valloc_init(1024 * 1024, PHYSBASE);
+	valloc_init(PHYSBASE - 1024 * 1024, PHYSBASE);
 
 	node = get_stdout();
 	if (node >= 0) {

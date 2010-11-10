@@ -28,9 +28,9 @@ OUTPUT_ARCH(powerpc:common64)
 
 SECTIONS
 {
-    . = 0x20000000;
+    . = 0x420000000;
 
-    .text (. + 4M): AT(4M) {
+    .text (. + 4M) : AT(4M) {
 	text_start = .;
         *(.text)
     }
@@ -60,6 +60,15 @@ SECTIONS
         *(.bss)
     }
     bss_end = .;
-    _end = .;
 
+    . = 0x429000000;
+    .faraway : {
+        *(.faraway)
+    }
+
+    . = 0x441000000;
+    .veryfaraway : {
+        *(.veryfaraway)
+    }
+    _end = .;
 }

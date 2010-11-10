@@ -92,8 +92,13 @@
 
 		pma1: pma1 {
 			compatible = "phys-mem-area";
-			addr = <0 0x2000000>;
-			size = <0 0x2000000>;
+			addr = <0 0x20000000>;
+			size = <0 0x20000000>;
+		};
+		pma2: pma2 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40000000>;
+			size = <0 0x40000000>;
 		};
 	};
 
@@ -108,7 +113,7 @@
 
 		gpma {
 			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma1>;
+			phys-mem = <&pma2>;
 			guest-addr = <0 0>;
 		};
 

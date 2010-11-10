@@ -56,7 +56,6 @@ void mcheck_interrupt(trapframe_t *frameptr)
 void libos_client_entry(unsigned long devtree_ptr)
 {
 	char *vaddr;
-	void (*func)(void);
 
 	init(devtree_ptr);
 
@@ -80,8 +79,10 @@ void libos_client_entry(unsigned long devtree_ptr)
 	else
 		printf("Machine check - data test --- FAILED\n");
 
-	func = (void (*) (void)) vaddr;
-	func();
+	/* Make the function call in asm, to avoid the C function descriptors */
+	__asm__ __volatile__ ("mtctr %0; bctrl;"
+		: : "r" (vaddr)
+		: EV_HCALL_CLOBBERS1);
 
 	if (inst_exception)
 		printf("Machine check exception generated for illegal instruction address-- PASSED\n");

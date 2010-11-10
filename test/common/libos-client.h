@@ -27,7 +27,11 @@
 #ifndef LIBOS_CLIENT_H
 #define LIBOS_CLIENT_H
 
+#ifdef CONFIG_LIBOS_64BIT
+#define PHYSBASE 0x420000000
+#else
 #define PHYSBASE 0x20000000
+#endif
 #define BASE_TLB_ENTRY 15
 #define KSTACK_SIZE 2048
 

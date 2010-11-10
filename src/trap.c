@@ -383,6 +383,10 @@ void reflect_mcheck(trapframe_t *regs, register_t mcsr, uint64_t mcar)
 		regs->srr1 &= MSR_GS | MSR_UCLE;
 	else
 		regs->srr1 &= MSR_GS | MSR_UCLE | MSR_DE;
+#ifdef CONFIG_LIBOS_64BIT
+	if (mfspr(SPR_EPCR) & EPCR_GICM)
+		regs->srr1 |= MSR_CM;
+#endif
 }
 
 void deliver_nmi(trapframe_t *regs)

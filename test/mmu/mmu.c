@@ -38,7 +38,7 @@ static int fail;
 
 void dtlb_handler(trapframe_t *frameptr)
 {
-	if (frameptr->gpregs[0] != NOFAULT) {
+	if ((uint32_t)frameptr->gpregs[0] != NOFAULT) {
 		dump_regs(frameptr);
 
 		printf("BROKEN\n");
@@ -52,7 +52,7 @@ void dtlb_handler(trapframe_t *frameptr)
 
 void dsi_handler(trapframe_t *frameptr)
 {
-	if (frameptr->gpregs[0] != NOFAULT) {
+	if ((uint32_t)frameptr->gpregs[0] != NOFAULT) {
 		dump_regs(frameptr);
 
 		printf("BROKEN\n");
@@ -64,7 +64,7 @@ void dsi_handler(trapframe_t *frameptr)
 	frameptr->srr0 += 4;
 }
 
-#define NUM_CORES 4
+#define NUM_CORES 2
 
 static int core_state[NUM_CORES];
 

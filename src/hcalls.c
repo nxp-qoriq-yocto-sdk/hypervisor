@@ -449,12 +449,9 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 #ifdef CONFIG_LIBOS_64BIT
 	uint64_t tmp[2];
 
-	/* support for 32-bit guests */
-	if (!(regs->srr1 & MSR_CM)) {
-		tmp[0] = (regs->gpregs[5] << 32) | ((uint32_t)regs->gpregs[6]);
-		tmp[1] = (regs->gpregs[7] << 32) | ((uint32_t)regs->gpregs[8]);
-		buf = (const uint8_t *)tmp;
-	}
+	tmp[0] = (regs->gpregs[5] << 32) | ((uint32_t)regs->gpregs[6]);
+	tmp[1] = (regs->gpregs[7] << 32) | ((uint32_t)regs->gpregs[8]);
+	buf = (const uint8_t *)tmp;
 #endif
 
 #ifdef DEBUG
@@ -467,7 +464,7 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 	printf("arg2 %08lx\n",regs->gpregs[8]);
 #endif
 
-	if (len > (4 * (regs->srr1 & MSR_CM ? sizeof(register_t) : 4))) {
+	if (len > 4 * sizeof(uint32_t)) {
 		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
@@ -508,7 +505,7 @@ static void hcall_byte_channel_receive(trapframe_t *regs)
 	 * registers to hold the data, so just truncate the length to the max.
 	 * The caller is supposed to be able to handle any count >= 0 anyway.
 	 */
-	size_t max_receive = min(regs->gpregs[4], 4 * sizeof(register_t));
+	size_t max_receive = min(regs->gpregs[4], 4 * sizeof(uint32_t));
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle]) {
@@ -527,16 +524,13 @@ static void hcall_byte_channel_receive(trapframe_t *regs)
 	spin_unlock_intsave(&bc->rx_lock, saved);
 
 #ifdef CONFIG_LIBOS_64BIT
-	/* support for 32-bit guests */
-	if (!(regs->srr1 & MSR_CM)) {
-		uint64_t tmp[2];
-		tmp[0] = regs->gpregs[5];
-		tmp[1] = regs->gpregs[6];
-		regs->gpregs[5] = tmp[0] >> 32;
-		regs->gpregs[6] = (uint32_t)tmp[0];
-		regs->gpregs[7] = tmp[1] >> 32;
-		regs->gpregs[8] = (uint32_t)tmp[1];
-	}
+	uint64_t tmp[2];
+	tmp[0] = regs->gpregs[5];
+	tmp[1] = regs->gpregs[6];
+	regs->gpregs[5] = tmp[0] >> 32;
+	regs->gpregs[6] = (uint32_t)tmp[0];
+	regs->gpregs[7] = tmp[1] >> 32;
+	regs->gpregs[8] = (uint32_t)tmp[1];
 #endif
 
 	regs->gpregs[3] = 0;  /* success */
