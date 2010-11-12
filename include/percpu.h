@@ -216,7 +216,7 @@ typedef struct guest {
 #define MAX_PARTITIONS 8
 
 extern struct guest guests[MAX_PARTITIONS];
-extern unsigned long last_lpid;
+extern unsigned long num_guests;
 extern unsigned long active_guests;
 
 /* The following flags correspond to gdbell_pending */

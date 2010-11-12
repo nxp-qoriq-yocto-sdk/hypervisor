@@ -66,7 +66,7 @@ uint32_t global_event_prod_lock;
 uint32_t global_event_cons_lock;
 
 guest_t guests[MAX_PARTITIONS];
-unsigned long last_lpid;
+unsigned long num_guests;
 
 /* active_guests is used as counter of all guests that are not stopped in
  * the system.  If the sysreset-on-partition-stop feature is enabled in the
@@ -1418,12 +1418,8 @@ static int process_managed_partition_node(dt_node_t *cfgnode, void *arg)
 	}
 
 	// Store the pointer to the target guest in our list of handles
-	target_guest->handle.guest = target_guest;
-
-	// Allocate a handle
-	int32_t ghandle = alloc_guest_handle(guest, &target_guest->handle);
-	if (ghandle < 0)
-		return ghandle;
+	uint32_t ghandle = target_guest->handle.id;
+	guest->handles[ghandle] = &target_guest->handle;
 
 	// Get a pointer to the manager's 'handles' node
 	node = get_handles_node(guest);
@@ -1624,7 +1620,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 {
 	register_t saved;
 	unsigned int i;
-	int ret;
+	int ret, ghandle;
 	char *name;
 
 	// Verify that 'partition' points to a compatible node
@@ -1636,18 +1632,24 @@ guest_t *node_to_partition(dt_node_t *partition)
 
 	saved = spin_lock_intsave(&start_guest_lock);
 
-	for (i = 0; i < last_lpid; i++) {
-		assert(guests[i].lpid == i + 1);
+	for (i = 0; i < num_guests; i++) {
 		if (guests[i].partition == partition)
 			break;
 	}
 
-	if (i == last_lpid) {
-		if (last_lpid >= MAX_PARTITIONS) {
+	if (i == num_guests) {
+		if (num_guests >= MAX_PARTITIONS) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "node_to_partition: too many partitions\n");
 			goto err;
 		}
+
+		// Allocate a global handle for this guest
+		ghandle = alloc_global_handle();
+		if (ghandle < 0)
+			goto err;
+		set_guest_global_handle(&guests[i], &guests[i].handle, ghandle);
+		guests[i].handle.guest = &guests[i];
 
 		// We create the special doorbells here, instead of in
 		// init_guest_primary(), because it guarantees that the
@@ -1690,7 +1692,9 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].name = name;
 		guests[i].state = guest_starting_uninit;
 		guests[i].partition = partition;
-		guests[i].lpid = ++last_lpid;
+		guests[i].lpid = ghandle;
+
+		num_guests++;
 
 		/* A partitions starts non-stopped, always.  If
 		 * initialization fails, it needs images loaded by a
@@ -3027,6 +3031,10 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
+	ret = dt_set_prop(node, "guest-id", &guest->lpid, 4);
+	if (ret < 0)
+		goto fail;
+
 	ret = dt_set_prop_string(node, "guest-name", guest->name);
 	if (ret < 0)
 		goto fail;
@@ -3201,7 +3209,7 @@ static void start_partitions(void)
 {
 	int i;
 
-	for (i = 0; i < last_lpid; i++) {
+	for (i = 0; i < num_guests; i++) {
 		guest_t *guest = &guests[i];
 		if (guest->state != guest_starting)
 			continue;

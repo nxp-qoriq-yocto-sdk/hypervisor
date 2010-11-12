@@ -72,7 +72,7 @@ static int get_partition_num(shell_t *shell, char *numstr)
 	if (cpu->errno)
 		return -1;
 
-	if (num >= last_lpid) {
+	if (num >= num_guests) {
 		qprintf(shell->out, 1, "Partition %u does not exist.\n", num);
 		return -1;
 	}
@@ -253,7 +253,7 @@ static void info_fn(shell_t *shell, char *args)
 	qprintf(shell->out, 1, "Partition   Name        State         Vcpus\n");
 	qprintf(shell->out, 1, "-------------------------------------------\n");
 
-	for (i = 0; i < last_lpid; i++) {
+	for (i = 0; i < num_guests; i++) {
 		guest_state_str(&guests[i], &state_str);
 		qprintf(shell->out, 1, "%-11d %s", i, guests[i].name);
 		if (state_str)
