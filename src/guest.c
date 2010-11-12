@@ -3017,6 +3017,20 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (!node)
 		goto nomem;
 
+	// Build & set the 'compatible' property in the hv node
+	ret = snprintf(buf, sizeof(buf),
+		       "fsl,embedded-hypervisor-v%d.%d%cepapr,hypervisor-1",
+		       CONFIG_HV_MAJOR_VERSION, CONFIG_HV_MINOR_VERSION, 0);
+	assert(ret < (int)sizeof(buf));
+
+	ret = dt_set_prop(node, "compatible", buf, ret + 1);
+	if (ret < 0)
+		goto fail;
+
+	ret = dt_set_prop_string(node, "guest-name", guest->name);
+	if (ret < 0)
+		goto fail;
+
 	status = get_sys_reset_status();
 	if (status == SYS_RESET_STATUS_POR) {
 		set_hypervisor_strprop(guest, "fsl,hv-sys-reset-status", "power-on-reset");
