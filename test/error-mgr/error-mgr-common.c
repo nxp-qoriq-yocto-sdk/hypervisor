@@ -26,7 +26,6 @@
 #include <libos/fsl_hcalls.h>
 #include <libos/alloc.h>
 #include <libos/console.h>
-#include <paging.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/trapframe.h>
 #include <libos/platform_error.h>
@@ -47,6 +46,7 @@
 #define DMA_DAR		0x7
 #define DMA_BCR		0x8
 #define DMA_CBs_MASK	0x04040404
+#define PAGE_SIZE 4096
 
 #define TEST_PASSED	0x00001
 #define TEST_INVALID	0x00100
