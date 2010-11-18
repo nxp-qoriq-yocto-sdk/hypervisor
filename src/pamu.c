@@ -57,20 +57,6 @@ static pamu_handle_t *liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
 static uint32_t pamu_lock;
 
-static unsigned int map_addrspace_size_to_wse(phys_addr_t addrspace_size)
-{
-	assert(!(addrspace_size & (addrspace_size - 1)));
-
-	/* window size is 2^(WSE+1) bytes */
-	return count_lsb_zeroes(addrspace_size >> PAGE_SHIFT) + 11;
-}
-
-static unsigned int map_subwindow_cnt_to_wce(uint32_t subwindow_cnt)
-{
-	/* window count is 2^(WCE+1) bytes */
-	return count_lsb_zeroes_32(subwindow_cnt) - 1;
-}
-
 static int is_subwindow_count_valid(int subwindow_cnt)
 {
 	if (subwindow_cnt <= 1 || subwindow_cnt > pamu_get_max_subwindow_count())
