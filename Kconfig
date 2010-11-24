@@ -67,6 +67,8 @@ config LIBOS_DEPS
 	select LIBOS_NO_BARE_SPINLOCKS
 	select LIBOS_QUEUE
 	select LIBOS_HCALL_INSTRUCTIONS
+	select LIBOS_POWERISA206
+	select LIBOS_POWERISA_E_PC
 
 config GCC_CPU_FLAG
 	string "Processor specific compiler optimizations"
