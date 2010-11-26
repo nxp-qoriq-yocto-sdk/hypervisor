@@ -280,11 +280,11 @@ void libos_client_entry(unsigned long devtree_ptr)
 	}
 
 	const char *label = fdt_getprop(fdt, 0, "label", &len);
+
+	addr_beg = 0x0e000000;
 	if(!strcmp("/part1", label)) {
 		read_memory_map();
 		find_unmapped_memory(&addr_beg, &addr_end);
-	} else {
-		addr_beg = 0x0e000000;
 	}
 
 	/* test access violation failure and pass cases */
@@ -350,13 +350,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		if (window_test) {
 			uint32_t start;
 
-			if (!find_next_mapped_memory(&start, &addr_end))
-				return;
-			
-			if (!find_next_mapped_memory(&addr_beg, &addr_end))
-				return;
-	
-			if (test_dma_memcpy(start, addr_beg, 1))
+			if (test_dma_memcpy(0x04000115, 0x05000127, 1))
 				printf("DMA access test : PASSED\n");
 			else
 				printf("DMA access test : FAILED\n");
