@@ -33,7 +33,7 @@ do
 	make test-$primary
 done
 
-cd output/test
+cd output/test32
 
 rc=0
 
