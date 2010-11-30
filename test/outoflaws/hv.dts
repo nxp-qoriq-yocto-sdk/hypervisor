@@ -282,7 +282,7 @@
 
 		pmahv: pmahv {
 			compatible = "phys-mem-area";
-			addr = <0 0x2000000>;
+			addr = <0 0x20000000>;
 			size = <0 0x2000000>;
 		};
 	};
