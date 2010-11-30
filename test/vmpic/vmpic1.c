@@ -175,6 +175,12 @@ void libos_client_entry(unsigned long devtree_ptr)
 	/* enable interrupts at the CPU */
 	enable_extint();
 
+	
+	/* wait for the first interrupt and then unmask the interrupts to
+	   receive the second one */
+	while (extint_cnt <= 0)
+		;
+
 	ev_int_set_mask(*handle_p, 0);
 	out8(&uart_virt[1], 0x2);
 
@@ -186,5 +192,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Test Complete\n");
 
 }
+
 
 
