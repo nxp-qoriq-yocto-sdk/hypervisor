@@ -81,6 +81,7 @@ static void release_secondary_cores(void);
 static void partition_init(void);
 
 #define UART_OFFSET		0x11c500
+#define COMMAND_LINE_SIZE	64
 
 dt_node_t *hw_devtree, *config_tree, *virtual_tree;
 uint32_t hw_devtree_lock;
@@ -91,6 +92,57 @@ uint64_t text_phys, bigmap_phys;
 char *displacement_flush_area[MAX_CORES];
 
 int auto_sys_reset_on_stop;
+
+#ifdef CONFIG_WARM_REBOOT
+int warm_reboot;
+phys_addr_t pamu_mem_addr, pamu_mem_size;
+pamu_hv_mem_t *pamu_mem_header;
+#endif
+
+static int get_cfg_addr(char *args, void *ctx)
+{
+	phys_addr_t *cfg_addr = ctx;
+	char *str, *numstr;
+
+	str = strstr(args, "config-addr=");
+	if (!str) {
+		printf("config-addr not specified in bootargs\n");
+		return ERR_NOTFOUND;
+	}
+
+	str += strlen("config-addr=");
+	numstr = nextword(&str);
+
+	*cfg_addr = get_number64(&consolebuf, numstr);
+	if (cpu->errno)
+		return cpu->errno;
+
+	return 0;
+}
+
+boot_param_t config_addr_param = {
+	.name = "config-addr",
+	.action = get_cfg_addr
+};
+boot_param(config_addr_param);
+
+#ifdef CONFIG_WARM_REBOOT
+static int get_warm_reboot(char *args, void *ctx)
+{
+	int *flag = ctx;
+
+	*flag = 1;
+
+	return 0;
+}
+
+boot_param_t warm_reboot_param = {
+	.name = "warm-reboot",
+	.ctx = &warm_reboot,
+	.action = get_warm_reboot
+};
+boot_param(warm_reboot_param);
+#endif
 
 static void exclude_phys(phys_addr_t addr, phys_addr_t end)
 {
@@ -219,11 +271,20 @@ static void unmap_fdt(void)
 
 extern queue_t early_console;
 
-static int get_cfg_addr(phys_addr_t *cfg_addr)
+/*
+ * Commands are separated by spaces and formatted as:
+ *	param=value
+ *	param=<list_of_comma_separated_values>
+ *	param
+ */
+static int parse_bootargs(void)
 {
 	void *fdt;
-	char *str, *numstr;
 	int offset, len;
+	extern boot_param_t *bootparam_begin, *bootparam_end;
+	boot_param_t **i;
+	static char cmdline[COMMAND_LINE_SIZE];
+	char *str, *cmd_iter = cmdline;
 
 	fdt = map_fdt(devtree_ptr);
 
@@ -239,20 +300,39 @@ static int get_cfg_addr(phys_addr_t *cfg_addr)
 		return len;
 	}
 
-	printf("Hypervisor command line: %s\n", str);
-
-	str = strstr(str, "config-addr=");
-	if (!str) {
-		printf("config-addr not specified in bootargs\n");
-		return ERR_NOTFOUND;
+	if (len > COMMAND_LINE_SIZE) {	/* len includes \0 */
+		printf("Too long command line: %d bytes\n", len);
+		return len;
 	}
 
-	str += strlen("config-addr=");
-	numstr = nextword(&str);
+	printf("Hypervisor command line: %s\n", str);
+	strncpy(cmdline, str, len - 1);
 
-	*cfg_addr = get_number64(&consolebuf, numstr);
-	if (cpu->errno)
-		return cpu->errno;
+	while ((str = nextword(&cmd_iter))) {
+		char *end_name;
+		int size;
+
+		/* FIXME: it is an excessive string parsing */
+		if ((end_name = strchr(str, '=')))
+			size = end_name - str;
+		else
+			size = strlen(str);
+
+		for (i = &bootparam_begin; i < &bootparam_end; i++) {
+			if (strlen((*i)->name) == size &&
+			    !strncmp(str, (*i)->name, size)) {
+				int ret = (*i)->action(str, (*i)->ctx);
+
+				if (ret) {
+					printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+						 "Error parsing boot args: %d\n",
+						 ret);
+				}
+
+				break;
+			}
+		}
+	}
 
 	unmap_fdt();
 	return 0;
@@ -358,11 +438,64 @@ static void process_hv_mem(void *fdt, int offset, int add)
 			continue;
 		}
 
-		if (add)
+		if (add) {
+#ifdef CONFIG_WARM_REBOOT
+			prop = fdt_getprop(fdt, offset, "hv-persistent-data",
+					   &len);
+			if (prop && !pamu_mem_size) {
+				if (prop && len != 4 * sizeof(uint32_t)) {
+					printf("%s: wrong length %d for "
+					       "hv-persistent-data\n",
+					       __func__, len);
+					warm_reboot = 0;
+					continue;
+				}
+
+				pamu_mem_addr = addr;
+				pamu_mem_addr += (((uint64_t)prop[0]) << 32)
+						 | prop[1];
+				pamu_mem_size = (((uint64_t)prop[2]) << 32)
+						| prop[3];
+
+				if ((pamu_mem_addr + pamu_mem_size > addr + size) ||
+				    (pamu_mem_addr + pamu_mem_size < pamu_mem_addr) ||
+				    (pamu_mem_addr > addr + size) ||
+				    (pamu_mem_addr < addr)) {
+					printf("%s: wrong offset/size for "
+					       "hv-persistent-data\n", __func__);
+					pamu_mem_size = 0;
+				} else {
+					pamu_mem_header = (void *)(uintptr_t)pamu_mem_addr +
+							  BIGPHYSBASE -
+							  bigmap_phys;
+				}
+			} else if (prop) {
+				printf("%s: discard multiple "
+				       "hv-persistent-data\n", __func__);
+			}
+#endif
 			add_memory(addr, size);
-		else if (addr < bigmap_phys)
+		} else if (addr < bigmap_phys) {
 			bigmap_phys = addr & ~((phys_addr_t)BIGPHYSBASE - 1);
+		}
 	}
+
+#ifdef CONFIG_WARM_REBOOT
+	if (add && !pamu_mem_size) {
+		/* Override a possible command line argument */
+		if (warm_reboot) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				 "ignoring parameter \"warm-reboot\" because "
+				 "hv-persistent-data was not found\n");
+			warm_reboot = 0;
+		}
+	}
+	if (add && !warm_reboot && pamu_mem_header) {
+		memset(pamu_mem_header, 0, pamu_mem_size);
+		pamu_mem_header->magic = HV_MEM_MAGIC;
+		pamu_mem_header->version = 0;
+	}
+#endif
 }
 
 /* Note that we do not verify that a PMA is covered by a hw memory node,
@@ -393,6 +526,10 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 	exclude_phys(0, &_end - &_start - 1);
 	exclude_phys(devtree_ptr, devtree_ptr + fdt_totalsize(fdt) - 1);
 	exclude_memrsv(fdt);
+#ifdef CONFIG_WARM_REBOOT
+	if (pamu_mem_size)
+		exclude_phys(pamu_mem_addr, pamu_mem_addr + pamu_mem_size - 1);
+#endif
 
 	unmap_fdt();
 
@@ -421,23 +558,33 @@ static void early_bind_devices(void)
 	dt_node_t *node;
 	const char *compat_srch_str[] = {
 		"fsl,qoriq-device-config-1.0",
-		 "fsl,corenet-cf",
-		 "fsl,corenet-law"
+		 "fsl,corenet-law",	/* before corenet-cf driver */
+		 "fsl,corenet-cf"
 	};
+	dt_node_t *sorted[sizeof(compat_srch_str) / sizeof(compat_srch_str[0])] = {};
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
 		prop = dt_get_prop(owner->hwnode, "compatible", 0);
 		if (!prop)
 			continue;
-		if (!strcmp((const char *)prop->data, compat_srch_str[0]) ||
-			!strcmp((const char *)prop->data, compat_srch_str[1]) ||
-			!strcmp((const char *)prop->data, compat_srch_str[2])) {
+		if (!strcmp((const char *)prop->data, compat_srch_str[0]))
+			sorted[0] = owner->hwnode;
+		else if (!strcmp((const char *)prop->data, compat_srch_str[1]))
+			sorted[1] = owner->hwnode;
+		else if (!strcmp((const char *)prop->data, compat_srch_str[2]))
+			sorted[2] = owner->hwnode;
+	}
 
-				dt_lookup_regs(owner->hwnode);
-				dt_lookup_irqs(owner->hwnode);
-				dt_bind_driver(owner->hwnode);
-		}
+	/* Execution dependence: law driver before ccm driver */
+	for (int i = 0; i < sizeof(compat_srch_str) / sizeof(compat_srch_str[0]);
+	     i++) {
+		if (!sorted[i])
+			continue;
+
+		dt_lookup_regs(sorted[i]);
+		dt_lookup_irqs(sorted[i]);
+		dt_bind_driver(sorted[i]);
 	}
 }
 
@@ -823,7 +970,8 @@ void libos_client_entry(unsigned long treephys)
 	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
 
-	ret = get_cfg_addr(&cfg_addr);
+	config_addr_param.ctx = &cfg_addr;
+	ret = parse_bootargs();
 	if (ret < 0)
 		panic("couldn't get config tree address\n");
 

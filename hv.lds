@@ -55,6 +55,11 @@ SECTIONS
 		shellcmd_end = .;
 
 		. = ALIGN(8);
+		bootparam_begin = .;
+		*(.bootparam)
+		bootparam_end = .;
+
+		. = ALIGN(8);
 		hvdbgstub_begin = .;
 		*(.hvdbgstub)
 		hvdbgstub_end = .;

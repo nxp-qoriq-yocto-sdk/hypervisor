@@ -59,5 +59,6 @@ typedef enum mem_tgts {
 
 void allocate_cpc_ways(struct dt_prop *prop, uint32_t tgt, uint32_t csdid, struct dt_node *node);
 int cpcs_enabled(void);
+int reset_cpc(mem_tgts_t mem_tgt);
 
 #endif

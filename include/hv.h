@@ -31,6 +31,27 @@
 
 #define MAX_CORES 8
 
+typedef struct {
+	const char *name;
+	void *ctx;
+	int (*action)(char *args, void *ctx);
+} boot_param_t;
+
+#define boot_param(x) \
+        static __attribute__((used,section(".bootparam"))) \
+        boot_param_t *_##x##_PTR = (&x)
+
+#ifdef CONFIG_WARM_REBOOT
+#define HV_MEM_MAGIC	0x98fef3ca
+
+typedef struct pamu_hv_mem {
+	uint32_t magic;
+	uint32_t version;
+	uint32_t reserved[1024-2];	/* offsetof(next field) == 4KB */
+	uint8_t data[];			/* PAMU tables */
+} pamu_hv_mem_t;
+#endif
+
 struct guest;
 struct queue;
 struct gcpu;
@@ -45,6 +66,12 @@ phys_addr_t find_lowest_guest_phys(void *fdt);
 
 extern unsigned long partition_init_counter;
 extern int auto_sys_reset_on_stop;
+
+#ifdef CONFIG_WARM_REBOOT
+extern int warm_reboot;
+extern phys_addr_t pamu_mem_addr, pamu_mem_size;
+extern pamu_hv_mem_t *pamu_mem_header;
+#endif
 
 char *stripspace(const char *str);
 char *nextword(char **str);

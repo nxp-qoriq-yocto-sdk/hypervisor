@@ -112,6 +112,18 @@ static void init_cpc_dev(mem_tgts_t mem_tgt, void *vaddr)
 		(cpc_err_reg_t *) ((uintptr_t)vaddr + CPC_ERRDET);
 	cpcs[mem_tgt].cpc_part_base =
 		(cpc_part_reg_t *)((uintptr_t)vaddr + CPCPIR0);
+
+	/* NOTE: In case of warm reboot, CPC can be reconfigured */
+	reset_cpc(mem_tgt);
+
+	reserve_partition_reg(mem_tgt, 0);
+}
+
+int reset_cpc(mem_tgts_t mem_tgt)
+{
+	if (!cpcs[mem_tgt].cpccsr0)
+		return 0;	/* This CPC is not mapped */
+
 	/*cpc_reg_map requires 16 bits*/
 	cpcs[mem_tgt].cpc_reg_map = ~0xffffUL;
 
@@ -121,7 +133,7 @@ static void init_cpc_dev(mem_tgts_t mem_tgt, void *vaddr)
 	out32(&cpcs[mem_tgt].cpc_part_base[0].cpcpar, CPCPAR0_RESET_MASK);
 	out32(&cpcs[mem_tgt].cpc_part_base[0].cpcpwr, CPCPIR0_RESET_MASK);
 
-	reserve_partition_reg(mem_tgt, 0);
+	return 1;
 }
 
 
@@ -343,20 +355,13 @@ static cpc_part_reg_t *allocate_ways(mem_tgts_t mem_tgt, dt_prop_t *prop, uint32
 		return NULL;
 	}
 
-	pir_num = get_free_cpcpir(mem_tgt);
-	if (pir_num == -1) {
-		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
-				"Way allocation failed, all CPC partitioning registers taken\n");
-		return NULL;
-	}
-
 	numways = prop->len / sizeof(uint32_t);
 	ways = (const uint32_t *)prop->data;
 
 	for (i = 0; i < numways; i++) {
 		if (ways[i] > num_cpc_ways - 1) {
 			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
-					"Invalid CPC way number %d\n", ways[i]);
+				 "Invalid CPC way number %d\n", ways[i]);
 			continue;
 		}
 		val |= (1 << (31 - ways[i]));
@@ -364,6 +369,14 @@ static cpc_part_reg_t *allocate_ways(mem_tgts_t mem_tgt, dt_prop_t *prop, uint32
 
 	if (val == 0)
 		return NULL;
+
+	pir_num = get_free_cpcpir(mem_tgt);
+	if (pir_num == -1) {
+		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			 "Way allocation failed, all CPC partitioning "
+			 "registers taken\n");
+		return NULL;
+	}
 
 	remove_pir0_ways(mem_tgt, val);
 

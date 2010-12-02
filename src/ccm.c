@@ -50,6 +50,10 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
 };
 
+#ifdef CONFIG_WARM_REBOOT
+int *ddr_laws_found;
+#endif
+
 static law_t *laws;
 static uint32_t *csdids;
 static uint32_t *err_det_reg, *err_enb_reg;
@@ -68,6 +72,38 @@ static driver_t __driver law = {
 	.compatible = "fsl,corenet-law",
 	.probe = law_probe
 };
+
+static void disable_law(unsigned int lawidx)
+{
+	uint32_t val;
+	assert(lawidx < numlaws);
+
+	val = in32(&laws[lawidx].attr);
+	val &= ~LAW_ENABLE;
+	out32(&laws[lawidx].attr, val);
+}
+
+static void enable_law(unsigned int lawidx)
+{
+	uint32_t val;
+	assert(lawidx < numlaws);
+
+	val = in32(&laws[lawidx].attr);
+	val |= LAW_ENABLE;
+	out32(&laws[lawidx].attr, val);
+}
+
+static inline void release_csd(int csdid)
+{
+	out32(&csdids[csdid], 0);
+	csdid_map &= ~(1 << csdid);
+}
+
+static inline void release_law(int lawidx)
+{
+	uint32_t val = in32(&laws[lawidx].attr);
+	out32(&laws[lawidx].attr, val & ~LAW_ENABLE);
+}
 
 static void dump_ccf_error(hv_error_t *err)
 {
@@ -135,7 +171,7 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
-	uint32_t *sidmr; /* Snoop ID Port mapping register */
+	uint32_t i, *sidmr; /* Snoop ID Port mapping register */
 	int num_snoopids;
 
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
@@ -157,9 +193,32 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	csdids = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x600);
 
 	/* Mark the CSDs that are already in use */
-	for (uint32_t i = 0; i < numcsds; i++)
+	for (i = 0; i < numcsds; i++) {
 		if (in32(&csdids[i]))
 			csdid_map |= 1 << i;
+	}
+
+#ifdef CONFIG_WARM_REBOOT
+	/*
+	 * In case of warm reboot, the HV LAWs are already disabled, meaning
+	 * that at this point, the ongoing I/O to memory is made through LAW31,
+	 * set by U-Boot using CSD_ID 0, containing all CoreNet ports. We should
+	 * release CSD_IDs from previous cold boot, taking care of their usage
+	 * in CPC.
+	 */
+	if (warm_reboot && ddr_laws_found) {
+		for (i = 0; i < numlaws; i++) {
+			int csdid_to_remove;
+
+			if (!ddr_laws_found[i])
+				continue;
+
+			csdid_to_remove = ddr_laws_found[i] & LAWAR_CSDID_MASK;
+			csdid_to_remove >>= LAWAR_CSDID_SHIFT;
+			release_csd(csdid_to_remove);
+		}
+	}
+#endif
 
 	/*
 	 * Snoop domains are meant specifically for (PAMU based) stashing
@@ -190,8 +249,13 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 	 * NOTE: Looks like SIDMR00 is used for snoop-id 0, i.e, to enable
 	 * snooping on all cores, hence program SIDMR01 onwards
 	 */
-	for (int i = 1; i < num_snoopids; i++)
-		out32(&sidmr[i], (0x80000000 >> (i - 1)));
+#ifdef CONFIG_WARM_REBOOT
+	if (!warm_reboot)
+#endif
+	{
+		for (int i = 1; i < num_snoopids; i++)
+			out32(&sidmr[i], (0x80000000 >> (i - 1)));
+	}
 
 	err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEDR);
 	err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEER);
@@ -250,27 +314,104 @@ static int law_probe(driver_t *drv, device_t *dev)
 
 	dev->driver = &law;
 
+#ifndef CONFIG_WARM_REBOOT
 	return 0;
-}
+#else
+	phys_addr_t addr;
+	int ddr1_pos, ddr2_pos, ddrint_pos;
+	uint32_t tgt = 0, val;
+	int lawidx, found_hv_laws = 0;
 
-static void disable_law(unsigned int lawidx)
-{
-	uint32_t val;
-	assert(lawidx < numlaws);
+	if (!warm_reboot)
+		return 0;
 
-	val = in32(&laws[lawidx].attr);
-	val &= ~LAW_ENABLE;
-	out32(&laws[lawidx].attr, val);
-}
+	ddr_laws_found = alloc(numlaws * sizeof(*ddr_laws_found),
+			       sizeof(*ddr_laws_found));
+	if (!ddr_laws_found) {
+		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
+			 "%s: memory allocation failed\n", __func__);
+		return ERR_NOMEM;
+	}
 
-static void enable_law(unsigned int lawidx)
-{
-	uint32_t val;
-	assert(lawidx < numlaws);
+	/* We can access VA of pamu_mem_header now, with HV relocated */
+	if (pamu_mem_header->magic != HV_MEM_MAGIC ||
+	    pamu_mem_header->version != 0) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			 "ignoring parameter \"warm-reboot\" because "
+			 "hv-persistent-data content is invalid\n");
+		goto warmreboot_fail;
+	}
 
-	val = in32(&laws[lawidx].attr);
-	val |= LAW_ENABLE;
-	out32(&laws[lawidx].attr, val);
+	/*
+	 * Identify U-Boot DDR target and disable other DDR LAWs. It gets a bit
+	 * complex if we aim not to use any information from a cold boot.
+	 * The worst case scenario to setup LAWs is in case of controller
+	 * interleaving: memory region A to DDR1, region B to DDR2, and region C
+	 * using DDR interleaved.
+	 * Alg: find the rightmost LAW for each of the three target IDs and
+	 * delete any LAW to the left of that target.
+	 */
+	ddr1_pos = ddr2_pos = ddrint_pos = numlaws;
+
+	for (lawidx = numlaws - 1; lawidx >= 0; lawidx--) {
+		val = in32(&laws[lawidx].attr);
+		if (val & LAW_ENABLE) {
+			tgt = (val & LAW_TARGETID_MASK) >> LAWAR_TARGETID_SHIFT;
+
+			/*
+			 * In case of warm reboot, disable all HV LAWs, as this
+			 * will not disturb in-flight transactions to DDR which
+			 * will be guided through U-Boot LAWs.
+			 */
+			if ((ddr1_pos < numlaws && tgt == LAW_TRGT_DDR1) ||
+			    (ddr2_pos < numlaws && tgt == LAW_TRGT_DDR2) ||
+			    (ddrint_pos < numlaws && tgt == LAW_TRGT_INTLV)) {
+				found_hv_laws = 1;
+				disable_law(lawidx);
+				ddr_laws_found[lawidx] = (val & LAWAR_CSDID_MASK)
+							 | 1;
+				printlog(LOGTYPE_DEV, LOGLEVEL_DEBUG,
+					 "warm reboot: disable LAW %d\n", lawidx);
+				continue;
+			}
+
+			if (ddr1_pos == numlaws && tgt == LAW_TRGT_DDR1)
+				ddr1_pos = lawidx;
+			else if (ddr2_pos == numlaws && tgt == LAW_TRGT_DDR2)
+				ddr2_pos = lawidx;
+			else if (ddrint_pos == numlaws && tgt == LAW_TRGT_INTLV)
+				ddrint_pos = lawidx;
+		}
+	}
+
+	if (!found_hv_laws) {
+		/*
+		 * A possible problem. HV uses at least a LAW for PAMU tables.
+		 * If PAMU support is disabled, there should be no warm-reboot.
+		 */
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			 "ignoring parameter \"warm-reboot\" because HV LAWs "
+			 "were not found in CCSR\n");
+		goto warmreboot_fail;
+	}
+
+	return 0;
+
+warmreboot_fail:
+	/*
+	 * NOTE: Maybe it would be better to abort the init, and just crash,
+	 * but in this way we help the testing, which does not clear the DDR
+	 * between each unit-testing execution, so you may find PAMU mem
+	 * leftovers from a previous run.
+	 */
+	warm_reboot = 0;
+	memset(pamu_mem_header, 0, pamu_mem_size);
+	pamu_mem_header->magic = HV_MEM_MAGIC;
+	pamu_mem_header->version = 0;
+	flush_caches();
+
+	return 0;
+#endif
 }
 
 /* allocate CPC ways for PMA here */
@@ -362,7 +503,7 @@ static uint32_t get_law_target(pma_t *pma)
 		}
 	}
 
-	return 0;
+	return -1;
 }
 
 static int set_law(dt_node_t *node, int csdid)
@@ -432,18 +573,6 @@ static int get_free_csd(void)
 	return csdid;
 }
 
-static inline void release_csd(int csdid)
-{
-	out32(&csdids[csdid], 0);
-	csdid_map &= ~(1 << csdid);
-}
-
-static inline void release_law(int lawidx)
-{
-	uint32_t val = in32(&laws[lawidx].attr);
-	out32(&laws[lawidx].attr, val & ~LAW_ENABLE);
-}
-
 static pma_t *read_pma(dt_node_t *node)
 {
 	pma_t *pma;
@@ -495,14 +624,19 @@ static pma_t *read_pma(dt_node_t *node)
 	if (dt_get_prop(node, "use-no-law", 0))
 		pma->use_no_law = 1;
 
-	if (dt_get_prop(node, "zero-pma", 0)) {
-		phys_addr_t ret = zero_to_phys(pma->start, pma->size);
-		if (ret != pma->size) {
-			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
-			         "%s: could not zero pma %s: "
-			         "zeroed %llu bytes\n",
-			         __func__, node->name,
-			         (unsigned long long)ret);
+#ifdef CONFIG_WARM_REBOOT
+	if (!warm_reboot)
+#endif
+	{
+		if (dt_get_prop(node, "zero-pma", 0)) {
+			phys_addr_t ret = zero_to_phys(pma->start, pma->size);
+			if (ret != pma->size) {
+				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+					 "%s: could not zero pma %s: "
+					 "zeroed %llu bytes\n",
+					 __func__, node->name,
+					 (unsigned long long)ret);
+			}
 		}
 	}
 

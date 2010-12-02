@@ -269,3 +269,15 @@ config HV_WATCHDOG
 		the "watchdog-enable" property is defined in the hypervisor's
 		configuration node, the hypervisor can use the core watchdog to
 		guard against some crashes and hangs.
+
+config WARM_REBOOT
+	bool "Hypervisor warm reboot support"
+	depends on PAMU
+	help
+		Enable support for the hypervisor warm reboot.  If enabled,
+		while the "warm-reboot" argument is given in bootargs and
+		"hv-persistent-data" is defined in the hypervisor's
+		configuration node, the hypervisor uses the memory area for
+		PAMU tables and skips its initialization during a warm reboot.
+		If the argument is missing, a cold boot is assumed and PAMU is
+		reconfigured.

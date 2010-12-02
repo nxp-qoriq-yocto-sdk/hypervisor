@@ -579,6 +579,10 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 
 	liodn_to_guest[liodn] = guest;
 
+#ifdef CONFIG_WARM_REBOOT
+	if (warm_reboot)
+		return 0; /* Skip the remaining tasks as PAMU tables are set */
+#endif
 	/* set up operation mapping if it's configured */
 	prop = dt_get_prop(cfgnode, "operation-mapping", 0);
 	if (prop) {
@@ -1096,16 +1100,37 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 			 align(SPAACT_SIZE + 1, PAMU_TABLE_ALIGNMENT) + OMT_SIZE;
 
 	pamumem_size = 1 << ilog2_roundup(pamumem_size);
+#ifndef CONFIG_WARM_REBOOT
 	pamumem = alloc(pamumem_size, pamumem_size);
+#else
+	if (!pamu_mem_size) {
+		pamumem = alloc(pamumem_size, pamumem_size);
+	} else {
+		void *tmp = pamu_mem_header;
+		void *end = tmp + pamu_mem_size;
+		if (end > tmp) {
+			tmp += sizeof(pamu_hv_mem_t);
+			tmp = (void *)align((uintptr_t)tmp, pamumem_size);
+			pamumem = tmp;
+			tmp += pamumem_size;
+			if (tmp > end || tmp < pamumem)
+				pamumem = 0;
+		} else {
+			pamumem = 0;
+		}
+	}
+#endif
 	if (!pamumem) {
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: Unable to allocate space for PAMU tables.\n",
-				__func__);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: Unable to "
+				"allocate space %#lxB for PAMU tables.\n",
+				__func__, pamumem_size);
 		return ERR_NOMEM;
 	}
 
 	pamu_node->pma = alloc_type(pma_t);
 	if (!pamu_node->pma) {
-		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: out of memory\n", __func__);
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR, "%s: out of memory\n",
+			 __func__);
 		goto fail_mem;
 	}
 
@@ -1151,7 +1176,13 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 		}
 	}
 
-	ret = pamu_hw_init(vaddr, size, pamubypenr_ptr, pamumem, pamumem_size);
+	/* In case of warm-reboot call the Libos driver to setup internal vars */
+	ret = pamu_hw_init(vaddr, size, pamubypenr_ptr, pamumem, pamumem_size,
+#ifndef CONFIG_WARM_REBOOT
+			   0);
+#else
+			   warm_reboot);
+#endif
 	if (ret < 0)
 		goto fail_pma;
 
@@ -1161,7 +1192,11 @@ static int pamu_probe(driver_t *drv, device_t *dev)
 	}
 
 	setup_pamu_law(pamu_node);
-	setup_omt();
+
+#ifdef CONFIG_WARM_REBOOT
+	if (!warm_reboot)
+#endif
+		setup_omt();
 
 	return 0;
 
@@ -1169,7 +1204,10 @@ fail_pma:
 	free(pamu_node->pma);
 
 fail_mem:
-	free(pamumem);
+#ifdef CONFIG_WARM_REBOOT
+	if (!pamu_mem_size)
+#endif
+		free(pamumem);
 	return ERR_NOMEM;
 }
 
@@ -1527,9 +1565,12 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 			liodn_to_handle[liodn[i]] = pamu_handle;
 			mbar(1);
 
-			if (pamu_handle->no_dma_disable ||
-			    owner->guest->no_dma_disable)
-				pamu_enable_liodn(liodn[i]);
+#ifdef CONFIG_WARM_REBOOT
+			if (!warm_reboot)
+#endif
+				if (pamu_handle->no_dma_disable ||
+				    owner->guest->no_dma_disable)
+					pamu_enable_liodn(liodn[i]);
 		}
 	}
 
