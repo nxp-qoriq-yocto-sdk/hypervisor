@@ -24,7 +24,7 @@
 
 export VERSION=0
 export SUBVERSION=8
-export EXTRAVERSION=-001
+export EXTRAVERSION=-002
 export LOCALVERSION := $(shell tools/setlocalversion)
 
 export PROJECTVERSION=$(VERSION).$(SUBVERSION)$(EXTRAVERSION)$(LOCALVERSION)

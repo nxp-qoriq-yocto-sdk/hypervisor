@@ -26,13 +26,20 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.8
-Revision: 001
-Date: 11/12/2010
+Revision: 002
+Date: 12/09/2010
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v0.8-002 bug fixes and changes
+       -warm reboot support
+       -unit test updates and fixes
+       -libos: support booting from non-zero addresses
+       -libos: updated examples
+       -libos: support for e500v2 core
+
    -v0.8-001 bug fixes and changes
        -removed ev_get_activity hcall (!)
        -first port of hypervisor to 64bit
