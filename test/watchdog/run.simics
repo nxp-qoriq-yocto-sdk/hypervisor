@@ -38,3 +38,8 @@ run-command-file "common.simics"
 add-directory "bin/watchdog" -prepend
 
 run-command-file "boot.simics"
+
+foreach $cpu in ($system.soc.cpu) {
+        $cpu->timebase_mode = stall
+}
+
