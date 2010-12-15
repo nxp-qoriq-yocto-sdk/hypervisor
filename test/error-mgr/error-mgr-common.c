@@ -552,7 +552,7 @@ static void test_common_do_dma(register_t pir, bool is_err_owner)
 		/* if not error owner, wait for machine check on boot cpu */
 		while (mcheck_cnt[pir] == 0);
 
-	delay_timebase(5000000); /* wait for whatever interrupts to be delivered */
+	delay_timebase(60000); /* wait for whatever interrupts to be delivered */
 
 	if (crit_cnt[pir]) {
 		printf("[%ld] Received critical interrupt\n", pir);
