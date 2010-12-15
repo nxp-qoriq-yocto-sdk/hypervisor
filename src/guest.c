@@ -2981,7 +2981,8 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 		return ERR_BADTREE;
 	}
 
-	guest->devtree = create_dev_tree();
+	if (!(guest->devtree = create_dev_tree()))
+		goto nomem;
 	ret = dt_set_prop_string(guest->devtree, "label", guest->name);
 	if (ret < 0)
 		goto fail;
