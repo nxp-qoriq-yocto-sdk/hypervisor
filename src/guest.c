@@ -918,7 +918,7 @@ static void reset_spintbl(guest_t *guest)
 		spintbl[i].addr_lo = 1;
 		spintbl[i].pir = i;
 		spintbl[i].r3_hi = 0;
-		spintbl[i].r3_lo = 0;
+		spintbl[i].r3_lo = i; /* in cpu "reg" is vcpu 0..cpucnt-1 */
 	}
 }
 
