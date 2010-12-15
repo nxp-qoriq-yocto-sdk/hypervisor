@@ -2996,18 +2996,19 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 
 	compat_prop = dt_get_prop(hw_devtree, "compatible", 0);
 	if (!compat_prop) {
-		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_WARN,
 		         "%s: warning: unable to set guest root compatible\n",
 		         __func__);
+	} else {
+		if (create_compat_bus_strings(compat_prop, &compat_buf, &compat_len))
+			goto nomem;
+
+		ret = dt_set_prop(guest->devtree, "compatible", compat_buf,
+				  compat_len + 1);
+		free(compat_buf);
+		if (ret < 0)
+			goto nomem;
 	}
-
-	if (create_compat_bus_strings(compat_prop, &compat_buf, &compat_len))
-		goto nomem;
-
-	ret = dt_set_prop(guest->devtree, "compatible", compat_buf, compat_len + 1);
-	free(compat_buf);
-	if (ret < 0)
-		goto nomem;
 
 	// Set the ePAPR version string.
 	ret = snprintf(buf, sizeof(buf), "ePAPR-%u.%u", 1, 0);
