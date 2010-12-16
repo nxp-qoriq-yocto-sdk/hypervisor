@@ -67,8 +67,9 @@ static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa, int tsi
 
 void libos_client_entry(unsigned long devtree_ptr)
 {
-	int len;
+	int len, ret;
 	const char *label;
+	uint32_t bufsize = sizeof(hv_error_t);
 
 	init(devtree_ptr);
 
@@ -80,6 +81,15 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	if (init_error_queues() < 0)
 		return;
+
+	printf("Test of error get in illegal guest space: ");
+	ret = fh_err_get_info(global_error_queue, &bufsize, 0, BAD_PHYS, 0);
+	if (!(global_error_queue == -1 && ret == EV_EINVAL) ||
+	    !(global_error_queue != -1 && ret == EV_EFAULT)) {
+		printf("PASSED (=%d)\n", ret);
+	} else {
+		printf("FAILED (=%d)\n", ret);
+	}
 
 	label = fdt_getprop(fdt, 0, "label", &len);
 	if(!strcmp("/part2", label)) {

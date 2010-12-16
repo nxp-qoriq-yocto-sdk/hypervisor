@@ -647,7 +647,7 @@ static void hcall_err_get_info(trapframe_t *regs)
 	guest_t *guest = gcpu->guest;
 	queue_t *q;
 	unsigned long *flag = NULL;
-	unsigned long mask = 0;
+	unsigned long mask = 0, attr;
 	int peek = regs->gpregs[7];
 	int bufsize = regs->gpregs[4];
 	phys_addr_t addr;
@@ -684,6 +684,15 @@ static void hcall_err_get_info(trapframe_t *regs)
 
 	addr = ((phys_addr_t) regs->gpregs[5]) << 32 |
 			regs->gpregs[6];
+
+	vptbl_xlate(guest->gphys, addr >> PAGE_SHIFT, &attr, PTE_PHYS_LEVELS, 0);
+	/* Check guest MSR[PR] */
+	int access = (regs->srr1 & MSR_PR) ? attr & PTE_UW : attr & PTE_SW;
+
+	if (!(attr & PTE_VALID) || (attr & PTE_VF) || !access) {
+		regs->gpregs[3] = EV_EFAULT;
+		return;
+	}
 
 	register_t save = spin_lock_intsave(lock);
 	regs->gpregs[3] = error_get(q, &err, flag, mask, peek);
