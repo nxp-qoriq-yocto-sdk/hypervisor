@@ -22,6 +22,9 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+$use_uart0 = 0
+$use_uart0_net = 1
+
 $guest_image[0] = "ipi"
 $guest_addr[0]  = 0x00a00000
 

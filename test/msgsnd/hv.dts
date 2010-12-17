@@ -61,6 +61,10 @@
 			device = "/soc/pic";
 		};
 
+		iommu {
+			device = "/soc/iommu";
+		};
+
 		cpc {
 			device = "/soc/l3-cache-controller";
 		};

@@ -24,6 +24,9 @@
 
 # UART0 is the hypervisor
 
+$use_uart0 = 0
+$use_uart0_net = 1
+
 $guest_image[0] = "error-int"
 $guest_addr[0]  = 0x00a00000
 

@@ -22,6 +22,9 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+$use_uart0 = 0
+$use_uart0_net = 1
+
 $pcie0_device = "sym53c875"
 add-directory "%script%/" -prepend
 run-command-file "run-pci.simics"

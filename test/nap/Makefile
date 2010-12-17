@@ -25,4 +25,6 @@
 test := nap
 dir := $(testdir)$(test)/
 
+$(test)-num-terms := 3
+
 include $(testdir)common/Makefile.inc

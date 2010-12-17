@@ -26,7 +26,10 @@
 # Script to run 8578/u-boot/ultravisor/simple-guest on simulator
 #
 
-# simple guest
+
+$use_uart0 = 0
+$use_uart0_net = 1
+
 $guest_image[0]  = "byte-chan"
 $guest_addr[0]   = 0x00a00000
 

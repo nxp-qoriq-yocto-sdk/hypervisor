@@ -24,6 +24,7 @@
 
 $(test)-src-y := $(dir)$(test).c
 $(test)-dts-y := $(wildcard $(dir)*.dts)
+$(test)-scr := $(wildcard $(dir)*.scr)
 
 $(test)-obj := $(basename $(libos-src-first-y:%=libos/%) \
                           $(libos-src-early-y:%=libos/%) \
@@ -37,13 +38,15 @@ $(test)-nocheck-obj := $($(test)-nocheck-obj:%=bin/nocheck/%.o)
 
 $(test)-hv-dtb := $($(test)-dts-y:$(dir)%.dts=bin/$(test)/%.dtb)
 
+$(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
+
 bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
 .PHONY: $(test)
-$(test): bin/$(test)/$(test) $($(test)-hv-dtb)
+$(test): bin/$(test)/$(test) $($(test)-hv-dtb) $($(test)-ubs)
 
 $(test)-num-terms ?= 2
 
@@ -55,6 +58,7 @@ $(test)-run: $(test)
 		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
 	fi
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run.simics
+
 
 $(test)-run-%: $(test)
 	@if [ $($<-num-terms) != 0 ]; then \

@@ -25,7 +25,12 @@
 test := simtst
 dir := $(testdir)$(test)/
 
+$(test)-scr := $(wildcard $(dir)*.scr)
+$(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
+
 .PHONY: tunctl
+
+$(test): $($(test)-ubs)
 
 tunctl:
 	ls /sys/class/net/*-f0e0* > /dev/null 2>&1 || \
@@ -38,10 +43,10 @@ simtst-run-1p: simtst tunctl
 
 simtst-run-2p: simtst tunctl
 	$(MAKE) -C $(testdir)../../sim
-	setsid $(testdir)../tools/xtel.sh 9000 4
+	setsid $(testdir)../tools/xtel.sh 9000 10
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-2p.simics
 
 simtst-run-4p: simtst tunctl
 	$(MAKE) -C $(testdir)../../sim
-	setsid $(testdir)../tools/xtel.sh 9000 5
+	setsid $(testdir)../tools/xtel.sh 9000 8
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-4p.simics

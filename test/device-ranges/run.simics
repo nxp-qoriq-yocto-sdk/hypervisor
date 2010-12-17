@@ -25,6 +25,9 @@
 # UART0 is the hypervisor
 # UART2 is the guest serial console
 
+$use_uart0 = 0
+$use_uart0_net = 1
+
 $guest_image[0] = "device-ranges"
 $guest_addr[0]  = 0x00a00000
 

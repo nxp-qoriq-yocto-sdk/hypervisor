@@ -71,6 +71,9 @@ $(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
 $($(test)-hv-dts): $($(test)-part-dtb)
 
+$(test)-scr := $(wildcard $(dir)*.scr)
+$(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
+
 bin/$(test)/ipi: $(ipi-obj)
 	@$(MKDIR) $(@D)
 	$(call show,link: $@)
@@ -86,11 +89,18 @@ bin/$(test)/ipi2: $(ipi2-obj)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 
-.PHONY: $(test)
-$(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb)
+%.ubs : %.scr
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	mkimage -A ppc -T script -a 0 -d $< $@
 
-$(test)-run-%: $(test)
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
+.PHONY: $(test)
+$(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb) \
+	$($(test)-ubs)
+
+$(test)-run-A: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-A.simics
 
 $(test)-run-B: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
@@ -99,6 +109,10 @@ $(test)-run-B: $(test)
 $(test)-run-C: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-C.simics
+
+$(test)-run-D: $(test)
+	setsid $(testdir)../tools/xtel.sh 9000 2
+	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-D.simics
 
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2

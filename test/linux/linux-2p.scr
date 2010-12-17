@@ -1,0 +1,4 @@
+setenv filesize; tftp 100000 $unittestdir/hv-2p.dtb; erase 0xe8900000 +$filesize; cp.b 100000 0xe8900000 $filesize
+setenv bootcmd bootm e8700000 - e8800000
+setenv bootargs config-addr=0xfe8900000
+boot

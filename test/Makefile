@@ -102,6 +102,11 @@ bin/%.dtb : $(testdir)%.dts
 	$(call show,build: $<)
 	$(V)$(DTC) -p 1024 -O dtb $< -o $@
 
+bin/%.ubs : $(testdir)%.scr
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	mkimage -A ppc -T script -a 0 -d $< $@
+
 ifneq ($(wildcard bin),)
 -include $(shell find bin -path bin/libos -prune -o -name '*.d' -print) ''
 endif

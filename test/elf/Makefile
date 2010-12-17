@@ -25,6 +25,8 @@
 test := elf
 dir := $(testdir)$(test)/
 
+$(test)-num-terms := 2
+
 # test source
 $(test)-src-y := $(dir)$(test).c
 
@@ -47,6 +49,9 @@ $(test)-part-dtb := $($(test)-part-dts:%.dts=%.dtb)
 
 $($(test)-hv-dts): $($(test)-part-dtb)
 
+$(test)-scr := $(wildcard $(dir)*.scr)
+$(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
+
 ifeq ($(CONFIG_LIBOS_64BIT),y)
 $(test)-LD_SCRIPT := $(testdir)elf/elf64.lds
 else
@@ -58,11 +63,22 @@ bin/$(test)/$(test): $($(test)-obj)
 	$(call show,link: $@)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$($(notdir $@)-LD_SCRIPT) -o $@ $^ -lgcc
 
+%.ubs : %.scr
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	mkimage -A ppc -T script -a 0 -d $< $@
+
 .PHONY: $(test)
-$(test): bin/$(test)/$(test) $($(test)-hv-dtb)
+$(test): bin/$(test)/$(test) $($(test)-hv-dtb) $($(test)-ubs)
 
 $(test)-run: $(test)
+	@if [ $($<-num-terms) != 0 ]; then \
+		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
+	fi
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run.simics
 
 $(test)-run-%: $(test)
+	@if [ $($<-num-terms) != 0 ]; then \
+		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
+	fi
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics

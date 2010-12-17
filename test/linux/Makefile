@@ -36,10 +36,18 @@ dir := $(testdir)$(test)/
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 
+$(test)-scr := $(wildcard $(dir)*.scr)
+$(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
+
 include $(src)tools/partman/Makefile $(src)tools/shmem/Makefile
 
+%.ubs : %.scr
+	@$(MKDIR) $(@D)
+	$(call show,build: $<)
+	mkimage -A ppc -T script -a 0 -d $< $@
+
 .PHONY: $(test)
-$(test): $($(test)-dtb)
+$(test): $($(test)-dtb) $($(test)-ubs)
 
 $(test)-run-%: $(test)
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
@@ -111,3 +119,7 @@ $(test)-run-e1000: $(test)
 $(test)-run-scsi: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-scsi.simics
+
+$(test)-pre-partman: bin/$(test)/rootfs-partman.ext2.gz
+
+$(test)-pre-hello: $(test) bin/$(test)/rootfs-hello.ext2.gz
