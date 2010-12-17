@@ -79,9 +79,10 @@ static inline void reconfigure_cpc(mem_tgts_t mem_tgt)
 	for (i = 0; i < NUM_PART_REGS; i++)
 		out32(&cpcs[mem_tgt].cpc_part_base[i].cpcpar, 0);
 
-	poll_reg_bit_clear(cpcs[mem_tgt].cpccsr0, CPCCSR0_CPCFL);
-	poll_reg_bit_clear(cpcs[mem_tgt].cpccsr0, CPCCSR0_CPCLFC);
-
+	/*
+	 * Just for CPC repartitioning, no need for flush nor lock flash
+	 * P4080 chip errata: CPC 10, CPC 8 (CPCFL, CPCLFC)
+	 */
 }
 
 static inline void reserve_partition_reg(mem_tgts_t mem_tgt, int pir_num)
