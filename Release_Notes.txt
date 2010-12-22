@@ -26,13 +26,19 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.8
-Revision: 002
-Date: 12/09/2010
+Revision: 003
+Date: 12/22/2010
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v0.8-003 bug fixes and changes
+       -fixes after Klockwork analysis
+       -automated unit tests
+       -bug 6749: configure PAMU also when Secure Boot mode is active
+       -bug 6762: fix boot of secondary cores
+       -bug 6784: let the guest set MSR[PMM]
    -v0.8-002 bug fixes and changes
        -warm reboot support
        -unit test updates and fixes
