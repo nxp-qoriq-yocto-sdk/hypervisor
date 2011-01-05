@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,13 +26,15 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.8
-Revision: 003
-Date: 12/22/2010
+Revision: 004
+Date: 01/05/2011
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v0.8-004 bug fixes and changes
+       -bug 6831: clear pending vint if destcpu has changed
    -v0.8-003 bug fixes and changes
        -fixes after Klockwork analysis
        -automated unit tests

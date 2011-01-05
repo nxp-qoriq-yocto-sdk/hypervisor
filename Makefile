@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,7 +24,7 @@
 
 export VERSION=0
 export SUBVERSION=8
-export EXTRAVERSION=-003
+export EXTRAVERSION=-004
 export LOCALVERSION := $(shell tools/setlocalversion)
 
 export PROJECTVERSION=$(VERSION).$(SUBVERSION)$(EXTRAVERSION)$(LOCALVERSION)
