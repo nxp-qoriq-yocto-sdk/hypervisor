@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -265,13 +265,11 @@ static vpic_interrupt_t *__vpic_iack(void)
 			}
 			
 			/* Tsk, tsk.  The guest changed the destcpu mask
-			 * while the interrupt was pending. Reissue it if
-			 * it's still active.
+			 * while the interrupt was pending. Clear it and
+			 * reissue it if it's still active.
 			 */
 			if (virq->pending) {
-				printlog(LOGTYPE_IRQ, LOGLEVEL_NORMAL,
-					"vpic_iack: changed destcpu while"
-					"pending\n");
+				clear_gcpu_pending_virq(virq->irqnum, gcpu);
 				__vpic_assert_vint(virq);
 			}
 		}
