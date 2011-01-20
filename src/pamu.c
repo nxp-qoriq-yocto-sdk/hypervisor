@@ -901,6 +901,23 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	paace_t *ppaace;
 	hv_error_t err = { };
 	pamu_error_t *pamu = &err.pamu;
+#ifdef CONFIG_P4080_ERRATUM_PAMU3
+	int rev1;
+
+	/*
+	 * For rev1 silicon we have PAMU 3 erratum that says: The PAMU CCSR register
+	 * PICS[AVICS] bit is not cleared when software writes the value 1 to clear.
+	 * The workaround is for the interrupt handler to write PICS[AVICS] to the value
+	 * 1 in two consecutive store instructions.
+	 * In rev2 silicon, PAMU 3 was fixed, but we have PAMU-A001 that says: If the PAMU
+	 * register bit value is 1, software writing 1 to the bit will clear the bit value,
+	 * but if the register bit value is 0, software writing 1 to the bit will update
+	 * the bit of the registers to a value of 1. In this case we have to make sure that
+	 * we are not writing the register twice, so the interrupt clear handling will be
+	 * different for rev1 and rev2.
+	 */
+	rev1 = (mfspr(SPR_PVR) & 0xfffffff0) == 0x80230010;
+#endif
 
 	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
 	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
@@ -915,10 +932,13 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	{
 		/* Clear the write one to clear bits in AVS1, mask out the LIODN */
 		out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
+		
 		/* De-assert access violation pin */
-#ifdef CONFIG_P4080_ERRATUM_PAMU3
-		/* erratum -- do it twice */
 		out32((uint32_t *)(reg + PAMU_PICS), pics);
+#ifdef CONFIG_P4080_ERRATUM_PAMU3
+		if (rev1)
+			/* erratum PAMU 3-- do it twice */
+			out32((uint32_t *)(reg + PAMU_PICS), pics);
 #endif
 		return -1;
 	}
@@ -958,12 +978,11 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
 	/* De-assert access violation pin */
 	out32((uint32_t *)(reg + PAMU_PICS), pics);
-
 #ifdef CONFIG_P4080_ERRATUM_PAMU3
-	/* erratum -- do it twice */
-	out32((uint32_t *)(reg + PAMU_PICS), pics);
+	if (rev1)
+		/* erratum PAMU 3 -- do it twice */
+		out32((uint32_t *)(reg + PAMU_PICS), pics);
 #endif
-
 	return 0;
 }
 
