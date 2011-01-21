@@ -57,9 +57,18 @@ static volatile char evict_buf[48 * 1024];
 static void evict_cache(void)
 {
 	unsigned int i;
+	unsigned int sum = 0;
 
+	/*
+	* Access cache with load type operations. On a load miss in L1, the line
+	* will be loaded in L1. On a store miss in L1, the behavior is different
+	* depending on how the cache is configured. If the cache is configured in
+	* write shadow mode a store miss in L1 will not be imediatelly linefilled
+	* in L1, it is first linefilled in L2 and later on a load miss the line
+	* is filled in L1.
+	*/
 	for(i = 0; i < sizeof(evict_buf); i++)
-		evict_buf[i] = i;
+		sum += evict_buf[i];
 }
 
 static int get_diff(void)
@@ -80,6 +89,10 @@ static void cache_lock_perf_test(void)
 {
 	uint32_t ct = 0;
 	int diff, diff1, i;
+
+	if (mfspr(SPR_L1CSR2) & L1CSR2_DCWS)
+		printf("Cache configured in write shadow mode\n");
+
 
 	arr = valloc(4096, 4096);
 	if (!arr) {
