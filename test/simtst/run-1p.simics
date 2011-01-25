@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,7 +22,16 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-add-directory "%script%/../../../sim/p4080ds/R_PPSXN_0x10/hv-1p-lnx" -prepend
+if ($target == "p4080ds") {
+	add-directory "%script%/../../../sim/p4080ds/R_PPSXN_0x10/hv-1p-lnx" -prepend
+}
+if ($target == "p3041ds") {
+	add-directory "%script%/../../../sim/p3041ds/NR_HXAPNSP_0x36/hv-1p-lnx" -prepend
+}
+if ($target == "p5020ds") {
+	add-directory "%script%/../../../sim/p5020ds/NR_HXAPNSP_0x36/hv-1p-lnx" -prepend
+}
+
 
 # pick up local HV
 add-directory "%script%/../../output/bin" -prepend

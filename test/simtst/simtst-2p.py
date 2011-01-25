@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,12 @@ def test(obj):
 	obj.sendline("ifconfig fm1-gb1 %s" % common.LINUX_FM1GB1_IP)
 	time.sleep(4)
 	obj.sendline("ping -c 4 %s" % common.LINUX_FM1GB1_PING)
-	obj.expect("4 packets transmitted",timeout=60)
-	obj.expect("4 packets received",timeout=10)
+	try:
+		obj.expect("4 packets transmitted",timeout=20)
+		obj.expect("4 packets received",timeout=10)
+	except pexpect.TIMEOUT:
+		#ignore ping for e.g. P3041
+		obj.send(chr(3))
 	obj.sendline("partman status")
 	obj.expect("Partition Name",timeout=10)
 	obj.expect_exact("-lwe",timeout=10)
