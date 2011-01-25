@@ -1,0 +1,82 @@
+# Copyright (C) 2011 Freescale Semiconductor, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+#  NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+#  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+byte-chan,none,2,1,enabled
+cache,A,2,1,disabled
+cache,B,2,1,enabled
+ccf-lae,none,3,2,disabled
+ccf-mint,none,2,1,disabled
+cpc,none,2,1,disabled
+csd,none,3,2,disabled
+device-ranges,none,2,1,enabled
+dma,A,3,2,disabled
+dma,B,3,2,disabled
+elf,none,2,1,enabled
+error-inj,none,2,1,disabled
+error-int,none,2,1,disabled
+error-mgr,A,3,2,disabled
+error-mgr,B,4,3,disabled
+exception,A,2,1,enabled
+failover,defer,3,1,disabled
+failover,no-disable,3,1,disabled
+failover,reconfig-subwins,3,1,disabled
+failover,reconfig,3,1,disabled
+failover,none,3,1,disabled
+fast-doorbell,A,2,1,enabled
+fast-doorbell,B,3,2,enabled
+gdb,A,,,disabled
+gdb,B,,,disabled
+gdb,C,,,disabled
+gdebug,A,2,1,enabled
+gdebug,B,2,1,enabled
+hello,none,2,1,enabled
+ipi,A,2,1,enabled
+ipi,B,3,2,enabled
+ipi,C,3,2,enabled
+ipi,D,2,1,enabled
+linux,2p,3,2,disabled
+linux,1core,2,1,disabled
+linux,1p,2,1,disabled
+linux,e1000,2,1,disabled
+linux,hello,3,2,disabled
+linux,partman,4,3,disabled
+linux,intmap,2,1,disabled
+linux,scsi,2,1,disabled
+mcheck,none,2,1,enabled
+mmu,none,2,1,enabled
+msgsnd,none,2,1,enabled
+nap,none,2,1,disabled
+nmi,none,2,1,disabled
+node-update,none,2,1,enabled
+outoflaws,none,2,1,enabled
+pmr,none,2,1,enabled
+reset,none,,,disabled
+reset-on-stop,none,,,disabled
+reset-status,none,2,1,disabled
+simtst,1p,2,1,enabled
+simtst,2p,6,4,enabled
+simtst,4p,8,7,disabled
+timer,none,2,1,enabled
+vmpic,A,2,1,enabled
+vmpic,B,2,1,enabled
+vmpic,C,2,1,enabled
+watchdog,none,5,2,disabled

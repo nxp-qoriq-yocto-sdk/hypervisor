@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,11 +64,16 @@ time_start = time.time()
 
 testn = 0
 for line in plan:
+	#remove comments
+	comment_index = line.find('#')
+	if comment_index >= 0:
+		line = line[0:comment_index]
 	#format line
 	line = line.rstrip()
+	#get test info
 	test_list = line.split(',')
 	if len(test_list) != 5:
-		print "Error in test plan!"
+		#line is not a test or sytnax is wrong
 		continue
 	testn += 1
 	print "\n===Test %d===\n" % testn
