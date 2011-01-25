@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,12 +34,15 @@ def ssh_command (user, host, password, command):
 	ssh_newkey = 'Are you sure you want to continue connecting'
 	child = pexpect.spawn('ssh -x -l %s %s'%(user, host),logfile=sys.stdout)
 	try:
-		i = child.expect([ssh_newkey, 'password: '])
+		i = child.expect([ssh_newkey, 'password: ', '[$#]'])
 		if i == 0: # SSH does not have the public key. Just accept it.
 			child.sendline ('yes')
 			child.expect('password: ')   
-		child.send(password+"\r")
-		child.expect ('[$#]', timeout = 30)
+			child.send(password+"\r")
+			child.expect ('[$#]', timeout = 30)
+		if i == 1:
+			child.send(password+"\r")
+			child.expect ('[$#]', timeout = 30)
 		for com in command:
 			child.send(com+"\r")
 			idx = child.expect(['password:',pexpect.TIMEOUT],timeout=3)
