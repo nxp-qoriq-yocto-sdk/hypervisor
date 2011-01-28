@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -102,7 +102,13 @@ Running automation on a board
 	boot/hv console
 	other consoles
 
-
+Running with code coverage analysis
+===================================
+ - make sure tools/gcov-extract is compiled
+ - add parameter '-gcov' to the run_plan.py command line as in the following
+   example:
+	./run_plan.py test_plan_p4080ds_hw.txt p4080ds_hw -gcov
+ - run 'gcov *.gcda' in directory output/bin
 
 Final report:
 =============

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,10 +37,12 @@ linux_tests = common.LINUX_TESTS
 cmd_sc = []
 
 
-if len(sys.argv) != 7:
+if len(sys.argv) != 7 and len(sys.argv) != 8:
 	print "Usage"
 	sys.exit(1)
-	
+
+gcov = (len(sys.argv) == 8 and sys.argv[7] == '-gcov')
+
 testname = sys.argv[1]
 
 if sys.argv[2] != 'none':
@@ -61,13 +63,14 @@ else:
 
 cmd_console = "socat -,raw,echo=0 tcp:%s:" % console_server
 
-port_list =""
 cmd_sc = []
 for i in range(consoles):
-	port_list =port_list+" "+str(start_port + i)
 	cmd_sc.append(cmd_console+str(start_port+i))
 
-	
+port_list =""
+for i in range(32):
+	port_list = port_list + " " + str(start_port + i)
+
 #prepare mux and startup commands
 if 'hw' in target:
 	cmd_mux_only = "mux_server -exec \\\"skermit -con %s\\\" " % (common.RMT_BOARD) +port_list
@@ -75,12 +78,12 @@ if 'hw' in target:
 	target_type = "hw"
 else:
 	cmd_mux = "../../tools/mux_server/mux_server localhost:9124"+port_list
-	cmd_sim = "simics -e '$target=%s' ../../test/%s/run%s.simics -e c" % (target,testname,subtestname)
+	cmd_sim = "simics -e '$target=%s' ../../test/%s/run%s.simics -e '$console.con->raw = TRUE' -e c" % (target,testname,subtestname)
 	target_type = "sim"
 	
 print cmd_mux
 print cmd_sc
-
+print cmd_sim
 
 #TODO: use os.path
 log_path = common.LOG_PATH+"%s/" % target
@@ -147,6 +150,13 @@ while stay_in_loop:
 		#print consoles_finished
 	time.sleep(1)
 	
+#extract coverage data
+if gcov:
+	print "Extracting coverage data\n"
+	gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v localhost:%d" % (start_port + 31)
+	print gcov_cmd
+	gcov_child = subprocess.Popen(gcov_cmd, shell=True)
+	gcov_child.communicate()
 
 #cleanup simics
 if "hw" not in target:
