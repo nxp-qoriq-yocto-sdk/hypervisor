@@ -72,6 +72,16 @@
 			guest-addr = <0 0x0>;
 			size = <0 0x20000000>;
 		};
+		dw_dqrr_qportal0: window1 {	// DMA window for stash_dqrr for qman-portal0
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4200000>;
+			size = <0 0x4000>;
+		};
+		dw_dqrr_qportal1: window2 {	// DMA window for stash_dqrr for qman-portal1
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4204000>;
+			size = <0 0x4000>;
+		};
 	};
 
 	// =====================================================
@@ -156,11 +166,6 @@
 		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
-
-		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
-				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
-				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
-				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
 
 		aliases {
 			stdout = <&console1>;
@@ -269,14 +274,15 @@
 			vcpu = <0>;
 
 			stash-mem {
-				liodn-index = <0>;
+				liodn-index = <1>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 			};
+
 			stash-dqrr {
-				liodn-index = <1>;
-				dma-window = <&window0>;
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 				snoop-cpu-only;
@@ -288,15 +294,15 @@
 			vcpu = <1>;
 
 			stash-mem {
-				liodn-index = <0>;
+				liodn-index = <1>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 			};
 
 			stash-dqrr {
-				liodn-index = <1>;
-				dma-window = <&window0>;
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal1>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 				snoop-cpu-only;
@@ -363,6 +369,35 @@
 			device = "/qman-portals/qman-pool@15";
 		};
 
+		// FMAN0 eth1 -- ethernet 1 assigned to this partition
+		dpa-ethernet@1 {
+			device = "/fsl,dpaa/ethernet@1";
+		};
+
+		// FMAN1 eth0 -- ethernet 5 assigned to this partition
+		dpa-ethernet@5 {
+			device = "/fsl,dpaa/ethernet@5";
+
+		};
+		gpio {
+			device = "/soc/gpio";
+		};
+
+		flash {
+			device = "/localbus";
+		};
+
+		fman0 {
+			device = "fman0";
+			dma-window = <&window0>;
+		};
+
+		fman1 {
+			device = "fman1";
+			dma-window = <&window0>;
+		};
+
+
 		p2-linux {
 			compatible = "managed-partition";
 			partition = <&part2>;
@@ -383,11 +418,6 @@
 		cpus = <2 2>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
-
-		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
-				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
-				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
-				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
 
 		aliases {
 			stdout = <&console2>;
@@ -467,10 +497,6 @@
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
-		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
-				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
-				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
-				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
 
 		aliases {
 			stdout = <&console3>;
