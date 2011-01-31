@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,6 +46,11 @@
 			compatible = "dma-window";
 			guest-addr = <0 0x0>;
 			size = <0 0x20000000>;
+		};
+		dw_dqrr_qportal0: window1 {	// DMA window for stash_dqrr for qman-portal0
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4200000>;
+			size = <0 0x4000>;
 		};
 	};
 
@@ -113,11 +118,6 @@
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
-		device-ranges = <0xf 0xf0000000 0x0 0xf0000000 0x0 0x10000000
-				 0xc 0x00000000 0x0 0x80000000 0x0 0x20000000
-				 0xc 0x20000000 0x0 0xa0000000 0x0 0x20000000
-				 0xc 0x40000000 0x0 0xc0000000 0x0 0x20000000>;
-
 		serial2 {
 			device = "serial2";
 		};
@@ -176,15 +176,15 @@
 			vcpu = <0>;
 
 			stash-mem {
-				liodn-index = <0>;
+				liodn-index = <1>;
 				dma-window = <&window0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 			};
 
 			stash-dqrr {
-				liodn-index = <1>;
-				dma-window = <&window0>;
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal0>;
 				operation-mapping = <0>;  // OMI_QMAN
 				stash-dest = <1>;
 				snoop-cpu-only;
@@ -249,6 +249,24 @@
 
 		qman-pool@15 {
 			device = "/qman-portals/qman-pool@15";
+		};
+
+		// FMAN0 eth1 -- ethernet 1 assigned to this partition
+		dpa-ethernet@1 {
+			device = "/fsl,dpaa/ethernet@1";
+		};
+
+		gpio {
+			device = "/soc/gpio";
+		};
+
+		flash {
+			device = "/localbus";
+		};
+
+		fman0 {
+			device = "fman0";
+			dma-window = <&window0>;
 		};
 
 		p1bc: byte-channel {
