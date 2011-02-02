@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -499,7 +499,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 			continue;
 		if ((space << MAS1_TS_SHIFT) != (entry->mas1 & MAS1_TS))
 			continue;
-		if (pid && entrypid && pid != entrypid)
+		if (entrypid && pid != entrypid)
 			continue;
 		if (entryepn > epn)
 			continue;
