@@ -29,11 +29,12 @@
 
 #ifdef CONFIG_LIBOS_64BIT
 #define PHYSBASE 0x420000000
+#define KSTACK_SIZE 2048*4
 #else
+#define KSTACK_SIZE 2048
 #define PHYSBASE 0x20000000
 #endif
 #define BASE_TLB_ENTRY 15
-#define KSTACK_SIZE 2048
 
 #ifndef _ASM
 typedef int client_cpu_t;

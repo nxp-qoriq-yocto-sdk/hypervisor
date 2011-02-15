@@ -29,7 +29,7 @@
 
 #define PHYSBASE 0x20000000
 #define BASE_TLB_ENTRY 15
-#define KSTACK_SIZE 2048
+#define KSTACK_SIZE 8192
 
 #ifndef _ASM
 typedef int client_cpu_t;
