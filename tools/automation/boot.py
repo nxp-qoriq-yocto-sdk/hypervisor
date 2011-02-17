@@ -45,8 +45,8 @@ def hw_boot(obj,testname_s, testname_l):
 	obj.send("setenv unittestdir %s\r" % (common.RMT_TESTDIR+testname_s))	
 	obj.expect_exact("=> ", timeout = 10)
 	obj.send("tftp 100000 $unittestdir/%s.ubs\r" % testname_l)
-	obj.expect_exact("=> ", timeout = 20)
-	obj.send("source 100000\r")	
+	obj.expect_exact("Bytes transferred", timeout = 20)
+	obj.send("source 100000\r")
 
 
 cmd = sys.argv[1] # start command
@@ -78,7 +78,7 @@ try:
 		hw_boot(obj,testnameshort,testnamelong)		
 	obj.expect('Freescale Hypervisor', timeout=120)
 	while 1:
-		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=300)
+		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=900)
 		#display warnings is not consistent, case removed
 		#if index != 0:
 			#print "HV encountered error or warning:\n",obj.before[-30:],obj.after,"\n"

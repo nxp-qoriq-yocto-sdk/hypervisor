@@ -89,7 +89,7 @@ for line in plan:
 		(test_list[0],test_list[1], test_list[2], test_list[3], target, results, gcov)
 		print cmd
 		part_time_start = time.time()
-		child = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		child = subprocess.Popen(cmd, shell=True)
 		child.communicate()
 		print "Test duration:",time.strftime("%H:%M:%S", time.gmtime(time.time()-part_time_start))
 		time.sleep(2)

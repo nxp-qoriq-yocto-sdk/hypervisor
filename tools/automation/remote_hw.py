@@ -65,7 +65,7 @@ cmd_mux = sys.argv[1] #command used to start mux remotely
 child = ssh_command (user, host, password, ['skermit -reset '+common.RMT_BOARD,cmd_mux])
 
 try:
-	child.expect(pexpect.EOF,timeout=330)
+	child.expect(pexpect.EOF,timeout=900)
 except pexpect.TIMEOUT:
 	print "TIMEOUT"
 except KeyboardInterrupt: #cleanup mux connection

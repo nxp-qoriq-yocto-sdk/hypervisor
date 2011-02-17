@@ -83,7 +83,6 @@ else:
 	
 print cmd_mux
 print cmd_sc
-print cmd_sim
 
 #TODO: use os.path
 log_path = common.LOG_PATH+"%s/" % target
@@ -149,14 +148,22 @@ while stay_in_loop:
 		#print consoles_req_finished
 		#print consoles_finished
 	time.sleep(1)
-	
+
+#cleanup consoles
+for i in range(0,consoles):
+	if child[i].poll() == None:
+		os.kill(child[i].pid,signal.SIGTERM)
+
 #extract coverage data
 if gcov:
 	print "Extracting coverage data\n"
-	gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v localhost:%d" % (start_port + 31)
+	if "hw" in target:
+		gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v %s:%d" % (common.RMT_SERVER, start_port + 31)
+	else:
+		gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v localhost:%d" % (start_port + 31)
+
 	print gcov_cmd
-	gcov_child = subprocess.Popen(gcov_cmd, shell=True)
-	gcov_child.communicate()
+	os.system(gcov_cmd)
 
 #cleanup simics
 if "hw" not in target:
@@ -171,12 +178,6 @@ if "hw" not in target:
 
 #cleanup mux server local or remote
 os.kill(child_mux.pid,signal.SIGINT)
-
-#cleanup consoles
-for i in range(0,consoles):
-	if child[i].poll() == None:
-		os.kill(child[i].pid,signal.SIGTERM)
-
 
 #result parser and reporter
 def parseResults(loglist):

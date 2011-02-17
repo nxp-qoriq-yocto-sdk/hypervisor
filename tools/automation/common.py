@@ -24,11 +24,11 @@
 #!/usr/bin/env python
 
 #constants used by automation scripts
-RMT_SERVER = "ofnir.am.freescale.net" 
-RMT_USER = "arailea1"
+RMT_SERVER = "rhuath.am.freescale.net" 
+RMT_USER = "ltudor"
 RMT_PASSWORD = "freescale"
-RMT_TESTDIR = "arailea1/" #dir on server used by tftp
-RMT_BOARD = "grinch"
+RMT_TESTDIR = "ltudor/" #dir on server used by tftp
+RMT_BOARD = "emerald"
 LOG_PATH = "../../output/test32/log/" #console log location
 BIN_PATH = "../../output/test32/"     #test binaries location
 
@@ -41,5 +41,6 @@ LINUX_ETH0_IP = "192.168.170.2"       #ip addr for eth0
 LINUX_ETH0_PING = "192.168.170.1"     #dest ip addr for ping test
 
 #for test simtst
-LINUX_FM1GB1_IP = "192.168.20.2"      #ip addr for fm1gb1
-LINUX_FM1GB1_PING = "192.168.20.1"    #dest ip addr for ping test
+LINUX_FM1GB1_IP = "192.168.1.140"      #ip addr for fm1gb1
+LINUX_FM1GB1_PING = "192.168.1.1"    #dest ip addr for ping test
+
