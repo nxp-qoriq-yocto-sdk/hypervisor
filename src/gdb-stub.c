@@ -104,6 +104,8 @@ static stub_ops_t attr_debug_stub stub_ops = {
 
 void gdb_stub_init(void)
 {
+	uint32_t index;
+
 	gcpu_t *gcpu = get_gcpu();
 	gdb_stub_core_context_t *stub;
 
@@ -159,6 +161,8 @@ void gdb_stub_init(void)
 	stub->breakpoint_table = alloc_type_num(breakpoint_t,
 	                                        MAX_BREAKPOINT_COUNT);
 	CHECK_MEM (stub->breakpoint_table);
+	for (index = 0; index < MAX_BREAKPOINT_COUNT; index++)
+		stub->breakpoint_table[index].addr = (uint32_t *) -1;
 
 	gcpu->dbgstub_cpu_data = stub;
 
@@ -1167,6 +1171,8 @@ static void delete_breakpoint(breakpoint_t *breakpoint_table, breakpoint_t *brea
 		guestmem_icache_block_sync((char *)breakpoint->addr);
 		memset(breakpoint, 0, sizeof(breakpoint_table[0]));
 		DEBUG("Cleared all data in entry with memset.");
+		breakpoint->addr = (uint32_t *) -1;
+		DEBUG("Set address field in entry to -1.");
 	}
 }
 
