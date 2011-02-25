@@ -1762,10 +1762,9 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 	guest_t *guest = get_gcpu()->guest;
 
 	if (secondary) {
-		ppage = entry >> PAGE_SHIFT;
-		tsize = pages_to_tsize(1);
-		size = PAGE_SIZE;
-		pages = 1;
+		tsize = TLB_TSIZE_1M;
+		size = 1 << 20;
+		pages = size >> PAGE_SHIFT;
 	} else {
 		dt_prop_t *prop;
 
