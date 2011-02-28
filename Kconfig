@@ -78,11 +78,11 @@ config GCC_CPU_FLAG
 
 config P4080_ERRATUM_CPU20
 	bool
-	default y
+	default y if !LIBOS_64BIT
 
 config P4080_ERRATUM_PAMU3
 	bool
-	default y
+	default y if !LIBOS_64BIT
 
 config BYTE_CHAN
 	bool "Byte-channel support"
