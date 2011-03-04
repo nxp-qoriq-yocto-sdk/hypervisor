@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,5 +25,8 @@
 
 xterm -e "${CROSS_COMPILE}gdb -x gdb0" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb1" &
+if [ $TARGET -ne `p5020ds` ]
+then
 xterm -e "${CROSS_COMPILE}gdb -x gdb2" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb3" &
+fi

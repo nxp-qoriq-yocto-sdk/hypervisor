@@ -39,14 +39,14 @@ Building the hypervisor
           o make defconfig
           o make
     * to build the tests
-          o make test
+          o make test TARGET=<platform>; e.g. p4080ds
     * to build a specific test "foo"
-          o make test-foo
+          o make test-foo TARGET=<platform>
     * to run a specific test "foo" in simics
-          o make test-foo-run
+          o make test-foo-run TARGET=<platform>
     * Some tests have multiple variants.
       To run a specific test variant "bar" in simics:
-          o make test-foo-run-bar
+          o make test-foo-run-bar TARGET=<platform>
 
 ----------------------------------------------------------
 Source tree directory structure

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,8 +43,11 @@ else
 SUBMAKES = $(wildcard $(testdir)*/Makefile)
 SUBDIRS = $(SUBMAKES:$(testdir)%/Makefile=%)
 
-.PHONY: all $(SUBDIRS)
-all: $(SUBDIRS)
+.PHONY: replace all $(SUBDIRS)
+all: replace $(SUBDIRS)
+
+replace : 
+	@for f in `find $(testdir) -name "*_$(TARGET).dts"`; do cp -v $$f $${f%_$(TARGET).dts}.dts; done
 
 include include/config/auto.conf
 
@@ -76,6 +79,9 @@ CC_OPTS_C = -fno-strict-aliasing -fno-common -O2 -g3 \
             -mno-altivec -funit-at-a-time \
 
 include $(SUBMAKES)
+
+#bash -c "for i in $(testdir)*/*_$(TARGET).dts ; do cp $dir/$$i $dir/$${i%_$(TARGET).dts}.dts ; done"
+
 
 #HDRS := $(shell cd $(testdir); find . -name '*.h')
 

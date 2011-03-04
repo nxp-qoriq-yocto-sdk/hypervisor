@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,6 +22,6 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 target remote :9005
-symbol-file ../../output/test/bin/gdb/gdb-whoami
+symbol-file ../../output/test32/bin/gdb/gdb-whoami
 hbreak debug_code
 c

@@ -1,6 +1,6 @@
 
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ define mount
 	$(V)mkdir -p bin/linux/$(1)
 	$(V)gunzip < $(testdir)../../images/rootfs.ext2.gz > bin/linux/$(1).ext2
         $(V)/sbin/e2fsck bin/linux/$(1).ext2
-        $(V)/sbin/resize2fs bin/linux/$(1).ext2 131072
+        $(V)/sbin/resize2fs bin/linux/$(1).ext2 $(2)
 	$(V)sudo mount -t ext2 -o rw,loop bin/linux/$(1).ext2 bin/linux/$(1)
 endef
 
@@ -72,16 +72,17 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)
 # We want partman on the managed partition, so that we can send and listen
 # for doorbells.  We want shmem on the managed partition, so that we can read
 # and write the shared memory buffers.
-	$(call mount,rootfs)
+	$(call mount,rootfs,115000)
 	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs/bin/
 	$(call unmount,bin/linux/rootfs)
-	$(call mount,rootfs-partman)
+	$(call mount,rootfs-partman,131072)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
+	sudo rm -rf bin/linux/rootfs-partman/opt/*
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
-	sudo cp -af $(testdir)linux/partman-start.sh bin/linux/rootfs-partman/start.sh
+	sudo cp -af $(testdir)linux/partman-start_$(TARGET).sh bin/linux/rootfs-partman/start.sh
 	$(call unmount,bin/linux/rootfs-partman)
 
 bin/$(test)/rootfs-hello.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.ext2.gz

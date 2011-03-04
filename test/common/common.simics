@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009,2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,16 @@ $kernel_cmdline = "config-addr=0xfe8900000"
 if not defined silicon_rev   {$silicon_rev = "rev2"}
 
 if ($target == "p4080ds") {
-	$rcw_image = rcw_0x10_13g_rev2.bin
+	$rcw_image = rcw_0x10_13g_rev2_high.bin
 	add-directory "%script%/../../../images/boot/p4080ds/R_PPSXN_0x10" -prepend
+}
+if ($target == "p3041ds") {
+	$rcw_image = rcw_0x36_12g.bin
+	add-directory "%script%/../../../images/boot/p3041ds/NR_HXAPNSP_0x36" -prepend
+}
+if ($target == "p5020ds") {
+	$rcw_image = rcw_0x36_12g.bin
+	add-directory "%script%/../../../images/boot/p5020ds/NR_HXAPNSP_0x36" -prepend
 }
 
 add-directory "%script%/../../../sim" -prepend

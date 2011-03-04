@@ -1,0 +1,189 @@
+/*
+ * Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x2000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x2000000>;
+			size = <0 0x2000000>;
+		};
+
+		pma2: pma2 {
+			compatible = "phys-mem-area";
+			addr = <0x0 0x4000000>;
+			size = <0x0 0x2000000>;
+		};
+
+		pma3: pma3 {
+			compatible = "phys-mem-area";
+			addr = <0x0 0x6000000>;
+			size = <0x0 0x2000000>;
+		};
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+		sysreset-on-partition-stop;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		uart0: serial0 {
+			device = "serial0";
+		};
+
+		serial1: serial1 {
+			device = "serial1";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
+		ddr1 {
+			device = "/soc/memory-controller@8000";
+		};
+
+		ddr2 {
+			device = "/soc/memory-controller@9000";
+		};
+	};
+
+	// =====================================================
+	// Global objects
+	// =====================================================
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
+	// =====================================================
+	// Partition 1 - has been removed on P5020
+	// =====================================================
+
+
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2 {
+		compatible = "partition";
+		cpus = <0 1>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
+		};
+
+		p2bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
+		};
+
+		slave-part {
+			compatible = "managed-partition";
+			partition = <&slave>;
+		};
+
+		aliases {
+			stdout = <&p2bc>;
+		};
+	};
+
+	// =====================================================
+	// Partition 3
+	// =====================================================
+	slave: part3 {
+		compatible = "partition";
+		cpus = <1 1>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+		no-auto-start;
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma3>;
+			guest-addr = <0 0>;
+		};
+
+		p3bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <3>;
+		};
+
+		aliases {
+			stdout = <&p3bc>;
+		};
+	};
+};

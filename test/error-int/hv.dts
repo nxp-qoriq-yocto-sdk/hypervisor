@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -90,14 +90,14 @@
 		pma0: pma0 {
 			compatible = "phys-mem-area";
 			addr = <0 0>;
-			size = <0 0x2000000>;
+			size = <0 0x20000000>;
 			allocate-cpc-ways = <0 1 2 3 4 5 6 7 8>;
 		};
 
 		pma1: pma1 {
 			compatible = "phys-mem-area";
-			addr = <0 0x2000000>;
-			size = <0 0x2000000>;
+			addr = <0 0x20000000>;
+			size = <0 0x20000000>;
 			allocate-cpc-ways = <9 10 11 12 13 14 15 16>;
 		};
 	};

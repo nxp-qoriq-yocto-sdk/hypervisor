@@ -1,0 +1,319 @@
+/*
+ * Copyright (C) 2009,2011 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0 {
+		compatible = "phys-mem-area";
+		addr = <0 0x00000000>;
+		size = <0 0x20000000>;  // 512 MiB
+	};
+
+	pma1 {
+		compatible = "phys-mem-area";
+		addr = <0 0x20000000>;
+		size = <0 0x20000000>;  // 512 MiB
+	};
+
+	window0 {
+		compatible = "dma-window";
+		guest-addr = <0 0>;
+		size = <0 0x20000000>;
+	};
+
+	pcie-window {
+		compatible = "dma-window";
+		subwindow-count = <2>;
+		guest-addr = <0 0>;
+		size = <0 0x40000000>; // 1GiB
+
+		sub-window@0 {
+			compatible = "dma-subwindow";
+			guest-addr = <0 0>;
+			size = <0 0x20000000>; // 512 MiB
+		};
+
+		sub-window@1 {
+			compatible = "dma-subwindow";
+			guest-addr = <0 0x20000000>;
+			size = <0 0x20000000>; // 512 MiB
+			pcie-msi-subwindow;
+		};
+
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&{/pma0}>;
+		};
+
+		serial0: serial0 {
+			device = "serial0";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+
+		// Byte channel used as hypervisor's console
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+	};
+
+	// uartmux
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&serial0>;
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		label = "p1-linux";
+		cpus = <0 2>;
+
+		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
+		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x02800000>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+		no-dma-disable;
+
+		// Byte channel used for stdout interface attached to mux-channel 1
+		p1bc: byte-channel@0 {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		pci0 {
+			device = "pci0";
+			map-ranges;
+			dma-window = <&{/pcie-window}>;
+		};
+
+		msi0 {
+			device = "msi0";
+		};
+
+		msi1 {
+			device = "msi1";
+		};
+
+		msi2 {
+			device = "msi2";
+		};
+
+		pci2 {
+			device = "pci2";
+			map-ranges;
+			dma-window = <&{/pcie-window}>;
+		};
+
+		qman {
+			device = "qman";
+			dma-window = <&{/window0}>;
+		};
+
+		bman {
+			device = "bman";
+			dma-window = <&{/window0}>;
+		};
+
+		bman-portalA {
+			device = "/bman-portals/bman-portal@0";
+			vcpu = <0>;
+		};
+
+		bman-portalB {
+			device = "/bman-portals/bman-portal@4000";
+			vcpu = <1>;
+		};
+
+		buffer-pool@0 {
+			device = "/bman-portals/buffer-pool@0";
+		};
+
+		portal-devices {
+			fman0 {
+				device = "fman0";
+				dma-window = <&{/window0}>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&{/window0}>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&{/window0}>;
+			};
+		};
+
+		qman-portalA {
+			device = "/qman-portals/qman-portal@0";
+			vcpu = <0>;
+
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&{/window0}>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&{/window0}>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+				snoop-cpu-only;
+			};
+		};
+
+		qman-portalB {
+			device = "/qman-portals/qman-portal@4000";
+			vcpu = <1>;
+
+			stash-mem {
+				liodn-index = <0>;
+				dma-window = <&{/window0}>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+			};
+
+			stash-dqrr {
+				liodn-index = <1>;
+				dma-window = <&{/window0}>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <1>;
+				snoop-cpu-only;
+			};
+		};
+
+		qman-pool@1 {
+			device = "/qman-portals/qman-pool@1";
+		};
+
+		qman-pool@2 {
+			device = "/qman-portals/qman-pool@2";
+		};
+
+		qman-pool@3 {
+			device = "/qman-portals/qman-pool@3";
+		};
+
+		qman-pool@4 {
+			device = "/qman-portals/qman-pool@4";
+		};
+
+		qman-pool@5 {
+			device = "/qman-portals/qman-pool@5";
+		};
+
+		qman-pool@6 {
+			device = "/qman-portals/qman-pool@6";
+		};
+
+		qman-pool@7 {
+			device = "/qman-portals/qman-pool@7";
+		};
+
+		qman-pool@8 {
+			device = "/qman-portals/qman-pool@8";
+		};
+
+		qman-pool@9 {
+			device = "/qman-portals/qman-pool@9";
+		};
+
+		qman-pool@10 {
+			device = "/qman-portals/qman-pool@10";
+		};
+
+		qman-pool@11 {
+			device = "/qman-portals/qman-pool@11";
+		};
+
+		qman-pool@12 {
+			device = "/qman-portals/qman-pool@12";
+		};
+
+		qman-pool@13 {
+			device = "/qman-portals/qman-pool@13";
+		};
+
+		qman-pool@14 {
+			device = "/qman-portals/qman-pool@14";
+		};
+
+		qman-pool@15 {
+			device = "/qman-portals/qman-pool@15";
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&{/pma1}>;
+			guest-addr = <0 0>;
+		};
+
+		aliases {
+			stdout = <&p1bc>;
+		};
+	};
+};
