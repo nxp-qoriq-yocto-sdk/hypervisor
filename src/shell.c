@@ -200,7 +200,11 @@ shell_cmd(help);
 
 static void version_fn(shell_t *shell, char *args)
 {
+#ifdef CONFIG_LIBOS_64BIT
+	printf("Freescale Embedded Hypervisor version %s ppc64\n", CONFIG_HV_VERSION);
+#else
 	printf("Freescale Embedded Hypervisor version %s\n", CONFIG_HV_VERSION);
+#endif
 }
 
 static command_t version = {

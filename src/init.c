@@ -962,7 +962,11 @@ void libos_client_entry(unsigned long treephys)
 	sched_core_init(cpu);
 
 	printf("=======================================\n");
+#ifdef CONFIG_LIBOS_64BIT
+	printf("Freescale Hypervisor %s ppc64\n", CONFIG_HV_VERSION);
+#else
 	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
+#endif
 
 	cpu->client.next_dyn_tlbe = DYN_TLB_START;
 
