@@ -73,7 +73,7 @@ void ext_int_handler(trapframe_t *frameptr)
 		printf("Unexpected extint %u\n", vector);
 	}
 
-	out32(((uint32_t *)((uint32_t)addr + MPIC_EOI)), 0);
+	out32(((uint32_t *)((uintptr_t)addr + MPIC_EOI)), 0);
 }
 
 static void dump_dev_tree(void)

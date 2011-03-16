@@ -246,7 +246,7 @@ static int find_next_mapped_memory(uint32_t *begin, uint32_t *end)
 
 	for (; i < max_subw; i++) {
 		if (win_map[i].start < win_map[i].end &&
-		    win_map[i].start >= (uint32_t)&_end - PHYSBASE) {
+		    win_map[i].start >= (uintptr_t)&_end - PHYSBASE) {
 			*begin = win_map[i].start;
 			*end = win_map[i].end;
 			i++;
