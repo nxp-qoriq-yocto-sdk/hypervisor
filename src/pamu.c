@@ -482,12 +482,16 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			continue;
 		}
 
-		if (!dt_get_prop(node, "pcie-msi-subwindow", 0)) {
+		if (dt_get_prop(node, "pcie-msi-subwindow", 0)) {
+			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
+				gnode, gaddr, &size);
+
+		} else if (dt_get_prop(node, "srio-ccsr-subwindow", 0)) {
+			rpn = gaddr >> PAGE_SHIFT;
+		}
+		else {
 			rpn = get_rpn(guest, gaddr >> PAGE_SHIFT,
 				size >> PAGE_SHIFT);
-		} else {
-			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
-					gnode, gaddr, &size);
 		}
 		if (rpn == ULONG_MAX)
 			continue;
