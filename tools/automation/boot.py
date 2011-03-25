@@ -78,7 +78,7 @@ try:
 		hw_boot(obj,testnameshort,testnamelong)		
 	obj.expect('Freescale Hypervisor', timeout=120)
 	while 1:
-		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=900)
+		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=300)
 		#display warnings is not consistent, case removed
 		#if index != 0:
 			#print "HV encountered error or warning:\n",obj.before[-30:],obj.after,"\n"

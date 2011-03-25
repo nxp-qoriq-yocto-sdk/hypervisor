@@ -56,11 +56,11 @@ ipi,D,2,1,enabled
 linux,2p,3,2,enabled
 linux,1core,2,1,enabled
 linux,1p,2,1,disabled
-linux,e1000,2,1,disabled
-linux,hello,3,2,disabled
+linux,e1000,2,1,enabled
+linux,hello,3,2,enabled
 linux,partman,4,3,disabled
 linux,intmap,2,1,disabled
-linux,scsi,2,1,disabled
+linux,scsi,2,1,enabled
 mcheck,none,2,1,enabled
 mmu,none,2,1,enabled
 msgsnd,none,2,1,enabled

@@ -34,8 +34,14 @@ import csv
 import glob
 import re
 
+
+if len(sys.argv) > 1:
+	redirect = sys.argv[1]
+	outFile = open(redirect,'w')
+	sys.stdout = outFile
+
 res_list = glob.glob("*_results.txt")
-print "\n\nUsing files: %s\n\n" % " ".join(res_list)
+#print "\n\nUsing files: %s\n\n" % " ".join(res_list)
 
 
 full_res = {}

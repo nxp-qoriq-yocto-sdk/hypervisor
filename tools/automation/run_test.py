@@ -37,11 +37,10 @@ linux_tests = common.LINUX_TESTS
 cmd_sc = []
 
 
-if len(sys.argv) != 7 and len(sys.argv) != 8:
+if len(sys.argv) < 7:
 	print "Usage"
 	sys.exit(1)
 
-gcov = (len(sys.argv) == 8 and sys.argv[7] == '-gcov')
 
 testname = sys.argv[1]
 
@@ -81,8 +80,8 @@ else:
 	cmd_sim = "simics -e '$target=%s' ../../test/%s/run%s.simics -e '$console.con->raw = TRUE' -e c" % (target,testname,subtestname)
 	target_type = "sim"
 	
-print cmd_mux
-print cmd_sc
+#print cmd_mux
+#print cmd_sc
 
 #TODO: use os.path
 log_path = common.LOG_PATH+"%s/" % target
@@ -112,7 +111,7 @@ specials = "../../test/%s/%s.py" %(testname,testname+subtestname) #special funct
 
 #start console 0 (boot and HV)
 tmp_call_cmd = "python boot.py \"%s\" %s %s %s %s" % (cmd_sc[0],logfiles[0],testname,testname+subtestname,target_type)
-print tmp_call_cmd
+#print tmp_call_cmd
 child[0] = subprocess.Popen(tmp_call_cmd, shell=True, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 
 
@@ -155,15 +154,19 @@ for i in range(0,consoles):
 		os.kill(child[i].pid,signal.SIGTERM)
 
 #extract coverage data
-if gcov:
+if common.ENABLE_COVERAGE:
 	print "Extracting coverage data\n"
 	if "hw" in target:
 		gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v %s:%d" % (common.RMT_SERVER, start_port + 31)
 	else:
 		gcov_cmd = "../gcov-extract/gcov-extract --host-libgcov-version=401p -v localhost:%d" % (start_port + 31)
 
-	print gcov_cmd
+	#print gcov_cmd
+	lcov_reset_cmd = "lcov --zerocounters -d ../../output/bin --gcov-tool powerpc-linux-gnu-gcov"
+	lcov_extract_cmd = "lcov -c -d ../../output/bin/ --gcov-tool powerpc-linux-gnu-gcov -o %s_%s.info -t %s_%s" % (testname+subtestname, target, testname+subtestname, target)
+	os.system(lcov_reset_cmd)
 	os.system(gcov_cmd)
+	os.system(lcov_extract_cmd)
 
 #cleanup simics
 if "hw" not in target:
@@ -204,4 +207,5 @@ def parseResults(loglist):
 resultsfile = file(results,'a')
 res,passed,failed,timeout = parseResults(logfiles)
 resultsfile.write("%s,%s,%d,%d,%d\n" % (testname+subtestname,res,passed,failed,timeout))
+print "Result = ",res
 resultsfile.flush()

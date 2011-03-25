@@ -35,6 +35,7 @@ BIN_PATH = "../../output/test32/"     #test binaries location
 
 START_PORT = 23400
 LINUX_TESTS = ["linux","simtst"]      #identify linux tests
+ENABLE_COVERAGE = False
 
 #for test linux-e1000
 LINUX_ETH0_IP = "192.168.170.2"       #ip addr for eth0

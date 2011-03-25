@@ -48,7 +48,7 @@ def ssh_command (user, host, password, command):
 			idx = child.expect(['password:',pexpect.TIMEOUT],timeout=3)
 			if idx == 0:
 				child.send(password+"\r")
-			time.sleep(10)
+			time.sleep(4) #4 works better if boot delay is short
 	except pexpect.TIMEOUT:
 		print 'ERROR!'
 		print 'SSH could not login. Here is what SSH said:'

@@ -34,34 +34,31 @@ import imp
 import pexpect
 import signal
 
-if (len(sys.argv) != 3 and len(sys.argv) != 4) or (len(sys.argv) == 4 and sys.argv[3] != "-gcov"):
-	print "Usage: %s <test_plan_file> <target> [-gcov]\n" % sys.argv[0]
-	print "(valid targets: p4080ds, p3041ds, p5020ds, p4080ds_hw)\n"
+if (len(sys.argv) < 3):
+	print "Usage: %s <test_plan_file> <target> [nocleanup]\n" % sys.argv[0]
+	print "(valid targets: p4080ds, p3041ds, p5020ds, p4080ds_hw)"
+	print "(nocleanup: will not erase log folder and results)\n"
 	sys.exit(1)
 
 test_plan = sys.argv[1]
 target = sys.argv[2]
 plan = file(test_plan,'r')
 
-# Check if we're running with gcov enabled
-if len(sys.argv) == 4 and sys.argv[3] == "-gcov":
-	gcov = "-gcov"
-	print "GCOV code coverage analysis enabled\n"
-else:
-	gcov = ""
-
 #create log dir
 log_dir = common.LOG_PATH+"%s/" % target
-if os.path.exists(log_dir):
-	shutil.rmtree(log_dir)
-os.makedirs(log_dir)
 
+#start a clean session
+if "nocleanup" not in sys.argv:
+	if os.path.exists(log_dir):
+		shutil.rmtree(log_dir)
+	os.makedirs(log_dir)
+	results = target+"_results.txt"
+	resultsp = file(results,'w')
+	resultsp.write("Test Name,Result,Passes,Fails,Timeouts\n")
+else:
+	results = target+"_results.txt"
+	resultsp = file(results,'a')
 
-
-
-results = target+"_results.txt"
-resultsp = file(results,'w')
-resultsp.write("Test Name,Result,Passes,Fails,Timeouts\n")
 resultsp.close()
 
 #start timer
@@ -85,8 +82,8 @@ for line in plan:
 	print "\n===Test %d===\n" % testn
 	print test_list[0],"-",test_list[1],":",test_list[4]
 	if test_list[4] == 'enabled':
-		cmd = "python run_test.py %s %s %s %s %s %s %s" % \
-		(test_list[0],test_list[1], test_list[2], test_list[3], target, results, gcov)
+		cmd = "python run_test.py %s %s %s %s %s %s" % \
+		(test_list[0],test_list[1], test_list[2], test_list[3], target, results)
 		print cmd
 		part_time_start = time.time()
 		child = subprocess.Popen(cmd, shell=True)
