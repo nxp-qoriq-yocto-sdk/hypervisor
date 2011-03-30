@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -688,40 +688,6 @@ int patch_guest_intmaps(dev_owner_t *owner)
 	return ret;
 }
 
-typedef struct {
-	unsigned int cpu;
-	dt_node_t *node;
-} cpu_to_node_t;
-
-static int do_cpu_to_node(dt_node_t *node, void *arg)
-{
-	cpu_to_node_t *ctx = arg;
-	dt_prop_t *prop;
-
-	prop = dt_get_prop_len(node, "reg", sizeof(uint32_t));
-	if (prop)
-		if ((* ((uint32_t *) (prop->data))) == ctx->cpu) {
-			ctx->node = node;
-			return 1;
-		}
-
-	return 0;
-}
-
-/**
- * cpu_to_node - return the HW node that corresponds to the given cpu number
- * @param[in] pcpu the physical CPU number
- */
-static dt_node_t *cpu_to_node(unsigned int pcpu)
-{
-	cpu_to_node_t ctx = { .cpu = pcpu };
-	dt_node_t *node = dt_get_subnode(hw_devtree, "cpus", 0);
-
-	dt_for_each_prop_value(node, "device_type", "cpu", sizeof("cpu"),
-			       do_cpu_to_node, &ctx);
-
-	return ctx.node;
-}
 
 /**
  * configure_portal - configure the vcpu property of a Qman or Bman portal node
@@ -760,7 +726,7 @@ static int configure_qman_portal(guest_t *guest, dt_node_t *cfgnode,
 	}
 
 	// Get the corresponding CPU node in the HW tree
-	dt_node_t *cpunode = cpu_to_node(pcpu);
+	dt_node_t *cpunode = get_cpu_node(hw_devtree,pcpu);
 	if (!cpunode) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: cpu %u does not exist\n", __func__, pcpu);
