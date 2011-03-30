@@ -1,4 +1,5 @@
-# Copyright (C) 2011 Freescale Semiconductor, Inc.
+#
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -20,8 +21,25 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-setenv filesize; tftp 100000 $unittestdir/watchdog; erase 0xe8a00000 +$filesize; cp.b 100000 0xe8a00000 $filesize 
-setenv filesize; tftp 100000 $unittestdir/hv.dtb; erase 0xe8900000 +$filesize; cp.b 100000 0xe8900000 $filesize
-setenv bootcmd bootm e8700000 - e8800000
-setenv bootargs config-addr=0xfe8900000
-boot
+
+$use_uart0 = 0
+$use_uart0_net = 1
+
+$guest_image[0] = "watchdog"
+$guest_addr[0]  = 0x00a00000
+
+
+$guest_image[1] = "hv-B.dtb"
+$guest_addr[1]  = 0x00900000
+
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
+add-directory "bin/watchdog" -prepend
+
+run-command-file "boot.simics"
+
+foreach $cpu in ($system.soc.cpu) {
+        $cpu->timebase_mode = stall
+}
+

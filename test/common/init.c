@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -386,6 +386,21 @@ static int get_stdout(void)
 		return ERR_BADTREE;
 
 	return node;
+}
+
+const char *get_bootargs(void)
+{
+	int offset, len;
+	const char *str;
+
+	offset = fdt_subnode_offset(fdt, 0, "chosen");
+	if (offset  < 0)
+		return NULL;
+	str = fdt_getprop_w(fdt, offset, "bootargs", &len);
+	if (!str || len == 0 || str[len - 1] != '\0')
+		return NULL;
+
+	return str;
 }
 
 phys_addr_t uart_addr;

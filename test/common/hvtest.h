@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,6 +62,7 @@ int dt_get_reg(const void *tree, int node, int res,
                phys_addr_t *addr, phys_addr_t *size);
 
 struct chardev *test_init_uart(int node);
+const char *get_bootargs(void);
 int get_vmpic_irq(int node, int irq);
 int set_vmpic_irq_priority(int handle, int prio);
 int init_error_queues(void);

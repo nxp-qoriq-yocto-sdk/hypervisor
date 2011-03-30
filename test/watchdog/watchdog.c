@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ void watchdog_handler(trapframe_t *frameptr)
 
 void ext_int_handler(trapframe_t *frameptr)
 {
-	unsigned int irq, status, ret;
+	unsigned int irq;
 	int i, found = 0;
 
 	if (coreint)
@@ -224,9 +224,9 @@ static int test5(void)
 	return (mfspr(SPR_TSR) & TSR_WRS) == 0;
 }
 
-static int test6_master(void)
+static int get_dbell_handles(void)
 {
-	int ret, node, len, i;
+	int node, len;
 	const uint32_t *phandle;
 
 	/* Iterate managed partitions and store partition handles, 
@@ -253,16 +253,6 @@ static int test6_master(void)
 			printf("Error retrieving 'fsl,hv-state-change-doorbell'\n");
 			return 0;
 		}
-		ret = ev_int_set_config(*phandle, 1, 15, 0);
-		if (ret) {
-			printf("ev_int_set_config failed %d\n", ret);
-			return 0;
-		}
-		ret = ev_int_set_mask(*phandle, 0);
-		if (ret) {
-			printf("ev_int_set_config failed %d\n", ret);
-			return 0;
-		}
 		state_dbells[num_parts] = *phandle;
 
 		// Get 'watchdog expiration doorbell' irq
@@ -271,19 +261,9 @@ static int test6_master(void)
 			printf("Error retrieving 'fsl,hv-watchdog-expiration-doorbell'\n");
 			return 0;
 		}
-		ret = ev_int_set_config(*phandle, 1, 15, 0);
-		if (ret) {
-			printf("ev_int_set_config failed %d\n", ret);
-			return 0;
-		}
-		ret = ev_int_set_mask(*phandle, 0);
-		if (ret) {
-			printf("ev_int_set_config failed %d\n", ret);
-			return 0;
-		}
 		wd_dbells[num_parts] = *phandle;
 
-		printf("partition %d reg: %d state-change-irq: %d watchdog-irq: %d\n",
+		printf("\tpartition #%d: reg = %d state-change-irq = %d watchdog-irq = %d\n",
 		       num_parts, parts[num_parts], state_dbells[num_parts],wd_dbells[num_parts]);
 
 		num_parts++;
@@ -291,7 +271,55 @@ static int test6_master(void)
 		node = fdt_node_offset_by_compatible(fdt, node, "fsl,hv-partition-handle");
 	}
 
+	return -1;
+}
+
+static int config_dbell_ints(void)
+{
+	int ret, i;
+
+	for (i = 0; i < num_parts; i++) {
+		ret = ev_int_set_config(state_dbells[i], 1, 15, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		ret = ev_int_set_mask(state_dbells[i], 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+
+		ret = ev_int_set_config(wd_dbells[i], 1, 15, 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+		ret = ev_int_set_mask(wd_dbells[i], 0);
+		if (ret) {
+			printf("ev_int_set_config failed %d\n", ret);
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+static int test6_master(void)
+{
 	int wd_restart = 0, wd_notify = 0, wd_stop = 0;
+	int i, ret;
+	const char *bootargs;
+
+	bootargs = get_bootargs();
+	printf("> [master partition] scenario '%s'\n", bootargs);
+
+	if (!get_dbell_handles())
+		return 0;
+
+	if (!config_dbell_ints())
+		return 0;
+
 	printf("> [master partition] start slave partitions, wait for watchdog events:\n");
 
 	// Start partitions one by one and wait for watchdog events
@@ -338,7 +366,7 @@ static int test6_master(void)
 			}
 			// Check for partition stop (state change from RUNNING to STOPPED)
 			if (status == FH_PARTITION_STOPPED) {
-				printf("\tpartition %d (reg=%d) watchdog stop\n", i, parts[i]);
+				printf("\tpartition #%d: (reg=%d) watchdog stop\n", i, parts[i]);
 				wd_stop++;
 			}
 		}
@@ -346,8 +374,16 @@ static int test6_master(void)
 	disable_extint();
 	printf("> [master partition] test6: ");
 
-	// Test is passed if each possible watchdog event triggered once
-	return (wd_restart == 1 && wd_notify == 1 && wd_stop == 1);
+	ret = 0;
+	if (wd_restart == 1 && !strcmp(bootargs, "partition-reset"))
+		ret++;
+	if (wd_notify == 1 && !strcmp(bootargs, "manager-notify"))
+		ret++;
+	if (wd_stop == 1 && !strcmp(bootargs, "partition-stop"))
+		ret++;
+
+	// Test is passed if one and only one watchdog event type happened
+	return ret == 1;
 }
 
 static int test6_slave(void)

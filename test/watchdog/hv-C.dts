@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -99,18 +99,6 @@
 			addr = <0 0x4000000>;
 			size = <0 0x2000000>;
 		};
-
-		pma3: pma3 {
-			compatible = "phys-mem-area";
-			addr = <0 0x6000000>;
-			size = <0 0x2000000>;
-		};
-
-		pma4: pma4 {
-			compatible = "phys-mem-area";
-			addr = <0 0x80000000>;
-			size = <0 0x2000000>;
-		};
 	};
 
 	uartmux: uartmux {
@@ -148,14 +136,10 @@
 			partition = <&part2>;
 		};
 
-		part3 {
-			compatible = "managed-partition";
-			partition = <&part3>;
-		};
-
-		part4 {
-			compatible = "managed-partition";
-			partition = <&part4>;
+		node-update {
+			chosen {
+				bootargs = "partition-stop";
+			};
 		};
 	};
 
@@ -165,66 +149,6 @@
 	part2: part2 {
 		compatible = "partition";
 		cpus = <1 1>;
-		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
-		dtb-window = <0 0x01000000 0 0x10000>;
-
-		no-auto-start;
-
-		watchdog-timeout = "partition-reset";
-
-		p2bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <2>;
-		};
-
-		aliases {
-			stdout = <&p2bc>;
-		};
-
-		gpma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma2>;
-			guest-addr = <0 0>;
-		};
-	};
-
-	// =====================================================
-	// Partition 3
-	// =====================================================
-	part3: part3 {
-		compatible = "partition";
-		cpus = <2 1>;
-		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
-		dtb-window = <0 0x01000000 0 0x10000>;
-
-		no-auto-start;
-
-		watchdog-timeout = "manager-notify";
-
-		p3bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <3>;
-		};
-
-		aliases {
-			stdout = <&p3bc>;
-		};
-
-		gpma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma3>;
-			guest-addr = <0 0>;
-		};
-	};
-
-	// =====================================================
-	// Partition 4
-	// =====================================================
-	part4: part4 {
-		compatible = "partition";
-		cpus = <3 1>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 
@@ -244,12 +168,9 @@
 
 		gpma {
 			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma4>;
+			phys-mem = <&pma2>;
 			guest-addr = <0 0>;
 		};
-	};
-
-	chosen {
 	};
 };
 

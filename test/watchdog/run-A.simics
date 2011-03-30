@@ -22,9 +22,24 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-test := watchdog
-dir := $(testdir)$(test)/
+$use_uart0 = 0
+$use_uart0_net = 1
 
-$(test)-num-terms := 3
+$guest_image[0] = "watchdog"
+$guest_addr[0]  = 0x00a00000
 
-include $(testdir)common/Makefile.inc
+
+$guest_image[1] = "hv-A.dtb"
+$guest_addr[1]  = 0x00900000
+
+add-directory "%script%/../common" -prepend
+run-command-file "common.simics"
+
+add-directory "bin/watchdog" -prepend
+
+run-command-file "boot.simics"
+
+foreach $cpu in ($system.soc.cpu) {
+        $cpu->timebase_mode = stall
+}
+

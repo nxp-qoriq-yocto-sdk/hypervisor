@@ -1,5 +1,4 @@
-#
-# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+# Copyright (C) 2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -21,10 +20,8 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
-test := watchdog
-dir := $(testdir)$(test)/
-
-$(test)-num-terms := 3
-
-include $(testdir)common/Makefile.inc
+setenv filesize; tftp 100000 $unittestdir/watchdog; erase 0xe8a00000 +$filesize; cp.b 100000 0xe8a00000 $filesize 
+setenv filesize; tftp 100000 $unittestdir/hv-B.dtb; erase 0xe8900000 +$filesize; cp.b 100000 0xe8900000 $filesize
+setenv bootcmd bootm e8700000 - e8800000
+setenv bootargs config-addr=0xfe8900000
+boot
