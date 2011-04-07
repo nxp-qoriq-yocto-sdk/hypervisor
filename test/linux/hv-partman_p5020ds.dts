@@ -66,6 +66,11 @@
 		size = <0x0 0x00001000>;  // 4KB
 	};
 
+	images_pma: images_pma {    //boot from RAM
+		compatible = "phys-mem-area";
+		addr = <0x0 0x78000000>;
+		size = <0x0 0x04000000>;
+	};
 	dma-windows {
 		window0: window0 {
 			compatible = "dma-window";
@@ -164,6 +169,8 @@
 		cpus = <0 1>;
 		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
 		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
+		//on hardware load rootfs from RAM
+		//linux-rootfs = <0x0 0x78000000 0 0x01300000 0 0x04000000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
@@ -362,7 +369,11 @@
 			compatible = "managed-partition";
 			partition = <&part2>;
 		};
-
+		node-update {
+			chosen {
+				bootargs = "ramdisk_size=172032";
+			};
+		};
 	};
 
 	// =====================================================

@@ -76,11 +76,10 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)
 	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs/bin/
 	$(call unmount,bin/linux/rootfs)
-	$(call mount,rootfs-partman,131072)
+	$(call mount,rootfs-partman,172032)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
-	sudo rm -rf bin/linux/rootfs-partman/opt/*
 	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
 	sudo cp -af $(testdir)linux/partman-start_$(TARGET).sh bin/linux/rootfs-partman/start.sh
 	$(call unmount,bin/linux/rootfs-partman)
