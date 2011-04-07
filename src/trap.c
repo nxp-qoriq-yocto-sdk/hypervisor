@@ -2,7 +2,7 @@
  * Trap handling
  */
 /*
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,7 +84,8 @@ void reflect_trap(trapframe_t *regs)
 
 	if (__builtin_expect(!(regs->srr1 & MSR_GS), 0)) {
 		set_crashing(1);
-		printf("unexpected trap in hypervisor\n");
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ALWAYS,
+		         "unexpected trap in hypervisor\n");
 		dump_regs(regs);
 		set_crashing(0);
 		stopsim();
@@ -120,7 +121,8 @@ void debug_trap(trapframe_t *regs)
 			return;
 #endif
 		set_crashing(1);
-		printf("unexpected debug exception\n");
+		printlog(LOGTYPE_IRQ, LOGLEVEL_ALWAYS,
+		         "unexpected debug exception\n");
 		dump_regs(regs);
 		set_crashing(0);
 		stopsim();

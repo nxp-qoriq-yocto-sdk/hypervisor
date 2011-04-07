@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -405,8 +405,9 @@ static byte_chan_t *mux_attach_chardev(dt_node_t *muxnode, dt_node_t *cdnode)
 
 		int ret = byte_chan_attach_chardev(bc, cd);
 		if (ret < 0) {
-			printf("%s: error %d attaching %s to %s\n",
-			       __func__, ret, muxnode->name, cdnode->name);
+			printlog(LOGTYPE_BCMUX, LOGLEVEL_ERROR,
+			         "%s: error %d attaching %s to %s\n",
+			         __func__, ret, muxnode->name, cdnode->name);
 			return NULL;
 		}
 

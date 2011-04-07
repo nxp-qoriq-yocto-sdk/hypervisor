@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -343,8 +343,9 @@ static ipi_doorbell_t *dbell_from_handle_node(dt_node_t *node)
 
 	dbell = gdnode->dbell;
 	if (!dbell) {
-		printf("%s: node %s (global-doorbell from %s) is not a doorbell\n",
-		       __func__, gdnode->name, node->name);
+		printlog(LOGTYPE_DOORBELL, LOGLEVEL_ERROR,
+		         "%s: node %s (global-doorbell from %s) is not a doorbell\n",
+		         __func__, gdnode->name, node->name);
 		return NULL;
 	}
 

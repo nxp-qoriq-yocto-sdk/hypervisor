@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -106,7 +106,8 @@ static int get_cfg_addr(char *args, void *ctx)
 
 	str = strstr(args, "config-addr=");
 	if (!str) {
-		printf("config-addr not specified in bootargs\n");
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		         "config-addr not specified in bootargs\n");
 		return ERR_NOTFOUND;
 	}
 
@@ -290,22 +291,26 @@ static int parse_bootargs(void)
 
 	offset = fdt_subnode_offset(fdt, 0, "chosen");
 	if (offset < 0) {
-		printf("Cannot find /chosen, error %d\n", offset);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		        "Cannot find /chosen, error %d\n", offset);
 		return offset;
 	}
 
 	str = fdt_getprop_w(fdt, offset, "bootargs", &len);
 	if (!str || len == 0 || str[len - 1] != 0) {
-		printf("Bad/missing bootargs in /chosen, error %d\n", len);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "Bad/missing bootargs in /chosen, error %d\n", len);
 		return len;
 	}
 
 	if (len > COMMAND_LINE_SIZE) {	/* len includes \0 */
-		printf("Too long command line: %d bytes\n", len);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "Too long command line: %d bytes\n", len);
 		return len;
 	}
 
-	printf("Hypervisor command line: %s\n", str);
+	printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+	         "Hypervisor command line: %s\n", str);
 	strncpy(cmdline, str, len - 1);
 
 	while ((str = nextword(&cmd_iter))) {
@@ -361,8 +366,9 @@ static void add_memory(phys_addr_t start, phys_addr_t size)
 
 	int ret = map_hv_pma(start, size, 0);
 	if (ret < 0) {
-		printf("%s: error %d mapping PMA %#llx to %#llx\n",
-		       __func__, ret, start, size);
+		printlog(LOGTYPE_MMU, LOGLEVEL_ERROR,
+		         "%s: error %d mapping PMA %#llx to %#llx\n",
+		         __func__, ret, start, size);
 		return;
 	}
 
@@ -396,45 +402,58 @@ static void process_hv_mem(void *fdt, int offset, int add)
 		                                           &depth, "hv-memory");
 		if (offset < 0) {
 			if (offset != -FDT_ERR_NOTFOUND)
-				printf("%s: error %d finding hv-memory\n", __func__, offset);
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: error %d finding hv-memory\n",
+				         __func__, offset);
 
 			break;
 		}
 
 		prop = fdt_getprop(fdt, offset, "phys-mem", &len);
 		if (!prop || len != 4) {
-			printf("%s: error %d getting phys-mem\n", __func__, len);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d getting phys-mem\n",
+			         __func__, len);
 			continue;
 		}
 
 		pma = fdt_node_offset_by_phandle(fdt, *prop);
 		if (pma < 0) {
-			printf("%s: error %d looking up phys-mem\n", __func__, pma);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d looking up phys-mem\n",
+			         __func__, pma);
 			continue;
 		}
 
 		prop = fdt_getprop(fdt, pma, "addr", &len);
 		if (!prop || len != 8) {
-			printf("%s: error %d getting pma addr\n", __func__, len);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d getting pma addr\n",
+			         __func__, len);
 			continue;
 		}
 		addr = (((uint64_t)prop[0]) << 32) | prop[1];
 
 		prop = fdt_getprop(fdt, pma, "size", &len);
 		if (!prop || len != 8) {
-			printf("%s: error %d getting pma size\n", __func__, len);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: error %d getting pma size\n",
+			         __func__, len);
 			continue;
 		}
 		size = (((uint64_t)prop[0]) << 32) | prop[1];
 
 		if (size & (size - 1)) {
-			printf("%s: pma size %lld not a power of 2\n", __func__, size);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: pma size %lld not a power of 2\n",
+			         __func__, size);
 			continue;
 		}
 
 		if (addr & (size - 1)) {
-			printf("%s: pma addr %llx not aligned to size %llx\n",
-			       __func__, addr, size);
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+			         "%s: pma addr %llx not aligned to size %llx\n",
+			         __func__, addr, size);
 			continue;
 		}
 
@@ -444,9 +463,10 @@ static void process_hv_mem(void *fdt, int offset, int add)
 					   &len);
 			if (prop && !pamu_mem_size) {
 				if (prop && len != 4 * sizeof(uint32_t)) {
-					printf("%s: wrong length %d for "
-					       "hv-persistent-data\n",
-					       __func__, len);
+					printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					        "%s: wrong length %d for "
+					        "hv-persistent-data\n",
+					        __func__, len);
 					warm_reboot = 0;
 					continue;
 				}
@@ -461,8 +481,10 @@ static void process_hv_mem(void *fdt, int offset, int add)
 				    (pamu_mem_addr + pamu_mem_size < pamu_mem_addr) ||
 				    (pamu_mem_addr > addr + size) ||
 				    (pamu_mem_addr < addr)) {
-					printf("%s: wrong offset/size for "
-					       "hv-persistent-data\n", __func__);
+					printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+					         "%s: wrong offset/size for "
+					         "hv-persistent-data\n",
+					         __func__);
 					pamu_mem_size = 0;
 				} else {
 					pamu_mem_header = (void *)(uintptr_t)pamu_mem_addr +
@@ -470,8 +492,9 @@ static void process_hv_mem(void *fdt, int offset, int add)
 							  bigmap_phys;
 				}
 			} else if (prop) {
-				printf("%s: discard multiple "
-				       "hv-persistent-data\n", __func__);
+				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+				         "%s: discard multiple "
+				         "hv-persistent-data\n", __func__);
 			}
 #endif
 			add_memory(addr, size);
@@ -511,8 +534,9 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 
 	offset = fdt_next_descendant_by_compatible(fdt, 0, &depth, "hv-config");
 	if (offset < 0) {
-		printf("%s: config tree has no hv-config, err %d\n",
-		       __func__, offset);
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: config tree has no hv-config, err %d\n",
+		         __func__, offset);
 		return offset;
 	}
 
@@ -537,7 +561,8 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 		void *new_text = malloc_alloc_segment(&_end - &_start,
 		                                      hv_text_size);
 		if (!new_text) {
-			printf("Cannot relocate hypervisor\n");
+			printlog(LOGTYPE_MALLOC, LOGLEVEL_ERROR,
+			         "Cannot relocate hypervisor\n");
 			return ERR_NOMEM;
 		}
 
@@ -941,7 +966,7 @@ void __attribute__((noreturn)) panic(const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-	printf("panic: ");
+	printlog(LOGTYPE_MISC, LOGLEVEL_ALWAYS,"panic: ");
 	int ret = vprintf(fmt, args);
 
 	va_end(args);
@@ -961,11 +986,14 @@ void libos_client_entry(unsigned long treephys)
 	sched_init();
 	sched_core_init(cpu);
 
-	printf("=======================================\n");
+	printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		 "=======================================\n");
 #ifdef CONFIG_LIBOS_64BIT
-	printf("Freescale Hypervisor %s ppc64\n", CONFIG_HV_VERSION);
+	printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		 "Freescale Hypervisor %s ppc64\n", CONFIG_HV_VERSION);
 #else
-	printf("Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
+	printlog(LOGTYPE_MISC, LOGLEVEL_NORMAL,
+		 "Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 #endif
 
 	cpu->client.next_dyn_tlbe = DYN_TLB_START;

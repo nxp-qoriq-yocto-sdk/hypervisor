@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -142,7 +142,8 @@ guest_t *handle_to_guest(int handle)
 
 static void unimplemented(trapframe_t *regs)
 {
-	printf("unimplemented hcall %ld\n", regs->gpregs[11]);
+	printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+	         "unimplemented hcall %ld\n", regs->gpregs[11]);
 	regs->gpregs[3] = EV_UNIMPLEMENTED;
 }
 
@@ -454,15 +455,16 @@ static void hcall_byte_channel_send(trapframe_t *regs)
 	buf = (const uint8_t *)tmp;
 #endif
 
-#ifdef DEBUG
-	printf("byte-channel send\n");
-	printf("arg0 %08lx\n",regs->gpregs[3]);
-	printf("arg1 %08lx\n",regs->gpregs[4]);
-	printf("arg2 %08lx\n",regs->gpregs[5]);
-	printf("arg2 %08lx\n",regs->gpregs[6]);
-	printf("arg2 %08lx\n",regs->gpregs[7]);
-	printf("arg2 %08lx\n",regs->gpregs[8]);
-#endif
+	printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_VERBOSE,
+	         "byte-channel send\n"
+	         "arg0 %08lx\n"
+	         "arg1 %08lx\n"
+	         "arg2 %08lx\n"
+	         "arg3 %08lx\n"
+	         "arg4 %08lx\n"
+		 "arg5 %08lx\n",
+		 regs->gpregs[3],regs->gpregs[4],regs->gpregs[5],
+		 regs->gpregs[6],regs->gpregs[7],regs->gpregs[8]);
 
 	if (len > 4 * sizeof(uint32_t)) {
 		regs->gpregs[3] = EV_EINVAL;

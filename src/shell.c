@@ -2,7 +2,7 @@
  * Command line shell
  */
 
-/* Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+/* Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -201,9 +201,9 @@ shell_cmd(help);
 static void version_fn(shell_t *shell, char *args)
 {
 #ifdef CONFIG_LIBOS_64BIT
-	printf("Freescale Embedded Hypervisor version %s ppc64\n", CONFIG_HV_VERSION);
+	qprintf(shell->out, 1, "Freescale Embedded Hypervisor version %s ppc64\n", CONFIG_HV_VERSION);
 #else
-	printf("Freescale Embedded Hypervisor version %s\n", CONFIG_HV_VERSION);
+	qprintf(shell->out, 1, "Freescale Embedded Hypervisor version %s\n", CONFIG_HV_VERSION);
 #endif
 }
 
