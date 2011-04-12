@@ -26,6 +26,7 @@
 
 #include <libos/fsl-booke-tlb.h>
 #include <libos/core-regs.h>
+#include <libos/asm-macros.S>
 
 #if 1
 /* 32-bit */
@@ -59,8 +60,7 @@ branch_to_reloc:
 	btctr	%r3
 
 1:	/* Now running out of bigmap, relocate boot mapping */
-	lis	%r6, PHYSBASE@h
-	ori	%r6, %r6, PHYSBASE@l
+	LOADIMM	%r6, PHYSBASE
 	tlbsx	0, %r6
 
 	mtspr	SPR_MAS3, %r4
