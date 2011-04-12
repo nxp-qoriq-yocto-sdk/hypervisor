@@ -27,7 +27,7 @@ $use_uart0_net = 1
 
 $guest_image[0]  = "uImage"
 $guest_addr[0]   = 0x00020000
-$guest_image[1]  = "hv-partman.dtb"
+$guest_image[1]  = "hv-partman_%s.dtb" % $target
 $guest_addr[1]   = 0x00900000
 $guest_image[2]  = "rootfs-partman.ext2.gz"
 $guest_addr[2]   = 0x01300000

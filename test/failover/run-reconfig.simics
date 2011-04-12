@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@ $use_uart0_net = 1
 $guest_image[0] = "failover"
 $guest_addr[0]  = 0x00a00000
 
-$guest_image[1] = "hv-reconfig.dtb"
+$guest_image[1] = "hv-reconfig_%s.dtb" % $target
 $guest_addr[1]  = 0x00900000
 
 add-directory "%script%/../common" -prepend

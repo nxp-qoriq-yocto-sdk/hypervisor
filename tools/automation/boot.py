@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2010,2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@ class empty:
 		return 0
 
 #function to be used on hardware boot, after hw reset
-def hw_boot(obj,testname_s, testname_l):
+def hw_boot(obj,testname_s, testname_l, board):
 	obj.send("\r")
 	obj.expect_exact("=> ", timeout = 10)
 	obj.send("pixis_reset altbank\r")
@@ -43,6 +43,8 @@ def hw_boot(obj,testname_s, testname_l):
 	obj.send("\r")
 	obj.expect_exact("=> ", timeout = 20)
 	obj.send("setenv unittestdir %s\r" % (common.RMT_TESTDIR+testname_s))	
+	obj.expect_exact("=> ", timeout = 10)
+	obj.send("setenv platform %s\r" % board)
 	obj.expect_exact("=> ", timeout = 10)
 	obj.send("tftp 100000 $unittestdir/%s.ubs\r" % testname_l)
 	obj.expect_exact("Bytes transferred", timeout = 20)
@@ -53,7 +55,7 @@ cmd = sys.argv[1] # start command
 filename = sys.argv[2] #log file
 testnameshort = sys.argv[3]
 testnamelong = sys.argv[4]
-target_type = sys.argv[5]
+target = sys.argv[5]
 
 #check if special behavior py script exists
 if os.path.exists("../../test/%s/%s.py" % (testnameshort,testnamelong)):
@@ -74,11 +76,12 @@ fileout =  file(filename,'w')
 
 obj = pexpect.spawn(cmd,logfile=fileout)
 try:
-	if target_type == 'hw':
-		hw_boot(obj,testnameshort,testnamelong)		
+	if '_hw' in target:
+		board = (target.split("_"))[0]
+		hw_boot(obj,testnameshort,testnamelong,board)
 	obj.expect('Freescale Hypervisor', timeout=120)
 	while 1:
-		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=300)
+		index = obj.expect_exact(['HV>','Error','error','Warning', 'warning','branching to guest reset-status'], timeout=250)
 		#display warnings is not consistent, case removed
 		#if index != 0:
 			#print "HV encountered error or warning:\n",obj.before[-30:],obj.after,"\n"
