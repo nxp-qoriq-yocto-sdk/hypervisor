@@ -1731,6 +1731,7 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 		tsize = TLB_TSIZE_1M;
 		size = 1 << 20;
 		pages = size >> PAGE_SHIFT;
+		ppage = (entry & ~((phys_addr_t)size - 1)) >> PAGE_SHIFT;
 	} else {
 		dt_prop_t *prop;
 
