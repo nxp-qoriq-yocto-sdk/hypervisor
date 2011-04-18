@@ -254,6 +254,8 @@ static int byte_chan_attach_guest(dt_node_t *node, guest_t *guest)
 		goto nomem;
 	if (dt_set_prop(gnode, "reg", &ghandle, 4) < 0)
 		goto nomem;
+	if (dt_set_prop(gnode, "hv-handle", &ghandle, 4) < 0)
+		goto nomem;
 	if (dt_set_prop(gnode, "interrupts", intspec, sizeof(intspec)) < 0)
 		goto nomem;
 

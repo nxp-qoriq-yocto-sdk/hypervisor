@@ -1106,6 +1106,10 @@ static int create_send_dbell_handle(const char *kind, guest_t *guest,
 	if (handle < 0)
 		return handle;
 
+	ret = dt_set_prop(node, "hv-handle", &handle, sizeof(handle));
+	if (ret < 0)
+		return ret;
+
 	return dt_set_prop(node, "reg", &handle, sizeof(handle));
 }
 

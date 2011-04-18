@@ -391,6 +391,10 @@ static int send_dbell_init_one(dt_node_t *node, void *arg)
 		// Out of memory
 		return ret;
 
+	ret = dt_set_prop(hnode, "hv-handle", &ghandle, 4);
+	if (ret)
+		return ret;
+
 	ret = dt_process_node_update(guest, hnode, node);
 	if (ret < 0) {
 		printlog(LOGTYPE_BYTE_CHAN, LOGLEVEL_ERROR,
