@@ -30,6 +30,12 @@
 #include <libos/trapframe.h>
 #include <libos/io.h>
 
+#ifdef CONFIG_LIBOS_64BIT
+#define GUESTMEM_AS_WORD ".quad"
+#else
+#define GUESTMEM_AS_WORD ".long"
+#endif
+
 #define GUESTMEM_OK 0
 #define GUESTMEM_TLBMISS 1
 #define GUESTMEM_TLBERR 2
@@ -48,10 +54,10 @@ static inline int guestmem_icache_block_sync(char *ptr)
 	    "4: msync;"
 	    "isync;"
 	    ".section .extable,\"a\";"
-	    ".long 1b;"
-	    ".long 2b;"
-	    ".long 3b;"
-	    ".long 4b;"
+	    GUESTMEM_AS_WORD " 1b;"
+	    GUESTMEM_AS_WORD " 2b;"
+	    GUESTMEM_AS_WORD " 3b;"
+	    GUESTMEM_AS_WORD " 4b;"
 	    ".previous;" : "+r" (stat) : "Z" (*ptr) : "memory");
 
 	return stat;
@@ -97,8 +103,8 @@ static inline int guestmem_in32(uint32_t *ptr, uint32_t *val)
 	asm("1: lwepx %0, %y2;"
 	    "2:"
 	    ".section .extable,\"a\";"
-	    ".long 1b;"
-	    ".long 2b;"
+	    GUESTMEM_AS_WORD " 1b;"
+	    GUESTMEM_AS_WORD " 2b;"
 	    ".previous;" : "=r" (*val), "+r" (stat) : "Z" (*ptr));
 
 	return stat;
@@ -111,8 +117,8 @@ static inline int guestmem_in8(uint8_t *ptr, uint8_t *val)
 	asm("1: lbepx %0, %y2;"
 	    "2:"
 	    ".section .extable,\"a\";"
-	    ".long 1b;"
-	    ".long 2b;"
+	    GUESTMEM_AS_WORD " 1b;"
+	    GUESTMEM_AS_WORD " 2b;"
 	    ".previous;" : "=r" (*val), "+r" (stat) : "Z" (*ptr));
 
 	return stat;
@@ -125,8 +131,8 @@ static inline int guestmem_out32(uint32_t *ptr, uint32_t val)
 	asm("1: stwepx %2, %y1;"
 	    "2:"
 	    ".section .extable,\"a\";"
-	    ".long 1b;"
-	    ".long 2b;"
+	    GUESTMEM_AS_WORD " 1b;"
+	    GUESTMEM_AS_WORD " 2b;"
 	    ".previous;" : "+r" (stat), "=Z" (*ptr) : "r" (val));
 
 	return stat;
@@ -139,8 +145,8 @@ static inline int guestmem_out8(uint8_t *ptr, uint8_t val)
 	asm("1: stbepx %2, %y1;"
 	    "2:"
 	    ".section .extable,\"a\";"
-	    ".long 1b;"
-	    ".long 2b;"
+	    GUESTMEM_AS_WORD " 1b;"
+	    GUESTMEM_AS_WORD " 2b;"
 	    ".previous;" : "+r" (stat), "=Z" (*ptr) : "r" (val));
 
 	return stat;
