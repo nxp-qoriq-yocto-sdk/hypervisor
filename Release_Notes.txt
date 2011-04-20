@@ -26,21 +26,36 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 0.8
-Revision: 004
-Date: 01/05/2011
+Revision: 005
+Date: 04/20/2011
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v0.8-005 bug fixes and changes
+       -bug 4632: added a new config dts property, "srio-ccsr-subwindow",
+        to support SRIO under HV
+       -bug 6838: search for a TLB entry to relocate HV now uses all 64 bits
+       -bug 7388: take into account the entry point when locating SIMA
+       -bug 7029: guest_tlb1_miss: fix handling of input pid = 0 case
+       -bug 7362: take into account that ESEL field from MAS0 is 6 bits long
+       -new unit test to exercise the perfmon interrupt
+       -ported several unit tests to new p3041 and p5020 SoCs
+       -numerous fixes in unit tests
+       -64bit support improvements and fixes
+       -added gcov and lcov support to test automation scripts
+
    -v0.8-004 bug fixes and changes
        -bug 6831: clear pending vint if destcpu has changed
+
    -v0.8-003 bug fixes and changes
        -fixes after Klockwork analysis
        -automated unit tests
        -bug 6749: configure PAMU also when Secure Boot mode is active
        -bug 6762: fix boot of secondary cores
        -bug 6784: let the guest set MSR[PMM]
+
    -v0.8-002 bug fixes and changes
        -warm reboot support
        -unit test updates and fixes
