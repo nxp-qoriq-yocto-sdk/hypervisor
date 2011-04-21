@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,6 +54,7 @@ void dtlb_handler(struct trapframe *regs);
 void watchdog_handler(struct trapframe *regs);
 void program_handler(struct trapframe *regs);
 void dsi_handler(struct trapframe *regs);
+void perfmon_handler(struct trapframe *regs);
 #endif
 
 #define EXC_DECR_HANDLER dec_handler
@@ -68,5 +69,6 @@ void dsi_handler(struct trapframe *regs);
 #define EXC_WDOG_HANDLER watchdog_handler
 #define EXC_PROGRAM_HANDLER program_handler
 #define EXC_DSI_HANDLER dsi_handler
+#define EXC_PERFMON_HANDLER perfmon_handler
 
 #endif
