@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -126,6 +126,13 @@ static const uint32_t *get_handle(const char *dbell_type,
 
 	return fdt_getprop(tree, off, prop, &len);
 }
+static void delay(unsigned long ticks)
+{
+	unsigned long start = mfspr(SPR_TBL);
+
+	while (mfspr(SPR_TBL) - start < ticks)
+		;
+}
 
 static int test_init(void)
 {
@@ -151,6 +158,10 @@ static int test_init(void)
 		printf("Couldn't get send doorbell handle\n");
 		return -1;
 	}
+	/* add an arbitrary delay to make sure that the other partion
+	 * has configured the VMPIC
+	 */
+	delay (1000);
 
 	ev_doorbell_send(*handle_p);
 
