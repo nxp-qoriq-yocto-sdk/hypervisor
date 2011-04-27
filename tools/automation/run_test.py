@@ -111,7 +111,7 @@ specials = "../../test/%s/%s.py" %(testname,testname+subtestname) #special funct
 
 #start console 0 (boot and HV)
 tmp_call_cmd = "python boot.py \"%s\" %s %s %s %s" % (cmd_sc[0],logfiles[0],testname,testname+subtestname,target)
-print tmp_call_cmd
+#print tmp_call_cmd
 child[0] = subprocess.Popen(tmp_call_cmd, shell=True, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 
 

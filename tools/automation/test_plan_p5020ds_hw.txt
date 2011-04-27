@@ -21,9 +21,9 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 byte-chan,none,2,1,enabled
-cache,A,2,1,disabled
+cache,A,2,1,enabled
 cache,B,2,1,enabled
-ccf-lae,none,3,2,disabled
+ccf-lae,none,3,1,enabled
 ccf-mint,none,2,1,disabled
 cpc,none,2,1,disabled
 csd,none,3,2,disabled
@@ -31,7 +31,7 @@ device-ranges,none,2,1,enabled
 dma,A,3,2,enabled
 dma,B,3,2,enabled
 elf,none,2,1,enabled
-error-inj,none,2,1,disabled
+error-inj,none,2,1,enabled
 error-int,none,2,1,disabled
 error-mgr,A,3,2,disabled
 error-mgr,B,4,3,disabled
@@ -68,7 +68,7 @@ nap,none,2,1,disabled
 nmi,none,2,1,disabled
 node-update,none,2,1,enabled
 outoflaws,none,2,1,enabled
-perfmon,none,2,1,disabled	#does not work on simics
+perfmon,none,2,1,enabled
 pmr,none,2,1,enabled
 reset,none,,,disabled
 reset-on-stop,none,,,disabled

@@ -20,7 +20,7 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-byte-chan,none,2,1,enabled       #this is good
+byte-chan,none,2,1,enabled
 cache,A,2,1,disabled
 cache,B,2,1,enabled
 ccf-lae,none,3,2,disabled
@@ -68,6 +68,7 @@ nap,none,2,1,enabled
 nmi,none,2,1,enabled
 node-update,none,2,1,enabled
 outoflaws,none,2,1,enabled
+perfmon,none,2,1,disabled	#does not work on simics
 pmr,none,2,1,enabled
 reset,none,,,disabled
 reset-on-stop,none,,,disabled
@@ -79,4 +80,6 @@ timer,none,2,1,enabled
 vmpic,A,2,1,enabled
 vmpic,B,2,1,enabled
 vmpic,C,2,1,enabled
-watchdog,none,5,2,enabled
+watchdog,A,5,2,enabled
+watchdog,B,5,1,enabled
+watchdog,C,5,1,enabled

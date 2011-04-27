@@ -34,10 +34,12 @@ if ($target == "p4080ds") {
 }
 if ($target == "p3041ds") {
 	$rcw_image = rcw_0x36_12g.bin
+	$devdisr1 = 0x00700000
 	add-directory "%script%/../../../images/boot/p3041ds/NR_HXAPNSP_0x36" -prepend
 }
 if ($target == "p5020ds") {
 	$rcw_image = rcw_0x36_12g.bin
+	$devdisr1 = 0x00700000
 	add-directory "%script%/../../../images/boot/p5020ds/NR_HXAPNSP_0x36" -prepend
 }
 

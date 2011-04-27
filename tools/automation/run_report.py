@@ -47,6 +47,8 @@ res_list = glob.glob("*_results.txt")
 full_res = {}
 target_lst = []
 
+res_list.sort()
+
 for filename in res_list:
 	filecsv = open(filename,'rb')
 	dictionar = csv.DictReader(filecsv)
