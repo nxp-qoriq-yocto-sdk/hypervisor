@@ -47,7 +47,7 @@
 #include <devtree.h>
 #include <gdb-stub.h>
 #include <greg.h>
-#include <e500mc-data.h>
+#include <td-data.h>
 #include <debug-stub.h>
 
 #define TRACE(fmt, info...) \
@@ -102,6 +102,18 @@ static stub_ops_t attr_debug_stub stub_ops = {
 #endif
 };
 
+static inline arch_t cur_arch(void)
+{
+
+#define RET_ARCH(mask, val)              \
+if ((mfspr(SPR_PVR) & (mask)) == (mask)) \
+	return (val);
+
+	RET_ARCH(0x80230000, e500mc);
+	RET_ARCH(0x80240000, e5500);
+	return unknown_arch;
+}
+
 void gdb_stub_init(void)
 {
 	uint32_t index;
@@ -144,18 +156,18 @@ void gdb_stub_init(void)
 		return;
 	}
 
-	stub->cbuf = malloc(BUFMAX*sizeof(uint8_t));
+	stub->cbuf = malloc(buf_max[cur_arch()]*sizeof(uint8_t));
 	CHECK_MEM(stub->cbuf);
-	memset(stub->cbuf, 0, BUFMAX*sizeof(uint8_t));
+	memset(stub->cbuf, 0, buf_max[cur_arch()]*sizeof(uint8_t));
 	stub->command.buf = stub->cbuf;
-	stub->command.len = BUFMAX;
+	stub->command.len = buf_max[cur_arch()];
 	stub->command.cur = stub->cbuf;
 	stub->cmd = &stub->command;
-	stub->rbuf = malloc(BUFMAX*sizeof(uint8_t));
+	stub->rbuf = malloc(buf_max[cur_arch()]*sizeof(uint8_t));
 	CHECK_MEM (stub->rbuf);
-	memset(stub->rbuf, 0, BUFMAX*sizeof(uint8_t));
+	memset(stub->rbuf, 0, buf_max[cur_arch()]*sizeof(uint8_t));
 	stub->response.buf = stub->rbuf;
-	stub->response.len = BUFMAX;
+	stub->response.len = buf_max[cur_arch()];
 	stub->response.cur = stub->rbuf;
 	stub->rsp = &stub->response;
 	stub->breakpoint_table = alloc_type_num(breakpoint_t,
@@ -268,7 +280,7 @@ static void put_debug_char(gdb_stub_core_context_t *stub, uint8_t c)
 /* TODO: Where do we call this? */
 static int bufsize_sanity_check(void)
 {
-	return BUFMAX >= NUMREGBYTES * 2;
+	return buf_max[cur_arch()] >= num_reg_bytes[cur_arch()] * 2;
 }
 
 #define ACK '+'
@@ -807,16 +819,16 @@ static int read_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_nu
 	uint32_t byte_length = 0;
 	register_t reg_value = 0xdeadbeef;
 	uint64_t fp_reg_value = 0xdeadbeef;
-	uint32_t e500mc_reg_num;
+	uint32_t hv_reg_num;
 	uint8_t c;
-	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
-	byte_length = e500mc_reg_table[reg_num].bitsize/8;
-	switch(e500mc_reg_table[reg_num].cat) {
+	hv_reg_num = reg_table[cur_arch()][reg_num].inum;
+	byte_length = reg_table[cur_arch()][reg_num].bitsize/8;
+	switch(reg_table[cur_arch()][reg_num].cat) {
 	case reg_cat_spr:
-		c = read_gspr(trap_frame, e500mc_reg_num, &reg_value);
+		c = read_gspr(trap_frame, hv_reg_num, &reg_value);
 		break;
 	case reg_cat_gpr:
-		c = read_ggpr(trap_frame, e500mc_reg_num, &reg_value);
+		c = read_ggpr(trap_frame, hv_reg_num, &reg_value);
 		break;
 	case reg_cat_pc:
 		c = read_gpc(trap_frame, &reg_value);
@@ -828,10 +840,10 @@ static int read_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_nu
 		c = read_gcr(trap_frame, &reg_value);
 		break;
 	case reg_cat_pmr:
-		c = read_pmr(trap_frame, e500mc_reg_num, &reg_value);
+		c = read_pmr(trap_frame, hv_reg_num, &reg_value);
 		break;
 	case reg_cat_fpr:
-		c = read_gfpr(trap_frame, e500mc_reg_num, &fp_reg_value);
+		c = read_gfpr(trap_frame, hv_reg_num, &fp_reg_value);
 		stringize_reg_value(value, fp_reg_value, byte_length);
 		return c;
 	case reg_cat_fpscr:
@@ -850,22 +862,22 @@ static int read_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_nu
 static int write_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_num)
 {
 	uint64_t reg_value;
-	uint32_t e500mc_reg_num;
+	uint32_t hv_reg_num;
 	uint8_t c;
-	e500mc_reg_num = e500mc_reg_table[reg_num].e500mc_num;
+	hv_reg_num = reg_table[cur_arch()][reg_num].inum;
 	reg_value = htoi((uint8_t *) value);
-	switch(e500mc_reg_table[reg_num].cat) {
+	switch(reg_table[cur_arch()][reg_num].cat) {
 	case reg_cat_spr:
-		c = write_gspr(trap_frame, e500mc_reg_num, reg_value);
+		c = write_gspr(trap_frame, hv_reg_num, reg_value);
 		break;
 	case reg_cat_gpr:
-		c = write_ggpr(trap_frame, e500mc_reg_num, reg_value);
+		c = write_ggpr(trap_frame, hv_reg_num, reg_value);
 		break;
 	case reg_cat_pc:
 		c = write_gpc(trap_frame, reg_value);
 		break;
 	case reg_cat_fpr:
-		c = write_gfpr(trap_frame, e500mc_reg_num, &reg_value);
+		c = write_gfpr(trap_frame, hv_reg_num, &reg_value);
 		break;
 	case reg_cat_msr:
 		c = write_gmsr(trap_frame, reg_value, 1);
@@ -874,7 +886,7 @@ static int write_cpu_reg(trapframe_t *trap_frame, uint8_t *value, uint32_t reg_n
 		c = write_gcr(trap_frame, reg_value);
 		break;
 	case reg_cat_pmr:
-		c = write_pmr(trap_frame, e500mc_reg_num, reg_value);
+		c = write_pmr(trap_frame, hv_reg_num, reg_value);
 		break;
 	case reg_cat_fpscr:
 		c = write_fpscr(reg_value);
@@ -1224,7 +1236,7 @@ static void pkt_write_dac_state(trapframe_t *trap_frame, gdb_stub_core_context_t
 	}
 }
 
-/* TODO: Autogenerate defines for the e500mc_reg_table indexes (used in transmit_stop_reply_pkt_T (),
+/* TODO: Autogenerate defines for the reg_table[cur_arch()] indexes (used in transmit_stop_reply_pkt_T (),
  *       pkt_write_dac_state()) for calls to read_cpu_reg().
  */
 static void transmit_stop_reply_pkt_T(trapframe_t *trap_frame, gdb_stub_core_context_t *stub)
@@ -1470,7 +1482,7 @@ return_to_guest:
 		case read_registers:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'g' packet.\n");
-			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
+			for (reg_num = 0; reg_num < num_regs[cur_arch()]; reg_num++) {
 				read_cpu_reg(trap_frame, value, reg_num);
 				TRACE("Register: %d, read-value: %s", reg_num, value);
 				pkt_cat_string(stub->rsp, (char *)value);
@@ -1504,9 +1516,9 @@ return_to_guest:
 			BREAK_IF_END(data);
 			INFO("Got data (register values): %s", data);
 			err_flag = 0;
-			for (reg_num = 0; reg_num < NUMREGS; reg_num++) {
+			for (reg_num = 0; reg_num < num_regs[cur_arch()]; reg_num++) {
 				int32_t byte_length = 0;
-				byte_length = e500mc_reg_table[reg_num].bitsize / 8;
+				byte_length = reg_table[cur_arch()][reg_num].bitsize / 8;
 				strncpy((char *)value, (const char *)data, 2 * byte_length);
 				value[2 * byte_length] = '\0';
 				err_flag = write_cpu_reg(trap_frame, value, reg_num);
@@ -1864,7 +1876,9 @@ return_to_guest:
 		case supported_features:
 			printlog(LOGTYPE_DEBUG_STUB, LOGLEVEL_DEBUG,
 				"Got 'qSupported' packet.\n");
-			pkt_cat_string(stub->rsp, "PacketSize=" BUFMAX_HEX ";");
+			pkt_cat_string(stub->rsp, "PacketSize=");
+			pkt_cat_string(stub->rsp, buf_max_hex[cur_arch()]);
+			pkt_cat_string(stub->rsp, ";");
 			pkt_cat_string(stub->rsp, "qXfer:auxv:read-;"
 			                          "qXfer:features:read+;"
 			                          "qXfer:libraries:read-;"
@@ -1888,16 +1902,20 @@ return_to_guest:
 				BREAK_IF_END(cur_pos);
 				td = "";
 				if (strncmp("target.xml", (char *) sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using td: e500mc_description");
-					td = e500mc_description;
+					TRACE("Using td: description[%s]", arch_name[cur_arch()]);
+					td = description[cur_arch()];
 				}
 				else if (strncmp ("power-core.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using td: power_core_description");
-					td = power_core_description;
+					TRACE("Using td: power_core_description[%s]", arch_name[cur_arch()]);
+					td = power_core_description[cur_arch()];
+				}
+				else if (strncmp ("power64-core.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
+					TRACE("Using td: power_core_description[%s]", arch_name[cur_arch()]);
+					td = power_core_description[cur_arch()];
 				}
 				else if (strncmp ("power-fpu.xml", (char *)sav_pos, cur_pos - sav_pos) == 0) {
-					TRACE("Using td: power_fpu_description");
-					td = power_fpu_description;
+					TRACE("Using td: power_fpu_description[%s]", arch_name[cur_arch()]);
+					td = power_fpu_description[cur_arch()];
 				}
 				BREAK_IF_END(td);
 				offset = scan_num (&cur_pos, ',');

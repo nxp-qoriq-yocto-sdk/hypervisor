@@ -1,6 +1,6 @@
 
 #
-# Copyright (C) 2008 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,42 +23,54 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 # Description:
 # emit_td uses the register information in GDB_REG_DEFS_H to generate
-# E500MC_DATA_H. e500mc-xml-dump emits out the XML target description.
+# TD_DATA_H. xml-dump emits out the XML target description.
 
 HEADERS_DIR = $(src)include
 GEN_HEADERS_DIR = bin/include
 
+GDB_TD_DEFS_H := $(HEADERS_DIR)/gdb-td-defs.h
 GDB_REG_DEFS_H := $(HEADERS_DIR)/gdb-register-defs.h
-E500MC_DATA_H := $(GEN_HEADERS_DIR)/e500mc-data.h
+TD_DATA_H := $(GEN_HEADERS_DIR)/td-data.h
 
 EMIT_TD_C := $(TDGEN_DIR)/emit_td.c
 EMIT_TD := bin/emit_td
 
-E500MC_XML_DUMP_C := $(TDGEN_DIR)/e500mc-xml-dump.c
-E500MC_XML_DUMP := bin/e500mc-xml-dump
+XML_DUMP_C := $(TDGEN_DIR)/xml-dump.c
+XML_DUMP := bin/xml-dump
 
 POWER_CORE_XML := bin/power-core.xml
+POWER64_CORE_XML := bin/power64-core.xml
 POWER_FPU_XML := bin/power-fpu.xml
-POWERPC_E500MC_XML := bin/powerpc-e500mc.xml
+POWERPC_TGT_XML := bin/powerpc-td.xml
 
-$(EMIT_TD) : $(EMIT_TD_C) $(GDB_REG_DEFS_H)
+$(EMIT_TD) : $(EMIT_TD_C) $(GDB_REG_DEFS_H) $(GDB_TD_DEFS_H)
 	$(HOSTCC) $(HOSTCC_OPTS) $(HOSTCC_OPTS_C) -o $@ $<
 
-$(E500MC_DATA_H) : $(EMIT_TD) $(GDB_REG_DEFS_H)
+$(TD_DATA_H) : $(EMIT_TD) $(GDB_REG_DEFS_H) $(GDB_TD_DEFS_H)
 	mkdir -p $(GEN_HEADERS_DIR)
-	$(EMIT_TD) > $@
+	$(EMIT_TD) -o $@
 
-$(E500MC_XML_DUMP) : $(E500MC_XML_DUMP_C) $(E500MC_DATA_H)
+$(XML_DUMP) : $(XML_DUMP_C) $(TD_DATA_H)
 	$(HOSTCC) $(HOSTCC_OPTS) $(HOSTCC_OPTS_C) -o $@ $<
 
-$(POWER_CORE_XML) : $(E500MC_XML_DUMP)
-	$(E500MC_XML_DUMP) core > $@
+# To generate the XML files:
+# make ARCH=e500mc bin/power-core.xml
+# make ARCH=e5500 bin/power64-core.xml
+# make ARCH=e500mc bin/power-fpu.xml
+# make ARCH=e5500 bin/power-fpu.xml
+# make ARCH=e500mc bin/powerpc-td.xml
+# make ARCH=e5500 bin/powerpc-td.xml
 
-$(POWER_FPU_XML) : $(E500MC_XML_DUMP)
-	$(E500MC_XML_DUMP) fpu > $@
+$(POWER_CORE_XML) : $(XML_DUMP)
+	$(XML_DUMP) --core --arch $(ARCH) > $@
 
-$(POWERPC_E500MC_XML) : $(E500MC_XML_DUMP)
-	$(E500MC_XML_DUMP) e500mc > $@
+$(POWER64_CORE_XML) : $(XML_DUMP)
+	$(XML_DUMP) --core --arch $(ARCH) > $@
+
+$(POWER_FPU_XML) : $(XML_DUMP)
+	$(XML_DUMP) --fpu --arch $(ARCH) > $@
+
+$(POWERPC_TGT_XML) : $(XML_DUMP)
+	$(XML_DUMP) --tgt --arch $(ARCH) > $@

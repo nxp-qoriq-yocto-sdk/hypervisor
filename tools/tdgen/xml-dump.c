@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,26 +23,47 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
-#include "e500mc-data.h"
+#include "td-data.h"
 
 static void show_usage (const char *program_name)
 {
-	printf ("Usage: %s [core|fpu|e500mc]\n", program_name);
+	fprintf (stderr, "Usage: %s [--core|--fpu|--tgt] --arch [e500mc|e5500]\n", program_name);
+	exit(EXIT_FAILURE);
 }
 
 int main (int argc, char *argv[])
 {
-	if (argc == 2) {
-		if (strcmp (argv[1], "core") == 0)
-			printf ("%s", power_core_description);
-		else if (strcmp (argv[1], "fpu") == 0)
-			printf ("%s", power_fpu_description);
-		else if (strcmp (argv[1], "e500mc") == 0)
-			printf ("%s", e500mc_description);
-		else
-			show_usage (argv[0]);
-	} else {
-		show_usage (argv[0]);
-	}
+	bool core = false, fpu = false, tgt = false;
+	arch_t arch;
+
+	if (argc == 4) {
+
+		if (strcmp (argv[1], "--core") == 0)
+			core = true;
+		else if (strcmp (argv[1], "--fpu") == 0)
+			fpu = true;
+		else if (strcmp (argv[1], "--tgt") == 0)
+			tgt = true;
+		else show_usage (argv[0]);
+
+		if (strcmp (argv[2], "--arch") == 0)
+			if (strcmp (argv[3], "e500mc") == 0)
+				arch = e500mc;
+			else if (strcmp (argv[3], "e5500") == 0)
+				arch = e5500;
+			else show_usage (argv[0]);
+		else show_usage (argv[0]);
+
+		if (core)
+			printf ("%s", power_core_description[arch]);
+		else if (fpu)
+			printf ("%s", power_fpu_description[arch]);
+		else if (tgt) printf ("%s", description[arch]);
+
+	} else show_usage (argv[0]);
+
+	return 0;
 }

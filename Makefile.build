@@ -175,7 +175,7 @@ bin/hv: include/config/auto.conf $(OBJS) $(OBJS_NOCHECK) \
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ \
 		$(OBJS) $(OBJS_NOCHECK) $(hypertrk-objs-y) -lgcc
 
-bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/e500mc-data.h
+bin/gdb-stub.d : $(src)src/gdb-stub.c bin/include/td-data.h
 
 bin/%.d : $(src)src/%.c
 	$(call mkdep,REAL_CC,$(CC_OPTS) $(CC_OPTS_C))
