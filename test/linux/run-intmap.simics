@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,28 +22,20 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-#
-# Script to run 8578/u-boot/ultravisor/linux on simulator
-#
+$use_uart0 = 1
+$use_uart2 = 1
 
-# UART0 is the hypervisor
-# UART1 is Linux byte channel console
-# UART2 is Linux serial console
-
-$use_uart0 = 0
-$use_uart0_net = 1
-
-$guest_image[0]  = "vmlinux.stripped"
-$guest_addr[0]   = 0x00900000
+$guest_image[0]  = "uImage"
+$guest_addr[0]   = 0x00020000
 $guest_image[1]  = "hv-intmap.dtb"
-$guest_addr[1]   = 0x00f00000
-$guest_image[2]  = "rootfs.ext2.gz"
-$guest_addr[2]   = 0x01000000
+$guest_addr[1]   = 0x00900000
+$guest_image[2]  = "rootfs.ext2.gz.uboot"
+$guest_addr[2]   = 0x01300000
 
 add-directory "%script%/../common" -prepend
 run-command-file "common.simics"
 
-$kernel_cmdline = "config-addr=0xfe8f00000"
+$kernel_cmdline = "config-addr=0xfe8900000"
 
 $dev_tree_blob  = "hardware-intmap.dtb"
 
