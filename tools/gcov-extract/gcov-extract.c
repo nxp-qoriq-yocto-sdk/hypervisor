@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
  *
  * K42: (C) Copyright IBM Corp. 2000.
  * All Rights Reserved
@@ -309,9 +309,16 @@ static unsigned int fetch_str_size(int tgt_fd, unsigned int tgt_addr)
 
 static void write_buf(int tgt_fd, const void *buf, size_t length)
 {
-	int count;
+	int i, count;
+	char tmpbuf[length * 2 + 1];
+	uint8_t ch;
 
-	count = write(tgt_fd, buf, length);
+	for (i = 0; i < length; i++) {
+		ch = ((uint8_t *)buf)[i];
+		snprintf(&tmpbuf[i * 2], 3, "%02x", ch);
+	}
+
+	count = write(tgt_fd, tmpbuf, length * 2);
 	if (count == -1) {
 		fprintf(stderr, "I/O error.");
 		fprintf(stderr, "Exiting...\n");
@@ -319,17 +326,45 @@ static void write_buf(int tgt_fd, const void *buf, size_t length)
 	}
 }
 
+static int hex_digit(uint8_t c)
+{
+        if (c >= '0' && c <= '9')
+                return c - '0';
+        else if (c >= 'A' && c <= 'F')
+                return c - 'A' + 10;
+        else if (c >= 'a' && c <= 'f')
+                return c - 'a' + 10;
+
+	fprintf(stderr, "%s: invalid hex digit: 0x%02x\n", __func__, c);
+        assert(0);
+
+        return -1;
+}
+
 static void read_buf(int tgt_fd, char *buf, unsigned int length)
 {
 	unsigned int received, count;
+	uint8_t ch;
+	int d1, d2;
+
 	for(received = 0; received < length;) {
-		count = read(tgt_fd, &buf[received], length - received);
+		count = read(tgt_fd, &ch, 1);
 		if (count == -1) {
 			fprintf(stderr, "I/O error.");
 			fprintf(stderr, "Exiting...\n");
 			exit(-1);
 		}
-		received += count;
+		d1 = hex_digit(ch);
+
+		count = read(tgt_fd, &ch, 1);
+		if (count == -1) {
+			fprintf(stderr, "I/O error.");
+			fprintf(stderr, "Exiting...\n");
+			exit(-1);
+		}
+		d2 = hex_digit(ch);
+
+		buf[received++] = (d1 << 4) | d2;
 	}
 }
 
