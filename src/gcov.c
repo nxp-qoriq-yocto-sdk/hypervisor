@@ -1,6 +1,6 @@
 /** @file
  *
- * Copyright (C) 2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2010,2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -94,6 +94,63 @@ static void gcov_rx(queue_t *q, int blocking)
 	unblock(gcov_thread);
 }
 
+static int hex_digit(uint8_t c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	else if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	else if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+
+	printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		 "%s: invalid hex char: 0x%02x\n", __func__, c);
+	assert(0);
+
+	return -1;
+}
+
+static int gcov_readchar(queue_t *q)
+{
+	int d1, d2;
+
+	d1 = hex_digit(queue_readchar_blocking(q, 0));
+	d2 = hex_digit(queue_readchar_blocking(q, 0));
+
+	return (d1 << 4) | d2;
+}
+
+static int gcov_writechar(queue_t *q, uint8_t ch)
+{
+	char buf[3];
+
+	snprintf(buf, sizeof(buf), "%02x", ch);
+
+	return queue_write_blocking(q, (uint8_t *)buf, 2);
+}
+
+static ssize_t gcov_read(queue_t *q, uint8_t *buf, size_t len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		buf[i] = gcov_readchar(q);
+	}
+
+	return len;
+}
+
+static ssize_t gcov_write(queue_t *q, const uint8_t *buf, size_t len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		gcov_writechar(q, buf[i]);
+	}
+
+	return len;
+}
+
 static void get_command(char *command)
 {
 	ssize_t byte_count = 0;
@@ -101,7 +158,7 @@ static void get_command(char *command)
 	int i = 0;
 
 	while (1) {
-		ch = queue_readchar_blocking(bch->rx, 0);
+		ch = gcov_readchar(bch->rx);
 
 		command[i++] = ch;
 		if (ch == '\0')
@@ -126,10 +183,10 @@ static void gcov_rx_thread(trapframe_t *regs, void *arg)
 		if (!strcmp(command, "get-data-info")) {
 
 			unknown_cmd_count = 0;
-			queue_write_blocking(bch->tx, (uint8_t *)&data_info.ea_size, sizeof(data_info.ea_size));
-			queue_write_blocking(bch->tx, (uint8_t *)&data_info.data_size, sizeof(data_info.data_size));
-			queue_write_blocking(bch->tx, (uint8_t *)&gcov_data.addr, word_size);
-			queue_write_blocking(bch->tx, (uint8_t *)&gcov_data.size, word_size);
+			gcov_write(bch->tx, (uint8_t *)&data_info.ea_size, sizeof(data_info.ea_size));
+			gcov_write(bch->tx, (uint8_t *)&data_info.data_size, sizeof(data_info.data_size));
+			gcov_write(bch->tx, (uint8_t *)&gcov_data.addr, word_size);
+			gcov_write(bch->tx, (uint8_t *)&gcov_data.size, word_size);
 
 		} else if (!strncmp(command, "get-data", strlen("get-data"))) {
 
@@ -140,22 +197,22 @@ static void gcov_rx_thread(trapframe_t *regs, void *arg)
 			unknown_cmd_count = 0;
 
 			/* get effect addr & size from the host */
-			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&address, word_size, 0);
-			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&length, word_size, 0);
+			byte_count = gcov_read(bch->rx, (uint8_t *)&address, word_size);
+			byte_count = gcov_read(bch->rx, (uint8_t *)&length, word_size);
 
 			/* send the data to the host */
-			queue_write_blocking(bch->tx, (uint8_t *)address, length);
+			gcov_write(bch->tx, (uint8_t *)address, length);
 		} else if (!strncmp(command, "get-str-size", strlen("get-str-size"))) {
 			void *address = 0x0;
 			char *p, *q;
 			uint32_t length = 0;
 			/* get effect addr from the host */
-			byte_count = queue_read_blocking(bch->rx, (uint8_t *)&address, word_size, 0);
+			byte_count = gcov_read(bch->rx, (uint8_t *)&address, word_size);
 			q = p = (char *) address;
 			while (*q++);
 			length = q - p;
 			/* send the length to the host */
-			queue_write_blocking(bch->tx, (uint8_t *)&length, sizeof(length));
+			gcov_write(bch->tx, (uint8_t *)&length, sizeof(length));
 		} else {
 			unknown_cmd_count++;
 			printlog(LOGTYPE_MISC, LOGLEVEL_WARN,
