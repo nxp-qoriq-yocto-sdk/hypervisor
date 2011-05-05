@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -175,11 +175,21 @@ static int flush_disable_caches(nap_state_t *ns)
  */
 void sync_nap(trapframe_t *regs)
 {
-	uint32_t cnapcrl = 0;
+	uint32_t cnapcrl = 0, prev_cnapcrl;
 	int i;
 
 	if (!rcpm)
 		return;
+
+	/* Used the algorithm from ref man to put multiple cores into nap
+	 * mode:
+	 * 1. Write 1 to the bit corresponding to the first core to be
+	 *    put in nap
+	 * 2. Read CNAPCR to push the previous write
+	 * 3. Repeat steps 1 and 2 for all desired cores.
+	 * The same algorithm applies when waking up a core from nap.
+	 */
+	prev_cnapcrl = in32(&rcpm[CNAPCRL]);
 
 	for (i = 0; i < MAX_CORES - 1; i++) {
 		cpu_t *c = &secondary_cpus[i];
@@ -187,10 +197,16 @@ void sync_nap(trapframe_t *regs)
 		if (c->client.nap_request &&
 		    c->client.gcpu->napping &&
 		    !c->client.gcpu->gevent_pending)
-			cnapcrl |= 1 << c->coreid;
+			cnapcrl = prev_cnapcrl | 1 << c->coreid;
+		else
+			cnapcrl = prev_cnapcrl & ~(1 << c->coreid);
+
+		if (cnapcrl != prev_cnapcrl) {
+			out32(&rcpm[CNAPCRL], cnapcrl);
+			prev_cnapcrl = in32(&rcpm[CNAPCRL]);
+		}
 	}
 
-	out32(&rcpm[CNAPCRL], cnapcrl);
 }
 
 void hcall_enter_nap(trapframe_t *regs)
