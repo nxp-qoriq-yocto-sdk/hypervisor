@@ -38,6 +38,8 @@ export LIBOS := $(src)libos
 export LIBOS_DIR := $(LIBOS)/lib
 export LIBOS_INC := $(LIBOS)/include
 
+export OLD_PROJECTVERSION=$(strip $(shell cat $(O)/version))
+
 .PHONY: all $(wildcard test/*)
 all:
 
@@ -66,6 +68,10 @@ ifeq ($(MAKECMDGOALS),)
 endif
 
 $(non-config): $(O)include/config/auto.conf FORCE
+ifneq ("$(OLD_PROJECTVERSION)","$(PROJECTVERSION)")
+	@echo $(PROJECTVERSION) > $(O)/version
+	@$(MAKE) silentoldconfig
+endif
 	@$(MKDIR) $(O)bin/
 	@$(MAKE) -C $(O) -f $(src)Makefile.build $@
 
