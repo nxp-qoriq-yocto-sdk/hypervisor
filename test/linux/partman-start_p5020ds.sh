@@ -22,5 +22,5 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 partman load -h p2-linux -f vmlinux -a 0x0
-partman load -h p2-linux -f rootfs.ext2.gz -a 0x1300000
+partman load -h p2-linux -f initramfs.cpio.gz.uboot -a 0x1300000 -r
 partman start -h p2-linux -e 0x0

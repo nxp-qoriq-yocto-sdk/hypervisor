@@ -482,21 +482,6 @@
 			};
 		};
 
-		/* Currently, the hypervisor does not support updating the
-		 * chosen node based on images loaded via partman.  This is
-		 * because there's no mechanism for partman to tell the
-		 * hypervisor that a particular image is a root file system.
-		 * So we need to hard-code the memory ranges used for the
-		 * rootfs here.  To load the rootfs, use:
-		 * "partman load -a X ...", where X is the value of
-		 * linux,initrd-start below.
-		 */
-		node-update {
-			chosen {
-				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x03B00000>;
-			};
-		};
 	};
 
 	// =====================================================
@@ -560,20 +545,5 @@
 			};
 		};
 
-		/* Currently, the hypervisor does not support updating the
-		 * chosen node based on images loaded via partman.  This is
-		 * because there's no mechanism for partman to tell the
-		 * hypervisor that a particular image is a root file system.
-		 * So we need to hard-code the memory ranges used for the
-		 * rootfs here.  To load the rootfs, use:
-		 * "partman load -a X ...", where X is the value of
-		 * linux,initrd-start below.
-		 */
-		node-update {
-			chosen {
-				linux,initrd-start = <0x01300000>;
-				linux,initrd-end = <0x0BB00000>;
-			};
-		};
 	};
 };

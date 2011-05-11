@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,6 +69,7 @@ struct parameters {
 	unsigned int a_specified:1;
 	unsigned int e_specified:1;
 	unsigned int l_specified:1;
+	unsigned int r_specified:1;
 };
 
 /* Elf file types that we support */
@@ -153,8 +154,9 @@ static void usage(void)
 
 	printf("   partman status\n");
 
-	printf("   partman load -h <handle> -f <file> [-a <address>]\n"
-	       "      Load an image.\n");
+	printf("   partman load -h <handle> -f <file> [-a <address>] [-r]\n"
+	       "      Load an image.\n"
+	       "      Use -r to tell that the image is a filesystem.\n");
 
 	printf("   partman start -h <handle> [-l] [-f <file>] [-e <addr>] [-a <addr>]\n"
 	       "     Start a partition.\n"
@@ -481,15 +483,13 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 /**
  * Load an image file into memory and parse it if it's an ELF
  *
- * @partition: the partition handle to copy to
- * @filename: file name of image
+ * @p: the program input parameters
  * @load_address: load address, or -1 to use ELF load address
  * @entry_address: pointer to returned entry address
  *
  * Returns 0 for failure or non-zero for success
  */
-static int load_and_copy_image_file(unsigned int partition,
-				    const char *filename,
+static int load_and_copy_image_file(struct parameters *p,
                                     unsigned long load_address,
 				    unsigned long *entry_address)
 {
@@ -499,6 +499,8 @@ static int load_and_copy_image_file(unsigned int partition,
 	void *buffer = NULL;
 	struct stat buf;
 	int ret;
+	unsigned int partition = p->h;
+	const char *filename = p->f;
 
 	f = open(filename, O_RDONLY);
 	if (f == -1) {
@@ -541,6 +543,49 @@ static int load_and_copy_image_file(unsigned int partition,
 		struct image_header *hdr;
 
 		hdr = (struct image_header *)mapped;
+
+		if (p->r_specified) {
+
+			char *path;
+			char *prop_start;
+			char *prop_end;
+			unsigned long end_address;
+			struct fsl_hv_ioctl_prop param;
+
+			if (verbose)
+				printf("Filesystem image: updating initrd-start/end\n");
+
+			/* set linux,initrd-start as load address */
+			path       = "/chosen";
+			prop_start = "linux,initrd-start";
+			prop_end   = "linux,initrd-end";
+
+			param.handle = partition;
+			param.path = (uint64_t)(uintptr_t)path;
+			param.propname = (uint64_t)(uintptr_t)prop_start;
+			param.propval = (uint64_t)(uintptr_t)&load_address;
+			param.proplen = sizeof(uintptr_t);
+
+			ret = hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+			if (ret && !quiet) {
+				printf("Could not set %s error=%i\n",
+					prop_start, ret);
+				goto fail;
+			}
+
+			/* set linux,initrd-end as initramfs end address */
+			end_address = load_address + ntohl(hdr->size);
+			param.propname = (uint64_t)(uintptr_t)prop_end;
+			param.propval = (uint64_t)(uintptr_t)&end_address;
+
+
+			ret = hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+			if (ret && !quiet) {
+				printf("Could not set %s error=%i\n",
+					prop_end, ret);
+				goto fail;
+			}
+		}
 		ret = copy_to_partition(partition,
 					&hdr->data,
 					load_address, ntohl(hdr->size));
@@ -761,7 +806,7 @@ static int cmd_load_image(struct parameters *p)
 
 	load_address = p->a_specified ? p->a : (unsigned long) -1;
 
-	ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
+	ret = load_and_copy_image_file(p, load_address, &entry_address);
 	if (!ret && !quiet) {
 		printf("Could not load and copy file %s\n", p->f);
 		return EV_EIO;
@@ -802,7 +847,7 @@ static int cmd_start(struct parameters *p)
 
 		load_address = p->a_specified ? p->a : (unsigned long) -1;
 
-		ret = load_and_copy_image_file(p->h, p->f, load_address, &entry_address);
+		ret = load_and_copy_image_file(p, load_address, &entry_address);
 		if (!ret)
 			return EV_EIO;
 
@@ -1156,7 +1201,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "-:vqh:f:a:e:n:p:t:l")) != -1) {
+	while ((c = getopt(argc, argv, "-:vqh:f:a:e:n:p:t:l:r")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose = 1;
@@ -1189,6 +1234,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			p.l_specified = 1;
+			break;
+		case 'r':
+			p.r_specified = 1;
 			break;
 		case 1:
 			if (cmdstr) {

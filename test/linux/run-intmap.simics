@@ -29,7 +29,7 @@ $guest_image[0]  = "uImage"
 $guest_addr[0]   = 0x00020000
 $guest_image[1]  = "hv-intmap.dtb"
 $guest_addr[1]   = 0x00900000
-$guest_image[2]  = "rootfs.ext2.gz.uboot"
+$guest_image[2]  = "initramfs.cpio.gz.uboot"
 $guest_addr[2]   = 0x01300000
 
 add-directory "%script%/../common" -prepend
