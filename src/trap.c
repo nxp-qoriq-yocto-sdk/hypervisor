@@ -487,9 +487,13 @@ void tlb_miss(trapframe_t *regs)
 		register_t mas1, mas2;
 		int store = mfspr(SPR_ESR) & ESR_ST;
 		int pid, space, ret;
+		uint32_t epc = 0;
 
 		if (epid) {
-			uint32_t epc = store ? regs->epsc : regs->eplc;
+			if (store)
+				epc = guest ? regs->epsc : mfspr(SPR_EPSC);
+			else
+				epc = guest ? regs->eplc : mfspr(SPR_EPLC);
 
 			pid = epc & EPC_EPID;
 			space = !!(epc & EPC_EAS);
@@ -499,17 +503,27 @@ void tlb_miss(trapframe_t *regs)
 			               (regs->srr1 & MSR_DS) >> 4;
 		}
 
-		ret = guest_tlb1_miss(vaddr, space, pid);
-		if (likely(ret == TLB_MISS_HANDLED))
-			return;
-
-		if (ret == TLB_MISS_MCHECK && guest) {
-			reflect_mcheck(regs, MCSR_MAV | MCSR_MEA |
-			                     (itlb ? MCSR_IF : (store ? MCSR_ST : MCSR_LD)), vaddr);
-			return;
-		};
+		if (guest || (epc & EPC_EGS)) {
+			ret = guest_tlb1_miss(vaddr, space, pid);
+			if (likely(ret == TLB_MISS_HANDLED))
+				return;
+		}
 
 		if (guest) {
+			if (ret == TLB_MISS_MCHECK) {
+				uint32_t mcsr = MCSR_MAV | MCSR_MEA;
+
+				if (itlb)
+					mcsr |= MCSR_IF;
+				else if (store)
+					mcsr |= MCSR_ST;
+				else
+					mcsr |= MCSR_LD;
+
+				reflect_mcheck(regs, mcsr, vaddr);
+				return;
+			};
+
 			assert(ret == TLB_MISS_REFLECT);
 
 			set_stat(bm_stat_tlb_miss_reflect, regs);

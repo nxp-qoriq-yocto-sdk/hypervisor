@@ -2,7 +2,7 @@
  * TLB miss fastpath, filling from TLB0 cache
  */
 /*
- * Copyright (C) 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -111,22 +111,45 @@
 	SHIFTL	%r7, %r7, %r9		// r7 = tag bits from address
 
 	.if	\itlb == 0
+	andis.	%r10, %r6, MSR_GS@h
 	mfspr	%r11, SPR_ESR
+	beq	hv_dtlb_miss
 	andi.	%r10, %r11, ESR_EPID
-
-	bne-	epid
+	bne	epid_guest
 	rlwimi	%r7, %r6, \asbit - 43, 11, 11 // Insert AS into tag
 	mfspr	%r12, SPR_PID
 ret_epid:
 	.else
+	andis.	%r10, %r6, MSR_GS@h
 	rlwimi	%r7, %r6, \asbit - 43, 11, 11 // Insert AS into tag
+	beq	tlb_miss_slow
 	mfspr	%r12, SPR_PID
 	.endif
 
 	b	tlb_miss_fast_common
 	.endm
 
-epid:
+/* If the hv uses epid to access guest space, treat it like a guest epid
+ * access.  Otherwise, take the slow path like normal hv tlb misses.
+ *
+ * The only valid HV epid scenarios are:
+ *   ELPID = LPID and EGS = 1
+ *   ELPID = 0 and EGS = 0
+ * ...so we don't test ELPID here.
+ */
+epid_hv:
+	andis.	%r10, %r11, ESR_ST@h
+	bne	1f
+	mfspr	%r10, SPR_EPLC
+	b	2f
+1:	mfspr	%r10, SPR_EPSC
+2:	andis.	%r12, %r10, EPC_EGS@h
+	rlwimi	%r7, %r10, 32 + EPCBIT_EAS - 43, 11, 11 // Insert AS into tag
+	beq	tlb_miss_slow
+	rlwinm	%r12, %r10, 0, EPC_EPID
+	b	ret_epid
+
+epid_guest:
 	andis.	%r10, %r11, ESR_ST@h
 	bne	1f
 	mfspr	%r10, SPR_EPLC
@@ -149,11 +172,9 @@ tlb_miss_fast_common:
 #endif
 	add	%r3, %r3, %r4		// r3 = tlbset_t address
 	LOAD	%r9, LONGBYTES*0(%r3)	// Load the tag words
-	andis.	%r10, %r6, MSR_GS@h	// HV misses always take the slow path
 	mfspr	%r5, SPR_LPIDR
 	LOAD	%r10, LONGBYTES*1(%r3)
 	LOAD	%r11, LONGBYTES*2(%r3)
-	beq-	tlb_miss_slow
 
 	rlwimi	%r7, %r5, 14, 12, 17	// Insert LPID into tag
 	li	%r4, -1
@@ -274,6 +295,9 @@ tlb_miss_fast_common:
 	mfspr	%r2, SPR_SPRG1
 	rfi
 
+hv_dtlb_miss:
+	andi.	%r10, %r11, ESR_EPID
+	bne	epid_hv
 tlb_miss_slow:
 	LOAD	%r12, LONGBYTES*15(%r2)
 	LOAD	%r3, LONGBYTES*0(%r2)
