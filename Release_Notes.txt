@@ -25,14 +25,24 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 0.8
-Revision: 005
-Date: 04/20/2011
+Topaz Version: 1.0
+Revision: 001
+Date: 05/12/2011
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.0-001 bug fixes and changes
+       -gdb-stub: support 64bit e5500 cores
+       -bug 7136: fix tlb misse handling on hv accesses to guest state
+       -bug 7418: new refman Rev0 states that each core should be put
+        into nap mode individually
+       -bug 7497: fixed EV_GET_INT_CONFIG to return level and sense in
+        the right bits
+       -bug 4328: version string is automatically updated when version changes
+       -changed tests to use initramfs
+
    -v0.8-005 bug fixes and changes
        -bug 4632: added a new config dts property, "srio-ccsr-subwindow",
         to support SRIO under HV
