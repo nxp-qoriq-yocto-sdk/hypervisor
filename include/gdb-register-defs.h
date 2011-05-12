@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -324,7 +324,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "Debug Status Register",
 	  .name="dbsr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_DBSR, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Debug Status Register Write Register",
 	  .name="dbsrwr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_DBSRWR, },
@@ -350,7 +350,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "Debug Save/Restore Register 1",
 	  .name="dsrr1", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_DSRR1, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Embedded Processor Control Register",
 	  .name="epcr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_EPCR, },
@@ -373,52 +373,52 @@ struct register_description e500mc_sprs[] =
 	{ .description = "Guest External Proxy Register",
 	  .name="gepr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GEPR, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Exception Syndrome Register",
 	  .name="gesr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GESR, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Data TLB Error Register",
 	  .name="givor13", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR13, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Instruction TLB Error",
 	  .name="givor14", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR14, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Data Storage Interrupt",
 	  .name="givor2", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR2, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Instruction Storage Interrupt",
 	  .name="givor3", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR3, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest External Input",
 	  .name="givor4", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR4, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest System Call",
 	  .name="givor8", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVOR8, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Interrupt Vector Prefix Register",
 	  .name="givpr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GIVPR, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Processor Identification Register",
 	  .name="gpir", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GPIR, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Special Purpose Register General 0",
 	  .name="gsprg0", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GSPRG0, },
@@ -432,12 +432,12 @@ struct register_description e500mc_sprs[] =
 	  .name="gsprg3", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GSPRG3, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Save/Restore Register 0",
 	  .name="gsrr0", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GSRR0, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Guest Save/Restore Register 1",
 	  .name="gsrr1", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_GSRR1, },
@@ -475,7 +475,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "Instruction Address Compare 2",
 	  .name="iac2", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IAC2, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 0 (Critical Input)",
 	  .name="ivor0", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR0, },
@@ -501,7 +501,7 @@ struct register_description e500mc_sprs[] =
 			 "(Instruction TLB Error)",
 	  .name="ivor14", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR14, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 15 (Debug)",
 	  .name="ivor15", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR15, },
@@ -525,13 +525,13 @@ struct register_description e500mc_sprs[] =
 	                 "(Processor Doorbell Critical Interrupt)",
 	  .name="ivor37", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR37, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 38"
 	                 "(Guest Processor Doorbell)",
 	  .name="ivor38", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR38, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 39"
 	                 "(Guest Processor Doorbell Critical"
 	                 " and "
@@ -542,13 +542,13 @@ struct register_description e500mc_sprs[] =
 	{ .description = "Interrupt Vector Offset Register 4 (External Input)",
 	  .name="ivor4", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR4, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 40"
 	                 "(Hypervisor System Call)",
 	  .name="ivor40", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_IVOR40, },
 #endif
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Interrupt Vector Offset Register 41"
 	                 "(Hypervisor Privilege)",
 	  .name="ivor41", .bitsize="32", .save_restore="no",
@@ -637,7 +637,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "L2 Cache error interrupt enable register",
 	  .name="l2errinten", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_L2ERRINTEN, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "Logical Partition ID Format Register",
 	  .name="lpidr", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_LPIDR, },
@@ -657,7 +657,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "MMU Assist Register 4",
 	  .name="mas4", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MAS4, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "MMU Assist Register 5",
 	  .name="mas5", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MAS5, },
@@ -668,7 +668,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "MMU Assist Register 7",
 	  .name="mas7", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MAS7, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "MMU Assist Register 8",
 	  .name="mas8", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MAS8, },
@@ -694,7 +694,7 @@ struct register_description e500mc_sprs[] =
 	{ .description = "MMU Control and Status Register 0",
 	  .name="mmucsr0", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MMUCSR0, },
-#ifndef TOPAZ
+#ifdef DEBUG_EHV
 	{ .description = "MSR Protect Register",
 	  .name="msrp", .bitsize="32", .save_restore="no",
 	  .group="general", .cat=reg_cat_spr, .inum=SPR_MSRP, },
