@@ -43,6 +43,8 @@ def hw_boot(obj,testname_s, testname_l, board):
 	obj.send("\r")
 	obj.expect_exact("=> ", timeout = 20)
 	obj.send("setenv unittestdir %s\r" % (common.RMT_TESTDIR+testname_s))	
+	obj.expect_exact("=> ", timeout = 20)
+	obj.send("setenv unittestname %s\r" % testname_s)
 	obj.expect_exact("=> ", timeout = 10)
 	obj.send("setenv platform %s\r" % board)
 	obj.expect_exact("=> ", timeout = 10)

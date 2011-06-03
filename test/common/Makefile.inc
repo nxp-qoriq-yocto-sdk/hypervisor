@@ -46,7 +46,7 @@ bin/$(test)/$(test): $($(test)-obj) $($(test)-nocheck-obj)
 	$(V)$(CC) $(LD_OPTS) -Wl,-T$(LD_SCRIPT) -o $@ $^ -lgcc
 	$(CROSS_COMPILE)objcopy -O binary $@ $@.bin
 	gzip $@.bin
-	mkimage -A ppc -O linux -T kernel -C none -a 00000000 -e 00000000 -d $@.bin.gz $@.uImage
+	mkimage -A ppc -O linux -T kernel -C gzip -a 00000000 -e 00000000 -d $@.bin.gz $@.uImage
 	rm -f $@.bin.gz
 
 .PHONY: $(test)
