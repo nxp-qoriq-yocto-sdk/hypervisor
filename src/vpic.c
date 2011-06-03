@@ -87,14 +87,15 @@ static void send_vint(gcpu_t *gcpu)
 static void set_virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
 {
 	gcpu->vpic.pending[virq->irqnum / LONG_BITS] |=
-					1 << (virq->irqnum % LONG_BITS);
+					1UL << (virq->irqnum % LONG_BITS);
+
 	virq->pending = 1;
 }
 
 static void set_virq_active(vpic_interrupt_t *virq, gcpu_t *gcpu)
 {
 	gcpu->vpic.active[virq->irqnum / LONG_BITS] |=
-					1 << (virq->irqnum % LONG_BITS);
+					1UL << (virq->irqnum % LONG_BITS);
 	virq->active = 1;
 }
 
@@ -102,27 +103,27 @@ static void clear_virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
 {
 
 	gcpu->vpic.pending[virq->irqnum / LONG_BITS] &=
-					~(1 << (virq->irqnum % LONG_BITS));
+					~(1UL << (virq->irqnum % LONG_BITS));
 	virq->pending = 0;
 }
 
 static void clear_virq_active(vpic_interrupt_t *virq, gcpu_t *gcpu)
 {
 	gcpu->vpic.active[virq->irqnum / LONG_BITS] &=
-					~(1 << (virq->irqnum % LONG_BITS));
+					~(1UL << (virq->irqnum % LONG_BITS));
 	virq->active = 0;
 }
 
 static int virq_pending(vpic_interrupt_t *virq, gcpu_t *gcpu)
 {
 	return gcpu->vpic.pending[virq->irqnum / LONG_BITS] &
-					(1 << (virq->irqnum % LONG_BITS));
+					(1UL << (virq->irqnum % LONG_BITS));
 }
 
 
 static void clear_gcpu_pending_virq(uint8_t irqnum, gcpu_t *gcpu)
 {
-	gcpu->vpic.pending[irqnum / LONG_BITS] &= ~(1 << (irqnum%LONG_BITS));
+	gcpu->vpic.pending[irqnum / LONG_BITS] &= ~(1UL << (irqnum%LONG_BITS));
 }
 
 

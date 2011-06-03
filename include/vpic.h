@@ -50,8 +50,8 @@ typedef struct vpic {
 } vpic_t;
 
 typedef struct vpic_cpu {
-	uint64_t active[MAX_VINT_INDEX];
-	uint64_t pending[MAX_VINT_INDEX];
+	unsigned long active[MAX_VINT_INDEX];
+	unsigned long pending[MAX_VINT_INDEX];
 } vpic_cpu_t;
 
 vpic_interrupt_t *vpic_alloc_irq(struct guest *guest, int config);
