@@ -1497,7 +1497,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
                register_t mas3flags)
 {
 	size_t offset, bytesize;
-	int tsize = pages_to_tsize((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	int tsize = pages_to_tsize_msb((*len + PAGE_SIZE - 1) >> PAGE_SHIFT);
 
 	tsize = min(max_page_tsize((uintptr_t)vpage >> PAGE_SHIFT, tsize),
 	            natural_alignment(paddr >> PAGE_SHIFT));
