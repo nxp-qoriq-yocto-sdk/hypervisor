@@ -213,7 +213,7 @@ static void usage(void)
  * <0: ioctl error condition
  * >0: Hypervisor error condition
  */
-static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
+static int hv(unsigned int cmd, void *p)
 {
 	int ret = 0;
 
@@ -225,12 +225,12 @@ static int hv(unsigned int cmd, union fsl_hv_ioctl_param *p)
 		return ret;
 	}
 
-	if (ioctl(f, _IOWR(0, cmd, union fsl_hv_ioctl_param), p) == -1) {
+	if (ioctl(f, cmd, p) == -1) {
 		ret = errno;
 		if (!quiet)
 			perror(__func__);
 	} else {
-		ret = p->ret;
+		ret = *((uint32_t *)p);
 		if (ret) {
 			const char *err_str;
 			switch (ret) {
@@ -274,7 +274,7 @@ static int copy_to_partition(unsigned int partition, void *buffer,
 	im.remote_paddr = target;
 	im.count = count;
 
-	return hv(FSL_HV_IOCTL_MEMCPY, (union fsl_hv_ioctl_param *)&im);
+	return hv(FSL_HV_IOCTL_MEMCPY, &im);
 }
 
 /**
@@ -566,7 +566,7 @@ static int load_and_copy_image_file(struct parameters *p,
 			param.propval = (uint64_t)(uintptr_t)&load_address;
 			param.proplen = sizeof(uintptr_t);
 
-			ret = hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+			ret = hv(FSL_HV_IOCTL_SETPROP, &param);
 			if (ret && !quiet) {
 				printf("Could not set %s error=%i\n",
 					prop_start, ret);
@@ -579,7 +579,7 @@ static int load_and_copy_image_file(struct parameters *p,
 			param.propval = (uint64_t)(uintptr_t)&end_address;
 
 
-			ret = hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+			ret = hv(FSL_HV_IOCTL_SETPROP, &param);
 			if (ret && !quiet) {
 				printf("Could not set %s error=%i\n",
 					prop_end, ret);
@@ -862,7 +862,7 @@ static int cmd_start(struct parameters *p)
 	if (verbose)
 		printf("Starting partition at entry point 0x%lx\n", p->e);
 
-	return hv(FSL_HV_IOCTL_PARTITION_START, (union fsl_hv_ioctl_param *)&im);
+	return hv(FSL_HV_IOCTL_PARTITION_START, &im);
 }
 
 static int cmd_stop(struct parameters *p)
@@ -880,7 +880,7 @@ static int cmd_stop(struct parameters *p)
 
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_STOP, (union fsl_hv_ioctl_param *)&im);
+	return hv(FSL_HV_IOCTL_PARTITION_STOP, &im);
 }
 
 static int cmd_restart(struct parameters *p)
@@ -898,7 +898,7 @@ static int cmd_restart(struct parameters *p)
 
 	im.partition = p->h;
 
-	return hv(FSL_HV_IOCTL_PARTITION_RESTART, (union fsl_hv_ioctl_param *)&im);
+	return hv(FSL_HV_IOCTL_PARTITION_RESTART, &im);
 }
 
 static int cmd_doorbells(struct parameters *p)
@@ -922,7 +922,7 @@ static int cmd_doorbells(struct parameters *p)
 		struct fsl_hv_ioctl_doorbell im;
 
 		im.doorbell = p->h;
-		return hv(FSL_HV_IOCTL_DOORBELL, (union fsl_hv_ioctl_param *)&im);
+		return hv(FSL_HV_IOCTL_DOORBELL, &im);
 	}
 
 	// The user specified -f, so he wants to monitor doorbells.
@@ -1144,7 +1144,7 @@ static int cmd_getprop(struct parameters *p)
 	param.propval = (uint64_t)(uintptr_t)p->prop;
 	param.proplen = sizeof(p->prop);
 
-	ret = hv(FSL_HV_IOCTL_GETPROP, (union fsl_hv_ioctl_param *)&param);
+	ret = hv(FSL_HV_IOCTL_GETPROP, &param);
 	if (ret == 0) {
 		// FIXME: pretty-print strlists, cells, bytes, etc.
 		fwrite(p->prop, param.proplen, 1, stdout);
@@ -1175,7 +1175,7 @@ static int cmd_setprop(struct parameters *p)
 	param.propval = (uint64_t)(uintptr_t)p->prop;
 	param.proplen = p->proplen;
 
-	return hv(FSL_HV_IOCTL_SETPROP, (union fsl_hv_ioctl_param *)&param);
+	return hv(FSL_HV_IOCTL_SETPROP, &param);
 }
 
 static void add_to_prop(struct parameters *p, const char *arg)
