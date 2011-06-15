@@ -23,4 +23,4 @@
 #
 #!/bin/sh
 
-xterm -e "${CROSS_COMPILE}gdb -x gdb0" &
+xterm -e "${CROSS_COMPILE}gdb" &

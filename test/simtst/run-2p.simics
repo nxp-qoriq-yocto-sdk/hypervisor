@@ -24,9 +24,17 @@
 
 if ($target == "p4080ds") {
 	add-directory "%script%/../../../sim/p4080ds/R_PPSXN_0x10/hv-2p-lnx-lwe" -prepend
+	add-directory "%script%/../../../images/boot/p4080ds/R_PPSXN_0x10" -prepend
+	$rcw_image = rcw_5g_1500mhz.bin
+	$traffic=5g
+	$serdes = "0x10"
 }
 if ($target == "p3041ds") {
 	add-directory "%script%/../../../sim/p3041ds/NR_HXAPNSP_0x36/hv-2p-lnx-lwe" -prepend
+	add-directory "%script%/../../../images/boot/NR_HXAPNSP_0x36/hv-2p-lnx-lwe" -prepend
+	$rcw_image = rcw_5g.bin
+	$traffic = 5g
+	$serdes = "0x36"
 }
 # pick up local HV
 add-directory "%script%/../../output/bin" -prepend

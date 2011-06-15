@@ -192,8 +192,11 @@ def parseResults(loglist):
 	for logfile in loglist:
 		tmp_file = file(logfile,'r')
 		text = tmp_file.read()
-		failed +=text.count('FAILED')
-		passed +=text.count('PASSED')
+		#check if log is linux
+		#TODO: this should be addressed more elegant in a validate function
+		if (text.count('Linux version') == 0):
+			failed +=text.count('FAILED')
+			passed +=text.count('PASSED')
 		timeout += text.count('TIMEOUT')
 		if text.count('Connection refused'):
 			warn = True

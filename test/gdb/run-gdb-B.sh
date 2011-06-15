@@ -25,7 +25,7 @@
 
 xterm -e "${CROSS_COMPILE}gdb -x gdb0" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb1" &
-if [ $TARGET -ne `p5020ds` ]
+if [ $1 != "p5020ds" ]
 then
 xterm -e "${CROSS_COMPILE}gdb -x gdb2" &
 xterm -e "${CROSS_COMPILE}gdb -x gdb3" &

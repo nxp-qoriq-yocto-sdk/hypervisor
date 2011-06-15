@@ -137,7 +137,7 @@ endif
 
 $(test)-run-hello: $(test) bin/$(test)/$(IMAGE_NAME_1)
 	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-hello.simics
+	$(SIMICS) $(SIMICS_FLAGS) -e '$$ramdisk_filename = $(IMAGE_NAME_1)' $(testdir)linux/run-hello.simics
 
 $(test)-run-2p: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 3
@@ -145,7 +145,7 @@ $(test)-run-2p: $(test)
 
 $(test)-run-partman: $(test) bin/$(test)/$(IMAGE_NAME_2)
 	setsid $(testdir)../tools/xtel.sh 9000 4
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-partman.simics
+	$(SIMICS) $(SIMICS_FLAGS) -e '$$ramdisk_filename = $(IMAGE_NAME_2)' $(testdir)linux/run-partman.simics
 
 $(test)-run-1p: $(test)
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1p.simics
