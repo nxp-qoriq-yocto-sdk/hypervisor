@@ -891,8 +891,7 @@ static dt_node_t *get_dev_node(uint32_t handle, guest_t *guest)
 	int ret;
 
 	ret = dt_for_each_prop_value(guest->devtree, "fsl,hv-dma-handle", &handle,
-				     sizeof(dt_node_t *), node_found_callback,
-				     &node);
+				     4, node_found_callback, &node);
 	if (ret)
 		return node;
 
