@@ -93,20 +93,12 @@ static unsigned long period_to_ticks(unsigned int period)
 	return 2UL << period;
 }
 
-static void delay(unsigned long ticks)
-{
-	unsigned long start = mfspr(SPR_TBL);
-
-	while (mfspr(SPR_TBL) - start < ticks)
-		;
-}
-
 /* Delay for a time equivalent to the expected interval
  * for a fit of the given period.
  */
 static void delay_period(unsigned int period)
 {
-	return delay(period_to_ticks(period));
+	return delay_timebase(period_to_ticks(period));
 }
 
 static void wait_for_timeout(unsigned int wp)
@@ -160,7 +152,7 @@ static int test2(void)
 	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT) | TCR_WIE);
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
-	delay(1000);
+	delay_timebase(1000);
 	if (watchdog)
 		return 0;
 
@@ -197,7 +189,7 @@ static int test4(void)
 	mtspr(SPR_TCR, TCR_INT_TO_WP(TIMEOUT));
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
-	delay(1000);
+	delay_timebase(1000);
 	if (watchdog)
 		return 0;
 
@@ -218,7 +210,7 @@ static int test5(void)
 	wait_for_timeout(TIMEOUT);
 	wait_for_timeout(TIMEOUT);
 
-	delay(100000);
+	delay_timebase(100000);
 
 	// TSR[WRS] should be 0
 	return (mfspr(SPR_TSR) & TSR_WRS) == 0;
@@ -401,7 +393,7 @@ static int test6_slave(void)
 		wait_for_timeout(TIMEOUT);
 		wait_for_timeout(TIMEOUT);
 
-		delay(100000);
+		delay_timebase(100000);
 	} else {
 		printf(" reset done.\n");
 	}

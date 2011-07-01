@@ -65,20 +65,12 @@ static unsigned long period_to_ticks(unsigned int period)
 	return 2UL << period;
 }
 
-static void delay(unsigned long ticks)
-{
-	unsigned long start = mfspr(SPR_TBL);
-
-	while (mfspr(SPR_TBL) - start < ticks)
-		;
-}
-
 /* Delay for a time equivalent to the expected interval
  * for a fit of the given period.
  */
 static void delay_period(unsigned int period)
 {
-	return delay(period_to_ticks(period));
+	return delay_timebase(period_to_ticks(period));
 }
 
 static void wait_for_interrupt(volatile int *count, unsigned int c)
@@ -189,7 +181,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	dont_clear = 1;
 	mtspr(SPR_DEC, 100000);
 	mtspr(SPR_TCR, TCR_DIE);
-	delay(100000);
+	delay_timebase(100000);
 	diff = dec_count - prev;
 	if (diff != 2) {
 		printf("FAILED: got %d interrupt(s) instead of two\n", diff);
@@ -205,7 +197,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	prev = dec_count;
 	mtspr(SPR_TCR, TCR_DIE | TCR_ARE);
 	mtspr(SPR_DEC, 1000);
-	delay(3 * 100000 + 1000);
+	delay_timebase(3 * 100000 + 1000);
 	diff = dec_count - prev;
 	if (diff != 4) {
 		printf("FAILED: got %d interrupt(s) instead of four\n", diff);

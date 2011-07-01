@@ -126,13 +126,6 @@ static const uint32_t *get_handle(const char *dbell_type,
 
 	return fdt_getprop(tree, off, prop, &len);
 }
-static void delay(unsigned long ticks)
-{
-	unsigned long start = mfspr(SPR_TBL);
-
-	while (mfspr(SPR_TBL) - start < ticks)
-		;
-}
 
 static int test_init(void)
 {
@@ -161,7 +154,7 @@ static int test_init(void)
 	/* add an arbitrary delay to make sure that the other partion
 	 * has configured the VMPIC
 	 */
-	delay (1000);
+	delay_timebase(1000);
 
 	ev_doorbell_send(*handle_p);
 
