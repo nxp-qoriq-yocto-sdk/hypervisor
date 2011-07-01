@@ -69,10 +69,19 @@ int init_error_queues(void);
 int get_number32(const char *numstr, uint32_t *num);
 char *nextword(char **str);
 
-static inline void delay_timebase(unsigned long ticks)
+uint64_t get_tb(void);
+uint32_t dt_get_timebase_freq(void);
+
+static inline void delay_timebase(uint64_t ticks)
 {
-	unsigned long start = mfspr(SPR_TBL);
-	while (mfspr(SPR_TBL) - start < ticks);
+	uint64_t start = get_tb();
+
+	while (get_tb() - start < ticks);
+}
+
+static inline void delay_ms(unsigned long ms)
+{
+	delay_timebase((uint64_t)ms * dt_get_timebase_freq() / 1000);
 }
 
 #endif

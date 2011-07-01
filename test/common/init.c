@@ -388,6 +388,40 @@ static int get_stdout(void)
 	return node;
 }
 
+uint64_t get_tb(void)
+{
+        register_t tbl, tbu;
+
+again:
+	tbu = mfspr(SPR_TBU);
+	tbl = mfspr(SPR_TBL);
+	if (tbu != mfspr(SPR_TBU))
+		goto again;
+
+        return ((uint64_t) tbu << 32 | tbl);
+}
+
+uint32_t dt_get_timebase_freq(void)
+{
+	int node;
+	int len;
+
+	node = fdt_node_offset_by_prop_value(fdt, -1, "device_type", "cpu", strlen("cpu")+1);
+
+	if (node == -FDT_ERR_NOTFOUND) {
+		printf("cpu node not found\n");
+		return -1;
+	}
+
+        const uint32_t *tb = fdt_getprop(fdt, node, "timebase-frequency", &len);
+	if (!tb) {
+		printf("timebase not found\n");
+		return -1;
+	}
+
+	return (uint32_t)*tb;
+}
+
 const char *get_bootargs(void)
 {
 	int offset, len;
