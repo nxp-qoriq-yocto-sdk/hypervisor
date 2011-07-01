@@ -285,6 +285,16 @@ void libos_client_entry(unsigned long devtree_ptr)
 	if(!strcmp("/part1", label)) {
 		read_memory_map();
 		find_unmapped_memory(&addr_beg, &addr_end);
+
+		/* Both partitions involved in the test trigger a pamu exception.
+		 * The first exception starts to get handled in the hv. The handler
+		 * prints a log message (an operation which takes _A_LOT_ of time) and
+		 * then clears the pamu error bits. However, the second exception was still
+		 * pending and is lost.
+		 * Add an arbitrary delay to first partition in order to
+		 * desynchronize the moment the error interrupts are triggered.
+		 */
+		delay_ms(500);
 	}
 
 	/* test access violation failure and pass cases */
