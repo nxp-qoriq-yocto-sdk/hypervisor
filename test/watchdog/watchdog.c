@@ -380,6 +380,16 @@ static int test6_master(void)
 
 static int test6_slave(void)
 {
+	const char *bootargs;
+
+	bootargs = get_bootargs();
+
+	if (!strcmp(bootargs, "watchdog-autostart")) {
+		printf("> [slave partition] wait for autostarted watchdog to trigger");
+		while (1)
+			;
+	}
+
 	if (!(mfspr(SPR_TSR) & TSR_WRS)) {
 		printf("> [slave partition] set timeout reset, set watchdog, wait thrice.");
 
@@ -413,8 +423,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("CPU%u TSR[WRS] = %lu\n", cpu_index, (mfspr(SPR_TSR) & TSR_WRS) >> 28);
 
-	mtspr(SPR_TCR, TCR_WRC_NOP);
-
 	label = fdt_getprop(fdt, 0, "label", &len);
 	if (!label || !len) {
 		printf("Error reading partition label\n");
@@ -422,6 +430,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 	}
 
 	if (!strcmp(label, "/manager-part")) {
+		mtspr(SPR_TCR, TCR_WRC_NOP);
+
 		if (test1())
 			printf("PASSED\n");
 		else
