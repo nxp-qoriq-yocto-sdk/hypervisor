@@ -1631,7 +1631,7 @@ return_to_guest:
 			err_flag = 0;
 			escape_flag = 0;
 			j = 0;
-			for (i = 0; i < length; i++) {
+			for (i = 0; j < length; i++) {
 				int ret;
 				INFO("X packet byte %d: 0x%2x", i, data[i]);
 				if (data[i] == '}') {
