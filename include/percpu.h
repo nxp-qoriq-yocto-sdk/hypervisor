@@ -146,6 +146,11 @@ typedef struct guest {
 	 */
 	wd_action_t wd_action;
 
+	/** Period with which to autostart the guest watchdog at guest
+	 *  start or -1 to disable this feature.
+	 */
+	int wd_autostart;
+
 	/** On partition stop, defer DMA disable to manager hcall, but
 	 *  disable as usual on cold boot and partition reset.
 	 */

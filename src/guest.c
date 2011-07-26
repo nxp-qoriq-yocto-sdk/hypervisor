@@ -1938,6 +1938,14 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	regs->srr1 = MSR_GS;
 	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
 
+	if (guest->wd_autostart != -1) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
+		         "autostarting guest watchdog with period %d\n",
+		         guest->wd_autostart);
+
+		set_tcr(TCR_INT_TO_WP(guest->wd_autostart) | TCR_WRC_RESET);
+	}
+
 #ifdef CONFIG_DEBUG_STUB
 	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
 		guest->stub_ops->vcpu_start(regs);
@@ -2071,6 +2079,9 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 
 	regs->srr1 = MSR_GS;
 	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
+
+	if (guest->wd_autostart != -1)
+		set_tcr(TCR_INT_TO_WP(guest->wd_autostart) | TCR_WRC_RESET);
 
 #ifdef CONFIG_DEBUG_STUB
 	if (get_gcpu()->dbgstub_cfg && guest->stub_ops && guest->stub_ops->vcpu_start)
@@ -3122,6 +3133,18 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 			 "%s: invalid watchdog timeout option %s\n",
 			 __func__, str);
 		guest->wd_action = wd_reset;
+	}
+
+	guest->wd_autostart = -1;
+	prop = dt_get_prop(guest->partition, "watchdog-autostart-period", 0);
+	if (prop) {
+		if (prop->len == 4 && *(uint32_t *)prop->data < 64) {
+			guest->wd_autostart = *(uint32_t *)prop->data;
+		} else {
+			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			         "%s: invalid watchdog autostart period\n",
+			         __func__);
+		}
 	}
 
 	ret = dt_process_node_update(guest, guest->devtree, guest->partition);
