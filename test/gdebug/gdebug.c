@@ -163,6 +163,8 @@ static void guest_debug_on(void)
 
 	if (saved_trap_eip + 8 == saved_icmp_eip )
 		printf("PASSED\n");
+	else
+		printf("FAILED\n");
 
 	printf("Testing IAC1/IAC2 Debug event : ");
 	loopcnt = 1;
@@ -177,8 +179,10 @@ static void guest_debug_on(void)
 	printf("PASSED\n");
 
 	printf("Testing DAC1/DAC2 Debug event : ");
-	if (dac2_write_hit_pc == 8 + data_watchpoint_cmp)
+	if (dac2_write_hit_pc == 16 + data_watchpoint_cmp)
 		printf("PASSED\n");
+	else
+		printf("FAILED\n");
 
 	printf("Testing Branch taken (BRT) Debug event : ");
 
