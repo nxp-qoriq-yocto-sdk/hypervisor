@@ -384,7 +384,7 @@ static int test6_slave(void)
 
 	bootargs = get_bootargs();
 
-	if (!strcmp(bootargs, "watchdog-autostart")) {
+	if (bootargs && !strcmp(bootargs, "watchdog-autostart")) {
 		printf("> [slave partition] wait for autostarted watchdog to trigger");
 		while (1)
 			;
