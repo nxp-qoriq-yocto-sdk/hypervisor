@@ -972,7 +972,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 
 	spin_unlock(&pamu_error_lock);
 
-	ppaace->addr_bitfields |= PAACE_V_VALID;
+	pamu_disable_liodn(av_liodn);
 	pamu_error_log(&err, guest);
 	error_policy_action(&err, error_pamu,
 			    pamu_err_policy[pamu_access_violation]);
