@@ -84,6 +84,10 @@ config P4080_ERRATUM_PAMU3
 	bool
 	default y if !LIBOS_64BIT
 
+config ERRATUM_PAMU_A_003638
+	bool
+	default y
+
 config BYTE_CHAN
 	bool "Byte-channel support"
 	select LIBOS_QUEUE

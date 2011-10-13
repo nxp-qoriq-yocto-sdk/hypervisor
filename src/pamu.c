@@ -56,6 +56,12 @@ static uint32_t pamu_error_lock;
 static pamu_handle_t *liodn_to_handle[PAACE_NUMBER_ENTRIES];
 static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
 static uint32_t pamu_lock;
+#ifdef CONFIG_ERRATUM_PAMU_A_003638
+static void *pamu_reg_disabled[PAACE_NUMBER_ENTRIES];
+
+#define PAMU_STAT (PAMU_ACCESS_VIOLATION_STAT | PAMU_OPERATION_ERROR_INT_STAT)
+
+#endif
 
 static int is_subwindow_count_valid(int subwindow_cnt)
 {
@@ -708,6 +714,24 @@ int hv_pamu_enable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
+#ifdef CONFIG_ERRATUM_PAMU_A_003638
+	/* re-enable access violations if necessary */
+	if (pamu_reg_disabled[liodn]) {
+		uint32_t pics;
+		void *reg = pamu_reg_disabled[liodn];
+
+		/* access violations are now enabled for this PAMU */
+		pamu_reg_disabled[liodn] = NULL;
+
+		lwsync();
+
+		/* re-enable access violations if necessary */
+		pics = in32((uint32_t *)(reg + PAMU_PICS));
+		out32((uint32_t *)(reg + PAMU_PICS), (pics & ~PAMU_STAT) | PAMU_ACCESS_VIOLATION_ENABLE);
+
+	}
+#endif
+
 	if (pamu_enable_liodn(liodn) != 0)
 		return EV_EINVAL;
 
@@ -928,6 +952,35 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 
 	avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
 	av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
+
+#ifdef CONFIG_ERRATUM_PAMU_A_003638
+	/* When a peripheral interface makes an invalid memory access, an access violation
+	 * interrupt is triggered. The interrupt handler clears PICS[AVICS] to clear
+	 * the interrupt and also clears the appropriate bit from the PAACE entry to stop
+	 * further attempts from the peripheral interface that may cause further access
+	 * violations. 
+	 * Due to errata, clearing the valid bit in PAACE entry will not stop further access
+	 * violations from the interface. Furthermore, if access violations continue to occur,
+	 * the PAMU can end up into a state where PICS[AVICS] is 0, but the access violation
+	 * interrupt is still fired.
+	 * Workaround:
+	 * When the access violation occurs, the access violation reporting is disabled for
+	 * this PAMU and it is the responsability of the guest to re-enable DMA when the
+	 * device is in a valid state (when no more illegal memory accesses are performed).
+	 * When the guest re-enables DMA, if that liodn caused the access violation interrupts
+	 * to be disabled, they will be re-enabled
+	 */
+	
+	/* disable the access violations for this PAMU
+	 *- AVICS should be 0, do not clear it yet
+	 *- POEICS should be 0, as 1 is changing the value
+	 *- AVIE should be 0 to disable access violations for this PAMU
+	 *- POEIE should be left as it is
+	 */
+	out32((uint32_t *)(reg + PAMU_PICS), (pics & ~PAMU_STAT) & ~PAMU_ACCESS_VIOLATION_ENABLE);
+	pamu_reg_disabled[av_liodn] = reg;
+	pics = pics & ~PAMU_ACCESS_VIOLATION_ENABLE;
+#endif
 
 	ppaace = pamu_get_ppaace(av_liodn);
 	/* We may get access violations for invalid LIODNs, just ignore them */
