@@ -117,13 +117,20 @@ static void guest_debug_off(void)
 
 	mtspr(SPR_DBCR4, test_events);
 	
-	mtspr(SPR_IAC1, (unsigned long) &hwbreaktestfunc);
+#ifndef CONFIG_LIBOS_64BIT
+	mtspr(SPR_IAC1, (register_t) &hwbreaktestfunc);
 
-	mtspr(SPR_IAC2, (unsigned long) &hwbreaktestfunc);
+	mtspr(SPR_IAC2, (register_t) &hwbreaktestfunc);
+#else
+	// function pointers are implemented as function descriptors on 64-bit
+	mtspr(SPR_IAC1, *(register_t *) &hwbreaktestfunc);
 
-	mtspr(SPR_DAC1, (unsigned long) &loopcnt);
+	mtspr(SPR_IAC2, *(register_t *) &hwbreaktestfunc);
+#endif
 
-	mtspr(SPR_DAC2, (unsigned long) &loopcnt);
+	mtspr(SPR_DAC1, (register_t) &loopcnt);
+
+	mtspr(SPR_DAC2, (register_t) &loopcnt);
 	
 	printf("Test Complete\n");
 
@@ -170,8 +177,15 @@ static void guest_debug_on(void)
 	loopcnt = 1;
 	mtspr(SPR_DBCR1, 0);
 	mtspr(SPR_DBCR2, 0);
-	mtspr(SPR_IAC1, (unsigned long) &hwbreaktestfunc);
-	mtspr(SPR_DAC2, (unsigned long) &loopcnt);
+
+#ifndef CONFIG_LIBOS_64BIT
+	mtspr(SPR_IAC1, (register_t) &hwbreaktestfunc);
+#else
+	// function pointers are implemented as function descriptors on 64-bit
+	mtspr(SPR_IAC1, *(register_t *) &hwbreaktestfunc);
+#endif
+
+	mtspr(SPR_DAC2, (register_t) &loopcnt);
 
 	while (loopcnt)
 		hwbreaktestfunc();
