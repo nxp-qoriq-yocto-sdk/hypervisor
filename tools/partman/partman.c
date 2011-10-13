@@ -80,9 +80,18 @@ struct parameters {
 #define PT_LOAD      1
 
 #define EI_CLASS     4  /* File class */
+#define EI_NIDENT   16  /* Size of ident field */
 #define ELFCLASS32   1  /* 32-bit objects */
+#define ELFCLASS64   2  /* 64-bit objects */
 #define EI_DATA      5  /* Data encoding */
 #define ELFDATA2MSB  2  /* 2's complement, big endian */
+
+#define SELECT_CLASS(a,b) ((hdr->h.ident[EI_CLASS] == ELFCLASS32)? \
+			(a)->h32.b : (a)->h64.b)
+
+#define ELF_HEADER(b) SELECT_CLASS(hdr,b)
+
+#define PROGRAM_HEADER(b) SELECT_CLASS(phdr,b)
 
 static int verbose = 0;
 static int quiet = 0;
@@ -90,8 +99,8 @@ static int quiet = 0;
 /*
  * ELF header
  */
-struct elf_header {
-	uint8_t ident[16];
+struct elf_header_32 {
+	uint8_t ident[EI_NIDENT];
 	uint16_t type;
 	uint16_t machine;
 	uint32_t version;
@@ -107,10 +116,41 @@ struct elf_header {
 	uint16_t shstrndx;
 };
 
+struct elf_header_64 {
+	uint8_t ident[EI_NIDENT]; /* ELF identification */
+	uint16_t type;		/* Object file type */
+	uint16_t machine;	/* Machine type */
+	uint32_t version;	/* Object file version */
+	uint64_t entry;		/* Entry point address */
+	uint64_t phoff;		/* Program header offset */
+	uint64_t shoff;		/* Section header offset */
+	uint32_t flags;		/* Processor-specific flags */
+	uint16_t ehsize;	/* ELF header size */
+	uint16_t phentsize;	/* Size of program header entry */
+	uint16_t phnum;		/* Number of program header entries */
+	uint16_t shentsize;	/* Size of section header entry */
+	uint16_t shnum;		/* Number of section header entries */
+	uint16_t shstrndx;	/* Section name string table index */
+};
+
+struct elf_header_generic {
+	uint8_t ident[EI_NIDENT]; /* ELF identification */
+	uint16_t type;		/* Object file type */
+};
+
+/*
+ * Internal representation of the ELF header
+ */
+union elf_header_int {
+	struct elf_header_generic h;
+	struct elf_header_32 h32;
+	struct elf_header_64 h64;
+};
+
 /*
  * ELF program header table
  */
-struct program_header {
+struct program_header_32 {
 	uint32_t type;
 	uint32_t offset;
 	uint32_t vaddr;
@@ -119,6 +159,23 @@ struct program_header {
 	uint32_t memsz;
 	uint32_t flags;
 	uint32_t align;
+};
+
+struct program_header_64 {
+	uint32_t type;		/* Type of segment */
+	uint32_t flags;		/* Segment attributes */
+	uint64_t offset;	/* Offset in file */
+	uint64_t vaddr;		/* Virtual address in memory */
+	uint64_t paddr;		/* Reserved */
+	uint64_t filesz;	/* Size of segment in file */
+	uint64_t memsz;		/* Size of segment in memory */
+	uint64_t align;		/* Alignment of segment */
+};
+
+union program_header_int {
+	uint32_t type;
+	struct program_header_32 h32;
+	struct program_header_64 h64;
 };
 
 /*
@@ -285,7 +342,7 @@ static int copy_to_partition(unsigned int partition, void *buffer,
  * @elf_length: length of the ELF image, or -1 to ignore length checking
  * @bin_length: pointer to returned buffer length
  * @load_address: load address, or -1 to use ELF load address
- * @entry_address: pointer to returned entry address
+ * @entryp: pointer to returned entry address
  *
  * 'plowest' contains the starting physical address of the segment that has
  * the lowest starting physical address.
@@ -296,42 +353,61 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 			      size_t elf_length, unsigned long load_address,
 			      unsigned long *entryp)
 {
-	struct elf_header *hdr = (struct elf_header *) elf;
-	struct program_header *phdr = (struct program_header *) (elf + hdr->phoff);
-	unsigned long entry = ULONG_MAX;
+	union elf_header_int *hdr = NULL;
+	unsigned long entry_address = ULONG_MAX;
 	unsigned long plowest = ULONG_MAX;
 	unsigned int i;
 
-	if (elf_length < sizeof(struct elf_header)) {
+	if (elf_length < sizeof(struct elf_header_generic)) {
 		if (!quiet)
 			printf("%s: truncated ELF image\n", __func__);
 		return 0;
 	}
 
-	if (elf_length < hdr->phoff + (hdr->phnum * sizeof(struct program_header))) {
-		if (!quiet)
-			printf("%s: truncated ELF image\n", __func__);
-		return 0;
-	}
-
-	/* We only support 32-bit for now */
-	if (hdr->ident[EI_CLASS] != ELFCLASS32) {
-		if (!quiet)
-			printf("%s: only 32-bit ELF images are supported\n", __func__);
-		return 0;
-	}
+	hdr = (union elf_header_int *)elf;
 
 	/* ePAPR only supports big-endian ELF images */
-	if (hdr->ident[EI_DATA] != ELFDATA2MSB) {
+	if (hdr->h.ident[EI_DATA] != ELFDATA2MSB) {
 		if (!quiet)
 			printf("%s: only big-endian ELF images are supported\n", __func__);
 		return 0;
 	}
 
 	/* We only support ET_EXEC images for now */
-	if (hdr->type != ET_EXEC) {
+	if (hdr->h.type != ET_EXEC) {
 		if (!quiet)
 			printf("%s: only fixed address ELF images are supported\n", __func__);
+		return 0;
+	}
+
+	/* TODO: check if hv supports 64-bit */
+	if (hdr->h.ident[EI_CLASS] != ELFCLASS32 &&
+	    hdr->h.ident[EI_CLASS] != ELFCLASS64) {
+		if (!quiet)
+			printf("%s: only 32-bit and 64-bit ELF images are supported\n", __func__);
+		return 0;
+	}
+
+	size_t hdr_len = (hdr->h.ident[EI_CLASS] == ELFCLASS32) ?
+			sizeof(struct elf_header_32) :
+			sizeof(struct elf_header_64);
+	if (elf_length < hdr_len) {
+		if (!quiet)
+			printf("%s: truncated ELF image\n", __func__);
+		return 0;
+	}
+
+	uint16_t phnum = ELF_HEADER(phnum);
+	uint64_t phoff = ELF_HEADER(phoff);
+	uint64_t entry = ELF_HEADER(entry);
+	uint16_t phentsize = ELF_HEADER(phentsize);
+
+	size_t phdr_len = (hdr->h.ident[EI_CLASS] == ELFCLASS32)?
+			  sizeof(struct program_header_32) :
+			  sizeof(struct program_header_64);
+	if (elf_length < phoff + (phnum * phdr_len)) {
+		if (!quiet)
+			printf("%s: truncated ELF image\n", __func__);
 		return 0;
 	}
 
@@ -340,19 +416,28 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	 * same time.  The base address is the smallest paddr of all PT_LOAD
 	 * segments.
 	 */
-	for (i = 0; i < hdr->phnum; i++) {
-		if (phdr[i].offset + phdr[i].filesz > elf_length) {
+	for (i = 0; i < phnum; i++) {
+		union program_header_int *phdr = (union program_header_int *)(elf + phoff + i * phentsize);
+
+		uint64_t offset = PROGRAM_HEADER(offset);
+		uint64_t filesz = PROGRAM_HEADER(filesz);
+		uint64_t memsz  = PROGRAM_HEADER(memsz);
+		uint64_t paddr  = PROGRAM_HEADER(paddr);
+
+		if (offset + filesz > elf_length) {
 			if (!quiet)
 				printf("%s: truncated ELF image\n", __func__);
 			return 0;
 		}
-		if (phdr[i].filesz > phdr[i].memsz) {
+
+		if (filesz > memsz) {
 			if (!quiet)
 				printf("%s: invalid ELF program header file size\n", __func__);
 			return 0;
 		}
-		if (phdr[i].type == PT_LOAD && phdr[i].paddr < plowest)
-			plowest = phdr[i].paddr;
+
+		if (phdr->type == PT_LOAD && paddr < plowest)
+			plowest = paddr;
 	}
 
 	if (plowest == ULONG_MAX) {
@@ -365,18 +450,26 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 	/* If the user did not specify -a, then we use the real paddr values
 	 * in the ELF image.
 	 */
-	if (load_address == (unsigned long) -1)
+	if (~load_address == 0)
 		load_address = plowest;
 
 	/* Copy each PT_LOAD segment to the target partition */
 
-	for (i = 0; i < hdr->phnum; i++) {
-		if (phdr[i].type == PT_LOAD) {
-			unsigned long seg_target = load_address + (phdr[i].paddr - plowest);
+	for (i = 0; i < phnum; i++) {
+		union program_header_int *phdr = (union program_header_int *)(elf + phoff + i * phentsize);
+
+		if (phdr->type == PT_LOAD) {
+			uint64_t offset = PROGRAM_HEADER(offset);
+			uint64_t filesz = PROGRAM_HEADER(filesz);
+			uint64_t memsz  = PROGRAM_HEADER(memsz);
+			uint64_t paddr  = PROGRAM_HEADER(paddr);
+			uint64_t vaddr  = PROGRAM_HEADER(vaddr);
+
+			unsigned long seg_target = load_address + (paddr - plowest);
 			int ret;
 
-			if (phdr[i].vaddr <= hdr->entry &&
-			    hdr->entry <= phdr[i].vaddr + phdr[i].memsz - 1) {
+			if (vaddr <= entry &&
+			    entry <= vaddr + memsz - 1) {
 				/* This segment contains the entry point.
 				 * Translate it into a physical address.
 				 *
@@ -388,43 +481,43 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				 * If we're not recolating, then seg_target =
 				 * phdr.paddr and this is a no-op.
 				 */
-				if (entry != ULONG_MAX) {
+				if (entry_address != ULONG_MAX) {
 					if (!quiet)
-						printf("%s: ELF entry point %#x "
+						printf("%s: ELF entry point %#llx "
 						       "is in multiple segments.\n",
-						       __func__, hdr->entry);
+						       __func__, entry);
 
-					/* It's fatal if we actually need 
+					/* It's fatal if we actually need
 					 * the entry.
 					 */
 					if (entryp)
 						return 0;
 				}
 
-				entry = hdr->entry - phdr[i].vaddr + seg_target;
+				entry_address = entry - vaddr + seg_target;
 			}
 
 			if (verbose)
-				printf("%s: copying 0x%x bytes from ELF image offset 0x%x to guest physical address 0x%lx\n",
-				       __func__, phdr[i].filesz, phdr[i].offset, seg_target);
-			ret = copy_to_partition(partition, elf + phdr[i].offset, seg_target, phdr[i].filesz);
+				printf("%s: copying 0x%llx bytes from ELF image offset 0x%llx to guest physical address 0x%lx\n",
+				       __func__, filesz, offset, seg_target);
+			ret = copy_to_partition(partition, elf + offset, seg_target, filesz);
 			if (ret) {
 				if (!quiet)
 					printf("Copy failed, error=%i\n", ret);
 				return 0;
 			}
 
-			if (phdr[i].memsz > phdr[i].filesz) {
+			if (memsz > filesz) {
 				void *buffer;
-				unsigned int rem_size;
-				unsigned int copy_offset;
+				unsigned long rem_size;
+				unsigned long copy_offset;
 
 				if (verbose)
-					printf("%s: writing 0x%x null bytes to guest physical address 0x%lx\n",
-					       __func__, phdr[i].memsz - phdr[i].filesz, seg_target + phdr[i].filesz);
+					printf("%s: writing 0x%llx null bytes to guest physical address 0x%llx\n",
+					       __func__, memsz - filesz, seg_target + filesz);
 
 #define CHUNK_SIZE	65536
-	
+
 				buffer = malloc(CHUNK_SIZE);
 				if (!buffer) {
 					if (!quiet)
@@ -433,18 +526,19 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				}
 				memset(buffer, 0, CHUNK_SIZE);
 
-				rem_size = phdr[i].memsz - phdr[i].filesz;
-				copy_offset = phdr[i].filesz;
+				rem_size = memsz - filesz;
+				copy_offset = filesz;
 				while (rem_size) {
-					int copy_size;
+					unsigned long copy_size;
 
-					if (rem_size > CHUNK_SIZE) 
+					if (rem_size > CHUNK_SIZE)
 						copy_size = CHUNK_SIZE;
 					else
 						copy_size = rem_size;
 
 
-					ret = copy_to_partition(partition, buffer,
+					ret = copy_to_partition(partition,
+							buffer,
 				                        seg_target + copy_offset,
 				                        copy_size);
 					if (ret) {
@@ -464,22 +558,25 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 	if (verbose) {
 		printf("%s: load address is 0x%lx\n", __func__, load_address);
-		printf("%s: physical entry address is 0x%lx\n", __func__, entry);
+		printf("%s: physical entry address is 0x%llx\n", __func__, entry);
 	}
 
 	if (entryp) {
-		if (entry == ULONG_MAX) {
-			printf("%s: ELF image has invalid entry address %x\n",
-			       __func__, hdr->entry);
+		if (entry_address == ULONG_MAX) {
+			printf("%s: ELF image has invalid entry address %llx\n",
+			       __func__, entry);
 			return 0;
 		}
 
-		*entryp = entry;
+		*entryp = entry_address;
 	}
 
 	return 1;
 }
 
+/*FIXME: 32bit version has the following limitations
+	- can't load images at guest physical addresses bigger than 4GB
+	- can't load images bigger that 3GB (due to mmap)*/
 /**
  * Load an image file into memory and parse it if it's an ELF
  *
@@ -1309,7 +1406,7 @@ int main(int argc, char *argv[])
 			}
 		} else {
 			p.h = ret;
-		}	
+		}
 		p.h_specified = 1;
 	}
 
