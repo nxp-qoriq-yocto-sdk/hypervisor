@@ -25,14 +25,22 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 1.0
+Topaz Version: 1.1
 Revision: 001
-Date: 05/12/2011
+Date: 10/14/2011
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.1-001 bug fixes and changes
+       -new "watchdog-autostart-period" property for guest nodes
+       -partman: added support for 64-bit ELF files
+       -workaround for PAMU erratum A-003638
+       -update zlib to version 1.2.3 to pick up some 64-bit related fixes
+       -misc 64bit related fixes
+       -test updates and fixes
+
    -v1.0-001 bug fixes and changes
        -gdb-stub: support 64bit e5500 cores
        -bug 7136: fix tlb misse handling on hv accesses to guest state

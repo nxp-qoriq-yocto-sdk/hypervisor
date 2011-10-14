@@ -23,7 +23,7 @@
 #
 
 export VERSION=1
-export SUBVERSION=0
+export SUBVERSION=1
 export EXTRAVERSION=-001
 export LOCALVERSION := $(shell tools/setlocalversion)
 
