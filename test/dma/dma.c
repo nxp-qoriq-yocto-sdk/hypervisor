@@ -315,6 +315,18 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Access violation test : PASSED\n");
 	printf("\n");
 
+	/* PPAACE entry correponding to access violation LIODN is marked
+	 * invalid by the hypervisor. We need to explicitly mark the entry
+	 * as valid using the hcall. Furthermore, due to erratum PAMU A-003638
+	 * when an access violation occurs, the access violations are disabled
+	 * for that PAMU until the DMA is re-enabled.
+	 */
+	ret = fh_dma_enable(liodn);
+	if (ret) {
+		printf("fh_dma_enable: failed %d\n", liodn);
+		return;
+	}
+
 	if(!strcmp("/part1", label)) {
 		while (crit_int < 2 );
 		for(i = 0 ; i < 2 ; i++) {
@@ -330,15 +342,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 		printf("Error Manager test : PASSED\n");
 		printf("\n");
 
-		/* PPAACE entry correponding to access violation LIODN is marked
-		 * invalid by the hypervisor. We need to explicitly mark the entry
-		 * as valid using the hcall.
-		 */
-		ret = fh_dma_enable(liodn);
-		if (ret) {
-			printf("fh_dma_enable: failed %d\n", liodn);
-			return;
-		}
 		/*
 		 * create a hard-coded TLB1 entry for PAMU address-translation
 		 * verification test; the default entry for Libos is set from
