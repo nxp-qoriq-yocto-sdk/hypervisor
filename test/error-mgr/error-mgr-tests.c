@@ -295,7 +295,7 @@ static int test4_claim_error_manager(register_t pir)
 		 * PAMU illegal interrupts in case of simultaneous causes.
 		 * Until then, just desynchronize the two guests by a delay.
 		 */
-		delay_timebase(6000);
+		delay_ms(500);
 	}
 	test_common_do_dma(pir, is_err_owner);
 
