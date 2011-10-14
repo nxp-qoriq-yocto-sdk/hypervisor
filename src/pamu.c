@@ -726,9 +726,8 @@ int hv_pamu_enable_liodn(unsigned int handle)
 		lwsync();
 
 		/* re-enable access violations if necessary */
-		pics = in32((uint32_t *)(reg + PAMU_PICS));
-		out32((uint32_t *)(reg + PAMU_PICS), (pics & ~PAMU_STAT) | PAMU_ACCESS_VIOLATION_ENABLE);
-
+		pics = in32(reg + PAMU_PICS);
+		out32(reg + PAMU_PICS, (pics & ~PAMU_STAT) | PAMU_ACCESS_VIOLATION_ENABLE);
 	}
 #endif
 
@@ -877,7 +876,7 @@ static int pamu_error_isr(void *arg)
 		void *reg = reg_base + reg_off;
 		uint32_t pics, poes1;
 
-		pics = in32((uint32_t *)(reg + PAMU_PICS));
+		pics = in32(reg + PAMU_PICS);
 		if (pics & PAMU_OPERATION_ERROR_INT_STAT) {
 			strncpy(err.domain, get_domain_str(error_pamu),
 				sizeof(err.domain));
@@ -885,17 +884,16 @@ static int pamu_error_isr(void *arg)
 				sizeof(err.error));
 			dt_get_path(NULL, pamu_node, err.hdev_tree_path,
 				    sizeof(err.hdev_tree_path));
-			poes1 = in32((uint32_t *)(reg + PAMU_POES1));
+			poes1 = in32(reg + PAMU_POES1);
 			if (poes1 & PAMU_POES1_POED) {
 				err.pamu.poes1 = poes1;
-				err.pamu.poeaddr = (((phys_addr_t)in32((uint32_t *)
-					(reg + PAMU_POEAH))) << 32) |
-					in32((uint32_t *)(reg + PAMU_POEAL));
+				err.pamu.poeaddr = (((phys_addr_t)in32(reg + PAMU_POEAH)) << 32) |
+						   in32(reg + PAMU_POEAL);
 			}
 			error_policy_action(&err, error_pamu,
 					    pamu_err_policy[pamu_operation]);
-			out32((uint32_t *)(reg + PAMU_POES1), PAMU_POES1_POED);
-			out32((uint32_t *)(reg + PAMU_PICS), pics);
+			out32(reg + PAMU_POES1, PAMU_POES1_POED);
+			out32(reg + PAMU_PICS, pics);
 		}
 	}
 
@@ -950,7 +948,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
 		    sizeof(err.hdev_tree_path));
 
-	avs1 = in32 ((uint32_t *) (reg + PAMU_AVS1));
+	avs1 = in32 (reg + PAMU_AVS1);
 	av_liodn = avs1 >> PAMU_AVS1_LIODN_SHIFT;
 
 #ifdef CONFIG_ERRATUM_PAMU_A_003638
@@ -977,7 +975,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	 *- AVIE should be 0 to disable access violations for this PAMU
 	 *- POEIE should be left as it is
 	 */
-	out32((uint32_t *)(reg + PAMU_PICS), (pics & ~PAMU_STAT) & ~PAMU_ACCESS_VIOLATION_ENABLE);
+	out32(reg + PAMU_PICS, (pics & ~PAMU_STAT) & ~PAMU_ACCESS_VIOLATION_ENABLE);
 	pamu_reg_disabled[av_liodn] = reg;
 	pics = pics & ~PAMU_ACCESS_VIOLATION_ENABLE;
 #endif
@@ -987,14 +985,14 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	if (!get_bf(ppaace->addr_bitfields, PAACE_AF_V))
 	{
 		/* Clear the write one to clear bits in AVS1, mask out the LIODN */
-		out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
+		out32(reg + PAMU_AVS1, (avs1 & PAMU_AV_MASK));
 		
 		/* De-assert access violation pin */
-		out32((uint32_t *)(reg + PAMU_PICS), pics);
+		out32(reg + PAMU_PICS, pics);
 #ifdef CONFIG_P4080_ERRATUM_PAMU3
 		if (rev1)
 			/* erratum PAMU 3-- do it twice */
-			out32((uint32_t *)(reg + PAMU_PICS), pics);
+			out32(reg + PAMU_PICS, pics);
 #endif
 		return -1;
 	}
@@ -1002,10 +1000,9 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
 			sizeof(err.error));
 	pamu->avs1 = avs1;
-	pamu->access_violation_addr = ((phys_addr_t) in32 ((uint32_t *) 
-				(reg + PAMU_AVAH))) 
-				<< 32 | in32 ((uint32_t *) (reg + PAMU_AVAL));
-	pamu->avs2 = in32 ((uint32_t *) (reg + PAMU_AVS2));
+	pamu->access_violation_addr = ((phys_addr_t) in32(reg + PAMU_AVAH)) << 32 |
+				       in32(reg + PAMU_AVAL);
+	pamu->avs2 = in32 (reg + PAMU_AVS2);
 
 	/*FIXME : LIODN index not in PPAACT table*/
 	assert(!(avs1 & PAMU_LAV_LIODN_NOT_IN_PPAACT));
@@ -1031,13 +1028,13 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 			    pamu_err_policy[pamu_access_violation]);
 
 	/* Clear the write one to clear bits in AVS1, mask out the LIODN */
-	out32((uint32_t *) (reg + PAMU_AVS1), (avs1 & PAMU_AV_MASK));
+	out32(reg + PAMU_AVS1, (avs1 & PAMU_AV_MASK));
 	/* De-assert access violation pin */
-	out32((uint32_t *)(reg + PAMU_PICS), pics);
+	out32(reg + PAMU_PICS, pics);
 #ifdef CONFIG_P4080_ERRATUM_PAMU3
 	if (rev1)
 		/* erratum PAMU 3 -- do it twice */
-		out32((uint32_t *)(reg + PAMU_PICS), pics);
+		out32(reg + PAMU_PICS, pics);
 #endif
 	return 0;
 }
@@ -1102,7 +1099,7 @@ static int pamu_av_isr(void *arg)
 		uint32_t pics;
 		pamu_ecc_err_reg_t *ecc_regs;
 
-		pics = in32((uint32_t *)(reg + PAMU_PICS));
+		pics = in32(reg + PAMU_PICS);
 		if (pics & PAMU_ACCESS_VIOLATION_STAT)
 			ret = handle_access_violation(reg, pamu_node, pics);
 
