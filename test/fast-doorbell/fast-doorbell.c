@@ -154,7 +154,7 @@ static int test_init(void)
 	/* add an arbitrary delay to make sure that the other partion
 	 * has configured the VMPIC
 	 */
-	delay_timebase(1000);
+	delay_ms(500);
 
 	ev_doorbell_send(*handle_p);
 
