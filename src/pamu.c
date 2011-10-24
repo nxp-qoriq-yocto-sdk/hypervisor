@@ -614,7 +614,7 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 	stash_prop = dt_get_prop(cfgnode, "stash-dest", 0);
 	if (stash_prop && stash_prop->len == 4) {
 		stash_dest = get_stash_dest( *(const uint32_t *)
-				stash_prop->data , hwnode);
+				stash_prop->data , gnode);
 	}
 
 	/* configure snoop-id if needed */
@@ -634,7 +634,7 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 			goto skip_snoop_id;
 		}
 
-		snpid = get_snoop_id(hwnode, guest) + 1;
+		snpid = get_snoop_id(gnode, guest) + 1;
 	}
 skip_snoop_id:
 
