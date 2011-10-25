@@ -2,7 +2,7 @@
  * Misc utilities
  */
 /*
- * Copyright (C) 2008,2009 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,7 +65,7 @@ char *nextword(char **str)
 	return ret;
 }
 
-static int print_num_error(queue_t *out, char *endp, const char *numstr)
+int print_num_error(queue_t *out, const char *numstr)
 {
 	int blocking = !is_idle();
 
@@ -79,17 +79,11 @@ static int print_num_error(queue_t *out, char *endp, const char *numstr)
 
 		return 1;
 	}
-
-	if (endp && *endp) {
-		qprintf(out, blocking, "Trailing junk after number: %s\n", numstr);
-		cpu->errno = ERR_INVALID;
-		return 1;
-	}
 	
 	return 0;
 }
 
-static int get_base(queue_t *out, const char *numstr, int *skip)
+static int get_base(const char *numstr, int *skip)
 {
 	*skip = 0;
 
@@ -112,8 +106,6 @@ static int get_base(queue_t *out, const char *numstr, int *skip)
 			return 8;
 		}
 
-		qprintf(out, !is_idle(),
-		        "Unrecognized number format: %s\n", numstr);
 		cpu->errno = ERR_INVALID;
 		return 0;
 	}
@@ -121,7 +113,7 @@ static int get_base(queue_t *out, const char *numstr, int *skip)
 	return 10;
 }
 
-uint64_t get_number64(queue_t *out, const char *numstr)
+uint64_t get_number64(const char *numstr)
 {
 	uint64_t ret;
 	char *endp;
@@ -131,25 +123,24 @@ uint64_t get_number64(queue_t *out, const char *numstr)
 
 	if (numstr[0] == '-') {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, !is_idle(),
-		        "Number exceeds range: %s\n", numstr);
 		return 0;
 	}
 
-	base = get_base(out, numstr, &skip);
+	base = get_base(numstr, &skip);
 	if (!base)
 		return 0;
 
 	ret = strtoull(&numstr[skip], &endp, base);
-
-	if (print_num_error(out, endp, numstr))
+	if (endp && *endp) {
+		cpu->errno = ERR_INVALID;
 		return 0;
+	}
 
 	return ret;
 }
 
 /* Only decimal numbers may be negative */
-int64_t get_snumber64(queue_t *out, const char *numstr)
+int64_t get_snumber64(const char *numstr)
 {
 	int64_t ret;
 	char *endp;
@@ -157,44 +148,41 @@ int64_t get_snumber64(queue_t *out, const char *numstr)
 
 	cpu->errno = 0;
 	
-	base = get_base(out, numstr, &skip);
+	base = get_base(numstr, &skip);
 	if (!base)
 		return 0;
 
 	ret = strtoll(&numstr[skip], &endp, base);
-
-	if (print_num_error(out, endp, numstr))
+	if (endp && *endp) {
+		cpu->errno = ERR_INVALID;
 		return 0;
+	}
 
 	return ret;
 }
 
-uint32_t get_number32(queue_t *out, const char *numstr)
+uint32_t get_number32(const char *numstr)
 {
-	uint64_t ret = get_number64(out, numstr);
+	uint64_t ret = get_number64(numstr);
 	if (cpu->errno)
 		return 0;
 
 	if (ret >= 0x100000000ULL) {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, !is_idle(),
-		        "Number exceeds range: %s\n", numstr);
 		ret = 0;
 	}
 
 	return ret;
 }
 
-int32_t get_snumber32(queue_t *out, const char *numstr)
+int32_t get_snumber32(const char *numstr)
 {
-	int64_t ret = get_snumber64(out, numstr);
+	int64_t ret = get_snumber64(numstr);
 	if (cpu->errno)
 		return 0;
 
 	if (ret >= 0x80000000LL || ret < -0x80000000LL) {
 		cpu->errno = ERR_RANGE;
-		qprintf(out, !is_idle(),
-		        "Number exceeds range: %s\n", numstr);
 		ret = 0;
 	}
 

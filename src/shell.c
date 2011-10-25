@@ -68,9 +68,11 @@ static int get_partition_num(shell_t *shell, char *numstr)
 {
 	uint32_t num;
 
-	num = get_number32(shell->out, numstr);
-	if (cpu->errno)
+	num = get_number32(numstr);
+	if (cpu->errno) {
+		print_num_error(shell->out, numstr);
 		return -1;
+	}
 
 	if (num >= num_guests) {
 		qprintf(shell->out, 1, "Partition %u does not exist.\n", num);
@@ -781,7 +783,7 @@ static void gtlb_fn(shell_t *shell, char *args)
 		return;
 	}
 
-	vcpu_num = get_number32(shell->out, vcpustr);
+	vcpu_num = get_number32(vcpustr);
 
 	if (vcpu_num >= guests[guest_num].cpucnt) {
 		qprintf(shell->out, 1, "Invalid vcpu number\n");
@@ -935,10 +937,18 @@ static void guestmem_fn(shell_t *shell, char *args)
 		return;
 	}
 
-	address = get_number64(shell->out, addrstr);
+	address = get_number64(addrstr);
+	if (cpu->errno) {
+		print_num_error(shell->out, addrstr);
+		return;
+	}
 
 	if (lenstr) {
-		length = get_number64(shell->out, lenstr);
+		length = get_number64(lenstr);
+		if (cpu->errno) {
+			print_num_error(shell->out, lenstr);
+			return;
+		}
 		if (length > 1024*1024) {
 			qprintf(shell->out, 1, "Invalid length\n");
 			return;
@@ -1134,7 +1144,7 @@ static void set_loglevel(shell_t *shell, char *args)
 		return;
 	}
 
-	level = get_number32(shell->out, levelstr);
+	level = get_number32(levelstr);
 	if ((cpu->errno) || (level > CONFIG_LIBOS_MAX_BUILD_LOGLEVEL)) {
 		qprintf(shell->out, 1, "Invalid log level (valid values: 0-%d)\n", CONFIG_LIBOS_MAX_BUILD_LOGLEVEL);
 		return;

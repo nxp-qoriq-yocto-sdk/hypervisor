@@ -114,9 +114,11 @@ static int get_cfg_addr(char *args, void *ctx)
 	str += strlen("config-addr=");
 	numstr = nextword(&str);
 
-	*cfg_addr = get_number64(&consolebuf, numstr);
-	if (cpu->errno)
+	*cfg_addr = get_number64(numstr);
+	if (cpu->errno) {
+		print_num_error(&consolebuf, numstr);
 		return cpu->errno;
+	}
 
 	return 0;
 }
