@@ -36,7 +36,7 @@ import signal
 
 if (len(sys.argv) < 3):
 	print "Usage: %s <test_plan_file> <target> [nocleanup]\n" % sys.argv[0]
-	print "(valid targets: p4080ds, p3041ds, p5020ds, p4080ds_hw)"
+	print "(valid targets: p4080ds, p3041ds, p5020ds, p4080ds_hw, p2041ds_hw)"
 	print "(nocleanup: will not erase log folder and results)\n"
 	sys.exit(1)
 

@@ -37,7 +37,7 @@ class empty:
 def hw_boot(obj,testname_s, testname_l, board):
 	obj.send("\r")
 	obj.expect_exact("=> ", timeout = 10)
-	obj.send("pixis_reset altbank\r")
+	obj.send(common.BOARD_RESET_CMD + "\r")
 	time.sleep(2)
 	#obj.expect_exact("Hit any key to stop autoboot", timeout = 10)
 	obj.send("\r")

@@ -1,4 +1,5 @@
-# Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
+#
+# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -20,29 +21,9 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
-#!/usr/bin/env python
-
-#constants used by automation scripts
-RMT_SERVER = "rhuath.am.freescale.net" 
-RMT_USER = "ltudor"
-RMT_PASSWORD = "freescale"
-RMT_TESTDIR = "ltudor/" #dir on server used by tftp
-RMT_BOARD = "emerald"
-LOG_PATH = "../../output/test32/log/" #console log location
-BIN_PATH = "../../output/test32/"     #test binaries location
-BOARD_RESET_CMD = "pixis altbank"     #command to switch to alternate bank
-
-
-START_PORT = 23400
-LINUX_TESTS = ["linux","simtst"]      #identify linux tests
-ENABLE_COVERAGE = False
-
-#for test linux-e1000
-LINUX_ETH0_IP = "192.168.170.2"       #ip addr for eth0
-LINUX_ETH0_PING = "192.168.170.1"     #dest ip addr for ping test
-
-#for test simtst
-LINUX_FM1GB1_IP = "192.168.1.140"      #ip addr for fm1gb1
-LINUX_FM1GB1_PING = "192.168.1.1"    #dest ip addr for ping test
-
+partman load -h p2-linux -f vmlinux -a 0x0
+partman load -h p2-linux -f initramfs.cpio.gz.uboot -a 0x1300000 -r
+partman start -h p2-linux -e 0x0
+partman load -h p3-linux -f vmlinux -a 0x0
+partman load -h p3-linux -f initramfs.cpio.gz.uboot -a 0x1300000 -r
+partman start -h p3-linux -e 0x0
