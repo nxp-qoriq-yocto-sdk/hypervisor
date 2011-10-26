@@ -22,143 +22,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/dts-v1/;
+/include/ "hv-B.dts" 
 
 / {
-	compatible = "fsl,hv-config";
-
-	// =====================================================
-	// Physical Memory Areas
-	// =====================================================
-	phys-mem {
-		pma0: pma0 {
-			compatible = "phys-mem-area";
-			addr = <0 0>;
-			size = <0 0x20000000>;
-		};
-
-		pma1: pma1 {
-			compatible = "phys-mem-area";
-			addr = <0 0x20000000>;
-			size = <0 0x20000000>;
-		};
-
-		pma2: pma2 {
-			compatible = "phys-mem-area";
-			addr = <0x0 0x40000000>;
-			size = <0x0 0x2000000>;
-		};
-
-		pma3: pma3 {
-			compatible = "phys-mem-area";
-			addr = <0x0 0x50000000>;
-			size = <0x0 0x0001000>;
-		};
-
-	};
-
-	// =====================================================
-	// Hypervisor Config
-	// =====================================================
-	hv: hv-config {
-		compatible = "hv-config";
-		stdout = <&hvbc>;
-		legacy-interrupts;
-
-		memory {
-			compatible = "hv-memory";
-			phys-mem = <&pma2>;
-		};
-
-		uart0: serial0 {
-			device = "serial0";
-		};
-
-		serial1: serial1 {
-			device = "serial1";
-		};
-
-		mpic {
-			device = "/soc/pic";
-		};
-
-		iommu {
-			device = "/soc/iommu";
-		};
-
-		cpc {
-			device = "/soc/l3-cache-controller";
-		};
-
-		corenet-law {
-			device = "/soc/corenet-law";
-		};
-
-		corenet-cf {
-			device = "/soc/corenet-cf";
-		};
-
-		guts {
-			device = "/soc/global-utilities@e0000";
-		};
-
-		hvbc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <0>;
-		};
-	};
-
-	doorbells {
-		dbell0: doorbell0 {
-			compatible = "doorbell", "fast-doorbell";
-		};
-	};
-
-	uartmux: uartmux {
-		compatible = "byte-channel-mux";
-		endpoint = <&uart0>;
-	};
 
 	// =====================================================
 	// Partition 1
 	// =====================================================
 	part1 {
-		compatible = "partition";
 		cpus = <0 1>;
-		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
-		dtb-window = <0 0x01000000 0 0x10000>;
-
-		gpma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma0>;
-			guest-addr = <0 0>;
-		};
-
-		gpma1 {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma3>;
-			guest-addr = <0 0x25000000>;
-			node-update {
-				prepend-stringlist = "compatible", "fsl,share-mem-test";
-			};
-		};
-
-		doorbell0 {
-			compatible = "receive-doorbell";
-			global-doorbell = <&dbell0>;
-		};
-
-		p1bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <1>;
-		};
-
-		aliases {
-			stdout = <&p1bc>;
-		};
-
 	};
 
 
@@ -166,44 +38,6 @@
 	// Partition 2
 	// =====================================================
 	part2 {
-		compatible = "partition";
 		cpus = <1 1>;
-		guest-image = <0xf 0xe8b00000 0 0 0 0x200000>;
-		dtb-window = <0 0x01000000 0 0x10000>;
-
-		gpma {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma1>;
-			guest-addr = <0 0>;
-		};
-
-		gpma1 {
-			compatible = "guest-phys-mem-area";
-			phys-mem = <&pma3>;
-			guest-addr = <0 0x25000000>;
-			node-update {
-				prepend-stringlist = "compatible", "fsl,share-mem-test";
-			};
-		};
-
-		doorbell1 {
-			compatible = "send-doorbell";
-			global-doorbell = <&dbell0>;
-		};
-
-		doorbell2 {
-			compatible = "receive-doorbell";
-			global-doorbell = <&dbell0>;
-		};
-
-		p2bc: byte-channel {
-			compatible = "byte-channel";
-			endpoint = <&uartmux>;
-			mux-channel = <2>;
-		};
-
-		aliases {
-			stdout = <&p2bc>;
-		};
 	};
 };
