@@ -65,12 +65,13 @@ int alloc_global_handle(void)
 					global_handles[j] |= 1 << i;
 
 					ret = i + (j * LONG_BITS);
-					break;
+					goto out;
 				}
 			}
 		}
 	}
 
+out:
 	spin_unlock_intsave(&global_handles_lock, saved);
 	return ret;
 }
