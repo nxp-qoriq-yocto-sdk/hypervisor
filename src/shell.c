@@ -66,20 +66,26 @@ static command_t *find_command(const char *str)
 
 static int get_partition_num(shell_t *shell, char *numstr)
 {
-	uint32_t num;
+	int i = num_guests;
+	uint32_t num = get_number32(numstr);
 
-	num = get_number32(numstr);
-	if (cpu->errno) {
-		print_num_error(shell->out, numstr);
+	// try to match by partition id
+	if (!cpu->errno) {
+		for (i = 0; i < num_guests && num != guests[i].handle.id; i++)
+				;
+	}
+	// try to match by partition name
+	if (i >= num_guests) {
+		for (i = 0; i < num_guests && strcmp(numstr, guests[i].name); i++)
+			;
+	}
+
+	if (i >= num_guests) {
+		qprintf(shell->out, 1, "Partition '%s' does not exist.\n", numstr);
 		return -1;
 	}
 
-	if (num >= num_guests) {
-		qprintf(shell->out, 1, "Partition %u does not exist.\n", num);
-		return -1;
-	}
-
-	return num;
+	return i;
 }
 
 static int shell_action(void *user_ctx, char *buf)
@@ -261,7 +267,8 @@ static void info_fn(shell_t *shell, char *args)
 
 	for (i = 0; i < num_guests; i++) {
 		guest_state_str(&guests[i], &state_str);
-		qprintf(shell->out, 1, "%-11d %s", i, guests[i].name);
+		qprintf(shell->out, 1, "%-11d %s",
+			guests[i].handle.id, guests[i].name);
 		if (state_str)
 			qprintf(shell->out, 1, "\t%s", state_str);
 		qprintf(shell->out, 1, "%10d", guests[i].cpucnt);
@@ -299,7 +306,7 @@ static void gdt_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr || !cmdstr) {
-		qprintf(shell->out, 1, "Usage: gdt <cmd> <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: gdt <cmd> <partition-spec>\n");
 		return;
 	}
 
@@ -318,7 +325,7 @@ static command_t gdt = {
 	.name = "gdt",
 	.action = gdt_fn,
 	.shorthelp = "Guest device tree operation",
-	.longhelp = "  Usage: gdt <cmd> <partition number>\n\n"
+	.longhelp = "  Usage: gdt <cmd> <partition-spec>\n\n"
 	            "  currently only 'print' command is supported.",
 };
 shell_cmd(gdt);
@@ -511,7 +518,7 @@ static void start_fn(shell_t *shell, char *args)
 	}
 
 	if (!str) {
-		qprintf(shell->out, 1, "Usage: start [load] <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: start [load] <partition-spec>\n");
 		return;
 	}
 
@@ -528,10 +535,10 @@ static command_t startcmd = {
 	.name = "start",
 	.action = start_fn,
 	.shorthelp = "Start a stopped partition",
-	.longhelp = "  Usage: start [load] <partition-number>\n\n"
+	.longhelp = "  Usage: start [load] <partition-spec>\n\n"
 	            "  The optional 'load' argument specifies that any images defined\n"
 	            "  by the partition are to be loaded.\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
+	            "  The partition name or number can be obtained with the 'info' command.",
 };
 shell_cmd(startcmd);
 
@@ -545,7 +552,7 @@ static void restart_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: restart <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: restart <partition-spec>\n");
 		return;
 	}
 
@@ -563,8 +570,8 @@ static command_t restart = {
 	.name = "restart",
 	.action = restart_fn,
 	.shorthelp = "Re-start a running partition",
-	.longhelp = "  Usage: restart <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
+	.longhelp = "  Usage: restart <partition-spec>\n\n"
+	            "  The partition name or number can be obtained with the 'info' command.",
 };
 shell_cmd(restart);
 
@@ -578,7 +585,7 @@ static void stop_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: stop <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: stop <partition-spec>\n");
 		return;
 	}
 
@@ -597,8 +604,8 @@ static command_t stop = {
 	.name = "stop",
 	.action = stop_fn,
 	.shorthelp = "Stop a partition",
-	.longhelp = "  Usage: stop <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
+	.longhelp = "  Usage: stop <partition-spec>\n\n"
+	            "  The partition name or number can be obtained with the 'info' command.",
 };
 shell_cmd(stop);
 
@@ -612,7 +619,7 @@ static void pause_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: pause <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: pause <partition-spec>\n");
 		return;
 	}
 
@@ -632,7 +639,7 @@ static command_t pause = {
 	.shorthelp = "Pause a running partition",
 	.longhelp = "  Usage: pause <partition-number>\n\n"
 	            "  Instruction execution is suspended on all CPUs of a paused partition.\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
+	            "  The partition name or number can be obtained with the 'info' command.",
 };
 shell_cmd(pause);
 
@@ -646,7 +653,7 @@ static void resume_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
-		qprintf(shell->out, 1, "Usage: resume <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: resume <partition-spec>\n");
 		return;
 	}
 
@@ -664,8 +671,8 @@ static command_t resume = {
 	.name = "resume",
 	.action = resume_fn,
 	.shorthelp = "Resume a paused partition",
-	.longhelp = "  Usage: resume <partition-number>\n\n"
-	            "  The partition number can be obtained with the 'info' command.",
+	.longhelp = "  Usage: resume <partition-spec>\n\n"
+	            "  The partition name or number can be obtained with the 'info' command.",
 };
 shell_cmd(resume);
 
@@ -768,13 +775,13 @@ static void gtlb_fn(shell_t *shell, char *args)
 	vcpustr = nextword(shell->out, &args);
 
 	if (!gueststr || !vcpustr) {
-		qprintf(shell->out, 1, "Usage: gtlb <guest#> <vcpu#>\n");
+		qprintf(shell->out, 1, "Usage: gtlb <guest-spec> <vcpu#>\n");
 		return;
 	}
 
 	guest_num = get_partition_num(shell, gueststr);
 	if (guest_num == -1 ) {
-		qprintf(shell->out, 1, "Invalid guest number\n");
+		qprintf(shell->out, 1, "Invalid guest specification\n");
 		return;
 	}
 
@@ -798,7 +805,7 @@ static command_t gtlb = {
 	.action = gtlb_fn,
 	.shorthelp = "Display guest tlb entries",
 	.longhelp = "  Usage: gtlb <partition-number> <vcpu-number>\n\n"
-	            "  The partition number and number of vcpus in a partition\n"
+	            "  The partition name or number and number of vcpus in a partition\n"
 	            "  can be obtained with the 'info' command.",
 };
 shell_cmd(gtlb);
@@ -890,7 +897,7 @@ static void stats_fn(shell_t *shell, char *args)
 	numstr = nextword(shell->out, &args);
 
 	if (!numstr || !cmdstr) {
-		qprintf(shell->out, 1, "Usage: stats <command> <partition-number>\n");
+		qprintf(shell->out, 1, "Usage: stats <command> <partition-spec>\n");
 		return;
 	}
 
@@ -908,7 +915,7 @@ static command_t stats = {
 	.name = "stats",
 	.action = stats_fn,
 	.shorthelp = "Print statistics/microbenchmark information",
-	.longhelp = "  Usage: stats <cmd> <partition number>\n\n"
+	.longhelp = "  Usage: stats <cmd> <partition-spec>\n\n"
 	            "  'print' & 'clear' commands are supported.",
 };
 shell_cmd(stats);
@@ -933,7 +940,7 @@ static void guestmem_fn(shell_t *shell, char *args)
 
 	guest = get_partition_num(shell, gueststr);
 	if (guest < 0) {
-		qprintf(shell->out, 1, "Invalid guest number\n");
+		qprintf(shell->out, 1, "Invalid guest specified\n");
 		return;
 	}
 
@@ -1003,7 +1010,7 @@ static command_t guestmem = {
 	.action = guestmem_fn,
 	.aliases = (const char *[]){ "gm", NULL },
 	.shorthelp = "Dump guest memory",
-	.longhelp = "  Usage: guestmem <partition-number> <address> [<length>]\n\n",
+	.longhelp = "  Usage: guestmem <partition-spec> <address> [<length>]\n\n",
 };
 shell_cmd(guestmem);
 

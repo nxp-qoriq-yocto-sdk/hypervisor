@@ -186,7 +186,7 @@
 	// =====================================================
 	part1 {
 		compatible = "partition";
-		label = "hello";
+		label = "hello wo'r'ld";
 		cpus = <0 1>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
