@@ -74,7 +74,7 @@ extern pamu_hv_mem_t *pamu_mem_header;
 #endif
 
 char *stripspace(const char *str);
-char *nextword(char **str);
+char *nextword(struct queue *out, char **str);
 uint64_t get_number64(const char *numstr);
 int64_t get_snumber64(const char *numstr);
 uint32_t get_number32(const char *numstr);

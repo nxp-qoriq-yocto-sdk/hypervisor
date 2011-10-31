@@ -44,23 +44,51 @@ char *stripspace(const char *str)
 	return (char *)str;
 }
 
-char *nextword(char **str)
+/** Find next word or quoted string.
+ * @param[in] out output queue where to send errors. Pass NULL to suppress output.
+ * @param[in, out] str input: pointer to start of string
+ *                     output: points to the end of the found word or quoted string
+ * @return pointer to the found word or quoted string, NULL on error
+ *
+ * The function supports alternating nested quotes.
+ * Example:
+ *     foo a'bc "bar" def'baz
+ * will return the strings:
+ *     foo
+ *     abc "bar" defbaz
+ */
+char *nextword(queue_t *out, char **str)
 {
-	char *ret;
+	char *ret, *src, *dest;
+	int quote = 0;
 
-	if (!*str)
-		return NULL;
-	
 	ret = stripspace(*str);
 	if (!ret)
 		return NULL;
-	
-	*str = strchr(ret, ' ');
 
-	if (*str) {
-		**str = 0;
-		(*str)++;
+	for (src = dest = ret; *src && (quote || *src != ' '); src++) {
+		if (quote) {
+			if (*src == quote)
+				quote = 0;
+			else
+				*dest++ = *src;
+		} else if (*src == '"' || *src == '\'') {
+			quote = *src;
+		} else {
+			*dest++ = *src;
+		}
 	}
+
+	if (quote) {
+		if (out)
+			qprintf(out, !is_idle(), "Missing end quote\n");
+
+		*str = NULL;
+		return NULL;
+	}
+
+	*str = *src ? src + 1 : src;
+	*dest = 0;
 	
 	return ret;
 }

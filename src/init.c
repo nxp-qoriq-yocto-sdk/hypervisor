@@ -112,7 +112,7 @@ static int get_cfg_addr(char *args, void *ctx)
 	}
 
 	str += strlen("config-addr=");
-	numstr = nextword(&str);
+	numstr = nextword(NULL, &str);
 
 	*cfg_addr = get_number64(numstr);
 	if (cpu->errno) {
@@ -315,7 +315,7 @@ static int parse_bootargs(void)
 	         "Hypervisor command line: %s\n", str);
 	strncpy(cmdline, str, len - 1);
 
-	while ((str = nextword(&cmd_iter))) {
+	while ((str = nextword(NULL, &cmd_iter))) {
 		char *end_name;
 		int size;
 

@@ -88,7 +88,7 @@ static int shell_action(void *user_ctx, char *buf)
 	char *cmdname;
 	command_t *cmd;
 
-	cmdname = nextword(&buf);
+	cmdname = nextword(shell->out, &buf);
 	if (!cmdname)
 		return 0;
 
@@ -158,7 +158,7 @@ static void print_aliases(shell_t *shell, command_t *cmd)
 static void help_fn(shell_t *shell, char *args)
 {
 	command_t *cmd;
-	const char *cmdname = nextword(&args);
+	const char *cmdname = nextword(shell->out, &args);
 
 	if (!cmdname) {
 		command_t **i;
@@ -295,8 +295,8 @@ static void gdt_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	cmdstr = nextword(&args);
-	numstr = nextword(&args);
+	cmdstr = nextword(shell->out, &args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr || !cmdstr) {
 		qprintf(shell->out, 1, "Usage: gdt <cmd> <partition-number>\n");
@@ -503,11 +503,11 @@ static void start_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	str = nextword(&args);
+	str = nextword(shell->out, &args);
 
 	if (str && !strcmp(str, "load")) {
 		load = 1;
-		str = nextword(&args);
+		str = nextword(shell->out, &args);
 	}
 
 	if (!str) {
@@ -542,7 +542,7 @@ static void restart_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
 		qprintf(shell->out, 1, "Usage: restart <partition-number>\n");
@@ -575,7 +575,7 @@ static void stop_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
 		qprintf(shell->out, 1, "Usage: stop <partition-number>\n");
@@ -609,7 +609,7 @@ static void pause_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
 		qprintf(shell->out, 1, "Usage: pause <partition-number>\n");
@@ -643,7 +643,7 @@ static void resume_fn(shell_t *shell, char *args)
 	guest_t *guest;
 
 	args = stripspace(args);
-	numstr = nextword(&args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr) {
 		qprintf(shell->out, 1, "Usage: resume <partition-number>\n");
@@ -764,8 +764,8 @@ static void gtlb_fn(shell_t *shell, char *args)
 	cpu_t *old_cpu = NULL;
 
 	args = stripspace(args);
-	gueststr = nextword(&args);
-	vcpustr = nextword(&args);
+	gueststr = nextword(shell->out, &args);
+	vcpustr = nextword(shell->out, &args);
 
 	if (!gueststr || !vcpustr) {
 		qprintf(shell->out, 1, "Usage: gtlb <guest#> <vcpu#>\n");
@@ -886,8 +886,8 @@ static void stats_fn(shell_t *shell, char *args)
 	int num;
 
 	args = stripspace(args);
-	cmdstr = nextword(&args);
-	numstr = nextword(&args);
+	cmdstr = nextword(shell->out, &args);
+	numstr = nextword(shell->out, &args);
 
 	if (!numstr || !cmdstr) {
 		qprintf(shell->out, 1, "Usage: stats <command> <partition-number>\n");
@@ -922,9 +922,9 @@ static void guestmem_fn(shell_t *shell, char *args)
 	phys_addr_t address, length;
 
 	args = stripspace(args);
-	gueststr = nextword(&args);
-	addrstr = nextword(&args);
-	lenstr = nextword(&args);
+	gueststr = nextword(shell->out, &args);
+	addrstr = nextword(shell->out, &args);
+	lenstr = nextword(shell->out, &args);
 
 	if (!gueststr || !addrstr) {
 		qprintf(shell->out, 1, "Usage: guestmem <partition> <address> [<length>]\n");
@@ -1124,8 +1124,8 @@ static void set_loglevel(shell_t *shell, char *args)
 	uint32_t level;
 
 	args = stripspace(args);
-	groupstr = nextword(&args);
-	levelstr = nextword(&args);
+	groupstr = nextword(shell->out, &args);
+	levelstr = nextword(shell->out, &args);
 
 	if (!groupstr) {
 		qprintf(shell->out, 1, "Group             Loglevel\n");
