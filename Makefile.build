@@ -81,6 +81,8 @@ ifeq "$(GUEST64)" "y"
 OUTPUTTEST := test64
 else ifndef GUEST64
 OUTPUTTEST := test32
+export GUEST64 := n
+else ifeq "$(GUEST64)" "n"
 else
 $(error Unsupported value (y/<undef>) for GUEST64=$(GUEST64))
 endif
