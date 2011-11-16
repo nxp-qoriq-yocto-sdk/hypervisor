@@ -69,6 +69,7 @@ config LIBOS_DEPS
 	select LIBOS_HCALL_INSTRUCTIONS
 	select LIBOS_POWERISA206
 	select LIBOS_POWERISA_E_PC
+	select LIBOS_POWERISA_E_ED
 
 config GCC_CPU_FLAG
 	string "Processor specific compiler optimizations"
