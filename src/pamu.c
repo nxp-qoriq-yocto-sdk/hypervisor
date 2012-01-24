@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -205,11 +205,11 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	int ret;
 	dt_prop_t *prop;
 	uint32_t phandle;
-	uint32_t msi_bank_addr;
+	uint32_t msiir_offset;
 	char buf[32];
 	uint32_t reg[2];
 	dt_prop_t *regprop;
-	uint64_t msi_addr = 0;
+	uint64_t msiir_addr = 0;
 	dt_node_t *msi_gnode, *msi_node;
 	unsigned long rpn = ULONG_MAX;
 	uint8_t *pci_ctrl = NULL;
@@ -233,18 +233,25 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 			         __func__, node->name);
 			return ULONG_MAX;
 		}
-
-		ret = dt_get_reg(msi_node, 0, &msi_addr, NULL);
+		/* Read the aliased MSIIR register address. If there is no
+		   alias, read the MSIIR address from the MSI bank */
+		ret = dt_get_reg(msi_node, 1, &msiir_addr, NULL);
 		if (ret < 0) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: Could not get reg in %s\n",
-			         __func__, msi_node->name);
-			return ULONG_MAX;
+			uint64_t msi_addr;
+			ret = dt_get_reg(msi_node, 0, &msi_addr, NULL);
+			if (ret < 0) {
+				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			    	     "%s: Could not get reg in %s\n",
+			        	 __func__, msi_node->name);
+				return ULONG_MAX;
+			}
+			// FIXME: This needs to be done via u-boot
+			msiir_addr = msi_addr + 0x140; 
 		}
+		msiir_offset = msiir_addr & (PAGE_SIZE - 1);
+		rpn = msiir_addr >> PAGE_SHIFT;
+		msiir_addr = gaddr + msiir_offset;
 
-		msi_bank_addr = msi_addr & (PAGE_SIZE - 1);
-		rpn = msi_addr >> PAGE_SHIFT;
-		msi_addr = gaddr + msi_bank_addr;
 		if (*size > PAGE_SIZE)
 			*size = PAGE_SIZE;
 
@@ -256,11 +263,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		regprop = dt_get_prop(msi_gnode, "reg", 0);
 		dt_delete_prop(regprop);
 
-		reg[0] = msi_addr >> 32;
-		reg[1] = msi_addr & 0xffffffff;
-
-		// FIXME: This needs to be done via u-boot
-		reg[1] += 0x140;
+		reg[0] = msiir_addr >> 32;
+		reg[1] = msiir_addr & 0xffffffff;
 
 		ret = dt_set_prop(gnode, "msi-address-64", reg, rootnaddr * 4);
 		if (ret < 0)
@@ -311,8 +315,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 				uint32_t inb_win_size = 1 <<
 					((piwar & PEXI_IWS) + 1);
 
-				if (msi_addr >= inb_win_addr &&
-				    msi_addr <= inb_win_addr + inb_win_size - 1)
+				if (msiir_addr >= inb_win_addr &&
+				    msiir_addr <= inb_win_addr + inb_win_size - 1)
 					break;
 			}
 		}
@@ -321,8 +325,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 
 		if (i > 2) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: %s: msi-address 0x%llx outside inbound memory windows\n",
-			         __func__, node->name, msi_addr);
+			         "%s: %s: msiir-address 0x%llx outside inbound memory windows\n",
+			         __func__, node->name, msiir_addr);
 
 			return ULONG_MAX;
 		}
