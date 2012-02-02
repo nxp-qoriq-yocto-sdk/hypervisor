@@ -147,17 +147,20 @@
 			device = "pci0";
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
+			node-update-phandle {
+				fsl,msi = <&msi0>;
+			};
 		};
 
-		msi0 {
+		msi0: msi@41600 {
 			device = "msi0";
 		};
 
-		msi1 {
+		msi1: msi@41800 {
 			device = "msi1";
 		};
 
-		msi2 {
+		msi2: msi@41a00 {
 			device = "msi2";
 		};
 
@@ -165,6 +168,9 @@
 			device = "pci2";
 			map-ranges;
 			dma-window = <&{/pcie-window}>;
+			node-update-phandle {
+				fsl,msi = <&msi2>;
+			};
 		};
 
 		qman {
