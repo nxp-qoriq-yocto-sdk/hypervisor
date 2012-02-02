@@ -261,7 +261,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 			return ULONG_MAX;
 
 		regprop = dt_get_prop(msi_gnode, "reg", 0);
-		dt_delete_prop(regprop);
+		if (regprop)
+			dt_delete_prop(regprop);
 
 		reg[0] = msiir_addr >> 32;
 		reg[1] = msiir_addr & 0xffffffff;
