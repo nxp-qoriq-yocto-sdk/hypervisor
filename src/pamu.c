@@ -210,127 +210,162 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint32_t reg[2];
 	dt_prop_t *regprop;
 	uint64_t msiir_addr = 0;
-	dt_node_t *msi_gnode, *msi_node;
+	dt_node_t *msi_gnode = NULL, *msi_node = NULL, *up_node;
+	dev_owner_t *owner;
 	unsigned long rpn = ULONG_MAX;
 	uint8_t *pci_ctrl = NULL;
 	phys_addr_t pcie_addr, pcie_size;
+	int i;
 
-	prop = dt_get_prop(node, "fsl,msi", 0);
-	if (prop) {
-		int i;
+	prop = dt_get_prop(node, "device_type", 0);
+	if (!prop || strcmp(prop->data, "pci"))
+		return rpn;
 
-		phandle = *(const uint32_t *)prop->data;
-		msi_gnode = dt_lookup_phandle(guest->devtree, phandle);
-		msi_node = dt_lookup_phandle(hw_devtree, phandle);
+	/* delete the fsl,msi property from the guest device tree. If the
+	   hv config contains a node-update-phandle for the fsl,msi property,
+	   the new property will be added to the guest device tree */
+	prop = dt_get_prop(gnode, "fsl,msi", 0);
+	if (prop)
+		dt_delete_prop(prop);
 
-		if (!msi_gnode)
-			return ULONG_MAX;
-		
-		if (!msi_node ||
-		    !dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: Bad fsl,msi phandle in %s\n",
-			         __func__, node->name);
-			return ULONG_MAX;
-		}
-		/* Read the aliased MSIIR register address. If there is no
-		   alias, read the MSIIR address from the MSI bank */
-		ret = dt_get_reg(msi_node, 1, &msiir_addr, NULL);
-		if (ret < 0) {
-			uint64_t msi_addr;
-			ret = dt_get_reg(msi_node, 0, &msi_addr, NULL);
-			if (ret < 0) {
-				printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			    	     "%s: Could not get reg in %s\n",
-			        	 __func__, msi_node->name);
-				return ULONG_MAX;
-			}
-			// FIXME: This needs to be done via u-boot
-			msiir_addr = msi_addr + 0x140; 
-		}
-		msiir_offset = msiir_addr & (PAGE_SIZE - 1);
-		rpn = msiir_addr >> PAGE_SHIFT;
-		msiir_addr = gaddr + msiir_offset;
+	up_node = dt_get_subnode(cfgnode, "node-update-phandle", 0);
 
-		if (*size > PAGE_SIZE)
-			*size = PAGE_SIZE;
-
-		ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi");
-		ret = dt_set_prop(msi_gnode, "compatible", buf, ret + 1);
-		if (ret < 0)
-			return ULONG_MAX;
-
-		regprop = dt_get_prop(msi_gnode, "reg", 0);
-		if (regprop)
-			dt_delete_prop(regprop);
-
-		reg[0] = msiir_addr >> 32;
-		reg[1] = msiir_addr & 0xffffffff;
-
-		ret = dt_set_prop(gnode, "msi-address-64", reg, rootnaddr * 4);
-		if (ret < 0)
-			goto nomem;
-
-		ret = dt_get_reg(node, 0, &pcie_addr, &pcie_size);
-		if (ret < 0 || pcie_size < 0x1000) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: bad/missing reg\n", __func__);
-			return ULONG_MAX;
-		}
-
-		size_t len = 0x1000;
-#if 1
-		pci_ctrl = map_phys(TEMPTLB1, pcie_addr, temp_mapping[0],
-		                    &len, TLB_TSIZE_4K, TLB_MAS2_IO,
-		                    TLB_MAS3_KDATA);
-#else
-/* Needed if PCIe virtualization is enabled */
-		if (node->vf)
-			pci_ctrl = node->vf->vaddr;
-#endif
-		if (!pci_ctrl || len < 0x1000) {
-			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: Couldn't map reg %llx (guest phys) of %s\n",
-			         __func__, pcie_addr, msi_node->name);
-			return ULONG_MAX;
-		}
-
-		for (i = 0; i <= 2; i++) {
-			uint32_t piwar, piwbear, piwbar;
-
-			piwar = in32((uint32_t *)
-				(pci_ctrl + PEXIWAR + i * 0x20));
-
-			if (piwar & PEXI_EN) {
-				piwbar = in32((uint32_t *)
-					(pci_ctrl + PEXIWBAR + i * 0x20));
-				piwbear = in32((uint32_t *) (pci_ctrl +
-						PEXIWBEAR + i * 0x20));
-
-				/* logic works for undefined PEXIWBEAR1 */
-				uint64_t inb_win_addr = ((uint64_t)
-					((piwbear & 0xFFFFF) << 12 |
-				          piwbar >> 20)  << 32) |
-					(piwbar & 0xFFFFF) << 12;
-
-				uint32_t inb_win_size = 1 <<
-					((piwar & PEXI_IWS) + 1);
-
-				if (msiir_addr >= inb_win_addr &&
-				    msiir_addr <= inb_win_addr + inb_win_size - 1)
+	if (up_node) {
+		prop = dt_get_prop(up_node, "fsl,msi", 0);
+		if (prop && prop->len == 4) {
+			phandle = *(const uint32_t *)prop->data;
+			list_for_each(&guest->dev_list, i) {
+				owner = to_container(i, dev_owner_t, guest_node);
+				if (dt_get_phandle(owner->cfgnode, 0) == phandle) {
+					msi_node = owner->hwnode;
+					msi_gnode = owner->gnode;
 					break;
+				}
+			}
+		}
+	}
+	/* if no node-update-phandle for fsl,msi property is found, the pci is 
+	 * associated with the first msi node assigned to this guest */
+	if (!msi_gnode)
+		list_for_each(&guest->dev_list, i) {
+			dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
+			if (dt_node_is_compatible(owner->hwnode, "fsl,mpic-msi")) {
+				msi_node = owner->hwnode;
+				msi_gnode = owner->gnode;
+				dt_set_prop(gnode, "fsl,msi", &owner->cfgnode->guest_phandle, 4);
+				break;
 			}
 		}
 
-		tlb1_clear_entry(TEMPTLB1);
 
-		if (i > 2) {
+	if (!msi_gnode)
+		return ULONG_MAX;
+
+	if (!msi_node ||
+		!dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				 "%s: bad fsl,msi phandle in %s\n",
+				 __func__, node->name);
+		return ULONG_MAX;
+	}
+	
+	/* read the aliased msiir register address. if there is no
+	   alias, read the msiir address from the msi bank */
+	ret = dt_get_reg(msi_node, 1, &msiir_addr, NULL);
+	if (ret < 0) {
+		uint64_t msi_addr;
+		ret = dt_get_reg(msi_node, 0, &msi_addr, NULL);
+		if (ret < 0) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
-			         "%s: %s: msiir-address 0x%llx outside inbound memory windows\n",
-			         __func__, node->name, msiir_addr);
-
+					 "%s: could not get reg in %s\n",
+					 __func__, msi_node->name);
 			return ULONG_MAX;
 		}
+		// fixme: this needs to be done via u-boot
+		msiir_addr = msi_addr + 0x140;
+	}
+	msiir_offset = msiir_addr & (PAGE_SIZE - 1);
+	rpn = msiir_addr >> PAGE_SHIFT;
+	msiir_addr = gaddr + msiir_offset;
+
+	if (*size > PAGE_SIZE)
+		*size = PAGE_SIZE;
+
+	ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi");
+	ret = dt_set_prop(msi_gnode, "compatible", buf, ret + 1);
+	if (ret < 0)
+		return ULONG_MAX;
+
+	regprop = dt_get_prop(msi_gnode, "reg", 0);
+	if (regprop)
+		dt_delete_prop(regprop);
+
+	reg[0] = msiir_addr >> 32;
+	reg[1] = msiir_addr & 0xffffffff;
+
+	ret = dt_set_prop(gnode, "msi-address-64", reg, rootnaddr * 4);
+	if (ret < 0)
+		goto nomem;
+
+	ret = dt_get_reg(node, 0, &pcie_addr, &pcie_size);
+	if (ret < 0 || pcie_size < 0x1000) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				 "%s: bad/missing reg\n", __func__);
+		return ULONG_MAX;
+	}
+
+	size_t len = 0x1000;
+#if 1
+	pci_ctrl = map_phys(TEMPTLB1, pcie_addr, temp_mapping[0],
+						&len, TLB_TSIZE_4K, TLB_MAS2_IO,
+						TLB_MAS3_KDATA);
+#else
+/* needed if pcie virtualization is enabled */
+	if (node->vf)
+		pci_ctrl = node->vf->vaddr;
+#endif
+	if (!pci_ctrl || len < 0x1000) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				 "%s: couldn't map reg %llx (guest phys) of %s\n",
+				 __func__, pcie_addr, msi_node->name);
+		return ULONG_MAX;
+	}
+
+	for (i = 0; i <= 2; i++) {
+		uint32_t piwar, piwbear, piwbar;
+
+		piwar = in32((uint32_t *)
+			(pci_ctrl + PEXIWAR + i * 0x20));
+
+		if (piwar & PEXI_EN) {
+			piwbar = in32((uint32_t *)
+				(pci_ctrl + PEXIWBAR + i * 0x20));
+			piwbear = in32((uint32_t *) (pci_ctrl +
+					PEXIWBEAR + i * 0x20));
+
+			/* logic works for undefined PEXIWBEAR1 */
+			uint64_t inb_win_addr = ((uint64_t)
+				((piwbear & 0xfffff) << 12 |
+					  piwbar >> 20)  << 32) |
+				(piwbar & 0xfffff) << 12;
+
+			uint32_t inb_win_size = 1 <<
+				((piwar & PEXI_IWS) + 1);
+
+			if (msiir_addr >= inb_win_addr &&
+				msiir_addr <= inb_win_addr + inb_win_size - 1)
+				break;
+		}
+	}
+
+	tlb1_clear_entry(TEMPTLB1);
+
+	if (i > 2) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+				 "%s: %s: msiir-address 0x%llx outside inbound memory windows\n",
+				 __func__, node->name, msiir_addr);
+
+		return ULONG_MAX;
 	}
 
 	return rpn;
