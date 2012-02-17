@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2012 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -902,7 +902,6 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 {
 	dt_node_t *node, *gnode;
 	int pcpu, ret;
-	uint32_t cells;
 	char buf[32];
 
 	pcpu = vcpu_to_cpu(cpulist, cpulist_len, vcpu);
@@ -920,22 +919,9 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 		return ERR_RANGE;
 	}
 
-	// The "cpu" nodes go under the /cpus node, which need the
-	// #address-cells and #size-cells properties.
-	//
-	gnode = dt_get_subnode(guest->devtree, "cpus", 1);
+	gnode = dt_get_subnode(guest->devtree, "cpus", 0);
 	if (!gnode)
-		return ERR_NOMEM;
-
-	cells = 1;
-	ret = dt_set_prop(gnode, "#address-cells", &cells, sizeof(cells));
-	if (ret < 0)
-		return ret;
-
-	cells = 0;
-	ret = dt_set_prop(gnode, "#size-cells", &cells, sizeof(cells));
-	if (ret < 0)
-		return ret;
+		return ERR_NOTFOUND;
 
 	// Create the "cpu" node for this CPU.
 
@@ -1010,6 +996,67 @@ static int create_guest_spin_table(guest_t *guest)
 			return ret;
 		}
 	}
+
+	return 0;
+}
+
+static int config_cpus(guest_t *guest)
+{
+	dt_node_t *gnode, *node;
+	dt_prop_t *prop;
+	int ret;
+	uint32_t cells;
+
+	gnode = dt_get_subnode(guest->devtree, "cpus", 1);
+	if (!gnode)
+		return ERR_NOMEM;
+
+	node = dt_get_subnode(hw_devtree, "cpus", 0);
+	if (!node)
+		return ERR_BADTREE;
+
+	ret = dt_copy_properties(node, gnode);
+	if (ret < 0)
+		return ret;
+
+	/* remove Embedded.Hypervisor category */
+	prop = dt_get_prop(gnode, "power-isa-e.hv", 0);
+	if (prop)
+		dt_delete_prop(prop);
+
+	/* remove Embedded.Enhanced Debug category if necessary */
+	if (!guest->guest_debug_mode) {
+		prop = dt_get_prop(gnode, "power-isa-e.ed", 0);
+		if (prop)
+			dt_delete_prop(prop);
+	}
+
+	/* remove Embedded.Cache Locking category if necessary */
+	if (!guest->guest_cache_lock) {
+		prop = dt_get_prop(gnode, "power-isa-ecl", 0);
+		if (prop)
+			dt_delete_prop(prop);
+	}
+
+	/* if Topaz is compiled 32 bit on 64 bit capable architectures,
+	 * remove 64-Bit category */
+#ifndef CONFIG_LIBOS_64BIT
+	prop = dt_get_prop(gnode, "power-isa-64", 0);
+	if (prop)
+		dt_delete_prop(prop);
+#endif
+
+	/* overwrite the #address-cells and #size-cells properties as needed
+	 * by the cpu nodes that will be added under this node */
+	cells = 1;
+	ret = dt_set_prop(gnode, "#address-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
+
+	cells = 0;
+	ret = dt_set_prop(gnode, "#size-cells", &cells, sizeof(cells));
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
@@ -3082,6 +3129,10 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	guest->gphys_rev = alloc(PAGE_SIZE * 2, PAGE_SIZE * 2);
 	if (!guest->gphys || !guest->gphys_rev)
 		goto nomem;
+
+	ret = config_cpus(guest);
+	if (ret < 0)
+		goto fail;
 
 	ret = create_guest_spin_table(guest);
 	if (ret < 0)
