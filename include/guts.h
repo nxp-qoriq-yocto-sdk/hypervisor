@@ -39,7 +39,7 @@
 
 int system_reset(void);
 int get_sys_reset_status(void);
-void set_reset_mask(uint32_t mask);
+int set_reset_mask(uint32_t mask);
 
 #define SYS_RESET_STATUS_POR  1
 #define SYS_RESET_STATUS_HARD 2

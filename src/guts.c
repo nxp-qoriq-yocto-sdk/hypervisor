@@ -102,9 +102,19 @@ int system_reset(void)
 	while (1);
 }
 
-void set_reset_mask(uint32_t mask)
+int set_reset_mask(uint32_t mask)
 {
-	uint32_t val = in32(guts_rstrqmr);
+	uint32_t val;
+
+	if (!guts_rstrqmr) {
+		printlog(LOGTYPE_GUTS, LOGLEVEL_ERROR,
+			 "%s: reset request mask reg not found\n", __func__);
+		return -EV_ENODEV;
+	}
+
+	val = in32(guts_rstrqmr);
 
 	out32(guts_rstrqmr, val | mask);
+
+	return 0;
 }
