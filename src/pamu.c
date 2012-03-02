@@ -53,15 +53,14 @@ static const char *pamu_err_policy[PAMU_ERROR_COUNT];
 /* mcheck-safe lock, used to ensure atomicity of reassignment */
 static uint32_t pamu_error_lock;
 
-static pamu_handle_t *liodn_to_handle[PAACE_NUMBER_ENTRIES];
-static guest_t *liodn_to_guest[PAACE_NUMBER_ENTRIES];
-static uint32_t pamu_lock;
+static struct {
+	pamu_handle_t *pamu_handle;
+	guest_t *guest;
 #ifdef CONFIG_ERRATUM_PAMU_A_003638
-static void *pamu_reg_disabled[PAACE_NUMBER_ENTRIES];
-
 #define PAMU_STAT (PAMU_ACCESS_VIOLATION_STAT | PAMU_OPERATION_ERROR_INT_STAT)
-
+	void *pamu_reg_disabled;
 #endif
+} liodn_data[PAACE_NUMBER_ENTRIES];
 
 static int is_subwindow_count_valid(int subwindow_cnt)
 {
@@ -626,7 +625,7 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 		return ERR_BADTREE;
 	}
 
-	liodn_to_guest[liodn] = guest;
+	liodn_data[liodn].guest = guest;
 
 #ifdef CONFIG_WARM_REBOOT
 	if (warm_reboot)
@@ -749,18 +748,18 @@ int hv_pamu_enable_liodn(unsigned int handle)
 	liodn = pamu_handle->assigned_liodn;
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
-	if (liodn_to_guest[liodn] != guest)
+	if (liodn_data[liodn].guest != guest)
 		return EV_INVALID_STATE;
 #endif
 
 #ifdef CONFIG_ERRATUM_PAMU_A_003638
 	/* re-enable access violations if necessary */
-	if (pamu_reg_disabled[liodn]) {
+	if (liodn_data[liodn].pamu_reg_disabled) {
 		uint32_t pics;
-		void *reg = pamu_reg_disabled[liodn];
+		void *reg = liodn_data[liodn].pamu_reg_disabled;
 
 		/* access violations are now enabled for this PAMU */
-		pamu_reg_disabled[liodn] = NULL;
+		liodn_data[liodn].pamu_reg_disabled = NULL;
 
 		lwsync();
 
@@ -793,7 +792,7 @@ int hv_pamu_disable_liodn(unsigned int handle)
 	liodn = pamu_handle->assigned_liodn;
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
-	if (liodn_to_guest[liodn] != guest)
+	if (liodn_data[liodn].guest != guest)
 		return EV_INVALID_STATE;
 #endif
 
@@ -1015,7 +1014,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	 *- POEIE should be left as it is
 	 */
 	out32(reg + PAMU_PICS, (pics & ~PAMU_STAT) & ~PAMU_ACCESS_VIOLATION_ENABLE);
-	pamu_reg_disabled[av_liodn] = reg;
+	liodn_data[av_liodn].pamu_reg_disabled = reg;
 	pics = pics & ~PAMU_ACCESS_VIOLATION_ENABLE;
 #endif
 
@@ -1048,10 +1047,10 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 
 	spin_lock(&pamu_error_lock);
 
-	guest_t *guest = liodn_to_guest[av_liodn];
+	guest_t *guest = liodn_data[av_liodn].guest;
 	if (guest) {
 		pamu->lpid = guest->lpid;
-		pamu->liodn_handle = liodn_to_handle[av_liodn]->user.id;
+		pamu->liodn_handle = liodn_data[av_liodn].pamu_handle->user.id;
 		dt_node_t *node = get_dev_node(pamu->liodn_handle, guest);
 		if (node)
 			dt_get_path(NULL, node, err.gdev_tree_path,
@@ -1358,14 +1357,14 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 {
 	pamu_handle_t *ph = to_container(action, pamu_handle_t, claim_action);
 	uint32_t liodn = ph->assigned_liodn;
-	guest_t *oldguest = liodn_to_guest[liodn];
-	pamu_handle_t *oldhandle = liodn_to_handle[liodn];
+	guest_t *oldguest = liodn_data[liodn].guest;
+	pamu_handle_t *oldhandle = liodn_data[liodn].pamu_handle;
 	uint32_t saved;
 
 	saved = spin_lock_mchksave(&pamu_error_lock);
 
-	liodn_to_handle[liodn] = ph;
-	liodn_to_guest[liodn] = owner->guest;
+	liodn_data[liodn].pamu_handle = ph;
+	liodn_data[liodn].guest = owner->guest;
 
 	spin_unlock_mchksave(&pamu_error_lock, saved);
 
@@ -1522,7 +1521,7 @@ static void pamu_reset_handle(handle_t *h, int partition_stop)
 {
 	pamu_handle_t *ph = h->pamu;
 	uint32_t liodn = ph->assigned_liodn;
-	guest_t *guest = liodn_to_guest[liodn];
+	guest_t *guest = liodn_data[liodn].guest;
 
 	if (guest == h->handle_owner) {
 		if (ph->no_dma_disable || guest->no_dma_disable)
@@ -1598,7 +1597,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	}
 	liodn = (const uint32_t *)liodn_prop->data;
 
-	/* get a count of liodns */
+	/* get a count of LIODNs */
 	liodn_cnt = liodn_prop->len / 4;
 
 	dma_handles = malloc(liodn_cnt * sizeof(uint32_t));
@@ -1639,7 +1638,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 			/* Don't allocate a new handle if it's a QMan
 			 * portal device that's already been configured.
 			 */
-			pamu_handle = liodn_to_handle[liodn[i]];
+			pamu_handle = liodn_data[liodn[i]].pamu_handle;
 		}
 
 		if (!pamu_handle) {
@@ -1673,7 +1672,7 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 #endif
 
 		if (!standby) {
-			liodn_to_handle[liodn[i]] = pamu_handle;
+			liodn_data[liodn[i]].pamu_handle = pamu_handle;
 			mbar(1);
 
 #ifdef CONFIG_WARM_REBOOT
