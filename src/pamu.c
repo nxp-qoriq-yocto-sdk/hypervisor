@@ -257,18 +257,17 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 			}
 		}
 
-
 	if (!msi_gnode)
 		return ULONG_MAX;
 
 	if (!msi_node ||
-		!dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
+	    !dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				 "%s: bad fsl,msi phandle in %s\n",
 				 __func__, node->name);
 		return ULONG_MAX;
 	}
-	
+
 	/* read the aliased msiir register address. if there is no
 	   alias, read the msiir address from the msi bank */
 	ret = dt_get_reg(msi_node, 1, &msiir_addr, NULL);
@@ -486,7 +485,7 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			         __func__, parent->name, node->name);
 			continue;
 		}
-		
+
 		gaddr = *(uint64_t *)prop->data;
 		if (gaddr < primary_base ||
 		    gaddr > primary_base + primary_size) {
@@ -504,7 +503,7 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			         node->name, subwindow_size);
 			continue;
 		}
-		
+
 		subwin = (gaddr - primary_base) / subwindow_size;
 		assert(primary_base + subwin * subwindow_size == gaddr);
 
@@ -686,7 +685,7 @@ skip_snoop_id:
 				 __func__, prop->len, cfgnode->name);
 			return ERR_BADTREE;
 		}
-	
+
 		subwindow_cnt = *(const uint32_t *)prop->data;
 
 		if (!is_subwindow_count_valid(subwindow_cnt)) {
@@ -996,7 +995,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	 * interrupt is triggered. The interrupt handler clears PICS[AVICS] to clear
 	 * the interrupt and also clears the appropriate bit from the PAACE entry to stop
 	 * further attempts from the peripheral interface that may cause further access
-	 * violations. 
+	 * violations.
 	 * Due to errata, clearing the valid bit in PAACE entry will not stop further access
 	 * violations from the interface. Furthermore, if access violations continue to occur,
 	 * the PAMU can end up into a state where PICS[AVICS] is 0, but the access violation
@@ -1008,7 +1007,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	 * When the guest re-enables DMA, if that liodn caused the access violation interrupts
 	 * to be disabled, they will be re-enabled
 	 */
-	
+
 	/* disable the access violations for this PAMU
 	 *- AVICS should be 0, do not clear it yet
 	 *- POEICS should be 0, as 1 is changing the value
@@ -1026,7 +1025,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	{
 		/* Clear the write one to clear bits in AVS1, mask out the LIODN */
 		out32(reg + PAMU_AVS1, (avs1 & PAMU_AV_MASK));
-		
+
 		/* De-assert access violation pin */
 		out32(reg + PAMU_PICS, pics);
 #ifdef CONFIG_P4080_ERRATUM_PAMU3
@@ -1347,7 +1346,7 @@ static void migrate_access_violations(guest_t *guest, queue_t *src,
 		if (!strcmp(err.domain, get_domain_str(error_pamu)) &&
 		    err.pamu.liodn_handle == oldhandle) {
 			err.pamu.liodn_handle = newhandle;
-			
+
 			error_log(&guest->error_event_queue, &err,
 			          &guest->error_log_prod_lock);
 		}
@@ -1362,7 +1361,7 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	guest_t *oldguest = liodn_to_guest[liodn];
 	pamu_handle_t *oldhandle = liodn_to_handle[liodn];
 	uint32_t saved;
-	
+
 	saved = spin_lock_mchksave(&pamu_error_lock);
 
 	liodn_to_handle[liodn] = ph;
