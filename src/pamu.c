@@ -34,6 +34,7 @@
 #include <libos/console.h>
 #include <libos/alloc.h>
 #include <libos/platform_error.h>
+#include <libos/fsl_hcalls.h>
 
 #include <pamu.h>
 #include <percpu.h>
@@ -59,6 +60,9 @@ static struct {
 #ifdef CONFIG_ERRATUM_PAMU_A_003638
 #define PAMU_STAT (PAMU_ACCESS_VIOLATION_STAT | PAMU_OPERATION_ERROR_INT_STAT)
 	void *pamu_reg_disabled;
+	unsigned int stash_vcpu;  // Target CPU for stashing for this LIODN
+	unsigned int stash_cache; // Cache level (1, 2, or 3) for stashing,
+				  // or 0 for no stashing
 #endif
 } liodn_data[PAACE_NUMBER_ENTRIES];
 
@@ -76,6 +80,84 @@ static int is_subwindow_count_valid(int subwindow_cnt)
 #define L3 3
 
 /*
+ * Find the stash ID for the given cache level of the given CPU node
+ * @cpu_node: pointer to the CPU node
+ * @cache_level: L1, L2, or L3
+ */
+static uint32_t get_stash_id(dt_node_t *cpu_node, unsigned int cache_level)
+{
+	dt_node_t *node = cpu_node;	// The cache node
+	dt_prop_t *prop;
+
+	/*
+	 * On the P4080, the L3 is the CPC and needs to be handled
+	 * separately.
+	 */
+	if (cache_level == L3) {
+		node = dt_get_first_compatible(hw_devtree,
+				"fsl,p4080-l3-cache-controller");
+		if (!node)
+			// There's no CPC node
+			return ~(uint32_t)0;
+
+		if (!cpcs_enabled()) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+				"%s: %s not enabled\n",	__func__, node->name);
+			return ~(uint32_t)0;
+		}
+		prop = dt_get_prop(node, "cache-stash-id", 0);
+		if (!prop) {
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+				"%s: missing cache-stash-id in %s\n",
+				__func__, node->name);
+			return ~(uint32_t)0;
+		}
+		return *(const uint32_t *)prop->data;
+	}
+
+	// Iterate through the cache nodes until we get to the one we want.
+	for (unsigned int i = L1; i < cache_level; i++) {
+		uint32_t phandle;
+
+		prop = dt_get_prop(node, "next-level-cache", 0);
+		if (!prop || (prop->len != sizeof(uint32_t))) {
+			// 'next-level-cache' property is missing or malformed
+			// If the property is missing, then it means that
+			// we're trying to find a cache level that does not
+			// exist for this CPU.
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+				 "%s: 'next-level-cache' property for node %s is missing or invalid\n",
+				__func__, node->name);
+			return ~(uint32_t)0;
+		}
+
+		phandle = *(const uint32_t *)prop->data;
+
+		node = dt_lookup_phandle(hw_devtree, phandle);
+		if (!node) {
+			// Invalid phandle
+			printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+				 "%s: 'next-level-cache' property for node %s is an invalid phandle\n",
+				__func__, node->name);
+			return ~(uint32_t)0;
+		}
+	}
+
+	// We've found a matching cache node.  Get the stash ID and exit.
+
+	prop = dt_get_prop(node, "cache-stash-id", 0);
+	if (!prop || (prop->len != sizeof(uint32_t))) {
+		// Missing or invalid cache-stash-id property
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
+			 "%s: 'cache-stash-id' property for node %s is missing or invalid\n",
+			__func__, node->name);
+		return ~(uint32_t)0;
+	}
+
+	return *(const uint32_t *)prop->data;
+}
+
+/*
  * Given the stash-dest enumeration value and a hw node of the device
  * being configured, return the cache-stash-id property value for
  * the associated cpu.  Assumption is that a cpu-handle property
@@ -87,33 +169,11 @@ static int is_subwindow_count_valid(int subwindow_cnt)
  *    3 : L3/CPC cache
  *
  */
-static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
+static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode,
+			       unsigned int *pcpu)
 {
 	dt_prop_t *prop;
 	dt_node_t *node;
-
-	/* Fastpath, exit early if L3/CPC cache is target for stashing */
-	if (stash_dest == L3) {
-		node = dt_get_first_compatible(hw_devtree,
-				"fsl,p4080-l3-cache-controller");
-		if (node) {
-			if (!cpcs_enabled()) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
-					"%s: %s not enabled\n",
-					__func__, node->name);
-				return ~(uint32_t)0;
-			}
-			prop = dt_get_prop(node, "cache-stash-id", 0);
-			if (!prop) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
-					"%s: missing cache-stash-id in %s\n",
-					__func__, node->name);
-				return ~(uint32_t)0;
-			}
-			return *(const uint32_t *)prop->data;
-		}
-		return ~(uint32_t)0;
-	}
 
 	prop = dt_get_prop(hwnode, "cpu-handle", 0);
 	if (!prop || prop->len != 4)
@@ -128,41 +188,13 @@ static uint32_t get_stash_dest(uint32_t stash_dest, dt_node_t *hwnode)
 		return ~(uint32_t)0;
 	}
 
+	// Return the physical CPU ID that we found
+	prop = dt_get_prop(node, "reg", 0);
+	if (prop)
+		*pcpu = *(const uint32_t *)prop->data;
+
 	/* find the hwnode that represents the cache */
-	for (uint32_t cache_level = L1; cache_level <= L3; cache_level++) {
-		if (stash_dest == cache_level) {
-			prop = dt_get_prop(node, "cache-stash-id", 0);
-			if (!prop || prop->len != 4) {
-				printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-				         "%s: missing/bad cache-stash-id at %s \n",
-				          __func__, node->name);
-				return ~(uint32_t)0;
-			}
-			return *(const uint32_t *)prop->data;
-		}
-
-		prop = dt_get_prop(node, "next-level-cache", 0);
-		if (!prop || prop->len != 4) {
-			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: can't find next-level-cache at %s \n",
-			          __func__, node->name);
-			return ~(uint32_t)0;  /* can't traverse any further */
-		}
-
-		/* advance to next node in cache hierarchy */
-		node = dt_lookup_phandle(hw_devtree, *(const uint32_t *)prop->data);
-		if (!node) {
-			printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-			         "%s: bad cpu phandle reference in %s \n",
-			          __func__, hwnode->name);
-			return ~(uint32_t)0;
-		}
-	}
-
-	printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
-	         "%s: stash dest not found for %d on %s \n",
-	          __func__, stash_dest, hwnode->name);
-	return ~(uint32_t)0;
+	return get_stash_id(node, stash_dest);
 }
 
 static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
@@ -648,11 +680,25 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 		}
 	}
 
-	/* configure stash id */
+	/*
+	 * Determine the stash ID, if specified.  We also want to remember
+	 * the stash target CPU and cache level.
+	 */
 	stash_prop = dt_get_prop(cfgnode, "stash-dest", 0);
 	if (stash_prop && stash_prop->len == 4) {
-		stash_dest = get_stash_dest( *(const uint32_t *)
-				stash_prop->data , gnode);
+		unsigned int pcpu = 0;
+
+		liodn_data[liodn].stash_cache = *(const uint32_t *)stash_prop->data;
+
+		stash_dest = get_stash_dest(liodn_data[liodn].stash_cache, gnode, &pcpu);
+
+		// Convert the physical CPU number to a guest CPU number
+		for (unsigned i = 0; i < guest->cpucnt; i++) {
+			if (guest->gcpus[i]->cpu->coreid == pcpu) {
+				liodn_data[liodn].stash_vcpu = i;
+				break;
+			}
+		}
 	}
 
 	/* configure snoop-id if needed */
@@ -1698,3 +1744,130 @@ nomem:
 	return ERR_NOMEM;
 }
 
+static register_t hv_pamu_set_stash_target(unsigned int handle, phys_addr_t addr)
+{
+	guest_t *guest = get_gcpu()->guest;
+	struct fh_dma_attr_stash user;
+	pamu_handle_t *pamu_handle;
+	unsigned long liodn;
+	uint32_t stash_id = 0;
+	paace_t *ppaace;
+	size_t len;
+
+	if (handle >= MAX_HANDLES || !guest->handles[handle])
+		// Invalid handle
+		return EV_EINVAL;
+
+	pamu_handle = guest->handles[handle]->pamu;
+	if (!pamu_handle)
+		// Not a handle for an LIODN
+		return EV_EINVAL;
+
+	liodn = pamu_handle->assigned_liodn;
+
+	len = copy_from_gphys(get_gcpu()->guest->gphys, &user, addr,
+		sizeof(struct fh_dma_attr_stash));
+	if (len != sizeof(struct fh_dma_attr_stash))
+		return EV_EFAULT;
+
+	ppaace = pamu_get_ppaace(liodn);
+	if (!ppaace)
+		// The LIODN has not been initialized yet
+		return EV_EINVAL;
+
+	// A non-zero value means the user wants to enable stashing.
+	// Otherwise, we leave stash_id at 0, which will disable stashing.
+	if (user.cache) {
+		dt_node_t *node;
+		int pcpu;
+
+		pcpu = vcpu_to_cpu(guest->cpulist, guest->cpulist_len, user.vcpu);
+		if (pcpu < 0)
+			return EV_EINVAL;
+
+		node = get_cpu_node(hw_devtree, pcpu);
+		stash_id = get_stash_id(node, user.cache);
+		if (stash_id == ~(uint32_t)0)
+			return EV_EINVAL;
+	}
+
+	/*
+	 * Although the PAMU supports different stash targets for each
+	 * subwindow, we're not going to support this feature.  All
+	 * subwindows will be set to the same stash target
+	 */
+	set_bf(ppaace->impl_attr, PAACE_IA_CID, stash_id);
+
+	/* The MW bit tells us if there are any SPAACEs  */
+	if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
+		unsigned int count =
+			1 << (1 + get_bf(ppaace->impl_attr, PAACE_IA_WCE));
+
+		for (unsigned i = 0; i < count; i++) {
+			paace_t *spaace = pamu_get_spaace(ppaace->fspi, i);
+			set_bf(spaace->impl_attr, PAACE_IA_CID, stash_id);
+		}
+	}
+
+	// Remember the settings
+	liodn_data[liodn].stash_vcpu = user.vcpu;
+	liodn_data[liodn].stash_cache = user.cache;
+
+	return 0;
+}
+
+static register_t hv_pamu_get_stash_target(unsigned int handle, phys_addr_t addr)
+{
+	guest_t *guest = get_gcpu()->guest;
+	struct fh_dma_attr_stash user;
+	pamu_handle_t *pamu_handle;
+	unsigned long liodn;
+	size_t len;
+
+	if (handle >= MAX_HANDLES || !guest->handles[handle])
+		// Invalid handle
+		return EV_EINVAL;
+
+	pamu_handle = guest->handles[handle]->pamu;
+	if (!pamu_handle)
+		// Not a handle for an LIODN
+		return EV_EINVAL;
+
+	liodn = pamu_handle->assigned_liodn;
+
+	user.vcpu = liodn_data[liodn].stash_vcpu;
+	user.cache = liodn_data[liodn].stash_cache;
+
+	len = copy_to_gphys(get_gcpu()->guest->gphys, addr, &user,
+		sizeof(struct fh_dma_attr_stash), 0);
+	if (len != sizeof(struct fh_dma_attr_stash))
+		return EV_EFAULT;
+
+	return 0;
+}
+
+void hcall_dma_attr_set(trapframe_t *regs)
+{
+	phys_addr_t addr = ((phys_addr_t)regs->gpregs[5] << 32) | regs->gpregs[6];
+
+	switch (regs->gpregs[4]) {
+	case FSL_PAMU_ATTR_STASH:
+		regs->gpregs[3] = hv_pamu_set_stash_target(regs->gpregs[3], addr);
+		break;
+	default:
+		regs->gpregs[3] = EV_EINVAL;
+	}
+}
+
+void hcall_dma_attr_get(trapframe_t *regs)
+{
+	phys_addr_t addr = ((phys_addr_t)regs->gpregs[5] << 32) | regs->gpregs[6];
+
+	switch (regs->gpregs[4]) {
+	case FSL_PAMU_ATTR_STASH:
+		regs->gpregs[3] = hv_pamu_get_stash_target(regs->gpregs[3], addr);
+		break;
+	default:
+		regs->gpregs[3] = EV_EINVAL;
+	}
+}

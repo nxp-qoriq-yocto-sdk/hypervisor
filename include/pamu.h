@@ -54,5 +54,9 @@ int hv_pamu_enable_liodn(unsigned int liodn);
 int hv_pamu_disable_liodn(unsigned int liodn);
 int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_node_t *cfgnode, dt_node_t *gnode);
 int hv_pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode);
+
+void hcall_dma_attr_set(trapframe_t *regs);
+void hcall_dma_attr_get(trapframe_t *regs);
+
 #endif
 

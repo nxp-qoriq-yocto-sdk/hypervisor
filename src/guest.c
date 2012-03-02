@@ -3042,6 +3042,18 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
+
+	/*
+	 * Add properties to specify support features
+	 */
+
+#ifdef CONFIG_PAMU
+	// hcall_dma_attr_xxx supports the FSL_PAMU_ATTR_STASH attribute
+	ret = dt_set_prop(node, "fsl,has-stash-attr-hcall", NULL, 0);
+	if (ret < 0)
+		goto fail;
+#endif
+
 	propdata = prop->data;
 	guest->dtb_gphys = int_from_tree(&propdata, rootnaddr);
 	guest->dtb_window_len = int_from_tree(&propdata, rootnsize);
