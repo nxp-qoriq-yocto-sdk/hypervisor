@@ -211,7 +211,7 @@ void map_dev_range(guest_t *guest, phys_addr_t addr, phys_addr_t size)
 		map_guest_addr_range(guest, addr, addr, size, 0);
 		return;
 	}
-	
+
 	while (size > 0) {
 		val_from_int(tmpaddr, addr);
 
@@ -463,7 +463,7 @@ static int map_guest_reg(dev_owner_t *owner)
 
 		ret = dt_set_prop(owner->gnode, "reg", reg, num * regsize);
 		free(reg);
-		
+
 		if (ret < 0)
 			return ret;
 	}
@@ -1798,7 +1798,7 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 		prop = dt_get_prop(guest->partition, "init-map-vaddr", 0);
 		if (prop) {
 			uintptr_t vaddr;
-		
+
 			if (prop->len != 8 ||
 			    (sizeof(void *) != 8 &&
 			     ((const uint32_t *)prop->data)[0] != 0)) {
@@ -1809,7 +1809,7 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 
 			vaddr = *(const uint64_t *)prop->data;
 			vpage = vaddr >> PAGE_SHIFT;
-			
+
 			if (vaddr & (size - 1)) {
 				printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 				         "%s: init-map-vaddr must be size-aligned\n", __func__);
@@ -1985,7 +1985,7 @@ static void start_guest_primary(trapframe_t *regs, void *arg)
 
 	if (!guest->no_auto_load) {
 		ret = load_images(guest);
-		
+
 		if (ret > 0 && load_only) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
 			         "Guest %s finished loading\n", guest->name);
@@ -2550,7 +2550,7 @@ static int assign_child(dt_node_t *node, void *arg)
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	if (owner->claimable) {
 		const char *active;
-	
+
 		if (owner->claimable == claimable_active) {
 			assert(!owner->hwnode->claimable_owner ||
 			       owner->hwnode->claimable_owner == owner);
@@ -2760,7 +2760,7 @@ static int qman_portal_fixup_one(dt_node_t *node, void *arg)
 	liodn = dt_get_prop(node, "fsl,liodn", 0);
 	if (!liodn)
 		return 0;
-	
+
 	first_liodn = dt_get_prop(first_child, "fsl,liodn", 0);
 	if (!first_liodn) {
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
