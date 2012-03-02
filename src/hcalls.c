@@ -101,11 +101,11 @@ int alloc_guest_handle(guest_t *guest, handle_t *handle)
 
 	do {
 		again = 0;
-	
+
 		for (int i = GLOBAL_HANDLES; i < MAX_HANDLES; i++) {
 			if (guest->handles[i])
 				continue;
-		
+
 			if (compare_and_swap((unsigned long *)&guest->handles[i],
 			                     0, (unsigned long)handle)) {
 				handle->id = i;
@@ -174,7 +174,7 @@ static void dtprop_access(trapframe_t *regs, int set)
 		regs->gpregs[3] = -ret;
 		goto out;
 	}
-	
+
 	ret = copy_string_from_gphys(cur_guest->gphys, reg_pair(regs, 6),
 	                             PAGE_SIZE, &propname);
 	if (ret < 0) {
@@ -193,7 +193,7 @@ static void dtprop_access(trapframe_t *regs, int set)
 		regs->gpregs[3] = EV_ENOMEM;
 		goto out;
 	}
-	
+
 	if (set && copy_from_gphys(cur_guest->gphys, propval,
 	                           reg_pair(regs, 8), proplen) < proplen) {
 		regs->gpregs[3] = EV_EFAULT;
@@ -265,13 +265,13 @@ static void hcall_partition_restart(trapframe_t *regs)
 	guest_t *guest;
 	const char *who;
 	int ret;
-	
+
 	guest = handle_to_guest(regs->gpregs[3]);
 	if (!guest) {
 		regs->gpregs[3] = EV_EINVAL;
 		return;
 	}
-	
+
 	// TSR[WRS] is reset to zero during a normal restart
 	get_gcpu()->watchdog_tsr = 0;
 
@@ -294,7 +294,7 @@ static void hcall_partition_get_status(trapframe_t *regs)
 	}
 
 	regs->gpregs[4] = guest->state;
-	regs->gpregs[3] = 0;  
+	regs->gpregs[3] = 0;
 
 	/* Don't let internal states be public API. */
 	if (guest->state >= guest_starting_min &&
@@ -625,7 +625,7 @@ static void hcall_partition_stop(trapframe_t *regs)
 
 	if ((int)regs->gpregs[3] == -1)
 		who = "self";
-	else 
+	else
 		who = "manager";
 
 	ret = stop_guest(guest, "stop", who);
@@ -769,7 +769,7 @@ again:
 	 * device tree modifications.
 	 */
 	spin_lock(&guest->state_lock);
-	
+
 	ret = EV_ENOMEM;
 	const char *hwstatus = dt_get_prop_string(owner->hwnode, "status");
 	int hwstatus_ok = !hwstatus || !strncmp(hwstatus, "ok", 2);
@@ -786,7 +786,7 @@ again:
 		ret = action->claim(action, owner, prev);
 		if (ret)
 			goto out_twolocks;
-		
+
 		action = action->next;
 	}
 
