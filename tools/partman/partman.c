@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+ * Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -769,18 +769,21 @@ static int cmd_status(void)
 
 	while ((node = gdt_find_next_compatible(node, "fsl,hv-partition-handle")) != NULL) {
 		gdt_prop_t *prop;
-		uint32_t reg;
+		uint32_t handle;
 		const char *label;
 		struct fsl_hv_ioctl_status status;
 		int ret;
 
-		prop = gdt_get_property(node, "reg");
+		prop = gdt_get_property(node, "hv-handle");
+		if (!prop)
+			prop = gdt_get_property(node, "reg");
+
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
-			       __func__, "reg", node->name);
+			       __func__, "hv-handle/reg", node->name);
 			return EV_ENOENT;
 		}
-		reg = * ((uint32_t *) prop->data);
+		handle = *((uint32_t *) prop->data);
 
 		prop = gdt_get_property(node, "label");
 		if (!prop || !prop->len) {
@@ -790,9 +793,9 @@ static int cmd_status(void)
 		}
 		label = prop->data;
 
-		printf("%-31s %-7u ", label, reg);
+		printf("%-31s %-7u ", label, handle);
 
-		status.partition = reg;
+		status.partition = handle;
 		ret = hv(FSL_HV_IOCTL_PARTITION_GET_STATUS, (void *) &status);
 		if (ret) {
 			printf("error %i\n", ret);
@@ -817,16 +820,19 @@ static int cmd_status(void)
 	node = NULL;
 	while ((node = gdt_find_next_compatible(node, "fsl,hv-byte-channel-handle")) != NULL) {
 		gdt_prop_t *prop;
-		uint32_t reg;
+		uint32_t handle;
 		uint32_t *irq;
 
-		prop = gdt_get_property(node, "reg");
+		prop = gdt_get_property(node, "hv-handle");
+		if (!prop)
+			prop = gdt_get_property(node, "reg");
+
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
-			       __func__, "reg", node->name);
+			       __func__, "hv-handle/reg", node->name);
 			return EV_ENOENT;
 		}
-		reg = * ((uint32_t *) prop->data);
+		handle = *((uint32_t *) prop->data);
 
 		prop = gdt_get_property(node, "interrupts");
 		if (!prop ||(prop->len != 4 * sizeof(uint32_t))) {
@@ -836,7 +842,7 @@ static int cmd_status(void)
 		}
 		irq = prop->data;
 
-		printf("%-31s %-7u %-7u %u\n", node->name, reg, irq[0], irq[2]);
+		printf("%-31s %-7u %-7u %u\n", node->name, handle, irq[0], irq[2]);
 	}
 
 	printf("\n"
@@ -864,19 +870,22 @@ static int cmd_status(void)
 	node = NULL;
 	while ((node = gdt_find_next_compatible(node, "epapr,hv-send-doorbell")) != NULL) {
 		gdt_prop_t *prop;
-		uint32_t reg;
+		uint32_t handle;
 		char name[32];
 
-		prop = gdt_get_property(node, "reg");
+		prop = gdt_get_property(node, "hv-handle");
+		if (!prop)
+			prop = gdt_get_property(node, "reg");
+
 		if (!prop || (prop->len != sizeof(uint32_t))) {
 			printf("%s: '%s' property for %s is missing or invalid\n",
-			       __func__, "reg", node->name);
+			       __func__, "hv-handle/reg", node->name);
 			return EV_ENOENT;
 		}
-		reg = * ((uint32_t *) prop->data);
+		handle = *((uint32_t *) prop->data);
 
 		printf("%-31s %-7u %s\n", get_full_node_name(node, name, sizeof(name)),
-		       reg, "send");
+		       handle, "send");
 	}
 
 	return 0;
@@ -1170,12 +1179,17 @@ static int get_handle(const char *name)
 		return -1;
 
 	// Receive doorbells have their handle in the "interrupts" property.
-	// Everyone else has it in the "reg" property.
+	// Everyone else has it in the "hv-handle" property. However if the
+	// hv-handle property is missing the handle is read from the reg
+	// property to maintain compatibility with older versions of Topaz
 
 	if (gdt_is_compatible(node, "epapr,hv-receive-doorbell"))
 		prop = gdt_get_property(node, "interrupts");
-	else
-		prop = gdt_get_property(node, "reg");
+	else {
+		prop = gdt_get_property(node, "hv-handle");
+		if (!prop)
+			prop = gdt_get_property(node, "reg");
+	}
 
 	if (!prop || (prop->len < sizeof(uint32_t)))
 		return -1;
@@ -1195,7 +1209,7 @@ static int get_part_handle_by_label(const char *label)
 {
 	gdt_node_t *node = NULL;
 	gdt_prop_t *prop;
-	int reg = -1;
+	int handle = -1;
 
 	while ((node = gdt_find_next_compatible(node, "fsl,hv-partition-handle")) != NULL) {
 		prop = gdt_get_property(node, "label");
@@ -1205,18 +1219,21 @@ static int get_part_handle_by_label(const char *label)
 			return -1;
 		}
 		if (!strcmp(prop->data, label)) {
-			prop = gdt_get_property(node, "reg");
+			prop = gdt_get_property(node, "hv-handle");
+			if (!prop)
+				prop = gdt_get_property(node, "reg");
+
 			if (!prop || (prop->len != sizeof(uint32_t))) {
 				printf("%s: '%s' property for %s is missing or invalid\n",
-				       __func__, "reg", node->name);
+				       __func__, "hv-handle/reg", node->name);
 				return -1;
 			}
-			reg = *((uint32_t *) prop->data);
+			handle = *((uint32_t *) prop->data);
 			break;
 		}
 	}
 
-	return reg;
+	return handle;
 }
 
 static int cmd_getprop(struct parameters *p)
