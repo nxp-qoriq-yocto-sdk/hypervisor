@@ -174,6 +174,14 @@ static int create_guest_error_node(guest_t *guest)
 		return ret;
 	}
 
+	ret = dt_set_prop(gnode, "hv-handle", &ghandle, sizeof(ghandle));
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, gnode->name, "hv-handle");
+		return ret;
+	}
+
 	return 0;
 
 nomem:
@@ -1420,6 +1428,14 @@ static int process_managed_partition_node(dt_node_t *cfgnode, void *arg)
 		return ret;
 	}
 
+	ret = dt_set_prop(node, "hv-handle", &ghandle, sizeof(ghandle));
+	if (ret) {
+		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
+			 "%s: guest %s: node %s: cannot create '%s' property\n",
+			 __func__, guest->name, node->name, "hv-handle");
+		return ret;
+	}
+
 	ret = dt_set_prop_string(node, "label", target_guest->name);
 	if (ret) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
@@ -2544,6 +2560,10 @@ static int assign_child(dt_node_t *node, void *arg)
 	}
 
 	ret = dt_set_prop(node, handle_name, &handle, sizeof(handle));
+	if (ret)
+		goto nomem;
+
+	ret = dt_set_prop(node, "hv-handle", &handle, sizeof(handle));
 	if (ret)
 		goto nomem;
 
