@@ -165,7 +165,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		goto out;
 	}
 
-	prop = fdt_getprop(fdt, node, "reg", &len);
+	prop = fdt_getprop(fdt, node, "hv-handle", &len);
 	if (!prop) {
 		printf("no part2 reg: BROKEN %d\n", len);
 		goto out;

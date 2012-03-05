@@ -245,7 +245,7 @@ static int error_manager_probe(void)
 	else
 		printf("claimable\n");
 
-	p_handle = fdt_getprop(fdt, error_manager_node, "reg", &len);
+	p_handle = fdt_getprop(fdt, error_manager_node, "hv-handle", &len);
 	if (!p_handle || len != 4) {
 		printf("[%ld] Error getting error manager handle: %d\n", pir,
 		       len);
@@ -427,7 +427,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 			if (node <= 0)
 				continue;
 
-			p_handle = fdt_getprop(fdt, node, "reg", &len);
+			p_handle = fdt_getprop(fdt, node, "hv-handle", &len);
 			if (!p_handle || len != 4) {
 				printf("[%ld] Error getting slave "
 				       "partition handle: %d\n", pir, len);

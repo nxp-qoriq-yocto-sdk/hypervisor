@@ -136,7 +136,7 @@ static int test_init(void)
 	 /*VMPIC*/ enable_critint();
 	enable_extint();
 
-	handle_p = get_handle("epapr,hv-send-doorbell", "reg", fdt);
+	handle_p = get_handle("epapr,hv-send-doorbell", "hv-handle", fdt);
 
 	if (!handle_p) {
 		printf("Couldn't get send doorbell handle\n");

@@ -58,7 +58,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		node = fdt_node_offset_by_compatible(fdt, node,
 						     "fsl,hv-partition-handle");
 		if (node > 0) {
-			p_handle = fdt_getprop(fdt, node, "reg", &len);
+			p_handle = fdt_getprop(fdt, node, "hv-handle", &len);
 			if (!p_handle || len != 4) {
 				printf("[%ld] Error getting slave "
 				       "partition handle: %d\n", pir, len);

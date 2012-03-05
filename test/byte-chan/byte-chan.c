@@ -223,7 +223,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("Byte channel test\n");
 
-	ret = get_prop("/hypervisor/handles/byte-channelA", "reg", &prop);
+	ret = get_prop("/hypervisor/handles/byte-channelA", "hv-handle", &prop);
 	if (ret) {
 		printf("get_prop failed\n");
 		return;
@@ -235,7 +235,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		return;
 	}
 
-	ret = get_prop("/hypervisor/handles/byte-channelB", "reg", &prop);
+	ret = get_prop("/hypervisor/handles/byte-channelB", "hv-handle", &prop);
 	if (ret) {
 		printf("get_prop failed\n");
 		return;

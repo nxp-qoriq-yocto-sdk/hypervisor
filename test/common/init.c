@@ -483,7 +483,7 @@ static chardev_t *test_init_byte_chan(int node)
 
 	tlb1_init();
 	
-	prop = fdt_getprop(fdt, node, "reg", &len);
+	prop = fdt_getprop(fdt, node, "hv-handle", &len);
 	if (prop && len == 4)
 		return byte_chan_init(*prop, NULL, NULL);
 
@@ -806,7 +806,7 @@ int init_error_queues(void)
 		return node;
 	}
 
-	prop = fdt_getprop(fdt, node, "reg", &len);
+	prop = fdt_getprop(fdt, node, "hv-handle", &len);
 	if (!prop || len != 4) {
 		printf("BROKEN: missing/bad reg in error queue node\n");
 		return -1;
@@ -818,7 +818,7 @@ int init_error_queues(void)
 	if (node < 0)
 		return 0;
 
-	prop = fdt_getprop(fdt, node, "reg", &len);
+	prop = fdt_getprop(fdt, node, "hv-handle", &len);
 	if (!prop || len != 4) {
 		printf("BROKEN: missing/bad reg in error queue node\n");
 		return -1;

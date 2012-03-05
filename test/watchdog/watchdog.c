@@ -232,7 +232,7 @@ static int get_dbell_handles(void)
 	node = fdt_node_offset_by_compatible(fdt, node, "fsl,hv-partition-handle");
 	while (node >= 0) {
 		// Get partition handle
-		phandle = fdt_getprop(fdt, node, "reg", &len);
+		phandle = fdt_getprop(fdt, node, "hv-handle", &len);
 		if (!phandle || len != 4) {
 			printf("\nError reading slave partition's 'reg' property\n");
 			return 0;

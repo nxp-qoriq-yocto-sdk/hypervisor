@@ -350,9 +350,9 @@ static int dma_init(void)
 			}
 		}
 
-		prop = fdt_getprop(fdt, node, "fsl,hv-device-handle", &len);
+		prop = fdt_getprop(fdt, node, "hv-handle", &len);
 		if (!prop || len != 4) {
-			printf("FAILED: missing/bad fsl,hv-device-handle "
+			printf("FAILED: missing/bad hv-handle "
 			       "in standby channel\n");
 			return -9;
 		}
@@ -364,9 +364,9 @@ static int dma_init(void)
 			return -10;
 		}
 
-		prop = fdt_getprop(fdt, parent, "fsl,hv-device-handle", &len);
+		prop = fdt_getprop(fdt, parent, "hv-handle", &len);
 		if (!prop || len != 4) {
-			printf("FAILED: missing/bad fsl,hv-device-handle "
+			printf("FAILED: missing/bad hv-handle "
 			       "in standby controller\n");
 			return -11;
 		}
@@ -480,7 +480,7 @@ static int setup_managed(void)
 		return -1;
 	}
 
-	prop = fdt_getprop(fdt, node, "reg", &len);
+	prop = fdt_getprop(fdt, node, "hv-handle", &len);
 	if (!prop || len != 4) {
 		printf("BROKEN: missing/bad reg in managed partition\n");
 		return -1;
