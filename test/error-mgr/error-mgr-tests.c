@@ -231,7 +231,7 @@ static int test4_claim_error_manager(register_t pir)
 
 	if (!dma_virt) {
 		/* This partition does not have DMA, must be the master */
-		assert(slave_part_handle[0] && slave_part_handle[1]);
+		assert(slave_part_handle[0] >= 0 && slave_part_handle[1] >= 0);
 
 		/* Whichever core is first */
 		ret = fh_partition_start(slave_part_handle[1], 0, 0);
@@ -254,7 +254,7 @@ static int test4_claim_error_manager(register_t pir)
 	 * error manager partition is stopped.
 	 */
 
-	if (slave_part_handle[0])
+	if (slave_part_handle[0] >= 0)
 		/* One of the two guests will do one illegal access while there
 		 * is no error manager active.
 		 */
