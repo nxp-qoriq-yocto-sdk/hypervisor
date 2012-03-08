@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Freescale Semiconductor, Inc.
+# Copyright (C) 2009-2012 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -21,6 +21,12 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+rootfs=rootfs.ext2.gz.uboot
+
+if [ $# -gt 0 ]; then
+	rootfs=$1
+fi
+
 partman load -h p2-linux -f vmlinux -a 0x0
-partman load -h p2-linux -f initramfs.cpio.gz.uboot -a 0x1300000 -r
+partman load -h p2-linux -f $rootfs -a 0x1300000 -r
 partman start -h p2-linux -e 0x0

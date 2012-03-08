@@ -1,6 +1,6 @@
 
 #
-# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 
 test := linux
 dir := $(testdir)$(test)/
-IMAGE_TYPE := initramfs
+IMAGE_TYPE := initrd
 
 $(test)-dts := $(wildcard $(dir)*.dts)
 $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
@@ -70,6 +70,11 @@ define unmount
 	$(V)gzip -f $(1).ext2
 endef
 
+define do_image
+	$(call show,do_image: $(1))
+	$(V)mkimage -n "uboot initrd rootfs" -A ppc -O linux -T ramdisk -C gzip -d $(1).ext2.gz $(1).ext2.gz.uboot
+endef
+
 # add files to existing initramfs
 define add_files
 	$(call show,add_files: bin/linux/$(1))
@@ -100,11 +105,12 @@ bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)
 	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs/bin/
 	$(call unmount,bin/linux/rootfs)
-	$(call mount,rootfs-partman,172032)
+	$(call do_image,bin/linux/rootfs)
+	$(call mount,rootfs-partman,344064)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
 	sudo cp -af bin/linux/shmem bin/linux/rootfs-partman/bin/
 	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
-	sudo cp -af bin/linux/rootfs.ext2.gz bin/linux/rootfs-partman/
+	sudo cp -af bin/linux/rootfs.ext2.gz.uboot bin/linux/rootfs-partman/
 	sudo cp -af $(testdir)linux/partman-start_$(TARGET).sh bin/linux/rootfs-partman/start.sh
 	$(call unmount,bin/linux/rootfs-partman)
 
