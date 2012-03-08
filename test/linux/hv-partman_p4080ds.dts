@@ -168,9 +168,9 @@
 		label = "p1-linux";
 		cpus = <0 2>;
 		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
-		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
+		//linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
 		//on hardware load rootfs from RAM
-		//linux-rootfs = <0x0 0x78000000 0 0x01300000 0 0x04000000>;
+		linux-rootfs = <0x0 0x78000000 0 0x01300000 0 0x04000000>;
 		dtb-window = <0 0x1000000 0 0x10000>;
 		no-dma-disable;
 
