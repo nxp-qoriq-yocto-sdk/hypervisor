@@ -38,7 +38,7 @@ export libos := $(src)libos/
 export CC=$(CROSS_COMPILE)gcc
 
 export GCCINCDIR := $(shell $(CC) -print-file-name=include)
-CC_OPTS=-Wa,-me500 -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
+CC_OPTS=-Wa,-m$(CONFIG_GCC_CPU_FLAG) -nostdinc -I $(GCCINCDIR) -I $(GCCINCDIR)-fixed \
         -I$(src)include -Ibin/include -I$(libos)include -I$(LIBFDT_DIR) \
         -I$(LIBOS)/include-libc -std=gnu99 -include $(LIBOS_CLIENT_H)
 

@@ -21,8 +21,15 @@
 #  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+CC_OPTS_PARTMAN = -static -Wall -Wa,-m$(CONFIG_GCC_CPU_FLAG) -std=gnu99
+ifeq ($(CONFIG_LIBOS_64BIT),y)
+CC_OPTS_PARTMAN += -m64
+else
+CC_OPTS_PARTMAN += -m32
+endif
+
 bin/linux/partman: $(src)tools/partman/partman.c $(src)tools/partman/parse_dt.c
 	@mkdir -p $(@D)
 	$(call show,build $(^:$(src)%=%) into $@)
-	$(V)$(CC) -static -m32 -Wall -Wa,-me500 -std=gnu99 -DVERSION=\"$(PROJECTVERSION)\" -o $@ $^
+	$(V)$(CC) $(CC_OPTS_PARTMAN) -DVERSION=\"$(PROJECTVERSION)\" -o $@ $^
 	$(V)$(CROSS_COMPILE)strip $@
