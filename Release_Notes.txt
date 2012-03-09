@@ -25,14 +25,23 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 1.1
+Topaz Version: 1.2
 Revision: 001
-Date: 10/14/2011
+Date: 03/09/2012
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.2-001 bug fixes and changes
+       -add dma attribute api. Only stash target cache is supported.
+       -relevant shell commands now accept partition names in addition
+        to the numeric IDs. Quoting is also supported.
+       -fixed stash and snoop ID settings for Qman portals
+       -ePAPR compliance update: there were several places in Topaz
+        that still used the "reg" property instead of "hv-handle"
+       -test updates and fixes
+
    -v1.1-001 bug fixes and changes
        -new "watchdog-autostart-period" property for guest nodes
        -partman: added support for 64-bit ELF files
