@@ -26,13 +26,15 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.2
-Revision: 001
-Date: 03/09/2012
+Revision: 002
+Date: 03/16/2012
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.2-002 bug fixes and changes
+       -add support for ePAPR 1.1, power-isa-* properties
    -v1.2-001 bug fixes and changes
        -add dma attribute api. Only stash target cache is supported.
        -relevant shell commands now accept partition names in addition
