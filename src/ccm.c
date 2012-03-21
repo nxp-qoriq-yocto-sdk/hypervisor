@@ -503,7 +503,7 @@ static uint32_t get_law_target(pma_t *pma)
 		}
 	}
 
-	return -1;
+	return ~(uint32_t)0;
 }
 
 static int set_law(dt_node_t *node, int csdid)
@@ -521,7 +521,7 @@ static int set_law(dt_node_t *node, int csdid)
 	}
 
 	tgt = get_law_target(pma);
-	if (!tgt) {
+	if (!(~tgt)) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
 		         "%s: No existing LAW found for %s\n",
 		         __func__, node->name);
