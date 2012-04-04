@@ -1801,7 +1801,7 @@ static register_t hv_pamu_set_stash_target(unsigned int handle, phys_addr_t addr
 	/* The MW bit tells us if there are any SPAACEs  */
 	if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
 		unsigned int count =
-			1 << (1 + get_bf(ppaace->impl_attr, PAACE_IA_WCE));
+			(1 << (1 + get_bf(ppaace->impl_attr, PAACE_IA_WCE))) - 1;
 
 		for (unsigned i = 0; i < count; i++) {
 			paace_t *spaace = pamu_get_spaace(ppaace->fspi, i);
