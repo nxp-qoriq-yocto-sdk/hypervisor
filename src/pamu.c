@@ -54,6 +54,15 @@ static const char *pamu_err_policy[PAMU_ERROR_COUNT];
 /* mcheck-safe lock, used to ensure atomicity of reassignment */
 static uint32_t pamu_error_lock;
 
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+/*
+ * The work-around says that we cannot have multiple writes to the PAACT
+ * in flight simultaneously. To prevent that, we wrap the write in a mutex,
+ * which will force the cores to perform their updates in sequence.
+ */
+static uint32_t pamu_lock;
+#endif
+
 static struct {
 	pamu_handle_t *pamu_handle;
 	guest_t *guest;
@@ -782,6 +791,8 @@ int hv_pamu_enable_liodn(unsigned int handle)
 	guest_t *guest = get_gcpu()->guest;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
+	int ret;
+	uint32_t saved;
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle])
@@ -815,7 +826,17 @@ int hv_pamu_enable_liodn(unsigned int handle)
 	}
 #endif
 
-	if (pamu_enable_liodn(liodn) != 0)
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	saved = spin_lock_intsave(&pamu_lock);
+#endif
+
+	ret = pamu_enable_liodn(liodn);
+
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	spin_unlock_intsave(&pamu_lock, saved);
+#endif
+
+	if (ret)
 		return EV_EINVAL;
 
 	return 0;
@@ -826,6 +847,8 @@ int hv_pamu_disable_liodn(unsigned int handle)
 	guest_t *guest = get_gcpu()->guest;
 	pamu_handle_t *pamu_handle;
 	unsigned long liodn;
+	int ret;
+	uint32_t saved;
 
 	// FIXME: race against handle closure
 	if (handle >= MAX_HANDLES || !guest->handles[handle])
@@ -842,7 +865,17 @@ int hv_pamu_disable_liodn(unsigned int handle)
 		return EV_INVALID_STATE;
 #endif
 
-	if (pamu_disable_liodn(liodn) != 0)
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	saved = spin_lock_intsave(&pamu_lock);
+#endif
+
+	ret = pamu_disable_liodn(liodn);
+
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	spin_unlock_intsave(&pamu_lock, saved);
+#endif
+
+	if (ret)
 		return EV_EINVAL;
 
 	return 0;
@@ -1421,8 +1454,16 @@ static int claim_dma(claim_action_t *action, dev_owner_t *owner,
 	 * guest is responsible for quiescing i/o devices, and HV disables
 	 * access to the device's PAMU entry till re-configuration is done.
 	 */
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	saved = spin_lock_intsave(&pamu_lock);
+#endif
 
 	int ret = hv_pamu_reconfig_liodn(owner->guest, liodn, owner->hwnode);
+
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	spin_unlock_intsave(&pamu_lock, saved);
+#endif
+
 	if (ret < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: re-config of liodn failed (rc=%d)\n",
@@ -1568,6 +1609,7 @@ static void pamu_reset_handle(handle_t *h, int partition_stop)
 	pamu_handle_t *ph = h->pamu;
 	uint32_t liodn = ph->assigned_liodn;
 	guest_t *guest = liodn_data[liodn].guest;
+	uint32_t saved;
 
 	if (guest == h->handle_owner) {
 		if (ph->no_dma_disable || guest->no_dma_disable)
@@ -1575,7 +1617,15 @@ static void pamu_reset_handle(handle_t *h, int partition_stop)
 		if (partition_stop && guest->defer_dma_disable)
 			return;
 
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+		saved = spin_lock_intsave(&pamu_lock);
+#endif
+
 		pamu_disable_liodn(liodn);
+
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+		spin_unlock_intsave(&pamu_lock, saved);
+#endif
 	}
 }
 
@@ -1753,6 +1803,8 @@ static register_t hv_pamu_set_stash_target(unsigned int handle, phys_addr_t addr
 	uint32_t stash_id = 0;
 	paace_t *ppaace;
 	size_t len;
+	uint32_t saved;
+	int ret = 0;
 
 	if (handle >= MAX_HANDLES || !guest->handles[handle])
 		// Invalid handle
@@ -1770,11 +1822,6 @@ static register_t hv_pamu_set_stash_target(unsigned int handle, phys_addr_t addr
 	if (len != sizeof(struct fh_dma_attr_stash))
 		return EV_EFAULT;
 
-	ppaace = pamu_get_ppaace(liodn);
-	if (!ppaace)
-		// The LIODN has not been initialized yet
-		return EV_EINVAL;
-
 	// A non-zero value means the user wants to enable stashing.
 	// Otherwise, we leave stash_id at 0, which will disable stashing.
 	if (user.cache) {
@@ -1791,29 +1838,43 @@ static register_t hv_pamu_set_stash_target(unsigned int handle, phys_addr_t addr
 			return EV_EINVAL;
 	}
 
-	/*
-	 * Although the PAMU supports different stash targets for each
-	 * subwindow, we're not going to support this feature.  All
-	 * subwindows will be set to the same stash target
-	 */
-	set_bf(ppaace->impl_attr, PAACE_IA_CID, stash_id);
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	saved = spin_lock_intsave(&pamu_lock);
+#endif
 
-	/* The MW bit tells us if there are any SPAACEs  */
-	if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
-		unsigned int count =
-			(1 << (1 + get_bf(ppaace->impl_attr, PAACE_IA_WCE))) - 1;
+	ppaace = pamu_get_ppaace(liodn);
+	if (ppaace) {
+		/*
+		 * Although the PAMU supports different stash targets for each
+		 * subwindow, we're not going to support this feature.  All
+		 * subwindows will be set to the same stash target
+		 */
+		set_bf(ppaace->impl_attr, PAACE_IA_CID, stash_id);
 
-		for (unsigned i = 0; i < count; i++) {
-			paace_t *spaace = pamu_get_spaace(ppaace->fspi, i);
-			set_bf(spaace->impl_attr, PAACE_IA_CID, stash_id);
+		/* The MW bit tells us if there are any SPAACEs  */
+		if (get_bf(ppaace->addr_bitfields, PPAACE_AF_MW)) {
+			unsigned int count =
+				(1 << (1 + get_bf(ppaace->impl_attr, PAACE_IA_WCE))) - 1;
+
+			for (unsigned i = 0; i < count; i++) {
+				paace_t *spaace = pamu_get_spaace(ppaace->fspi, i);
+				set_bf(spaace->impl_attr, PAACE_IA_CID, stash_id);
+			}
 		}
+
+		// Remember the settings
+		liodn_data[liodn].stash_vcpu = user.vcpu;
+		liodn_data[liodn].stash_cache = user.cache;
+	} else {
+		// The LIODN has not been initialized yet
+		ret = EV_EINVAL;
 	}
 
-	// Remember the settings
-	liodn_data[liodn].stash_vcpu = user.vcpu;
-	liodn_data[liodn].stash_cache = user.cache;
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+	spin_unlock_intsave(&pamu_lock, saved);
+#endif
 
-	return 0;
+	return ret;
 }
 
 static register_t hv_pamu_get_stash_target(unsigned int handle, phys_addr_t addr)

@@ -697,16 +697,68 @@ fail_csd:
 }
 
 #ifdef CONFIG_PAMU
+
+/*
+ * Table of SVRs and the corresponding PORT_ID values.
+ *
+ * All future CoreNet-enabled SOCs will have erratum A-004510 fixed, so this
+ * table should never need to be updated. SVRs are guaranteed to be unique,
+ * so there is no worry that a future SOC will inadvertently have one of
+ * these values.
+ */
+static const struct {
+	uint32_t svr;
+	uint32_t port_id;
+} port_id_map[] = {
+	{0x82100010, 0xFF000000},	/* P2040 1.0 */
+	{0x82100011, 0xFF000000},	/* P2040 1.1 */
+	{0x82100110, 0xFF000000},	/* P2041 1.0 */
+	{0x82100111, 0xFF000000},	/* P2041 1.1 */
+	{0x82110310, 0xFF000000},	/* P3041 1.0 */
+	{0x82110311, 0xFF000000},	/* P3041 1.1 */
+	{0x82010020, 0xFFF80000},	/* P4040 2.0 */
+	{0x82000020, 0xFFF80000},	/* P4080 2.0 */
+	{0x82210010, 0xFC000000},       /* P5010 1.0 */
+	{0x82210020, 0xFC000000},       /* P5010 2.0 */
+	{0x82200010, 0xFC000000},	/* P5020 1.0 */
+	{0x82050010, 0xFF800000},	/* P5021 1.0 */
+	{0x82040010, 0xFF800000},	/* P5040 1.0 */
+	{0, 0}
+};
+
+#define	SVR_SECURITY	0x80000	/* The Security (E) bit */
+
 int setup_pamu_law(dt_node_t *node)
 {
-	int ret;
+	int ret, i;
 
 	ret = setup_csd_law(node);
-	if (ret == 0)
+	if (ret == 0) {
 		/* CSDID0 reset value defines a mask of all corenet ports
 		 * which includes all the cores and CHBs with PAMU enabled.
 		 */
-		set_csd_cpus(node->csd, in32(&csdids[0]));
+		uint32_t csd_port_id = in32(&csdids[0]);
+
+#ifdef CONFIG_ERRATUM_PAMU_A_004510
+		/*
+		 * Check to see if we need to implement the erratum A-004510
+		 * work-around on this SoC
+		 *
+		 * Determine the Port ID for our coherence subdomain
+		 */
+		for (i = 0; port_id_map[i].svr; i++) {
+			if (port_id_map[i].svr == (mfspr(SPR_SVR) & ~SVR_SECURITY)) {
+				csd_port_id = port_id_map[i].port_id;
+				printlog(LOGTYPE_CCM, LOGLEVEL_DEBUG,
+					 "found matching SVR %08x\n",
+					 port_id_map[i].svr);
+				break;
+			}
+		}
+#endif
+
+		set_csd_cpus(node->csd, csd_port_id);
+	}
 
 	return ret;
 }
