@@ -47,3 +47,8 @@ config LIBOS_DEPS
 	select LIBOS_POWERISA206
 	select LIBOS_POWERISA_E_PC
 	select LIBOS_POWERISA_E_ED
+config GCC_CPU_FLAG
+	string
+	default e500mc if !GUEST64
+	default e5500  if GUEST64
+
