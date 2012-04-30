@@ -42,7 +42,7 @@ $(test)-dtb := $($(test)-dts:$(dir)%.dts=bin/$(test)/%.dtb)
 $(test)-scr := $(wildcard $(dir)*.scr)
 $(test)-ubs := $($(test)-scr:$(dir)%.scr=bin/$(test)/%.ubs)
 
-include $(src)tools/partman/Makefile $(src)tools/shmem/Makefile
+include $(src)tools/partman/Makefile
 
 %.ubs : %.scr
 	@$(MKDIR) $(@D)
@@ -85,31 +85,27 @@ define add_files
 endef
 
 # initramfs filesystem for partman
-bin/$(test)/initramfs-partman.cpio.gz.uboot: bin/linux/partman bin/linux/shmem $(testdir)../../images/initramfs.cpio.gz.uboot
+bin/$(test)/initramfs-partman.cpio.gz.uboot: $(testdir)../../images/initramfs.cpio.gz.uboot
 # We want partman on the managed partition, so that we can send and listen
-# for doorbells.  We want shmem on the managed partition, so that we can read
-# and write the shared memory buffers.
+# for doorbells.
 	mkdir -p bin/linux/initramfs-partman/bin
 	cp -af bin/linux/partman bin/linux/initramfs-partman/bin/
-	cp -af bin/linux/shmem bin/linux/initramfs-partman/bin/
-	cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/initramfs-partman/vmlinux
+	cp -af $(testdir)../../images/vmlinux.stripped bin/linux/initramfs-partman/vmlinux
 	cp -af $(testdir)../../images/initramfs.cpio.gz.uboot bin/linux/initramfs-partman/
 	cp -af $(testdir)linux/partman-start_$(TARGET).sh bin/linux/initramfs-partman/start.sh
 	$(call add_files,initramfs-partman)
 	rm -rf bin/linux/initramfs-partman/
 
 # initrd filesystem for partman
-bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman bin/linux/shmem $(testdir)../../images/rootfs.ext2.gz
+bin/$(test)/rootfs-partman.ext2.gz: bin/linux/partman $(testdir)../../images/rootfs.ext2.gz
 
 	$(call mount,rootfs,115000)
 	sudo cp -af bin/linux/partman bin/linux/rootfs/bin/
-	sudo cp -af bin/linux/shmem bin/linux/rootfs/bin/
 	$(call unmount,bin/linux/rootfs)
 	$(call do_image,bin/linux/rootfs)
 	$(call mount,rootfs-partman,344064)
 	sudo cp -af bin/linux/partman bin/linux/rootfs-partman/bin/
-	sudo cp -af bin/linux/shmem bin/linux/rootfs-partman/bin/
-	sudo cp -af $(testdir)../../images/boot/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
+	sudo cp -af $(testdir)../../images/vmlinux.stripped bin/linux/rootfs-partman/vmlinux
 	sudo cp -af bin/linux/rootfs.ext2.gz.uboot bin/linux/rootfs-partman/
 	sudo cp -af $(testdir)linux/partman-start_$(TARGET).sh bin/linux/rootfs-partman/start.sh
 	$(call unmount,bin/linux/rootfs-partman)
