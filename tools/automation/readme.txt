@@ -70,10 +70,21 @@ Running automation on a board
 	make
 - build unit tests
 	make test
+- create the images directory on the same level as the hypervisor
+- copy the rootfs and vmlinux.stripped files into the images folder. The next step
+  assumes that the images folder contains two files:
+  	- rootfs.ext2.gz
+	- vmlinux.stripped
+  These files are used by the partman unit test to create a custom rootfs where
+  vmlinux.stripped is added in order to start the managed partitions with
+  partman. If vmlinux.stripped image is not created by default by the build
+  system it can be created from vmlinux using $CROSS_COMPILE_strip. The reason
+  for using this stripped image is that it has a smaller size.
 - create rootfs for special linux cases
 	make test-linux-pre-hello
 	make test-linux-pre-partman
 	note: currently, rootfs for partman tests does not fit into allocated flash
+	and will be loaded in RAM
 - claim the board
 - connect to board and write to flash the following:
 	uboot
