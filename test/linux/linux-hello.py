@@ -29,8 +29,9 @@ def test(obj):
 	obj.sendline("partman status")
 	obj.expect("Partition Name",timeout=10)
 	obj.expect_exact("reset-status",timeout=10)
-	current_line = obj.readline()
-	handle,state = current_line.split()
+	current_line = obj.read(100)
+	tokens = current_line.split()
+	handle=tokens[0]
 	obj.sendline("partman restart -h %d" % int(handle))
 	obj.expect("[$#] ",timeout=10)
 	obj.sendline("cd /;./start.sh")

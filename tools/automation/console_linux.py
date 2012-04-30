@@ -71,9 +71,9 @@ try:
 		obj.close()
 		sys.exit(0)
 	obj.sendline("root")
-	obj.expect("Password:",timeout=60)
-	obj.sendline("root")
-	obj.expect("[$#] ",timeout=60)
+	#obj.expect("Password:",timeout=60)
+	#obj.sendline("root")
+	obj.expect("root@.*:~# *",timeout=60)
 	obj.sendline("uname")
 	obj.expect("Linux",timeout=60)
 	#here special linux commands are issued
