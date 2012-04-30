@@ -73,7 +73,7 @@ pmr,none,2,1,enabled
 reset,none,,,disabled
 reset-on-stop,none,,,disabled
 reset-status,none,2,1,disabled
-simtst,1p,2,1,enabled
+simtst,1p,2,1,diabled
 simtst,2p,10,8,disabled
 simtst,4p,8,7,disabled
 timer,none,2,1,enabled
