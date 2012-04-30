@@ -74,6 +74,9 @@ void libos_client_entry(unsigned long devtree_ptr)
 	tlb1_set_entry(2, (unsigned long)vaddr, 0x20000000, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0);
 	*vaddr = 'a';
 
+	/* make sure that the data_exception is seen after the access */
+	sync();
+
 	if (data_exception)
 		printf("Machine check exception generated for illegal data address -- PASSED\n");
 	else
