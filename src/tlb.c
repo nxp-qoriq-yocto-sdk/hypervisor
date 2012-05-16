@@ -173,7 +173,6 @@ none_avail:
 	return -1;
 }
 
-#ifdef CONFIG_TLB_CACHE
 /**
  * Find a TLB cache entry, or a slot suitable for use
  *
@@ -558,12 +557,13 @@ void tlbcache_init(void)
 	cpu->client.tlbcache =
 		alloc(sizeof(tlbcset_t) << cpu->client.tlbcache_bits, PAGE_SIZE);
 
+	cpu->client.tlbcache_enable = 1;
+
 	mtspr(SPR_SPRG3, ((uintptr_t)cpu->client.tlbcache) |
 	                 cpu->client.tlbcache_bits);
 	mtspr(SPR_IVOR13, (uintptr_t)dtlb_miss_fast);
 	mtspr(SPR_IVOR14, (uintptr_t)itlb_miss_fast);
 }
-#endif /* TLB cache */
 
 /** Check whether an ISI should be reflected as an ISI, or a machine check.
  *
@@ -587,11 +587,11 @@ int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid)
 	    (mfspr(SPR_MAS8) & MAS8_VF)) {
 		ret = TLB_MISS_MCHECK;
 
-#ifdef CONFIG_TLB_CACHE
-		/* FIXME: If the original permission bit was clear, reflect an ISI
-		 * even if VF was set.  We can't detect this without the TLB cache.
-		 */
-#endif
+		if (cpu->client.tlbcache_enable) {
+			/* FIXME: If the original permission bit was clear, reflect an ISI
+			 * even if VF was set.  We can't detect this without the TLB cache.
+			*/
+		}
 	}
 
 	restore_mas(gcpu);
@@ -624,7 +624,9 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	if (!(mas1 & MAS1_VALID))
 		return;
 
-#ifndef CONFIG_TLB_CACHE
+	if (cpu->client.tlb1_virt)
+		return;
+
 	guest_t *guest = gcpu->guest;
 
 	while (epn < end) {
@@ -644,7 +646,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		if (!(attr & PTE_VALID)) {
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-			         "invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
+					 "invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
 			epn = (epn | rpn) + 1;
 			grpn = (grpn | rpn) + 1;
 			continue;
@@ -677,7 +679,6 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		epn += tsize_to_pages(size);
 		grpn += tsize_to_pages(size);
 	}
-#endif
 }
 
 static void guest_inv_tlb1(register_t va, int pid,
@@ -720,16 +721,16 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 	register_t va = ivax & TLBIVAX_VA;
 
 	if (flags & INV_TLB0) {
-#ifdef CONFIG_TLB_CACHE
-		if (global) {
-			if (pid < 0)
-				guest_inv_tlb0_all();
-			else
-				guest_inv_tlb0_pid(pid);
-		} else {
-			guest_inv_tlb0_va(va, pid);
+		if (cpu->client.tlbcache_enable) {
+			if (global) {
+				if (pid < 0)
+					guest_inv_tlb0_all();
+				else
+					guest_inv_tlb0_pid(pid);
+			} else {
+				guest_inv_tlb0_va(va, pid);
+			}
 		}
-#endif
 
 		if (global) {
 			if (pid < 0)
@@ -778,7 +779,10 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
                    register_t mas3flags, unsigned long rpn, register_t mas8,
                    register_t guest_mas3flags)
 {
-#ifndef CONFIG_TLB_CACHE
+	if (cpu->client.tlbcache_enable)
+		return guest_set_tlbcache(mas0, mas1, mas2, mas3flags,
+		                          rpn, mas8, guest_mas3flags);
+
 	mtspr(SPR_MAS0, mas0);
 	mtspr(SPR_MAS1, mas1);
 	mtspr(SPR_MAS2, mas2);
@@ -787,10 +791,6 @@ int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
 	mtspr(SPR_MAS8, mas8);
 	asm volatile("isync; tlbwe" : : : "memory");
 	return 0;
-#else
-	return guest_set_tlbcache(mas0, mas1, mas2, mas3flags,
-	                          rpn, mas8, guest_mas3flags);
-#endif
 }
 
 void guest_reset_tlb(void)
@@ -844,18 +844,18 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 
 void fixup_tlb_sx_re(void)
 {
-	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
-		return;
-
-#ifdef CONFIG_TLB_CACHE
-	BUG();
-#else
 	gcpu_t *gcpu = get_gcpu();
 	unsigned long mas3 = mfspr(SPR_MAS3);
 	unsigned long mas7 = mfspr(SPR_MAS7);
 
 	unsigned long grpn = (mas7 << (32 - PAGE_SHIFT)) |
 				(mas3 >> MAS3_RPN_SHIFT);
+
+	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
+		return;
+
+	if (cpu->client.tlbcache_enable)
+		BUG();
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		"sx_re: mas0 %lx mas1 %lx mas3 %lx mas7 %lx grpn %lx\n",
@@ -875,7 +875,6 @@ void fixup_tlb_sx_re(void)
 	}
 
 	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
-#endif
 }
 
 int guest_tlb_search_mas(uintptr_t va)
@@ -898,17 +897,17 @@ int guest_tlb_search_mas(uintptr_t va)
 
 		return 0;
 	}
-#ifdef CONFIG_TLB_CACHE
-	tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
-				mas6 & MAS6_SAS);
-	tlbcset_t *set;
-	unsigned int way;
+	if (cpu->client.tlbcache_enable) {
+		tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
+					mas6 & MAS6_SAS);
+		tlbcset_t *set;
+		unsigned int way;
 
-	if (find_gtlb_entry(va, tag, &set, &way)) {
-		gtlb0_to_mas(set - cpu->client.tlbcache, way, gcpu);
-		return 0;
+		if (find_gtlb_entry(va, tag, &set, &way)) {
+			gtlb0_to_mas(set - cpu->client.tlbcache, way, gcpu);
+			return 0;
+		}
 	}
-#endif
 
 	asm volatile("isync; tlbsx 0, %0" : : "r" (va) : "memory");
 	fixup_tlb_sx_re();
@@ -1686,11 +1685,11 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 	uint32_t tlb_index, way, tlb0_nentries;
 	unsigned int tlb;
 
-#ifndef CONFIG_TLB_CACHE
-	tlb0_nentries = (mfspr(SPR_TLB0CFG) & 0xFFF) >> 2;
-#else
-	tlb0_nentries = 1 << (cpu->client.tlbcache_bits);
-#endif
+	if (cpu->client.tlbcache_enable)
+		tlb0_nentries = 1 << (cpu->client.tlbcache_bits);
+	else
+		tlb0_nentries = (mfspr(SPR_TLB0CFG) & 0xFFF) >> 2;
+
 	tlb = MAS0_GET_TLBSEL(gmas->mas0);
 
 	switch (tlb) {
@@ -1712,18 +1711,20 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 
 		/*
 		 * TLB0 is pass-thorugh with grpn<->true-rpn fixups applied
-		 * in non TLB_CACHE case
+		 * in non TLB cache case
 		 */
 		disable_int();
 		save_mas(gcpu);
-#ifndef CONFIG_TLB_CACHE
-		mtspr(SPR_MAS0, MAS0_ESEL(way));
-		mtspr(SPR_MAS2, tlb_index << PAGE_SHIFT);
-		asm volatile("isync; tlbre" : : : "memory");
-		fixup_tlb_sx_re();
-#else
-		gtlb0_to_mas(tlb_index, way, gcpu);
-#endif
+
+		if (cpu->client.tlbcache_enable) {
+			gtlb0_to_mas(tlb_index, way, gcpu);
+		} else {
+			mtspr(SPR_MAS0, MAS0_ESEL(way));
+			mtspr(SPR_MAS2, tlb_index << PAGE_SHIFT);
+			asm volatile("isync; tlbre" : : : "memory");
+			fixup_tlb_sx_re();
+		}
+
 		if (!(mfspr(SPR_MAS1) & MAS1_VALID)) {
 			gmas->mas0 = MAS0_ESEL(way);
 			gmas->mas1 = mfspr(SPR_MAS1);

@@ -68,14 +68,19 @@ typedef struct {
 
 	struct gcpu *gcpu;
 
-#ifdef CONFIG_TLB_CACHE
 	struct tlbcset *tlbcache;
 
 	/* The number of virtual address bits used as an index
 	 * into the TLB cache.
 	 */
 	unsigned int tlbcache_bits;
-#endif
+
+	/* Indicates if the TLB cache for TLB 0 is enabled */
+	int tlbcache_enable;
+
+	/* indicates if TLB 1 is virtualized. TLB 1 is virtualized when
+	 * the tlb misses are directed to the Hypervisor */
+	int tlb1_virt;
 
 	/** HV dynamic TLB round-robin eviction pointer */
 	int next_dyn_tlbe;

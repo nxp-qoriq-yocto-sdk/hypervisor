@@ -482,74 +482,74 @@ void tlb_miss(trapframe_t *regs)
 	int epid = !itlb && (mfspr(SPR_ESR) & ESR_EPID);
 	register_t vaddr = itlb ? regs->srr0 : mfspr(SPR_DEAR);
 
-#ifdef CONFIG_TLB_CACHE
-	if (guest || epid) {
-		register_t mas1, mas2;
-		int store = mfspr(SPR_ESR) & ESR_ST;
-		int pid, space, ret;
-		uint32_t epc = 0;
+	if (cpu->client.tlb1_virt) {
+		if (guest || epid) {
+			register_t mas1, mas2;
+			int store = mfspr(SPR_ESR) & ESR_ST;
+			int pid, space, ret;
+			uint32_t epc = 0;
 
-		if (epid) {
-			if (store)
-				epc = guest ? regs->epsc : mfspr(SPR_EPSC);
-			else
-				epc = guest ? regs->eplc : mfspr(SPR_EPLC);
-
-			pid = epc & EPC_EPID;
-			space = !!(epc & EPC_EAS);
-		} else {
-			pid = mfspr(SPR_PID);
-			space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
-			               (regs->srr1 & MSR_DS) >> 4;
-		}
-
-		if (guest || (epc & EPC_EGS)) {
-			ret = guest_tlb1_miss(vaddr, space, pid);
-			if (likely(ret == TLB_MISS_HANDLED))
-				return;
-		}
-
-		if (guest) {
-			if (ret == TLB_MISS_MCHECK) {
-				uint32_t mcsr = MCSR_MAV | MCSR_MEA;
-
-				if (itlb)
-					mcsr |= MCSR_IF;
-				else if (store)
-					mcsr |= MCSR_ST;
+			if (epid) {
+				if (store)
+					epc = guest ? regs->epsc : mfspr(SPR_EPSC);
 				else
-					mcsr |= MCSR_LD;
+					epc = guest ? regs->eplc : mfspr(SPR_EPLC);
 
-				reflect_mcheck(regs, mcsr, vaddr);
-				return;
-			};
+				pid = epc & EPC_EPID;
+				space = !!(epc & EPC_EAS);
+			} else {
+				pid = mfspr(SPR_PID);
+				space = itlb ? (regs->srr1 & MSR_IS) >> 5 :
+							   (regs->srr1 & MSR_DS) >> 4;
+			}
 
-			assert(ret == TLB_MISS_REFLECT);
+			if (guest || (epc & EPC_EGS)) {
+				ret = guest_tlb1_miss(vaddr, space, pid);
+				if (likely(ret == TLB_MISS_HANDLED))
+					return;
+			}
 
-			set_stat(bm_stat_tlb_miss_reflect, regs);
+			if (guest) {
+				if (ret == TLB_MISS_MCHECK) {
+					uint32_t mcsr = MCSR_MAV | MCSR_MEA;
 
-			mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
-			asm volatile("isync; tlbsx 0, %0" : : "r" (vaddr));
-		
-			mas1 = mfspr(SPR_MAS1);
-			assert(!(mas1 & MAS1_VALID));
-			mtspr(SPR_MAS1, mas1 | MAS1_VALID);
-		
-			mas2 = mfspr(SPR_MAS2);
-			mas2 &= MAS2_EPN;
-			mas2 |= vaddr & MAS2_EPN;
-			mtspr(SPR_MAS2, mas2);
+					if (itlb)
+						mcsr |= MCSR_IF;
+					else if (store)
+						mcsr |= MCSR_ST;
+					else
+						mcsr |= MCSR_LD;
 
-			mtspr(SPR_GESR, mfspr(SPR_ESR)); 
+					reflect_mcheck(regs, mcsr, vaddr);
+					return;
+				};
 
-			if (!itlb)
-				mtspr(SPR_DEAR, vaddr); /* note: reflect_trap() moves this into GDEAR */
+				assert(ret == TLB_MISS_REFLECT);
+
+				set_stat(bm_stat_tlb_miss_reflect, regs);
+
+				mtspr(SPR_MAS6, (pid << MAS6_SPID_SHIFT) | space);
+				asm volatile("isync; tlbsx 0, %0" : : "r" (vaddr));
+
+				mas1 = mfspr(SPR_MAS1);
+				assert(!(mas1 & MAS1_VALID));
+				mtspr(SPR_MAS1, mas1 | MAS1_VALID);
+
+				mas2 = mfspr(SPR_MAS2);
+				mas2 &= MAS2_EPN;
+				mas2 |= vaddr & MAS2_EPN;
+				mtspr(SPR_MAS2, mas2);
+
+				mtspr(SPR_GESR, mfspr(SPR_ESR));
+
+				if (!itlb)
+					mtspr(SPR_DEAR, vaddr); /* note: reflect_trap() moves this into GDEAR */
+			}
 		}
+	} else {
+		set_stat(bm_stat_tlb_miss, regs);
+		assert(!(regs->srr1 & MSR_GS));
 	}
-#else
-	set_stat(bm_stat_tlb_miss, regs);
-	assert(!(regs->srr1 & MSR_GS));
-#endif
 
 	if (unlikely(!guest)) {
 		if (epid) {

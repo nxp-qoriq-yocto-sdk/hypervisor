@@ -1722,6 +1722,12 @@ guest_t *node_to_partition(dt_node_t *partition)
 		if (dt_get_prop(partition, "privileged", 0))
 			guests[i].privileged = 1;
 
+		if (dt_get_prop(partition, "direct-guest-tlb-management", 0))
+			guests[i].direct_guest_tlb_mgt = 1;
+
+		if (dt_get_prop(partition, "direct-guest-tlb-miss", 0))
+			guests[i].direct_guest_tlb_miss = 1;
+
 		guests[i].name = name;
 		guests[i].state = guest_starting_uninit;
 		guests[i].partition = partition;
@@ -3303,6 +3309,33 @@ static void start_partitions(void)
 	}
 }
 
+static void configure_tlb_mgt(guest_t *guest)
+{
+	register_t epcr;
+
+	epcr = mfspr(SPR_EPCR) | (EPCR_EXTGS | EPCR_DSIGS | EPCR_DUVD);
+
+	if (!guest->direct_guest_tlb_mgt)
+		epcr |= EPCR_DGTMI;
+
+	if (guest->direct_guest_tlb_miss)
+		epcr |= EPCR_DTLBGS | EPCR_ITLBGS;
+	else {
+		epcr |= EPCR_DMIUH;
+		cpu->client.tlb1_virt = 1;
+	}
+
+	mtspr(SPR_EPCR, epcr);
+
+	/* we have TLB cache on TLB 0 only if the TLB misses are directed
+	 * to the hypervisor and tlbwe instruction traps to the hypervisor.
+	 * In all the other cases there is no reason in maintaining the TLB 0
+	 * cache */
+
+	if (!guest->direct_guest_tlb_miss && !guest->direct_guest_tlb_mgt)
+		tlbcache_init();
+}
+
 /* init_guest() is called once per CPU
  */
 __attribute__((noreturn)) void init_guest(void)
@@ -3323,6 +3356,8 @@ __attribute__((noreturn)) void init_guest(void)
 
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		         "guest at %s on core %d\n", guest->name, pir);
+
+		configure_tlb_mgt(guest);
 
 		if (pir == guest->cpulist[0]) {
 			/* Boot CPU */

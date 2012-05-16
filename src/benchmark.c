@@ -70,12 +70,9 @@ const char *benchmark_names[num_benchmarks] = {
 	"watchdog int",
 	"alignment",
 	"floating pt. unavail",
-#ifdef CONFIG_TLB_CACHE
 	"tlb miss count",
 	"tlb miss reflected",
-#else
 	"tlb miss",
-#endif
 	/* microbenchmarks go here */
 	"tlbinv by PID",
 	"tlbcache inv all",

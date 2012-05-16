@@ -240,9 +240,8 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 
 	case SPR_TLB0CFG:
 		*val = mfspr(SPR_TLB0CFG);
-#ifdef CONFIG_TLB_CACHE
-		*val &= ~TLBCFG_NENTRY_MASK; 
-#endif		
+		if (cpu->client.tlbcache_enable)
+			*val &= ~TLBCFG_NENTRY_MASK;
 		/*
 		 * Mask out MMUv2 features not yet supported.
 		 * They will be unmasked as they'll be implemented.

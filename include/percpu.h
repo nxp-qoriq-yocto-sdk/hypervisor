@@ -216,6 +216,15 @@ typedef struct guest {
 
 	/** portal-devices node under partition config node */
 	dt_node_t *portal_devs;
+
+	/** allow TLB management instructions (tlbwe, tlbilx) to be executed
+	 * in guest state
+	 */
+	int direct_guest_tlb_mgt;
+
+	/** TLB miss interrupts are taken directly by the guest */
+	int direct_guest_tlb_miss;
+
 } guest_t;
 
 #define MAX_PARTITIONS 8

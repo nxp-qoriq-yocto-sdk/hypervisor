@@ -29,7 +29,6 @@
 
 #include <paging.h>
 
-#ifdef CONFIG_TLB_CACHE
 #define TLBC_WAYS 4
 
 #define TLBC_MIN_IDX_BITS 10
@@ -100,5 +99,4 @@ void gtlb0_to_mas(unsigned int index, unsigned int way, struct gcpu *gcpu);
 int check_tlb1_conflict(uintptr_t epn, unsigned int tsize,
                         unsigned int pid, unsigned int space);
 
-#endif
 #endif

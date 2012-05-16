@@ -1232,17 +1232,6 @@ static void core_init(void)
 
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
 
-#ifdef CONFIG_TLB_CACHE
-	mtspr(SPR_EPCR,
-	      mfspr(SPR_EPCR) | (EPCR_EXTGS | EPCR_DSIGS |
-	      EPCR_DUVD | EPCR_DGTMI | EPCR_DMIUH));
-
-	tlbcache_init();
-#else
-	mtspr(SPR_EPCR,
-	      mfspr(SPR_EPCR) | (EPCR_EXTGS | EPCR_DTLBGS | EPCR_ITLBGS |
-	      EPCR_DSIGS | EPCR_DUVD | EPCR_DGTMI));
-#endif
 }
 
 /** Flush and disable core L2 cache

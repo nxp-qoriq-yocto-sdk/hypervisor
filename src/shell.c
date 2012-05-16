@@ -676,7 +676,7 @@ static command_t resume = {
 };
 shell_cmd(resume);
 
-#ifdef CONFIG_TLB_CACHE
+#if 0
 
 #ifndef CONFIG_LIBOS_64BIT
 #define VADDR_WIDTH	"8"
