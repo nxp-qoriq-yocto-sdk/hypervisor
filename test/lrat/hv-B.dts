@@ -1,0 +1,281 @@
+/*
+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0:pma0 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x00000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+	pma1_1:pma1_1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x20000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_2:pma1_2 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x22000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_3:pma1_3 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x24000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_4:pma1_4 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x26000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_5:pma1_5 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x28000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_6:pma1_6 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x2a000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_7:pma1_7 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x2c000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_8:pma1_8 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x2e000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+	pma1_9:pma1_9 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x30000000>;
+		size = <0x0 0x4000000>;  // 64MB
+	};
+	pma1_10:pma1_10 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x34000000>;
+		size = <0x0 0x4000000>;  // 64MB
+	};
+
+	pma2_1:pma2_1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x38000000>;
+		size = <0x0 0x2000000>;  // 32MB
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv:hypervisor-config {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		serial0:serial0 {
+			device = "serial0";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&serial0>;
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		label = "lrat-test";
+		cpus = <0 1 2 1>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		direct-guest-tlb-management;
+		direct-guest-tlb-miss;
+
+		p1bc: p1bc {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_1>;
+			guest-addr = <0 0>;
+		};
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_2>;
+			guest-addr = <0 0x2000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+		};
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_3>;
+			guest-addr = <0 0x4000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma3 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_4>;
+			guest-addr = <0 0x6000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma4 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_5>;
+			guest-addr = <0 0x8000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma5 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_6>;
+			guest-addr = <0 0xa000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma6 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_7>;
+			guest-addr = <0 0xc000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma7 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_8>;
+			guest-addr = <0 0xe000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma8 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_9>;
+			guest-addr = <0 0x10000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+		gpma9 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1_10>;
+			guest-addr = <0 0x14000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl,lrat-test";
+			};
+
+		};
+
+		aliases {
+			stdout = <&p1bc>;
+		};
+
+	};
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2 {
+		compatible = "partition";
+		label = "mmu-test";
+		cpus = <4 1 6 1>;
+		guest-image = <0xf 0xe8b00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		p2bc: p2bc {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2_1>;
+			guest-addr = <0 0>;
+		};
+
+		aliases {
+			stdout = <&p2bc>;
+		};
+
+	};
+
+};
