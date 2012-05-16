@@ -1,0 +1,211 @@
+/*
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0:pma0 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x00000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+	pma1:pma1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x20000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+
+	dma-windows {
+		window0: window0 {
+			compatible = "dma-window";
+			guest-addr = <0 0x0>;
+			size = <0 0x20000000>;
+		};
+
+		dw_dqrr_qportal0: window1 {	// DMA window for stash_dqrr for qman-portal0
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4200000>;
+			size = <0 0x4000>;
+		};
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv:hypervisor-config {
+		compatible = "hv-config";
+		stdout = <&uart0>;
+
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		uart0:serial0 {
+			device = "serial0";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		label = "p1-linux";
+		cpus = <0 2>;
+
+		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
+		linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x02800000>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+		no-dma-disable;
+
+		serial2 {
+			device = "serial2";
+		};
+
+		qman {
+			device = "qman";
+			dma-window = <&window0>;
+		};
+
+		bman {
+			device = "bman";
+			dma-window = <&window0>;
+		};
+
+		bman-portalA {
+			device = "/bman-portals/bman-portal@0";
+		};
+
+		bman-portalB {
+			device = "/bman-portals/bman-portal@4000";
+		};
+
+
+		portal-devices {
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+		};
+
+		qman-portalA {
+			device = "/qman-portals@ff4200000/qman-portal@0";
+
+			stash-mem {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+			};
+
+			stash-dqrr {
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal0>;
+				operation-mapping = <0>;  // OMI_QMAN
+			};
+		};
+
+		// FMAN0 eth1 -- ethernet 1 assigned to this partition
+		dpa-ethernet@1 {
+				device = "/fsl,dpaa/ethernet@1";
+		};
+	
+		gpio {
+				device = "/soc/gpio";
+		};
+
+		fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+		};
+
+		bman-bpids {
+				device = "/bman-portals@ff4000000/bman-bpids@0";
+		};
+
+		qman-fqids {
+				device = "qman-portals@ff4200000/qman-fqids@0";
+		};
+
+		qman-pools {
+				device = "/qman-portals@ff4200000/qman-pools@0";
+		};
+																							
+		qman-cgrids {
+				device = "/qman-portals@ff4200000/qman-cgrids@0";
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		node-update {
+			chosen {
+				linux,stdout-path = "/serial2";
+				bootargs = "console=ttyS0,115200";
+			};
+		};
+
+	};
+};
