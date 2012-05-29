@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+# Copyright (C) 2008-2012 Freescale Semiconductor, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,18 +54,24 @@ $(test): bin/$(test)/$(test) $($(test)-hv-dtb) $($(test)-ubs)
 
 $(test)-num-terms ?= 2
 
+# $(call run-sim, sim-script-wo-extension, num-terminals)
+
+define run-sim
+	@if [ $(SIM) == "sim_T4240" ]; then						\
+		$(SIM) $(T4SIM_FLAGS) $1.py;					\
+	else									\
+		if [ $2 != 0 ]; then						\
+			setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms);	\
+		fi;								\
+		$(SIM) $(SIMICS_FLAGS) $1.simics;				\
+	fi;
+endef
+
 # We cannot use $(dir) or $(test) in the actions because rule evaluation is
 # deferred and we'd end up with the last test procesed, not the one actually
 # being run.
 $(test)-run: $(test)
-	@if [ $($<-num-terms) != 0 ]; then \
-		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
-	fi
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run.simics
-
+	$(call run-sim,$(testdir)$</run,$($<-num-terms))
 
 $(test)-run-%: $(test)
-	@if [ $($<-num-terms) != 0 ]; then \
-		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
-	fi
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
+	$(call run-sim,$(testdir)$</run-$*,$($<-num-terms))

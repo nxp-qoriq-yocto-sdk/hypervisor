@@ -25,7 +25,12 @@
 # default to p4080ds, can override from command line
 export TARGET := p4080ds
 
+# default T4 simulator, can be changed from command line
+export SIM := sim_T4240
+
 SIMICS_FLAGS += -e '$$target = $(TARGET)'
+T4SIM_FLAGS += -s sim.num_cores=4 -s sim.num_threads_per_core=1 \
+				-s sim.clock_dpa=false
 
 testdir := $(src)test/
 
