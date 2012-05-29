@@ -110,21 +110,31 @@ bin/$(test)/ipi2: $(ipi2-obj)
 $(test): bin/$(test)/ipi bin/$(test)/ipi1  bin/$(test)/ipi2 $($(test)-hv-dtb) \
 	$($(test)-ubs)
 
+# $(call run-sim, sim-script-wo-extension, num-terminals)
+
+define run-sim
+	echo "here"
+	@if [ $(SIM) == "sim_T4240" ]; then						\
+		$(SIM) $(T4SIM_FLAGS) $1.py;					\
+	else									\
+		if [ $2 != 0 ]; then						\
+			setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms);	\
+		fi;								\
+		$(SIM) $(SIMICS_FLAGS) $1.simics;				\
+	fi;
+endef
+
 $(test)-run-A: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-A.simics
+	$(call run-sim,$(testdir)$</run-A,2)
 
 $(test)-run-B: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-B.simics
+	$(call run-sim,$(testdir)$</run-B,3)
 
 $(test)-run-C: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-C.simics
+	$(call run-sim,$(testdir)$</run-C,3)
 
 $(test)-run-D: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-D.simics
+	$(call run-sim,$(testdir)$</run-D,2)
 
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2
