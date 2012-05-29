@@ -87,14 +87,23 @@ bin/$(test)/fast-doorbell1: $(fast-doorbell1-obj)
 	$(call show,build: $<)
 	mkimage -A ppc -T script -a 0 -d $< $@
 
+define run-sim
+	echo "here"
+	@if [ $(SIM) == "sim_T4240" ]; then						\
+		$(SIM) $(T4SIM_FLAGS) $1.py;					\
+	else									\
+		if [ $2 != 0 ]; then						\
+			setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms);	\
+		fi;								\
+		$(SIM) $(SIMICS_FLAGS) $1.simics;				\
+	fi;
+endef
+
 .PHONY: $(test)
 $(test): bin/$(test)/fast-doorbell bin/$(test)/fast-doorbell1 $($(test)-hv-dtb) \
 	$($(test)-ubs)
 $(test)-run-%: $(test)
-	@if [ $($<-num-terms) != 0 ]; then \
-		setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms); \
-	fi
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)$</run-$*.simics
+	$(call run-sim,$(testdir)$</run-$*,$($<-num-terms))
 
 $(test)-check-A: $(test)-run-A-batch
 	$(testdir)common/check-results 2
