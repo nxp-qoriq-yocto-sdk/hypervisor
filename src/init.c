@@ -812,7 +812,7 @@ uint32_t cpus_mask;
 static int count_cores(dt_node_t *node, void *arg)
 {
 	dt_prop_t *prop = dt_get_prop(node, "reg", 0);
-	if (prop && prop->len == 4) {
+	if (prop && prop->len >= 4) {
 		uint32_t reg = *(const uint32_t *)prop->data;
 
 		if (reg <= MAX_CORES) {
@@ -1132,7 +1132,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 	}
 
 	prop = dt_get_prop(node, "reg", 0);
-	if (!prop || prop->len != 4) {
+	if (!prop || prop->len < 4) {
 		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
 		         "release_secondary: Missing/bad reg property in cpu node\n");
 		return 0;
