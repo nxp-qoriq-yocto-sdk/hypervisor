@@ -91,6 +91,12 @@ typedef struct {
 	 * clear, sync_nap() will wake the core from nap state.
 	 */
 	int nap_request;
+
+	/* lrat entries are allocated in a round robin fashion */
+	int lrat_next_entry;
+
+	/* the supported number of lrat entries */
+	int lrat_nentries;
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */
@@ -127,6 +133,7 @@ void hcall(struct trapframe *regs);
 void align_trap(struct trapframe *regs);
 void fpunavail(struct trapframe *regs);
 void perfmon_int(struct trapframe *regs);
+void lrat_miss(struct trapframe *regs);
 #endif
 
 #define EXC_CRIT_INT_HANDLER critical_interrupt
@@ -150,6 +157,7 @@ void perfmon_int(struct trapframe *regs);
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
 #define EXC_PERFMON_HANDLER perfmon_int
+#define EXC_LRAT_HANDLER lrat_miss
 
 #ifdef CONFIG_STATISTICS
 #define UPDATE_STATS statistics_stop

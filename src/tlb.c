@@ -1761,3 +1761,108 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 
 	return 0;
 }
+
+void lrat_miss(trapframe_t *regs)
+{
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+	unsigned long grpn = 0;
+	unsigned long attr;
+	unsigned long rpn;
+	unsigned long mas0, mas1, mas2, mas3, mas7, mas8, mas3_flags;
+	unsigned long tsize, size_pages;
+	uint32_t esr = mfspr(SPR_ESR);
+
+	if (mfspr(SPR_ESR) & ESR_PT) {
+		/* TODO: add support for LRAT translation in case of page table
+		 * translation. For now just hang here.
+		 */
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
+		         "Unsupported LRAT miss from page table translation lrat miss address"
+		         "0x%lx, srr1 0x%lx\n", regs->srr0, regs->srr1);
+		BUG();
+	}
+
+	disable_int();
+	save_mas(gcpu);
+
+	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
+	       (gcpu->mas3 >> MAS3_RPN_SHIFT);
+
+	rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
+
+	/* for bad mappings, the Hypervisor writes the TLB entry on behalf of
+	 * the guest and sets the virtualization fault bit
+	 */
+	if (unlikely(!(attr & PTE_VALID))) {
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+		        "Trying to map a non existing page srr0 0x%lx, srr1 0x%lx, grpn 0x%lx\n",
+		        regs->srr0, regs->srr1, grpn);
+
+		mas0 = gcpu->mas0;
+		mas1 = gcpu->mas1;
+		mas2 = gcpu->mas2;
+		mas3 = gcpu->mas3;
+		mas7 = gcpu->mas7;
+		mas8 = guest->lpid | MAS8_GTS | MAS8_VF;
+		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
+
+		/* VF does not prevent instruction execution */
+		mas3 &= !(MAS3_SX | MAS3_UX);
+
+		rpn = grpn;
+
+		mtspr(SPR_MAS0, mas0);
+		mtspr(SPR_MAS1, mas1);
+		mtspr(SPR_MAS2, mas2);
+		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+		mtspr(SPR_MAS3, (uint32_t)(rpn << PAGE_SHIFT) | mas3);
+		mtspr(SPR_MAS8, mas8);
+		asm volatile("isync; tlbwe" : : : "memory");
+
+		mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+		restore_mas(gcpu);
+		enable_int();
+
+		/* the Hypervisor has written the entry on behalf of the guest,
+		   so the tlbwe instruction should not be again executed
+		 */
+		regs->srr0 += 4;
+
+		return;
+	}
+
+	tsize = attr >> PTE_SIZE_SHIFT;
+	size_pages = tsize_to_pages(tsize);
+	grpn &= ~(size_pages - 1);
+	rpn &= ~(size_pages - 1);
+
+	mas0 = MAS0_LRATSEL | MAS0_ESEL(cpu->client.lrat_next_entry);
+	mas1 = MAS1_VALID;
+	mas1 |= tsize << MAS1_TSIZE_SHIFT;
+	mas2 = grpn << PAGE_SHIFT;
+	mas3 = (rpn << PAGE_SHIFT) & MAS3_RPN;
+	mas7 = rpn >> (32 - PAGE_SHIFT);
+	mas8 = guest->lpid;
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE, "LPN: %lx, RPN: %lx,"
+	         "MAS0: %lx, MAS1: %lx, MAS2: %lx, MAS3: %lx, MAS7: %lx, MAS8: %lx\n",
+	         grpn, rpn, mas0, mas1, mas2, mas3, mas7, mas8);
+
+	mtspr(SPR_MAS0, mas0);
+	mtspr(SPR_MAS1, mas1);
+	mtspr(SPR_MAS2, mas2);
+	mtspr(SPR_MAS7, mas7);
+	mtspr(SPR_MAS3, mas3);
+	mtspr(SPR_MAS8, mas8);
+	asm volatile("isync; tlbwe" : : : "memory");
+
+	cpu->client.lrat_next_entry++;
+	if (cpu->client.lrat_next_entry == cpu->client.lrat_nentries)
+		cpu->client.lrat_next_entry = 0;
+
+	mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+	restore_mas(gcpu);
+	enable_int();
+
+}

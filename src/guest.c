@@ -3318,9 +3318,10 @@ static void configure_tlb_mgt(guest_t *guest)
 	if (!guest->direct_guest_tlb_mgt)
 		epcr |= EPCR_DGTMI;
 
-	if (guest->direct_guest_tlb_miss)
+	if (guest->direct_guest_tlb_miss) {
 		epcr |= EPCR_DTLBGS | EPCR_ITLBGS;
-	else {
+		cpu->client.lrat_nentries = mfspr(SPR_LRATCFG) & LRATCFG_NENTRY_MASK;
+	} else {
 		epcr |= EPCR_DMIUH;
 		cpu->client.tlb1_virt = 1;
 	}
