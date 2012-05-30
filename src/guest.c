@@ -2233,6 +2233,9 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 	guest_reset_tlb();
 
+	if ((mfspr(SPR_MMUCFG) & MMUCFG_MAVN) && guest->direct_guest_tlb_mgt)
+		inv_lrat(gcpu);
+
 	/* The guest can get its caches into an unpleasant state
 	 * with noncoherent mappings.  Clean things up for the next guest.
 	 */

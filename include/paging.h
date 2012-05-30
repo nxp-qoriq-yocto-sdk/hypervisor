@@ -189,6 +189,8 @@ struct gcpu;
 void save_mas(struct gcpu *gcpu);
 void restore_mas(struct gcpu *gcpu);
 
+void inv_lrat(struct gcpu *gcpu);
+
 void *map(phys_addr_t paddr, size_t len, int mas2flags, int mas3flags);
 int map_hv_pma(phys_addr_t paddr, size_t len, int text);
 int handle_hv_tlb_miss(struct trapframe *regs, uintptr_t vaddr);

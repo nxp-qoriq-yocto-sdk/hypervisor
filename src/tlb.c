@@ -1762,6 +1762,34 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 	return 0;
 }
 
+void inv_lrat(gcpu_t *gcpu)
+{
+	unsigned long mas0, mas1 = 0;
+
+	save_mas(gcpu);
+
+	/* lrat entries can only be invalidated by writing the LRAT entry
+	 * with MAS1[V] = 0
+	 */
+
+	for (int i = 0; i < cpu->client.lrat_nentries; i++) {
+		/* read the entry */
+		mas0 = MAS0_LRATSEL | MAS0_ESEL(i);
+		mtspr(SPR_MAS0, mas0);
+		asm volatile("isync; tlbre" : : : "memory");
+
+		/* invalidate the entry */
+		mas1 &= ~MAS1_VALID;
+		mtspr(SPR_MAS1, mas1);
+		asm volatile("isync; tlbwe" : : : "memory");
+
+	}
+
+	cpu->client.lrat_next_entry = 0;
+
+	restore_mas(gcpu);
+}
+
 void lrat_miss(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
