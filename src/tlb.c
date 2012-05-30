@@ -45,7 +45,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
                                 unsigned int tid, unsigned int ts,
                                 register_t mas8)
 {
-	register_t mas0, mas1, mas2, mas3, mas7;
+	register_t mas0, mas1, mas2, mas3, mas7, saved_mas8;
 	register_t saved;
 
 	saved = disable_int_save();
@@ -55,6 +55,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 	mas2 = mfspr(SPR_MAS2);
 	mas3 = mfspr(SPR_MAS3);
 	mas7 = mfspr(SPR_MAS7);
+	saved_mas8 = mfspr(SPR_MAS8);
 
 	tlb1_set_entry(idx, va, pa, tsize, mas2flags, mas3flags, tid, ts, mas8);
 
@@ -63,6 +64,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 	mtspr(SPR_MAS2, mas2);
 	mtspr(SPR_MAS3, mas3);
 	mtspr(SPR_MAS7, mas7);
+	mtspr(SPR_MAS8, saved_mas8);
 
 	restore_int(saved);
 }
@@ -757,6 +759,9 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 						tlb_inv_addr(va);
 					}
 				}
+
+				/* restore MAS8 as it might have been changed */
+				mtspr(SPR_MAS8, get_gcpu()->guest->lpid | MAS8_GTS);
 			} else {
 				assert((mfspr(SPR_MAS6) & MAS6_SPID_MASK) ==
 				       ((unsigned int)pid << MAS6_SPID_SHIFT));

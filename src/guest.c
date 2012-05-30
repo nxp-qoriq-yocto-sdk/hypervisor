@@ -1772,6 +1772,8 @@ static void guest_core_init(guest_t *guest)
 	mtspr(SPR_TSR, TSR_DIS);
 
 	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
+	mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+
 	mtspr(SPR_PID, 0);
 
 	if (!guest->guest_cache_lock)
