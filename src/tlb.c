@@ -603,7 +603,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
                     unsigned long mas2flags, unsigned long mas3flags)
 {
 	gcpu_t *gcpu = get_gcpu();
-	unsigned int size = (mas1 >> MAS1_TSIZE_SHIFT) & 15;
+	unsigned int size = (mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT;
 	unsigned long size_pages = tsize_to_pages(size);
 	unsigned long end = epn + size_pages;
 
@@ -1124,12 +1124,11 @@ static map_entry_t pma_maps[PERM_TLB_END - PERM_TLB_START + 1];
 int map_hv_pma(phys_addr_t paddr, size_t len, int text)
 {
 	unsigned long npages = len >> PAGE_SHIFT;
-	int order = ilog2(npages);
-	int tsize = order / 2 + 1;
+	int tsize = max_valid_tsize(pages_to_tsize_msb(npages));
 	unsigned long pages_per_entry = tsize_to_pages(tsize);
 	register_t saved;
 	map_entry_t *me;
-	int entries = order & 1 ? 2 : 1;
+	int entries = pages_per_entry < npages ? 2 : 1;
 	int ret = 0;
 
 	saved = spin_lock_intsave(&map_lock);

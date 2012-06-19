@@ -83,9 +83,9 @@
 #define PTE_W       0x00100000 /* Write-through */
 #define PTE_VLE     0x00200000 /* Variable Length Encoding */
 #define PTE_ACM     0x00c00000 /* Alternate Coherency Mode */
-#define PTE_SIZE    0xf0000000 /* log4(page size):
-                                * <=5 valid on level 1 ptes,
-                                * >5 valid on level 2 (toplevel) ptes
+#define PTE_SIZE    0xf8000000 /* log2(page size):
+                                * <=10 valid on level 1 ptes,
+                                * >10 valid on level 2 (toplevel) ptes
                                 * Should be zero on toplevel
                                 * pointers to level 1 page tables
                                 */
@@ -96,7 +96,7 @@
 #define PTE_MAS3_MASK (PTE_SR | PTE_UR | PTE_SW | \
                        PTE_UW | PTE_SX | PTE_UX)
 
-#define PTE_SIZE_SHIFT 28
+#define PTE_SIZE_SHIFT 27
 
 #define PTE_ALL (PTE_MAS3_MASK | PTE_VALID | PTE_GS | PTE_DMA)
 

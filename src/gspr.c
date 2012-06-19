@@ -243,11 +243,23 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 #ifdef CONFIG_TLB_CACHE
 		*val &= ~TLBCFG_NENTRY_MASK; 
 #endif		
+		/*
+		 * Mask out MMUv2 features not yet supported.
+		 * They will be unmasked as they'll be implemented.
+		 */
+		if ((mfspr(SPR_MMUCFG) & MMUCFG_MAVN)) {
+			*val &= ~(TLBCFG_HES_MASK | TLBCFG_IND_MASK |
+				  TLBCFG_GTWE_MASK | TLBCFG_PT_MASK);
+		}
 		break;
 
 	case SPR_TLB1CFG:
 		*val = mfspr(SPR_TLB1CFG) & ~(TLBCFG_NENTRY_MASK | TLBCFG_ASSOC_MASK);
 		*val |= TLB1_GSIZE;
+		break;
+
+	case SPR_TLB1PS:
+		*val = valid_tsize_mask;
 		break;
 
 	case SPR_CDCSR0:
@@ -355,7 +367,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_MMUCFG:
-		*val = mfspr(SPR_MMUCFG) & ~MMUCFG_LPIDSIZE;
+		*val = mfspr(SPR_MMUCFG) & ~(MMUCFG_LPIDSIZE | MMUCFG_LRAT);
 		break;
 
 	case SPR_SVR:

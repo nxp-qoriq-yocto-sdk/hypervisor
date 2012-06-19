@@ -1829,8 +1829,8 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 
 			pages = size >> PAGE_SHIFT;
 
-			tsize = pages_to_tsize_msb(pages);
-			if (ilog2(pages) & 1)
+			tsize = max_valid_tsize(pages_to_tsize_msb(pages));
+			if (tsize_to_pages(tsize) < pages)
 				need_two = 1;
 		} else {
 			tsize = TLB_TSIZE_1G;
