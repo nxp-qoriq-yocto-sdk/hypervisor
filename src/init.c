@@ -99,6 +99,8 @@ phys_addr_t pamu_mem_addr, pamu_mem_size;
 pamu_hv_mem_t *pamu_mem_header;
 #endif
 
+static int core_local_l2;
+
 static int get_cfg_addr(char *args, void *ctx)
 {
 	phys_addr_t *cfg_addr = ctx;
@@ -797,6 +799,19 @@ static void watchdog_init(void)
 }
 #endif
 
+static void core_cache_init(void)
+{
+	uint32_t pvr;
+
+	pvr = mfspr(SPR_PVR) & 0xffff0000;
+
+	/*
+	 * L2 is core local on e500mc and e5500 so mark that it
+	 * needs to be flushed along with L1
+	 */
+	core_local_l2 = (pvr == 0x80230000 || pvr == 0x80240000);
+}
+
 /* partition_init_counter is atomically decremented each time a core
  * completes its partition init (or lack thereof if it has no
  * partition).  Once this reaches zero, gevents will be sent
@@ -1053,6 +1068,8 @@ void libos_client_entry(unsigned long treephys)
 	enable_mcheck();
 
 	init_gevents();
+
+	core_cache_init();
 
 	ccm_init();
 
@@ -1329,7 +1346,8 @@ int flush_disable_core_caches(core_cache_state_t *state)
 	uint32_t timeout = dt_get_timebase_freq() / 10;
 	int ret;
 
-	flush_disable_l2_cache(timeout, 1, &state->l2csr0);
+	if (core_local_l2)
+		flush_disable_l2_cache(timeout, 1, &state->l2csr0);
 
 	state->l1csr0 = mfspr(SPR_L1CSR0);
 	state->l1csr1 = mfspr(SPR_L1CSR1);
@@ -1353,14 +1371,16 @@ int restore_core_caches(const core_cache_state_t *state)
 	register_t tb = mfspr(SPR_TBL);
 	int ret = 0;
 
-	set_cache_reg(SPR_L2CSR0, state->l2csr0);
+	if (core_local_l2) {
+		set_cache_reg(SPR_L2CSR0, state->l2csr0);
 
-	while (mfspr(SPR_L2CSR0) != state->l2csr0) {
-		if (mfspr(SPR_TBL) - tb > timeout) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			         "%s: L2 cache enable timeout\n",
-			         __func__);
-			ret = ERR_HARDWARE;;
+		while (mfspr(SPR_L2CSR0) != state->l2csr0) {
+			if (mfspr(SPR_TBL) - tb > timeout) {
+				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+				         "%s: L2 cache enable timeout\n",
+				         __func__);
+				ret = ERR_HARDWARE;
+			}
 		}
 	}
 
