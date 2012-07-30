@@ -84,6 +84,19 @@ define add_files
 	$(V)mkimage -n 'uboot initramfs rootfs' -A ppc -O linux -T ramdisk -C gzip -d bin/linux/$(1).cpio.gz bin/linux/$(1).cpio.gz.uboot
 endef
 
+define run-sim
+	echo "here"
+	@if [ $(SIM) == "sim_T4240" ]; then						\
+		$(SIM) $(T4SIM_FLAGS) $1.py;					\
+	else									\
+		if [ $2 != 0 ]; then						\
+			setsid $(testdir)../tools/xtel.sh 9000 $($<-num-terms);	\
+		fi;								\
+		$(SIM) $(SIMICS_FLAGS) $1.simics;				\
+	fi;
+endef
+
+
 # initramfs filesystem for partman
 bin/$(test)/initramfs-partman.cpio.gz.uboot: $(testdir)../../images/initramfs.cpio.gz.uboot
 # We want partman on the managed partition, so that we can send and listen
@@ -153,8 +166,7 @@ $(test)-run-1p: $(test)
 	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1p.simics
 
 $(test)-run-1core: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 2
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-1core.simics
+	$(call run-sim,$(testdir)$</run-1core,2)
 
 $(test)-run-e1000: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
