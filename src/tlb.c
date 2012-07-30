@@ -1829,32 +1829,47 @@ void lrat_miss(trapframe_t *regs)
 	unsigned long mas0, mas1, mas2, mas3, mas7, mas8, mas3_flags;
 	unsigned long tsize, size_pages;
 	uint32_t esr = mfspr(SPR_ESR);
-
-	if (mfspr(SPR_ESR) & ESR_PT) {
-		/* TODO: add support for LRAT translation in case of page table
-		 * translation. For now just hang here.
-		 */
-		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,
-		         "Unsupported LRAT miss from page table translation lrat miss address"
-		         "0x%lx, srr1 0x%lx\n", regs->srr0, regs->srr1);
-		BUG();
-	}
+	int pt = mfspr(SPR_ESR) & ESR_PT;
 
 	disable_int();
 	save_mas(gcpu);
 
-	grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
-	       (gcpu->mas3 >> MAS3_RPN_SHIFT);
+	if (pt)
+		grpn = (mfspr(SPR_LPER) & LPER_ALPN) >> LPER_ALPN_SHIFT;
+	else
+		grpn = (gcpu->mas7 << (32 - PAGE_SHIFT)) |
+		       (gcpu->mas3 >> MAS3_RPN_SHIFT);
 
 	rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
-	/* for bad mappings, the Hypervisor writes the TLB entry on behalf of
-	 * the guest and sets the virtualization fault bit
-	 */
 	if (unlikely(!(attr & PTE_VALID))) {
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 		        "Trying to map a non existing page srr0 0x%lx, srr1 0x%lx, grpn 0x%lx\n",
 		        regs->srr0, regs->srr1, grpn);
+
+		/* for page table walk originated bad mappings, reflect a machine
+		 * check to the guest.
+		 */
+		if (pt) {
+			uint32_t mcsr = MCSR_MAV | MCSR_MEA;
+			register_t vaddr;
+
+			vaddr = mfspr(SPR_DEAR);
+			if (esr & ESR_ST)
+				mcsr |= MCSR_ST;
+			else
+				mcsr |= MCSR_LD;
+
+			reflect_mcheck(regs, mcsr, vaddr);
+
+			restore_mas(gcpu);
+			enable_int();
+			return;
+		}
+
+		/* for tlbwe originated bad mappings, the Hypervisor writes the TLB
+		 * entry on behalf of the guest and sets the virtualization fault bit
+		 */
 
 		mas0 = gcpu->mas0;
 		mas1 = gcpu->mas1;
