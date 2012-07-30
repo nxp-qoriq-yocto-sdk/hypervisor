@@ -382,6 +382,52 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int check_tlb0_duplicate(unsigned long epn, unsigned long mas0,
+                                unsigned long mas1, unsigned long pages)
+{
+	if (cpu->client.tlbcache_enable) {
+		if ((mas0 & MAS0_TLBSEL1) &&
+			unlikely(check_tlb1_conflict(epn, MAS1_GETTSIZE(mas1), MAS1_GETTID(mas1),
+										 !!(mas1 & MAS1_TS)))) {
+
+			return 1;
+		}
+	} else {
+		mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
+					  ((mas1 >> MAS1_TS_SHIFT) & 1));
+		isync();
+
+		for (unsigned long i = epn; i < epn + pages; i++) {
+			unsigned long sx_mas0;
+
+			mtspr(SPR_MAS2, i << PAGE_SHIFT);
+			asm volatile("isync; tlbsx 0, %0" : : "r" (i << PAGE_SHIFT) : "memory");
+			sx_mas0 = mfspr(SPR_MAS0);
+
+			if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
+				continue;
+
+			if (!(mas0 & MAS0_TLBSEL1)) {
+				assert(MAS0_GET_TLBSEL(sx_mas0) == 0);
+				if ((mas0 & MAS0_ESEL_MASK) == (sx_mas0 & MAS0_ESEL_MASK))
+					continue;
+			} else if (sx_mas0 & MAS0_TLBSEL1) {
+				continue;
+			}
+
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+					 "check_tlb0_duplicate: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
+					 "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+					 mfspr(SPR_MAS0), mfspr(SPR_MAS1), mfspr(SPR_MAS2),
+					 mfspr(SPR_MAS3), mfspr(SPR_MAS7));
+			return 1;
+		}
+	}
+
+	return 0;
+
+}
+
 static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -510,63 +556,22 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			return 1;
 		}
 
-		if (cpu->client.tlbcache_enable) {
-			if ((mas0 & MAS0_TLBSEL1) &&
-			    unlikely(check_tlb1_conflict(epn, tsize, MAS1_GETTID(mas1),
-			                                 !!(mas1 & MAS1_TS)))) {
+		int ret = check_tlb0_duplicate(epn, mas0, mas1, pages);
+		if (ret) {
+			restore_mas(gcpu);
+			enable_int();
 
-				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-				         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
-				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-				         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-				         regs->srr0, mas0, mas1,
-			           mas2, mas3, mas7);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+			         regs->srr0, mas0, mas1, mas2, mas3, mas7);
 
-				return 1;
-			}
-		} else {
-			mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
-		                  ((mas1 >> MAS1_TS_SHIFT) & 1));
-			isync();
+			return 1;
 
-			for (unsigned long i = epn; i < epn + pages; i++) {
-				unsigned long sx_mas0;
-
-				mtspr(SPR_MAS2, i << PAGE_SHIFT);
-				asm volatile("isync; tlbsx 0, %0" : : "r" (i << PAGE_SHIFT) : "memory");
-				sx_mas0 = mfspr(SPR_MAS0);
-
-				if (likely(!(mfspr(SPR_MAS1) & MAS1_VALID)))
-					continue;
-
-				if (!(mas0 & MAS0_TLBSEL1)) {
-					assert(MAS0_GET_TLBSEL(sx_mas0) == 0);
-					if ((mas0 & MAS0_ESEL_MASK) == (sx_mas0 & MAS0_ESEL_MASK))
-						continue;
-				} else if (sx_mas0 & MAS0_TLBSEL1) {
-					continue;
-				}
-
-				restore_mas(gcpu);
-				enable_int();
-
-				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-				         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
-				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-				         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-				         regs->srr0, mas0, mas1, mas2, mas3, mas7);
-				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-				         "tlbwe@0x%lx: dup: mas0 = 0x%lx, mas1 = 0x%lx\n"
-				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-				         regs->srr0, mfspr(SPR_MAS0),
-				         mfspr(SPR_MAS1), mfspr(SPR_MAS2),
-				         mfspr(SPR_MAS3), mfspr(SPR_MAS7));
-
-				return 1;
-			}
 		}
+
 	}
 
 	if (mas0 & MAS0_TLBSEL1) {
