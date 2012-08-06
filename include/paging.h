@@ -135,7 +135,7 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
 #define INV_TLB0  MMUCSR_L2TLB0_FI
 #define INV_TLB1  MMUCSR_L2TLB1_FI
 
-void guest_inv_tlb(register_t ivax, int pid, int flags);
+void guest_inv_tlb(register_t ivax, int pid, int ind, int flags);
 
 int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
                    register_t mas3flags, unsigned long rpn, register_t mas8,
@@ -242,7 +242,7 @@ void fixup_tlb_sx_re(void);
 
 int guest_tlb_search_mas(uintptr_t va);
 
-int guest_tlb_search(uintptr_t va, int as, int pid, tlb_entry_t *mas);
+int guest_tlb_search(uintptr_t va, int as, int pid, int ind, tlb_entry_t *mas);
 
 void map_dev_range(struct guest *guest, phys_addr_t addr, phys_addr_t size);
 

@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (C) 2007-2011 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2012 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
                                 phys_addr_t pa, register_t tsize,
                                 register_t mas2flags, register_t mas3flags,
                                 unsigned int tid, unsigned int ts,
-                                register_t mas8)
+                                register_t mas8, unsigned int ind)
 {
 	register_t mas0, mas1, mas2, mas3, mas7, saved_mas8;
 	register_t saved;
@@ -57,7 +57,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 	mas7 = mfspr(SPR_MAS7);
 	saved_mas8 = mfspr(SPR_MAS8);
 
-	tlb1_set_entry(idx, va, pa, tsize, mas2flags, mas3flags, tid, ts, mas8);
+	tlb1_set_entry(idx, va, pa, tsize, mas2flags, mas3flags, tid, ts, mas8, ind);
 
 	mtspr(SPR_MAS0, mas0);
 	mtspr(SPR_MAS1, mas1);
@@ -490,7 +490,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		unsigned long grpn, rpn, baserpn, attr;
 		unsigned int entrypid = MAS1_GETTID(entry->mas1);
 		unsigned int tsize = MAS1_GETTSIZE(entry->mas1);
-		unsigned int mapsize, mappages, index;
+		unsigned int mapsize, mappages, index, tsize_rpn, offset = 0;
 
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE + 1,
 		         "checking %x/%lx/%lx for %lx/%d/%d\n",
@@ -507,20 +507,26 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		if (entryepn + tsize_to_pages(tsize) <= epn)
 			continue;
 
+		if (entry->mas1 & MAS1_IND)
+			offset = MAS3_GETSPSIZE(entry->mas3) + 7;
+
 		grpn = (entry->mas3 >> PAGE_SHIFT) | (entry->mas7 << (32 - PAGE_SHIFT));
-		grpn += epn - entryepn;
+
+		grpn += (epn - entryepn) >> offset;
+
 		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		if (unlikely(!(attr & PTE_VALID)))
 			return TLB_MISS_MCHECK;
 
-		tsize = min(tsize, attr >> PTE_SIZE_SHIFT);
-		baserpn = rpn & ~(tsize_to_pages(tsize) - 1);
+		tsize_rpn = tsize - offset;
 
-		mapsize = max_page_tsize(baserpn, tsize);
+		tsize_rpn = min(tsize_rpn, attr >> PTE_SIZE_SHIFT);
+		rpn = rpn & ~(tsize_to_pages_roundup(tsize_rpn) - 1);
+
+		mapsize = tsize_rpn + offset;
 		mappages = tsize_to_pages(mapsize);
 
-		rpn &= ~(mappages - 1);
 		epn &= ~(mappages - 1);
 
 		disable_int();
@@ -533,7 +539,8 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		               mapsize, entry->mas2,
 		               (entry->mas3 & ~MAS3_RPN)
 				& (attr & PTE_MAS3_MASK),
-		               pid, space, MAS8_GTS | gcpu->guest->lpid);
+		               pid, space, MAS8_GTS | gcpu->guest->lpid,
+		               (entry->mas1 >> MAS1_IND_SHIFT) & 1);
 
 		restore_mas(gcpu);
 		enable_int();
@@ -607,7 +614,13 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	gcpu_t *gcpu = get_gcpu();
 	unsigned int size = (mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT;
 	unsigned long size_pages = tsize_to_pages(size);
-	unsigned long end = epn + size_pages;
+	int offset = 0;
+	unsigned long end;
+
+	/* there is no restrictions for the page offset bit to be cleared by
+	 * the guest */
+	epn &= (~(size_pages - 1));
+	end = epn + size_pages;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 	         "gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %lx\n",
@@ -629,10 +642,14 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 	guest_t *guest = gcpu->guest;
 
-	while (epn < end) {
-		int size = max_page_size(epn, end - epn);
+	if (mas1 & MAS1_IND)
+		offset = MAS3_GETSPSIZE(mas3flags) + 7;
 
+	while (epn < end) {
 		unsigned long attr, rpn;
+		int size_epn = max_page_size(epn, end - epn);
+		int size_rpn = size_epn - offset;
+
 		rpn = vptbl_xlate(guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
 		/* If there's no valid mapping, try again at the next page. Note
@@ -647,7 +664,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		if (!(attr & PTE_VALID)) {
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 					 "invalid grpn %lx, epn %lx, skip %lx\n", grpn, epn, rpn);
-			epn = (epn | rpn) + 1;
+			epn = (epn | (((rpn + 1) << offset) - 1)) + 1;
 			grpn = (grpn | rpn) + 1;
 			continue;
 		}
@@ -657,7 +674,8 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		unsigned long mas8 = guest->lpid;
 		mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 
-		size = min(size, attr >> PTE_SIZE_SHIFT);
+		size_rpn = min(size_rpn, attr >> PTE_SIZE_SHIFT);
+		size_epn = size_rpn + offset;
 
 		int real_entry = alloc_tlb1(entry, 0);
 		if (real_entry < 0) {
@@ -672,16 +690,17 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		tlb1_set_entry_safe(real_entry, epn << PAGE_SHIFT,
 		                    ((phys_addr_t)rpn) << PAGE_SHIFT,
-		                    size, mas2flags, mas3flags,
+		                    size_epn, mas2flags, mas3flags,
 		                    (mas1 >> MAS1_TID_SHIFT) & 0xff,
-		                    (mas1 >> MAS1_TS_SHIFT) & 1, mas8);
+		                    (mas1 >> MAS1_TS_SHIFT) & 1, mas8,
+		                    (mas1 >> MAS1_IND_SHIFT) & 1);
 
-		epn += tsize_to_pages(size);
-		grpn += tsize_to_pages(size);
+		epn += tsize_to_pages(size_epn);
+		grpn += tsize_to_pages_roundup(size_rpn);
 	}
 }
 
-static void guest_inv_tlb1(register_t va, int pid,
+static void guest_inv_tlb1(register_t va, int pid, int ind,
                            int flags, int global)
 {
 	unsigned long bm_start = bench_start();
@@ -708,6 +727,11 @@ static void guest_inv_tlb1(register_t va, int pid,
 			    (tlbe->mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
 				continue;
 
+			if (ind >= 0 &&
+				(unsigned int)ind !=
+				(tlbe->mas1 & MAS1_IND) >> MAS1_IND_SHIFT)
+				continue;
+
 			free_tlb1(i);
 		}
 	}
@@ -715,7 +739,7 @@ static void guest_inv_tlb1(register_t va, int pid,
 	bench_stop(bm_start, bm_tlb1_inv);
 }
 
-void guest_inv_tlb(register_t ivax, int pid, int flags)
+void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 {
 	int global = ivax & TLBIVAX_INV_ALL;
 	register_t va = ivax & TLBIVAX_VA;
@@ -772,7 +796,7 @@ void guest_inv_tlb(register_t ivax, int pid, int flags)
 	}
 
 	if (flags & INV_TLB1)
-		guest_inv_tlb1(va, pid, flags, global);
+		guest_inv_tlb1(va, pid, ind, flags, global);
 }
 
 int guest_set_tlb0(register_t mas0, register_t mas1, register_t mas2,
@@ -797,7 +821,7 @@ void guest_reset_tlb(void)
 {
 	mtspr(SPR_MMUCSR0, MMUCSR_L2TLB0_FI);
 	isync();
-	guest_inv_tlb(TLBIVAX_INV_ALL, -1, INV_TLB0 | INV_TLB1 | INV_IPROT);
+	guest_inv_tlb(TLBIVAX_INV_ALL, -1, -1, INV_TLB0 | INV_TLB1 | INV_IPROT);
 	isync();
 }
 
@@ -807,6 +831,8 @@ void guest_reset_tlb(void)
  * @param[in] mas1 MAS1 value describing entry being added/searched for.
  * @param[in] epn Virtual page number describing the beginning of the
  * mapping to be added, or the page to be searched for.
+ * @param[in] check_ind If set to 1 MAS1[IND] is also checked for matching,
+ * if set to 0 MAS1[IND] is ignored.
  */
 int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 {
@@ -826,6 +852,8 @@ int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn)
 		if (entry == i)
 			continue;
 		if (!(other->mas1 & MAS1_VALID))
+			continue;
+		if ((mas1 & MAS1_IND) != (other->mas1 & MAS1_IND))
 			continue;
 		if ((mas1 & MAS1_TS) != (other->mas1 & MAS1_TS))
 			continue;
@@ -885,7 +913,8 @@ int guest_tlb_search_mas(uintptr_t va)
 	mas6 = mfspr(SPR_MAS6);
 	mas1 = (TLB_TSIZE_4K << MAS1_TSIZE_SHIFT) |
 		((mas6 & MAS6_SAS) << MAS1_TS_SHIFT) |
-		(mas6 & MAS6_SPID_MASK);
+		(mas6 & MAS6_SPID_MASK) |
+		(((mas6 & MAS6_SIND) >> MAS6_SIND_SHIFT) << MAS1_IND_SHIFT);
 
 	int tlb1 = guest_find_tlb1(-1, mas1, va >> PAGE_SHIFT);
 	if (tlb1 >= 0) {
@@ -925,14 +954,14 @@ int guest_tlb_search_mas(uintptr_t va)
  * registers are preserved.
  *
  */
-int guest_tlb_search(uintptr_t va, int as, int pid, tlb_entry_t *mas)
+int guest_tlb_search(uintptr_t va, int as, int pid, int ind, tlb_entry_t *mas)
 {
 	register_t saved;
 
 	saved = disable_critint_save();
 	save_mas(get_gcpu());
 
-	mtspr(SPR_MAS6, ((pid << MAS6_SPID_SHIFT) | as));
+	mtspr(SPR_MAS6, ((pid << MAS6_SPID_SHIFT) | as | (ind << MAS6_SIND_SHIFT)));
 	guest_tlb_search_mas(va);
 	if ((mfspr(SPR_MAS1) & MAS1_VALID)) {
 		mas->mas0 = mfspr(SPR_MAS0);
@@ -995,7 +1024,7 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 	tlb1_set_entry_safe(tlbe, start_page << PAGE_SHIFT,
 	                    ((phys_addr_t)start_phys) << PAGE_SHIFT,
 	                    me->tsize, me->mas2flags, me->mas3flags,
-	                    0, 0, TLB_MAS8_HV);
+	                    0, 0, TLB_MAS8_HV, 0);
 }
 
 /** Try to handle a TLB miss on a hypervisor mapping
@@ -1215,7 +1244,7 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
 	                    physaddr & ~((phys_addr_t)bytesize - 1),
 	                    tsize, TLB_MAS2_MEM, TLB_MAS3_KERN,
-	                    0, 0, TLB_MAS8_HV);
+	                    0, 0, TLB_MAS8_HV, 0);
 
 	return vpage + offset;
 }
@@ -1511,7 +1540,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 
 	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
 	                    paddr & ~((phys_addr_t)bytesize - 1),
-	                    tsize, mas2flags, mas3flags, 0, 0, TLB_MAS8_HV);
+	                    tsize, mas2flags, mas3flags, 0, 0, TLB_MAS8_HV, 0);
 
 	*len = min(bytesize - offset, *len);
 	return vpage + offset;

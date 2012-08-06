@@ -210,7 +210,7 @@ void tlbivax_ipi(trapframe_t *regs)
 	int tlb = (guest->tlbivax_addr & TLBIVAX_TLB1) ? INV_TLB1 : INV_TLB0;
 
 	save_mas(gcpu);
-	guest_inv_tlb(guest->tlbivax_addr, -1, tlb);
+	guest_inv_tlb(guest->tlbivax_addr, -1, -1, tlb);
 	restore_mas(gcpu);
 	
 	atomic_add(&guest->tlbivax_count, -1);
@@ -280,6 +280,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	unsigned long va = get_ea_indexed(regs, insn);
 	gcpu_t *gcpu = get_gcpu();
 	unsigned int pid;
+	unsigned int ind;
 	int type = (insn >> 21) & 3;
 	int ret = 0;
 
@@ -289,14 +290,15 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 	set_stat(bm_stat_tlbilx, regs);
 
 	pid = (gcpu->mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT;
+	ind = (gcpu->mas6 & MAS6_SIND) >> MAS6_SIND_SHIFT;
 
 	switch (type) {
 	case 0: /* Invalidate LPID */
-		guest_inv_tlb(TLBIVAX_INV_ALL, -1, INV_TLB0 | INV_TLB1);
+		guest_inv_tlb(TLBIVAX_INV_ALL, -1, -1, INV_TLB0 | INV_TLB1);
 		break;
 
 	case 1: /* Invalidate PID */
-		guest_inv_tlb(TLBIVAX_INV_ALL, pid, INV_TLB0 | INV_TLB1);
+		guest_inv_tlb(TLBIVAX_INV_ALL, pid, -1, INV_TLB0 | INV_TLB1);
 		break;
 
 	case 2: /* Invalid */
@@ -308,7 +310,7 @@ static int emu_tlbilx(trapframe_t *regs, uint32_t insn)
 		break;
 
 	case 3: /* Invalidate address */
-		guest_inv_tlb(va & TLBIVAX_VA, pid, INV_TLB0 | INV_TLB1);
+		guest_inv_tlb(va & TLBIVAX_VA, pid, ind, INV_TLB0 | INV_TLB1);
 		break;
 	}
 
@@ -504,17 +506,38 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 	 * adding a duplicate entry.
 	 */
 	if (mas1 & MAS1_VALID) {
-		unsigned long epn = mas2 >> PAGE_SHIFT;
+		unsigned long epn;
 		unsigned long pages;
 		int tlb1esel, tsize;
+		unsigned long pages_rpn;
 
 		if (mas0 & MAS0_TLBSEL1) {
 			tsize = MAS1_GETTSIZE(mas1);
 			pages = tsize_to_pages(tsize);
 			tlb1esel = MAS0_GET_TLB1ESEL(mas0);
+			pages_rpn = pages;
 
-			if (((mas2 >> PAGE_SHIFT) & (pages - 1)) ||
-			    ((mas3 >> PAGE_SHIFT) & (pages - 1))) {
+			if (mas1 & MAS1_IND) {
+				if (tsize < TLB_TSIZE_512K) {
+					restore_mas(gcpu);
+					enable_int();
+
+					printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				         "tlbwe@0x%lx: tsize too low for indirect entry:"
+				         "mas0 = 0x%lx, mas1 = 0x%lx,\n"
+				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+				         regs->srr0, mas0, mas1, mas2, mas3, mas7);
+
+					return 1;
+				}
+
+				/* in case of indirect entries, the size of the page table
+				 * is allowed to be less than 4K
+				 */
+				pages_rpn = tsize_to_pages_roundup(tsize - MAS3_GETSPSIZE(mas3) - 7);
+			}
+
+			if ((mas3 >> PAGE_SHIFT) & (pages_rpn - 1)) {
 				restore_mas(gcpu);
 				enable_int();
 
@@ -535,6 +558,11 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			tlb1esel = -1;
 		}
 
+		epn = (mas2 >> PAGE_SHIFT) & (~(pages - 1));
+
+		/*
+		 * Skip indirect entries for TLB 0 when checking for overlapping entries
+		 */
 		int dup = guest_find_tlb1(tlb1esel, mas1, epn);
 		if (dup >= 0) {
 			restore_mas(gcpu);
@@ -556,22 +584,23 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			return 1;
 		}
 
-		int ret = check_tlb0_duplicate(epn, mas0, mas1, pages);
-		if (ret) {
-			restore_mas(gcpu);
-			enable_int();
+		if (!(mas1 & MAS1_IND)) {
+			int ret = check_tlb0_duplicate(epn, mas0, mas1, pages);
+			if (ret) {
+				restore_mas(gcpu);
+				enable_int();
 
-			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
-			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
-			         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
-			         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
-			         regs->srr0, mas0, mas1, mas2, mas3, mas7);
+				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				         "tlbwe@0x%lx: duplicate TLB entry\n", regs->srr0);
+				printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				         "tlbwe@0x%lx: new: mas0 = 0x%lx, mas1 = 0x%lx,\n"
+				         "    mas2 = 0x%lx, mas3 = 0x%lx, mas7 = 0x%lx\n",
+				         regs->srr0, mas0, mas1, mas2, mas3, mas7);
 
-			return 1;
+				return 1;
 
+			}
 		}
-
 	}
 
 	if (mas0 & MAS0_TLBSEL1) {
