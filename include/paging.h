@@ -42,7 +42,7 @@
 #define PERM_TLB_START 55
 #define PERM_TLB_END 62
 
-#define PHYS_BITS 36
+#define PHYS_BITS 40
 #define VIRT_BITS 32
 
 #define PAGE_SIZE 4096U

@@ -1,7 +1,7 @@
 /*
  * Paging, including guest phys to real phys translation.
  *
- * Copyright (C) 2007-2010 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007-2010, 2012 Freescale Semiconductor, Inc.
  * Author: Scott Wood <scottwood@freescale.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -102,9 +102,12 @@ unsigned long vptbl_xlate(pte_t *tbl, unsigned long epn,
 
 	if (level == 0) {
 		assert(size < TLB_TSIZE_4M);
-	} else {
-		assert(level == 1);
+	} else if (level == 1) {
 		assert(size >= TLB_TSIZE_4M);
+		assert(size < TLB_TSIZE_4G);
+	} else {
+		assert(level == 2);
+		assert(size >= TLB_TSIZE_4G);
 	}
 
 	*attr = pte.attr;
@@ -146,7 +149,8 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 
 		assert(size > 0);
 		int largepage = size >= TLB_TSIZE_4M;
-		int incr = largepage ? PGDIR_SIZE - 1 : 0;
+		largepage += size >= TLB_TSIZE_4G;
+		int incr = (1 << (PGDIR_SHIFT * largepage)) - 1;
 
 		while (epn < sub_end) {
 			int level = levels - largepage;
@@ -154,7 +158,7 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 			                             epn >> (PGDIR_SHIFT * largepage),
 			                             1);
 
-			if (!largepage && level > 0) {
+			if (level > 0) {
 				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
 				         "vptbl_map: Tried to overwrite a large page with "
 				         "a small page at %llx\n",
@@ -179,6 +183,14 @@ void vptbl_map(pte_t *tbl, unsigned long epn, unsigned long rpn,
 				 * and that permissions of the large page are a
 				 * superset.
 				 */
+				if (largepage == 2) {
+					pte_t *next_ptep = (pte_t *)ptep->page;
+					for (int i = 0; i < PGDIR_SIZE; i++)
+						if ((next_ptep[i].attr & PTE_VALID) &&
+						   (!(next_ptep[i].attr & PTE_SIZE)))
+							free((void *)next_ptep[i].page);
+				}
+
 				free((void *)ptep->page);
 			}
 
