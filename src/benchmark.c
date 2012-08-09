@@ -51,6 +51,7 @@ const char *benchmark_names[num_benchmarks] = {
 	"tlbivax(tlb0)",
 	"tlbivax(all tlb1)",
 	"tlbivax(tlb1)",
+	"tlbivax",
 	"emulated inst - other",
 	/* hcalls start here */
 	"vmpic eoi",

@@ -50,6 +50,7 @@ typedef enum benchmark_num {
 	bm_stat_tlbivax_tlb0, /**< Overhead of tlbivax instructions for tlb0 */
 	bm_stat_tlbivax_tlb1_all, /**< Overhead of tlbivax all instructions for tlb1 */
 	bm_stat_tlbivax_tlb1, /**< Overhead of tlbivax instructions for tlb1 */
+	bm_stat_tlbivax, /**< Overhead of tlbivax instruction for MMU V2 */
 	bm_stat_emulated_other, /**< emulated instruction overhead -- other */
 	/* hcalls start here */
 	bm_stat_vmpic_eoi, /**< vmpic eoi hcall */

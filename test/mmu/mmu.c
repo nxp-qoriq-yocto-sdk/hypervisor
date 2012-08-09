@@ -578,8 +578,13 @@ static void inv_pid_test(const char *name, void (*inv)(int pid), int secondary)
 
 static void tlbivax_test(int secondary)
 {
-	inv_all_test("tlbivax.all", tlbivax_inv_all, secondary, 0);
-	inv_test("tlbivax.ea", tlbivax_inv, secondary, 0, 0);
+	int unified = 1;
+
+	if (!(mfspr(SPR_MMUCFG) & MMUCFG_MAVN)) {
+		inv_all_test("tlbivax.all", tlbivax_inv_all, secondary, 0);
+		unified = 0;
+	}
+	inv_test("tlbivax.ea", tlbivax_inv, secondary, unified, 0);
 }
 
 static void tlbilx_inv_all(int tlb_mask)

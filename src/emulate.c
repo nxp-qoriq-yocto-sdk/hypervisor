@@ -207,8 +207,22 @@ void tlbivax_ipi(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
-	int tlb = (guest->tlbivax_addr & TLBIVAX_TLB1) ? INV_TLB1 : INV_TLB0;
+	int tlb;
 	int ind = (guest->tlbivax_mas6 & MAS6_SIND) >> MAS6_SIND_SHIFT;
+
+	/* For MMU V1 some bits from the address have special meaning:
+	 * - EA[60] - selects the TLB array to which the invalidation is to occur
+	 * - EA[61] - if set, all TLB entries in the designated TLB array are
+	 *            invalidated.
+	 * For MMU V2, these bits are ignored and invalidations are applied to
+	 * all matching TLB entries in all TLB arrays
+	 */
+
+	if (mfspr(SPR_MMUCFG) & MMUCFG_MAVN) {
+		tlb = INV_TLB1 | INV_TLB0;
+		guest->tlbivax_addr &= ~TLBIVAX_INV_ALL;
+	} else
+		tlb = (guest->tlbivax_addr & TLBIVAX_TLB1) ? INV_TLB1 : INV_TLB0;
 
 	save_mas(gcpu);
 	guest_inv_tlb(guest->tlbivax_addr, -1, ind, tlb);
@@ -219,6 +233,9 @@ void tlbivax_ipi(trapframe_t *regs)
 
 static inline int get_tlb_ivax_stat(unsigned long va)
 {
+	if (mfspr(SPR_MMUCFG) & MMUCFG_MAVN)
+		return bm_stat_tlbivax;
+
 	if (va & TLBIVAX_TLB1) {
 		if (va & TLBIVAX_INV_ALL)
 			return bm_stat_tlbivax_tlb1_all;
