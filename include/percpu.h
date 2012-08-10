@@ -117,6 +117,7 @@ typedef struct guest {
 	phys_addr_t dtb_gphys;  /**< Guest physical addr of DTB image */
 	phys_addr_t dtb_window_len; /**< Length of guest DTB window */
 	register_t tlbivax_addr; /**< Used for tlbivax shootdown IPIs */
+	register_t tlbivax_mas6; /**< Used for tlbivax ipis */
 
 	/** Countdown to wait for all cores to invalidate */
 	register_t tlbivax_count;

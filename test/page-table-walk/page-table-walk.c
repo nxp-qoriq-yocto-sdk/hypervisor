@@ -256,9 +256,11 @@ static void tlbivax_inv_all(int tlb_mask)
 	spin_unlock(&tlbsync_lock);
 }
 
-static void tlbivax_inv(void *addr, int tlb_mask, int pid)
+static void tlbivax_inv(void *addr, int tlb_mask, int pid, int ind)
 {
 	register_t ea = ((register_t)addr) & ~4095;
+
+	mtspr(SPR_MAS6, ind << MAS6_SIND_SHIFT);
 
 	if (tlb_mask & 1)
 		asm volatile("tlbivax 0, %0" : :
@@ -678,7 +680,8 @@ static void test_pgtable_multiple_pmas(int secondary)
  * This function tests that TLB invalidations and TLB searches take
  * into account the indirect bit.
  */
-static void test_search_invalidate(void)
+static void test_search_invalidate(void (*inv)(void *addr,
+                                   int tlbmask, int pid, int ind))
 {
 	pte_t *pg_table;
 	phys_addr_t pgtbl_pa;
@@ -719,7 +722,7 @@ static void test_search_invalidate(void)
 	if (!(mfspr(SPR_MAS1) & MAS1_VALID) || !(mfspr(SPR_MAS1) & MAS1_IND))
 		fail = 1;
 
-	tlbilx_inv(vaddrs[va_offset], 0, 0, 0);
+	inv(vaddrs[va_offset], 2, 0, 0);
 
 	fault = 0;
 
@@ -731,7 +734,7 @@ static void test_search_invalidate(void)
 	/* test 2 */
 	create_mapping(1, tlb_entry, vaddrs[va_offset], pgtbl_pa, TLB_TSIZE_2M, 0, 0, 1);
 
-	tlbilx_inv(vaddrs[va_offset], 0, 0, 1);
+	inv(vaddrs[va_offset], 2, 0, 1);
 
 	fault = 1;
 
@@ -752,7 +755,7 @@ static void test_search_invalidate(void)
 	if (!(mfspr(SPR_MAS1) & MAS1_VALID))
 		fail = 1;
 
-	tlbilx_inv(vaddrs[va_offset], 0, 0, 1);
+	inv(vaddrs[va_offset], 2, 0, 1);
 
 	fault = 0;
 
@@ -764,7 +767,7 @@ static void test_search_invalidate(void)
 	/* test 4 */
 	create_mapping(1, tlb_entry, vaddrs[va_offset], pgtbl_pa, TLB_TSIZE_2M, 0, 0, 0);
 
-	tlbilx_inv(vaddrs[va_offset], 0, 0, 0);
+	inv(vaddrs[va_offset], 2, 0, 0);
 
 	fault = 1;
 
@@ -833,7 +836,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 		test_bad_mapping_pgtable();
 
-		test_search_invalidate();
+		test_search_invalidate(tlbilx_inv);
+		test_search_invalidate(tlbivax_inv);
 
 		secondary_startp = secondary_entry_A;
 		release_secondary_cores();

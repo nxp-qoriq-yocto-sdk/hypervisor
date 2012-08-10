@@ -780,7 +780,8 @@ void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 					mas1 = mfspr(SPR_MAS1);
 
 					if (mas1 & MAS1_VALID) {
-						mtspr(SPR_MAS6, mas1 & MAS1_TID_MASK);
+						mtspr(SPR_MAS6, (mas1 & MAS1_TID_MASK) |
+						      (ind << MAS6_SIND_SHIFT));
 						tlb_inv_addr(va);
 					}
 				}
@@ -790,6 +791,8 @@ void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 			} else {
 				assert((mfspr(SPR_MAS6) & MAS6_SPID_MASK) ==
 				       ((unsigned int)pid << MAS6_SPID_SHIFT));
+				assert((mfspr(SPR_MAS6) & MAS6_SIND) ==
+				       ((unsigned int)ind << MAS6_SIND_SHIFT));
 				tlb_inv_addr(va);
 			}
 		}

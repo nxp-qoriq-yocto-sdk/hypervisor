@@ -208,9 +208,10 @@ void tlbivax_ipi(trapframe_t *regs)
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
 	int tlb = (guest->tlbivax_addr & TLBIVAX_TLB1) ? INV_TLB1 : INV_TLB0;
+	int ind = (guest->tlbivax_mas6 & MAS6_SIND) >> MAS6_SIND_SHIFT;
 
 	save_mas(gcpu);
-	guest_inv_tlb(guest->tlbivax_addr, -1, -1, tlb);
+	guest_inv_tlb(guest->tlbivax_addr, -1, ind, tlb);
 	restore_mas(gcpu);
 	
 	atomic_add(&guest->tlbivax_count, -1);
@@ -254,6 +255,11 @@ static int emu_tlbivax(trapframe_t *regs, uint32_t insn)
 	 */
 	raw_spin_lock(&guest->sync_ipi_lock);
 	guest->tlbivax_addr = va;
+
+	/* for cores not supporting indirect entries, it is assumed
+	 * that MAS6[SIND] is read as 0
+	 */
+	guest->tlbivax_mas6 = mfspr(SPR_MAS6);
 	guest->tlbivax_count = 1;
 
 	/* We skip napping cores, as they won't respond to the event,
