@@ -745,7 +745,7 @@ void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 	register_t va = ivax & TLBIVAX_VA;
 
 	if (flags & INV_TLB0) {
-		if (cpu->client.tlbcache_enable) {
+		if (cpu->client.tlbcache_enable && (ind < 1)) {
 			if (global) {
 				if (pid < 0)
 					guest_inv_tlb0_all();
@@ -929,7 +929,7 @@ int guest_tlb_search_mas(uintptr_t va)
 
 		return 0;
 	}
-	if (cpu->client.tlbcache_enable) {
+	if (cpu->client.tlbcache_enable && !(mas6 & MAS6_SIND)) {
 		tlbctag_t tag = make_tag(va, (mas6 & MAS6_SPID_MASK) >> MAS6_SPID_SHIFT,
 					mas6 & MAS6_SAS);
 		tlbcset_t *set;
