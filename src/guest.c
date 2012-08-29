@@ -3334,9 +3334,12 @@ static void configure_tlb_mgt(guest_t *guest)
 	/* we have TLB cache on TLB 0 only if the TLB misses are directed
 	 * to the hypervisor and tlbwe instruction traps to the hypervisor.
 	 * In all the other cases there is no reason in maintaining the TLB 0
-	 * cache */
+	 * cache
+	 * Also for e6500 the TLB0 cache is disabled.
+	 */
 
-	if (!guest->direct_guest_tlb_miss && !guest->direct_guest_tlb_mgt)
+	if (!guest->direct_guest_tlb_miss && !guest->direct_guest_tlb_mgt &&
+		((mfspr(SPR_PVR) & 0xffff0000) < 0x80400000))
 		tlbcache_init();
 }
 

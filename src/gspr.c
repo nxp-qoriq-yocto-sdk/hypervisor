@@ -247,7 +247,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		 * They will be unmasked as they'll be implemented.
 		 */
 		if ((mfspr(SPR_MMUCFG) & MMUCFG_MAVN))
-			*val &= ~(TLBCFG_HES_MASK | TLBCFG_GTWE_MASK);
+			*val &= ~TLBCFG_GTWE_MASK;
 		break;
 
 	case SPR_TLB1CFG:
