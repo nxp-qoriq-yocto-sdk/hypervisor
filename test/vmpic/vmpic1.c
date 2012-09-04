@@ -161,7 +161,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 		addr |= *reg;
 		tlb1_set_entry(1, (unsigned long)addr, (phys_addr_t)addr,
 				TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN,
-				0, 0, 0);
+				0, 0, 0, 0);
 	}
 
 	ev_int_set_mask(*handle_p, 0);
