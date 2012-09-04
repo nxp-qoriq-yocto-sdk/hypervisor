@@ -1,7 +1,7 @@
 #!/bin/bash
 # Creates multiple xterm windows
 
-# Copyright (c) 2008 - 2010, Freescale Semiconductor, Inc.
+# Copyright (c) 2008 - 2010, 2012 Freescale Semiconductor, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,41 +33,38 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # TOP_DIR needs to point to the root folder (containing lwe) before calling this script
+#set -xv
 
-if [ "$#" -lt "2" -o "$#" -gt "6" ]
+if [ "$#" -lt "2" -o "$#" -gt "8" ]
 then
 	echo "$0: required arguments missing"
-	echo "Usage: xtel <start-port-id> <#byte-channel-sessions> [-p mux_server_port] [-i mux_server_host_ip_addr]"
+	echo "Usage: xtel <start-port-id> <#byte-channel-sessions> [-p mux_server_port] [-i mux_server_host_ip_addr][-e mux_server_exec_cmd]"
 	exit 1
 fi
 
 MUX_SERVER_PORT=9124
 HOST_IP_ADDRESS=localhost
 launch_mux_server=1
+MUX_SERVER_EXEC=""
 
-if [ $# -ge 3 ]
-then
-	case "$3" in
-		-p) MUX_SERVER_PORT=$4
+port=$1
+sessions=$2
+
+shift 2
+
+while getopts p:i:e: option
+do
+	case $option in
+		p) MUX_SERVER_PORT="$OPTARG"
 		;;
-		-i) HOST_IP_ADDRESS=$4
+		i) HOST_IP_ADDRESS="$OPTARG"
 		;;
-		*) echo "$0: unrecognized option $3"; exit 2
+		e) MUX_SERVER_EXEC="$OPTARG"
+		;;
+		?) echo "$0: unrecognized option"; exit 2
 		;;
 	esac
-fi
-
-if [ $# -ge 5 ]
-then
-	case "$5" in
-		-p) MUX_SERVER_PORT=$6
-		;;
-		-i) HOST_IP_ADDRESS=$6
-		;;
-		*) echo "$0: unrecognized option $5"; exit 3
-		;;
-	esac
-fi
+done
 
 if [ $HOST_IP_ADDRESS != "localhost" ]
 then
@@ -75,15 +72,20 @@ then
 fi
 
 # add a path to mux_server
-export PATH=$PATH:/opt/freescale/ltib/usr/bin
+export PATH=$PATH:./mux_server
 
 if [ $launch_mux_server -eq 1 ]
 then
-	mux_server $HOST_IP_ADDRESS:$MUX_SERVER_PORT $(($1 + 0)) $(($1 + 1)) $(($1 + 2)) $(($1 + 3)) $(($1 + 4)) $(($1 + 5)) $(($1 + 6)) $(($1 + 7)) $(($1 + 8)) $(($1 + 9)) $(($1 + 10)) $(($1 + 11)) $(($1 + 12)) $(($1 + 13)) $(($1 + 14)) $(($1 + 15)) $(($1 + 16)) $(($1 + 17)) $(($1 + 18)) $(($1 + 19))  $(($1 + 20)) $(($1 + 21)) $(($1 + 22)) $(($1 + 23)) $(($1 + 24)) $(($1 + 25)) $(($1 + 26)) $(($1 + 27)) $(($1 + 28)) $(($1 + 29)) $(($1 + 30)) $(($1 + 31)) &
+	if [ -z "$MUX_SERVER_EXEC" ]
+	then
+		mux_server $HOST_IP_ADDRESS:$MUX_SERVER_PORT $(($port + 0)) $(($port + 1)) $(($port + 2)) $(($port + 3)) $(($port + 4)) $(($port + 5)) $(($port + 6)) $(($port + 7)) $(($port + 8)) $(($port + 9)) $(($port + 10)) $(($port + 11)) $(($port + 12)) $(($port + 13)) $(($port + 14)) $(($port + 15)) $(($port + 16)) $(($port + 17)) $(($port + 18)) $(($port + 19))  $(($port + 20)) $(($port + 21)) $(($port + 22)) $(($port + 23)) $(($port + 24)) $(($port + 25)) $(($port + 26)) $(($port + 27)) $(($port + 28)) $(($port + 29)) $(($port + 30)) $(($port + 31)) &
+	else
+		mux_server -exec "$MUX_SERVER_EXEC" $(($port + 0)) $(($port + 1)) $(($port + 2)) $(($port + 3)) $(($port + 4)) $(($port + 5)) $(($port + 6)) $(($port + 7)) $(($port + 8)) $(($port + 9)) $(($port + 10)) $(($port + 11)) $(($port + 12)) $(($port + 13)) $(($port + 14)) $(($port + 15)) $(($port + 16)) $(($port + 17)) $(($port + 18)) $(($port + 19))  $(($port + 20)) $(($port + 21)) $(($port + 22)) $(($port + 23)) $(($port + 24)) $(($port + 25)) $(($port + 26)) $(($port + 27)) $(($port + 28)) $(($port + 29)) $(($port + 30)) $(($port + 31)) &
+	fi
 fi
 
-for ((i=0; i<$2; i+=1))
+for ((i=0; i<$sessions; i+=1))
 do
 	xterm  -sl 5000 -title console$(($i + 1)) \
-	-e socat -,raw,echo=0 tcp:$HOST_IP_ADDRESS:$(($1 + $i + 0))&
+	-e socat -,raw,echo=0 tcp:$HOST_IP_ADDRESS:$(($port + $i + 0))&
 done

@@ -26,6 +26,9 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/outoflaws/hv.dtb'
 GUEST_FILE[0] = 'bin/outoflaws/outoflaws.uImage'
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

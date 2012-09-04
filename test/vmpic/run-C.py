@@ -26,6 +26,9 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/vmpic/hv-C_t4240qds.dtb'
 GUEST_FILE[0] = 'bin/vmpic/vmpic1.uImage'
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

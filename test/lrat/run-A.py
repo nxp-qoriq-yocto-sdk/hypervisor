@@ -27,6 +27,9 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/lrat/hv-A.dtb'
 GUEST_FILE[0] = 'bin/lrat/lrat.uImage'
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

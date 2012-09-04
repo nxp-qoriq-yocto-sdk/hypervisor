@@ -30,7 +30,7 @@ export SIM := sim_T4240
 
 SIMICS_FLAGS += -e '$$target = $(TARGET)'
 T4SIM_FLAGS += -s sim.num_cores=4 -s sim.num_threads_per_core=1 \
-				-s sim.clock_dpa=false
+				-s sim.clock_dpa=false -t
 
 testdir := $(src)test/
 

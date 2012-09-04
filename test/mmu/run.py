@@ -27,6 +27,9 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/mmu/hv_t4240qds.dtb'
 GUEST_FILE[0] = 'bin/mmu/mmu.uImage'
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

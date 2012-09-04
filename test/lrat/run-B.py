@@ -27,6 +27,10 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/lrat/hv-B.dtb'
 GUEST_FILE[0] = 'bin/lrat/lrat.uImage'
 GUEST_FILE[1] = 'bin/mmu/mmu.uImage'
+TOTAL_PORTS = 3
+
+runfile('../../test/common/consoles.py')
+run_mux_server()
 
 runfile('../../test/common/post_common.py')
 bootprep()

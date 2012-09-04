@@ -31,6 +31,9 @@ GUEST_ADDR[0] = 0x20000
 GUEST_FILE[1] = IMAGES_PATH + 'rootfs.ext2.gz.u-boot'
 GUEST_ADDR[1] = 0x1300000
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

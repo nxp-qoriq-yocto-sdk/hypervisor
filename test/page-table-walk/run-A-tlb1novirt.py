@@ -27,6 +27,9 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/page-table-walk/hv-A-tlb1novirt.dtb'
 GUEST_FILE[0] = 'bin/page-table-walk/page-table-walk.uImage'
 
+runfile('../../test/common/consoles.py')
+run_mux_server()
+
 runfile('../../test/common/post_common.py')
 bootprep()
 hv_autoboot()

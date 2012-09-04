@@ -27,6 +27,10 @@ runfile('../../test/common/pre_common.py')
 HV_DTB     = 'bin/fast-doorbell/hv-B_t4240qds.dtb'
 GUEST_FILE[0] = 'bin/fast-doorbell/fast-doorbell.uImage'
 GUEST_FILE[1] = 'bin/fast-doorbell/fast-doorbell.uImage'
+TOTAL_PORTS = 3
+
+runfile('../../test/common/consoles.py')
+run_mux_server()
 
 runfile('../../test/common/post_common.py')
 bootprep()
