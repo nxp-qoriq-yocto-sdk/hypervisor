@@ -154,10 +154,6 @@ $(test)-run-hello: $(test) bin/$(test)/$(IMAGE_NAME_1)
 	setsid $(testdir)../tools/xtel.sh 9000 3
 	$(SIMICS) $(SIMICS_FLAGS) -e '$$ramdisk_filename = $(IMAGE_NAME_1)' $(testdir)linux/run-hello.simics
 
-$(test)-run-2p: $(test)
-	setsid $(testdir)../tools/xtel.sh 9000 3
-	$(SIMICS) $(SIMICS_FLAGS) $(testdir)linux/run-2p.simics
-
 $(test)-run-partman: $(test) bin/$(test)/$(IMAGE_NAME_2)
 	setsid $(testdir)../tools/xtel.sh 9000 4
 	$(SIMICS) $(SIMICS_FLAGS) -e '$$ramdisk_filename = $(IMAGE_NAME_2)' $(testdir)linux/run-partman.simics
@@ -167,6 +163,9 @@ $(test)-run-1p: $(test)
 
 $(test)-run-1core: $(test)
 	$(call run-sim,$(testdir)$</run-1core,2)
+
+$(test)-run-2p: $(test)
+	$(call run-sim,$(testdir)$</run-2p,3)
 
 $(test)-run-e1000: $(test)
 	setsid $(testdir)../tools/xtel.sh 9000 2
