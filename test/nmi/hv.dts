@@ -99,7 +99,7 @@
 	part1 {
 		compatible = "partition";
 		label = "nmi-test";
-		cpus = <0 5>;
+		cpus = <0 4>;
 		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
 		dtb-window = <0 0x01000000 0 0x10000>;
 

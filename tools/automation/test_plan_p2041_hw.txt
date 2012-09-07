@@ -65,7 +65,7 @@ mcheck,none,2,1,enabled
 mmu,none,2,1,enabled
 msgsnd,none,2,1,enabled
 nap,none,2,1,disabled
-nmi,none,2,1,disabled
+nmi,none,2,1,enabled
 node-update,none,2,1,enabled
 outoflaws,none,2,1,enabled
 perfmon,none,2,1,enabled

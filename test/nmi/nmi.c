@@ -33,9 +33,9 @@
 #include <libos/bitops.h>
 #include <libos/fsl-booke-tlb.h>
 
-#define CPUCNT 5
-static volatile int cpus_complete[CPUCNT];
-static volatile int cpus_ready[CPUCNT];
+#define MAX_CPUCNT 8
+static volatile int cpus_complete[MAX_CPUCNT];
+static volatile int cpus_ready[MAX_CPUCNT];
 
 void init(unsigned long devtree_ptr);
 
@@ -51,7 +51,7 @@ void mcheck_interrupt(trapframe_t *frameptr)
 		printf("Invalid Machine Check Interrupt, pir %d\n", pir);
 }
 
-void release_secondary_cores(void);
+int release_secondary_cores(void);
 extern void (*secondary_startp)(void);
 
 
@@ -67,27 +67,28 @@ void libos_client_entry(unsigned long devtree_ptr)
 	int ret;
 	int vcpu_mask;
 	int count = 100;
+	int cpucnt;
 
 	init(devtree_ptr);
 
 	printf("NMI test\n");
 
 	secondary_startp = secondary_entry;
-	release_secondary_cores();
+	cpucnt = release_secondary_cores();
 
 	/* wait for secondary cores to be ready */
 	while (1) {
 		int i;
-		for (i = 1; i < CPUCNT; i++) {
+		for (i = 1; i < cpucnt + 1; i++) {
 			if (!cpus_ready[i])
 				break;
 			barrier();
 		}
-		if (i == CPUCNT)
+		if (i == (cpucnt + 1))
 			break;
 	}
 
-	vcpu_mask = 0xf;
+	vcpu_mask = (1 << cpucnt) - 1;
 	ret = fh_send_nmi(vcpu_mask);
 
 	if (ret == EV_EINVAL) {
@@ -99,7 +100,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf(" > vcpu mask 0x%x\n", vcpu_mask);
 	if (!ret) {
 		while (count--) {
-			for (int i = 0; i < CPUCNT; i++) {
+			for (int i = 0; i < (cpucnt + 1); i++) {
 				if (vcpu_mask & (1 << i))
 					if (cpus_complete[i]) {
 						printf(" > NMI Test pir %d:  PASSED\n", i);
