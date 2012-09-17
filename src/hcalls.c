@@ -49,7 +49,11 @@ typedef void (*hcallfp_t)(trapframe_t *regs);
 #define GLOBAL_HANDLES 64
 #define GLOBAL_HANDLE_INDEX ((GLOBAL_HANDLES + LONG_BITS - 1) / LONG_BITS)
 
-static unsigned long global_handles[GLOBAL_HANDLE_INDEX];
+
+ /* A handle of 0 is considered invalid. This is to avoid,
+  * for example, assingning LPID 0 to one of the guests
+  */
+static unsigned long global_handles[GLOBAL_HANDLE_INDEX] = {1};
 static uint32_t global_handles_lock;
 
 int alloc_global_handle(void)

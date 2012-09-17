@@ -532,7 +532,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		               mapsize, entry->mas2,
 		               (entry->mas3 & ~MAS3_RPN)
 				& (attr & PTE_MAS3_MASK),
-		               pid, space, MAS8_GTS);
+		               pid, space, MAS8_GTS | gcpu->guest->lpid);
 
 		restore_mas(gcpu);
 		enable_int();
