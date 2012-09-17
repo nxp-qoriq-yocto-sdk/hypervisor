@@ -100,7 +100,7 @@ static void cache_lock_perf_test(void)
 		return;
 	}
 
-	tlb1_set_entry(1, (unsigned long)arr, (phys_addr_t)0x1600000, TLB_TSIZE_4K, 0, TLB_MAS3_KERN, 0, 0, 0);
+	tlb1_set_entry(1, (unsigned long)arr, (phys_addr_t)0x1600000, TLB_TSIZE_4K, 0, TLB_MAS3_KERN, 0, 0, 0, 0);
 
 	for (i = 0; i< 4096; i += 64) {
 		asm volatile("dcbtls %0, 0, %1" : : "i" (ct),"r" (&arr[i]): "memory");

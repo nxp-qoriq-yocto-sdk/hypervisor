@@ -90,7 +90,7 @@ static void check_dma1_node(int node)
 
 	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
 	               TLB_TSIZE_4K, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, 0);
+	               TLB_MAS3_KERN, 0, 0, 0, 0);
 	
 	in32(dma_virt);
 	printf("delete-property reg (access) --- %s\n",
