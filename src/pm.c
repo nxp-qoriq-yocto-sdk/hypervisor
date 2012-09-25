@@ -124,7 +124,7 @@ typedef struct nap_state {
 static void restore_caches(nap_state_t *ns)
 {
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	uint32_t tb = mfspr(SPR_TBL);
+	register_t tb = mfspr(SPR_TBL);
 
 	set_cache_reg(SPR_L2CSR0, ns->l2csr0);
 
@@ -311,7 +311,7 @@ void idle_loop(void)
 		cpu->client.nap_request = 1;
 
 		while (gcpu->napping && !gcpu->gevent_pending) {
-			uint32_t tb;
+			register_t tb;
 			setevent(cpu0.client.gcpu, EV_SYNC_NAP);
 
 			/* We can't use "wait", at least with doorbells
@@ -324,7 +324,7 @@ void idle_loop(void)
 
 			tb = mfspr(SPR_TBL);
 			while (mfspr(SPR_TBL) - tb < tb_freq) {
-				uint32_t tb2 = mfspr(SPR_TBL);
+				register_t tb2 = mfspr(SPR_TBL);
 				while (mfspr(SPR_TBL) - tb2 < tb_freq / 10000)
 					;
 

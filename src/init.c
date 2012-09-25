@@ -1273,7 +1273,7 @@ int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
 		inval |= L2CSR0_L2LFC;
 
 	if (l2csr0 & L2CSR0_L2E) {
-		uint32_t tb = mfspr(SPR_TBL);
+		register_t tb = mfspr(SPR_TBL);
 		int lock = L2CSR0_L2IO | L2CSR0_L2DO;
 
 		/* The lock bits need to be set, with a read-back

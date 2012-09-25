@@ -132,7 +132,7 @@ static int claim_int(claim_action_t *action, dev_owner_t *owner,
 	
 	/* Arbitrary 100ms timeout for active bit to deassert */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	uint32_t time;
+	register_t time;
 
 	/* NOTE: This sequence is designed around what the MPIC
 	 * expects.  It assumes that get_activity will return
