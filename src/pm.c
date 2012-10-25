@@ -118,55 +118,8 @@ void hcall_get_core_state(trapframe_t *regs)
 
 typedef struct nap_state {
 	uint32_t tcr;
-	uint32_t l1csr0, l1csr1, l1csr2, l2csr0;
+	core_cache_state_t state;
 } nap_state_t;
-
-static void restore_caches(nap_state_t *ns)
-{
-	uint32_t timeout = dt_get_timebase_freq() / 10;
-	register_t tb = mfspr(SPR_TBL);
-
-	set_cache_reg(SPR_L2CSR0, ns->l2csr0);
-
-	while (mfspr(SPR_L2CSR0) != ns->l2csr0) {
-		if (mfspr(SPR_TBL) - tb > timeout) {
-			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
-			         "%s: L2 cache enable timeout\n",
-			         __func__);
-			break;
-		}
-	}
-	
-	set_cache_reg(SPR_L1CSR0, ns->l1csr0);
-	set_cache_reg(SPR_L1CSR1, ns->l1csr1);
-	set_cache_reg(SPR_L1CSR2, ns->l1csr2);
-}
-
-/* No snooping during nap, so flush core caches, and stop allocation */
-static int flush_disable_caches(nap_state_t *ns)
-{
-	/* Arbitrary 100ms timeout for cache to flush */
-	uint32_t timeout = dt_get_timebase_freq() / 10;
-	int ret;
-
-	ns->l1csr0 = mfspr(SPR_L1CSR0);
-	ns->l1csr1 = mfspr(SPR_L1CSR1);
-	ns->l1csr2 = mfspr(SPR_L1CSR2);
-
-	ret = flush_disable_l2_cache(timeout, 0, &ns->l2csr0);
-	if (ret < 0)
-		return ret;
-
-	if (flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
-	                           timeout) < 0) {
-		restore_caches(ns);
-		printlog(LOGTYPE_PM, LOGLEVEL_ERROR,
-		         "%s: L1 cache invalidate timeout\n", __func__);
-		return ERR_HARDWARE;
-	}
-
-	return 0;
-}
 
 /* Runs only on the boot core (which cannot nap).  Checks every
  * gcpu, and puts to sleep any that need it.  Allowing cores to
@@ -299,7 +252,7 @@ void idle_loop(void)
 		 */
 		mtspr(SPR_TSR, TSR_WIS);
 
-		if (flush_disable_caches(&ns))
+		if (flush_disable_core_caches(&ns.state))
 			goto out_timers;
 
 		/* To avoid races with multiple nap transitions, we can't let
@@ -335,7 +288,7 @@ void idle_loop(void)
 
 		cpu->client.nap_request = 0;
 
-		restore_caches(&ns);
+		restore_core_caches(&ns.state);
 
 		/* Restore decrementer, FIT, and watchdog. */
 		mtspr(SPR_TCR, ns.tcr);

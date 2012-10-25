@@ -52,6 +52,13 @@ typedef struct pamu_hv_mem {
 } pamu_hv_mem_t;
 #endif
 
+typedef struct local_cache_state {
+	uint32_t l1csr0;
+	uint32_t l1csr1;
+	uint32_t l1csr2;
+	uint32_t l2csr0;
+} core_cache_state_t;
+
 struct guest;
 struct queue;
 struct gcpu;
@@ -113,7 +120,6 @@ static void wake_hcall_nap(struct gcpu *gcpu)
 #endif
 
 int flush_disable_l1_cache(void *disp_addr, uint32_t timeout);
-int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0);
 int check_perfmon(trapframe_t *regs);
 void gcov_config(struct dt_node *hvconfig);
 
@@ -126,7 +132,10 @@ extern char *displacement_flush_area[MAX_CORES];
 	isync(); \
 } while (0)
 
-void flush_caches(void);
+int flush_core_caches(void);
+int flush_disable_core_caches(core_cache_state_t *state);
+int restore_core_caches(const core_cache_state_t *state);
+
 void panic_flush(void) __attribute__((noreturn));
 void panic(const char *fmt, ...) __attribute__((noreturn));
 

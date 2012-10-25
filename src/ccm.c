@@ -408,7 +408,7 @@ warmreboot_fail:
 	memset(pamu_mem_header, 0, pamu_mem_size);
 	pamu_mem_header->magic = HV_MEM_MAGIC;
 	pamu_mem_header->version = 0;
-	flush_caches();
+	flush_core_caches();
 
 	return 0;
 #endif

@@ -1250,7 +1250,7 @@ static void core_init(void)
  *    The old L2CSR0 is stored here, even if the operation fails.
  * @return negative on error
  */
-int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
+static int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
 {
 	uint32_t l2csr0 = mfspr(SPR_L2CSR0);
 	int inval = L2CSR0_L2FI;
@@ -1310,28 +1310,63 @@ int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2csr0)
 
 /** Flush core L1 and L2 caches, leaving them enabled.
  */
-void flush_caches(void)
+int flush_core_caches(void)
+{
+	core_cache_state_t state;
+	int ret;
+
+	ret = flush_disable_core_caches(&state);
+	restore_core_caches(&state);
+
+	return ret;
+}
+
+/** Flush core L1 and L2 caches, leaving them disabled.
+ */
+int flush_disable_core_caches(core_cache_state_t *state)
 {
 	/* Arbitrary 100ms timeout for cache to flush */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	uint32_t l2csr0, l1csr0, l1csr1, l1csr2;
 	int ret;
 
-	flush_disable_l2_cache(timeout, 1, &l2csr0);
+	flush_disable_l2_cache(timeout, 1, &state->l2csr0);
 
-	l1csr0 = mfspr(SPR_L1CSR0);
-	l1csr1 = mfspr(SPR_L1CSR1);
-	l1csr2 = mfspr(SPR_L1CSR2);
+	state->l1csr0 = mfspr(SPR_L1CSR0);
+	state->l1csr1 = mfspr(SPR_L1CSR1);
+	state->l1csr2 = mfspr(SPR_L1CSR2);
 
 	ret = flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
 	                             timeout);
 
-	set_cache_reg(SPR_L1CSR0, l1csr0);
-	set_cache_reg(SPR_L1CSR1, l1csr1);
-	set_cache_reg(SPR_L1CSR2, l1csr2);
-	set_cache_reg(SPR_L2CSR0, l2csr0);
-
 	if (ret < 0)
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 		         "%s: L1 cache invalidate timeout\n", __func__);
+
+	return ret;
+}
+
+/** Restore core L1 and L2 caches to a specified state
+ */
+int restore_core_caches(const core_cache_state_t *state)
+{
+	uint32_t timeout = dt_get_timebase_freq() / 10;
+	register_t tb = mfspr(SPR_TBL);
+	int ret = 0;
+
+	set_cache_reg(SPR_L2CSR0, state->l2csr0);
+
+	while (mfspr(SPR_L2CSR0) != state->l2csr0) {
+		if (mfspr(SPR_TBL) - tb > timeout) {
+			printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+			         "%s: L2 cache enable timeout\n",
+			         __func__);
+			ret = ERR_HARDWARE;;
+		}
+	}
+
+	set_cache_reg(SPR_L1CSR0, state->l1csr0);
+	set_cache_reg(SPR_L1CSR1, state->l1csr1);
+	set_cache_reg(SPR_L1CSR2, state->l1csr2);
+
+	return ret;
 }

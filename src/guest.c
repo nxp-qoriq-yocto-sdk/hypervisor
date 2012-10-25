@@ -2239,7 +2239,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 	/* The guest can get its caches into an unpleasant state
 	 * with noncoherent mappings.  Clean things up for the next guest.
 	 */
-	flush_caches();
+	flush_core_caches();
 
 	enable_int();
 
