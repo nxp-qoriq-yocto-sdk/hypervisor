@@ -1160,6 +1160,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 		printlog(LOGTYPE_MP, LOGLEVEL_NORMAL,
 		         "%s: Ignoring core %d, max cores %d\n",
 		         __func__, reg, MAX_CORES);
+		return 0;
 	}
 
 	prop = dt_get_prop(node, "cpu-release-addr", 0);
