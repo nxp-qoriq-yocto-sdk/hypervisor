@@ -82,9 +82,6 @@ typedef struct {
 	 * the tlb misses are directed to the Hypervisor */
 	int tlb1_virt;
 
-	/** HV dynamic TLB round-robin eviction pointer */
-	int next_dyn_tlbe;
-
 	uint64_t previous_tb; // The previous value of tb
 
 	/** When set, sync_nap() will put the core into nap state.  When
@@ -100,6 +97,8 @@ typedef struct {
 
 	/* link to primary thread's cpu_t or NULL if this is the primary thread */
 	struct cpu *primary;
+	/* points to the shared cpu data */
+	struct shared_cpu *shared;
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */

@@ -253,7 +253,6 @@ typedef struct gcpu {
 	guest_t *guest;
 	cpu_t *cpu;
 	thread_t thread;
-	tlbmap_t tlb1_inuse;
 	tlbmap_t tlb1_map[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
 	unsigned long dbell_pending;
@@ -280,7 +279,7 @@ typedef struct gcpu {
 	uint32_t gtcr;  // virtualized guest TCR
 	// gtsr should be a u32, but atomic_or() takes an unsigned long
 	unsigned long gtsr;  // virtualized guest TSR
-	int evict_tlb1, clean_tlb, clean_tlb_pid;
+	int clean_tlb, clean_tlb_pid;
 
 /*** gcpu is napping on explicit request */
 #define GCPU_NAPPING_HCALL 1
@@ -292,6 +291,45 @@ typedef struct gcpu {
 	struct benchmark benchmarks[num_benchmarks];
 #endif
 } gcpu_t;
+
+typedef struct shared_cpu {
+	/** HV dynamic TLB round-robin eviction pointer */
+	int next_dyn_tlbe;
+
+	/** Spinlock used to synchronize TLB1 operations done on hw threads */
+	uint32_t tlblock;
+
+	tlbmap_t tlb1_inuse;
+
+	int evict_tlb1;
+} shared_cpu_t;
+
+#define get_shared_cpu() (cpu->client.shared)
+
+#if CONFIG_LIBOS_MAX_HW_THREADS > 1
+
+static inline register_t tlb_lock(void)
+{
+	return spin_lock_intsave(&get_shared_cpu()->tlblock);
+}
+
+static inline void tlb_unlock(register_t saved)
+{
+	spin_unlock_intsave(&get_shared_cpu()->tlblock, saved);
+}
+
+#else
+
+static inline register_t tlb_lock(void)
+{
+	return 0;
+}
+
+static inline void tlb_unlock(register_t saved)
+{
+}
+
+#endif
 
 #define get_gcpu() (cpu->client.gcpu)
 

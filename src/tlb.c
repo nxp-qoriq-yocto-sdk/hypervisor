@@ -76,7 +76,10 @@ static void free_tlb1(unsigned int entry)
 	gcpu_t *gcpu = get_gcpu();
 	int i = 0;
 	int idx = 0;
+	shared_cpu_t *shared_cpu = get_shared_cpu();
+	register_t saved;
 
+	saved = tlb_lock();
 	do {
 		while (gcpu->tlb1_map[entry][i]) {
 			int bit = count_lsb_zeroes(gcpu->tlb1_map[entry][i]);
@@ -90,12 +93,13 @@ static void free_tlb1(unsigned int entry)
 			tlb1_write_entry(idx + bit);
 
 			gcpu->tlb1_map[entry][i] &= ~(1UL << bit);
-			gcpu->tlb1_inuse[i] &= ~(1UL << bit);
+			shared_cpu->tlb1_inuse[i] &= ~(1UL << bit);
 		}
 
 		i++;
 		idx += LONG_BITS;
 	} while (idx < TLB1_SIZE);
+	tlb_unlock(saved);
 
 	gcpu->gtlb1[entry].mas1 &= ~MAS1_VALID;
 }
@@ -105,19 +109,24 @@ static int alloc_tlb1(unsigned int entry, int evict)
 	gcpu_t *gcpu = get_gcpu();
 	int idx = 0;
 	int i = 0;
+	shared_cpu_t *shared_cpu = get_shared_cpu();
+	register_t saved;
 
+	saved = tlb_lock();
 	do {
-		while (~gcpu->tlb1_inuse[i]) {
-			int bit = count_lsb_zeroes(~gcpu->tlb1_inuse[i]);
+		while (~shared_cpu->tlb1_inuse[i]) {
+			int bit = count_lsb_zeroes(~shared_cpu->tlb1_inuse[i]);
 
 			if (idx + bit > GUEST_TLB_END)
 				goto none_avail;
 
-			gcpu->tlb1_inuse[i] |= 1UL << bit;
+			shared_cpu->tlb1_inuse[i] |= 1UL << bit;
 			gcpu->tlb1_map[entry][i] |= 1UL << bit;
 
+			tlb_unlock(saved);
+
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-			         "tlb1_inuse[%d] now %lx\n", i, gcpu->tlb1_inuse[i]);
+			         "tlb1_inuse[%d] now %lx\n", i, shared_cpu->tlb1_inuse[i]);
 			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 			         "using tlb1[%d] for gtlb1[%d]\n", idx + bit, entry);
 
@@ -130,15 +139,17 @@ static int alloc_tlb1(unsigned int entry, int evict)
 
 none_avail:
 	if (evict) {
-		i = gcpu->evict_tlb1++;
+		i = shared_cpu->evict_tlb1++;
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 		         "alloc_tlb1: evicting entry %d\n", i);
 
-		if (gcpu->evict_tlb1 > GUEST_TLB_END)
-			gcpu->evict_tlb1 = 0;
+		if (shared_cpu->evict_tlb1 > GUEST_TLB_END)
+			shared_cpu->evict_tlb1 = 0;
 
+		tlb_unlock(saved);
 		return i;
 	}
+	tlb_unlock(saved);
 
 	return -1;
 }
@@ -977,15 +988,22 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 {
 	unsigned long start_page = me->start_page;
 	unsigned long start_phys;
+	register_t saved;
+	shared_cpu_t *shared_cpu = get_shared_cpu();
 
 	int tlbe = me->pinned_tlbe;
 
 	if (likely(!tlbe)) {
-		start_phys = (gaddr >> PAGE_SHIFT) + me->phys_offset;
-		tlbe = cpu->client.next_dyn_tlbe++;
+		register_t saved;
 
-		if (cpu->client.next_dyn_tlbe > DYN_TLB_END)
-			cpu->client.next_dyn_tlbe = DYN_TLB_START;
+		start_phys = (gaddr >> PAGE_SHIFT) + me->phys_offset;
+
+		saved = tlb_lock();
+		tlbe = shared_cpu->next_dyn_tlbe++;
+
+		if (shared_cpu->next_dyn_tlbe > DYN_TLB_END)
+			shared_cpu->next_dyn_tlbe = DYN_TLB_START;
+		tlb_unlock(saved);
 
 		unsigned long page_mask = ~(tsize_to_pages(me->tsize) - 1);
 		start_phys &= page_mask;
@@ -1032,8 +1050,11 @@ int handle_hv_tlb_miss(trapframe_t *regs, uintptr_t vaddr)
 void secondary_map_mem(void)
 {
 	unsigned long saved = spin_lock_intsave(&map_lock);
+	register_t tlb_saved;
 
-	cpu->client.next_dyn_tlbe = DYN_TLB_START;
+	tlb_saved = tlb_lock();
+	get_shared_cpu()->next_dyn_tlbe = DYN_TLB_START;
+	tlb_unlock(tlb_saved);
 
 	/* Insert pre-existing pinned mappings */
 	list_for_each(&maps, i) {

@@ -78,11 +78,13 @@ cpu_t cpu0 = {
 
 cpu_t secondary_cpus[CONFIG_LIBOS_MAX_CPUS - 1];
 static uint8_t secondary_stacks[CONFIG_LIBOS_MAX_CPUS - 1][KSTACK_SIZE];
+shared_cpu_t shared_cpus[CONFIG_LIBOS_MAX_CPUS / CONFIG_LIBOS_MAX_HW_THREADS];
 
 static void core_init(void);
 static void release_secondary_cores(void);
 static void release_secondary_threads(void);
 static void partition_init(void);
+static void shared_cpu_init(shared_cpu_t *shared);
 
 #define UART_OFFSET		0x11c500
 #define COMMAND_LINE_SIZE	64
@@ -1022,7 +1024,8 @@ void libos_client_entry(unsigned long treephys)
 		 "Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 #endif
 
-	cpu->client.next_dyn_tlbe = DYN_TLB_START;
+	cpu->client.shared = &shared_cpus[0];
+	shared_cpu_init(cpu->client.shared);
 
 	valloc_init(VMAPBASE, BIGPHYSBASE);
 	for (i = 0; i < CONFIG_LIBOS_MAX_HW_THREADS; i++) {
@@ -1216,8 +1219,10 @@ static int release_secondary(dt_node_t *node, void *arg)
 	newcpu->kstack = secondary_stacks[reg - 1] + KSTACK_SIZE - FRAMELEN;
 	newcpu->client.gcpu = &noguest[reg];
 	newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
+	newcpu->client.shared = &shared_cpus[reg / CONFIG_LIBOS_MAX_HW_THREADS];
 	newcpu->coreid = reg;
 
+	shared_cpu_init(newcpu->client.shared);
 	sched_core_init(newcpu);
 
 	/* Terminate the callback chain. */
@@ -1264,6 +1269,7 @@ static void release_secondary_threads(void)
 		newcpu->kstack = secondary_stacks[reg[i] - 1] + KSTACK_SIZE - FRAMELEN;
 
 		newcpu->client.primary = cpu;
+		newcpu->client.shared = cpu->client.shared;
 		newcpu->client.gcpu = &noguest[reg[i]];
 		newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
 		newcpu->coreid = reg[i];
@@ -1314,6 +1320,11 @@ static void core_init(void)
 
 	mtspr(SPR_HID0, HID0_EMCP | HID0_DPM | HID0_ENMAS7);
 
+}
+
+static void shared_cpu_init(shared_cpu_t *shared)
+{
+	shared->next_dyn_tlbe = DYN_TLB_START;
 }
 
 /** Flush and disable core L2 cache
