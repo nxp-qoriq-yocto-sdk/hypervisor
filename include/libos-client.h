@@ -89,9 +89,6 @@ typedef struct {
 	 */
 	int nap_request;
 
-	/* lrat entries are allocated in a round robin fashion */
-	int lrat_next_entry;
-
 	/* the supported number of lrat entries */
 	int lrat_nentries;
 

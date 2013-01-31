@@ -302,6 +302,9 @@ typedef struct shared_cpu {
 	tlbmap_t tlb1_inuse;
 
 	int evict_tlb1;
+
+	/* lrat entries are allocated in a round robin fashion */
+	int lrat_next_entry;
 } shared_cpu_t;
 
 #define get_shared_cpu() (cpu->client.shared)

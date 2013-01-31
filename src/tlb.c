@@ -1788,6 +1788,7 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 void inv_lrat(gcpu_t *gcpu)
 {
 	unsigned long mas0, mas1 = 0;
+	register_t saved;
 
 	save_mas(gcpu);
 
@@ -1795,6 +1796,7 @@ void inv_lrat(gcpu_t *gcpu)
 	 * with MAS1[V] = 0
 	 */
 
+	saved = tlb_lock();
 	for (int i = 0; i < cpu->client.lrat_nentries; i++) {
 		/* read the entry */
 		mas0 = MAS0_LRATSEL | MAS0_ESEL(i);
@@ -1808,7 +1810,8 @@ void inv_lrat(gcpu_t *gcpu)
 
 	}
 
-	cpu->client.lrat_next_entry = 0;
+	get_shared_cpu()->lrat_next_entry = 0;
+	tlb_unlock(saved);
 
 	restore_mas(gcpu);
 }
@@ -1817,6 +1820,7 @@ void lrat_miss(trapframe_t *regs)
 {
 	gcpu_t *gcpu = get_gcpu();
 	guest_t *guest = gcpu->guest;
+	register_t saved;
 	unsigned long grpn = 0;
 	unsigned long attr;
 	unsigned long rpn;
@@ -1905,7 +1909,11 @@ void lrat_miss(trapframe_t *regs)
 	grpn &= ~(size_pages - 1);
 	rpn &= ~(size_pages - 1);
 
-	mas0 = MAS0_LRATSEL | MAS0_ESEL(cpu->client.lrat_next_entry);
+	saved = tlb_lock();
+
+	shared_cpu_t *shared_cpu = get_shared_cpu();
+
+	mas0 = MAS0_LRATSEL | MAS0_ESEL(shared_cpu->lrat_next_entry);
 	mas1 = MAS1_VALID;
 	mas1 |= tsize << MAS1_TSIZE_SHIFT;
 	mas2 = grpn << PAGE_SHIFT;
@@ -1925,12 +1933,15 @@ void lrat_miss(trapframe_t *regs)
 	mtspr(SPR_MAS8, mas8);
 	asm volatile("isync; tlbwe" : : : "memory");
 
-	cpu->client.lrat_next_entry++;
-	if (cpu->client.lrat_next_entry == cpu->client.lrat_nentries)
-		cpu->client.lrat_next_entry = 0;
+	shared_cpu->lrat_next_entry++;
+	if (shared_cpu->lrat_next_entry == cpu->client.lrat_nentries)
+		shared_cpu->lrat_next_entry = 0;
 
 	mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
 	restore_mas(gcpu);
+
+	tlb_unlock(saved);
+
 	enable_int();
 
 }
