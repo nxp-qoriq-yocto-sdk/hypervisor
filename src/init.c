@@ -89,7 +89,7 @@ static void partition_init(void);
 
 dt_node_t *hw_devtree, *config_tree, *virtual_tree;
 uint32_t hw_devtree_lock;
-void *temp_mapping[2];
+void *temp_mapping[2 * CONFIG_LIBOS_MAX_HW_THREADS];
 extern char _end, _start;
 uint64_t text_phys, bigmap_phys;
 
@@ -249,9 +249,9 @@ static void *map_fdt(phys_addr_t treephys)
 	void *vaddr;
 
 	/* Map guarded, as we don't know where the end of memory is yet. */
-	vaddr = map_phys(TEMPTLB1, mapaddr, temp_mapping[0], &len,
+	vaddr = map_phys(TEMPTLB1, mapaddr, TEMP_MAPPING1, &len,
 	                 TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G, TLB_MAS3_KDATA);
-	map_phys(TEMPTLB2, mapaddr + mapsize, temp_mapping[0] + mapsize,
+	map_phys(TEMPTLB2, mapaddr + mapsize, TEMP_MAPPING1 + mapsize,
 	         &len, TLB_TSIZE_4M, TLB_MAS2_MEM | MAS2_G, TLB_MAS3_KDATA);
 
 	vaddr += treephys & (mapsize - 1);
@@ -271,7 +271,7 @@ static void *map_fdt(phys_addr_t treephys)
 
 static void unmap_fdt(void)
 {
-	/* We need to unmap the FDT, since we use temp_mapping[0] in
+	/* We need to unmap the FDT, since we use TEMP_MAPPING1 in
 	 * TEMPTLB2, which could otherwise cause a duplicate TLB entry.
 	 */
 	tlb1_clear_entry(TEMPTLB1);
@@ -971,7 +971,7 @@ guess:
 	/* It's worth a shot... */
 	phys = 0xffe11c500ULL;
 gotphys:
-	addr = map_phys(TEMPTLB1, phys, temp_mapping[0], &mapsize,
+	addr = map_phys(TEMPTLB1, phys, TEMP_MAPPING1, &mapsize,
 	                TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KDATA);
 
 	int ch;
@@ -1005,7 +1005,7 @@ void libos_client_entry(unsigned long treephys)
 	phys_addr_t cfg_addr = 0;
 	size_t ccsr_size;
 	void *fdt;
-	int ret;
+	int ret, i;
 
 	devtree_ptr = treephys;
 
@@ -1025,8 +1025,10 @@ void libos_client_entry(unsigned long treephys)
 	cpu->client.next_dyn_tlbe = DYN_TLB_START;
 
 	valloc_init(VMAPBASE, BIGPHYSBASE);
-	temp_mapping[0] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
-	temp_mapping[1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	for (i = 0; i < CONFIG_LIBOS_MAX_HW_THREADS; i++) {
+		temp_mapping[i * 2] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+		temp_mapping[i * 2 + 1] = valloc(16 * 1024 * 1024, 16 * 1024 * 1024);
+	}
 
 	config_addr_param.ctx = &cfg_addr;
 	ret = parse_bootargs();
@@ -1196,7 +1198,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 	         "starting cpu %u, table %llx\n", reg, (unsigned long long)table);
 
 	size_t len = sizeof(struct boot_spin_table);
-	void *table_va = map_phys(TEMPTLB1, table, temp_mapping[0],
+	void *table_va = map_phys(TEMPTLB1, table, TEMP_MAPPING1,
 	                          &len, TLB_TSIZE_16M, TLB_MAS2_MEM,
 	                          TLB_MAS3_KDATA);
 

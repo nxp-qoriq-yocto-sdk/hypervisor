@@ -1240,7 +1240,7 @@ size_t copy_to_gphys(pte_t *tbl, phys_addr_t dest, void *src, size_t len,
 		size_t chunk;
 		void *vdest;
 
-		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
+		vdest = map_gphys(TEMPTLB1, tbl, dest, TEMP_MAPPING1,
 		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 		if (!vdest)
 			break;
@@ -1278,7 +1278,7 @@ size_t zero_to_gphys(pte_t *tbl, phys_addr_t dest, size_t len, int cache_sync)
 		size_t chunk;
 		void *vdest;
 
-		vdest = map_gphys(TEMPTLB1, tbl, dest, temp_mapping[0],
+		vdest = map_gphys(TEMPTLB1, tbl, dest, TEMP_MAPPING1,
 		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 		if (!vdest)
 			break;
@@ -1316,7 +1316,7 @@ size_t copy_from_gphys(pte_t *tbl, void *dest, phys_addr_t src, size_t len)
 		size_t chunk;
 		void *vsrc;
 
-		vsrc = map_gphys(TEMPTLB1, tbl, src, temp_mapping[0],
+		vsrc = map_gphys(TEMPTLB1, tbl, src, TEMP_MAPPING1,
 		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 		if (!vsrc)
 			break;
@@ -1354,14 +1354,14 @@ size_t copy_between_gphys(pte_t *dtbl, phys_addr_t dest,
 
 	while (len > 0) {
 		if (!schunk) {
-			vsrc = map_gphys(TEMPTLB1, stbl, src, temp_mapping[0],
+			vsrc = map_gphys(TEMPTLB1, stbl, src, TEMP_MAPPING1,
 			                 &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 			if (!vsrc)
 				break;
 		}
 
 		if (!dchunk) {
-			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
+			vdest = map_gphys(TEMPTLB2, dtbl, dest, TEMP_MAPPING2,
 			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest)
 				break;
@@ -1425,7 +1425,7 @@ static ssize_t guest_strnlen(pte_t *tbl, phys_addr_t gaddr, ssize_t maxlen)
 		char *vaddr;
 		char *end;
 
-		vaddr = map_gphys(TEMPTLB1, tbl, gaddr, temp_mapping[0],
+		vaddr = map_gphys(TEMPTLB1, tbl, gaddr, TEMP_MAPPING1,
 		                  &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 0);
 		if (!vaddr)
 			return -EV_EFAULT;
@@ -1534,7 +1534,7 @@ size_t copy_from_phys(void *dest, phys_addr_t src, size_t len)
 		size_t chunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
 		void *vsrc;
 
-		vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+		vsrc = map_phys(TEMPTLB1, src, TEMP_MAPPING1,
 		                &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
 		                TLB_MAS3_KERN);
 		if (!vsrc)
@@ -1571,7 +1571,7 @@ phys_addr_t zero_to_phys(phys_addr_t dest, phys_addr_t len)
 		if (chunk > PAGE_SIZE)
 			chunk = 1UL << ilog2(chunk);
 
-		vdest = map_phys(TEMPTLB1, dest, temp_mapping[0],
+		vdest = map_phys(TEMPTLB1, dest, TEMP_MAPPING1,
 		                 &chunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
 		                 TLB_MAS3_KERN);
 		if (!vdest)
@@ -1609,7 +1609,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 	while (len > 0) {
 		if (!schunk) {
 			schunk = len >= PAGE_SIZE ? 1UL << ilog2(len) : len;
-			vsrc = map_phys(TEMPTLB1, src, temp_mapping[0],
+			vsrc = map_phys(TEMPTLB1, src, TEMP_MAPPING1,
 			                &schunk, TLB_TSIZE_16M, TLB_MAS2_MEM,
 			                TLB_MAS3_KERN);
 			if (!vsrc) {
@@ -1621,7 +1621,7 @@ size_t copy_phys_to_gphys(pte_t *dtbl, phys_addr_t dest,
 		}
 
 		if (!dchunk) {
-			vdest = map_gphys(TEMPTLB2, dtbl, dest, temp_mapping[1],
+			vdest = map_gphys(TEMPTLB2, dtbl, dest, TEMP_MAPPING2,
 			                  &dchunk, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			if (!vdest) {
 				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ERROR,

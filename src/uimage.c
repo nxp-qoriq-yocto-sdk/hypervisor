@@ -141,9 +141,9 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 	size_t comprlen = size >= PAGE_SIZE ? 1UL << ilog2_32(size) : size;
 
 	comprlen = comprlen > 16*1024*1024 ? 16*1024*1024 : comprlen;
-	uncompr = map_gphys(TEMPTLB1, guest_gphys, target, temp_mapping[0],
+	uncompr = map_gphys(TEMPTLB1, guest_gphys, target, TEMP_MAPPING1,
 			    &uncomprlen, TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
-	compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1], &comprlen,
+	compr = map_phys(TEMPTLB2, image_phys, TEMP_MAPPING2, &comprlen,
 	                 TLB_TSIZE_16M, TLB_MAS2_MEM, TLB_MAS3_KERN);
 	size -= comprlen;
 	index = parse_gzip_header(compr);
@@ -182,7 +182,7 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 
 			target += uncomprlen;
 			uncompr = map_gphys(TEMPTLB1, guest_gphys, target,
-					    temp_mapping[0], &chunk,
+					    TEMP_MAPPING1, &chunk,
 					    TLB_TSIZE_16M, TLB_MAS2_MEM, 1);
 			uncomprlen = chunk;
 			d_stream.next_out = uncompr;
@@ -196,7 +196,7 @@ static int do_inflate(pte_t *guest_gphys, phys_addr_t target,
 								size;
 			tsize = tsize > 16*1024*1024 ? 16*1024*1024 : tsize;
 			image_phys += comprlen;
-			compr = map_phys(TEMPTLB2, image_phys, temp_mapping[1],
+			compr = map_phys(TEMPTLB2, image_phys, TEMP_MAPPING2,
 			                 &tsize, TLB_TSIZE_16M, TLB_MAS2_MEM,
 			                 TLB_MAS3_KERN);
 			size -= tsize;

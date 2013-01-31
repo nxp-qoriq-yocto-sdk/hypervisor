@@ -355,7 +355,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 
 	size_t len = 0x1000;
 #if 1
-	pci_ctrl = map_phys(TEMPTLB1, pcie_addr, temp_mapping[0],
+	pci_ctrl = map_phys(TEMPTLB1, pcie_addr, TEMP_MAPPING1,
 						&len, TLB_TSIZE_4K, TLB_MAS2_IO,
 						TLB_MAS3_KDATA);
 #else

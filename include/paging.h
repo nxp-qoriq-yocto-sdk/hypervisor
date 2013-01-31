@@ -30,11 +30,12 @@
 #include <libos/interrupts.h>
 #include <libos/list.h>
 #include <libos/fsl-booke-tlb.h>
+#include <libos/mp.h>
 
-#define GUEST_TLB_END 47
+#define GUEST_TLB_END (49 - CONFIG_LIBOS_MAX_HW_THREADS * 2)
 
-#define TEMPTLB1 48
-#define TEMPTLB2 49
+#define TEMPTLB1 (GUEST_TLB_END + 1 + 2 * get_hw_thread_id())
+#define TEMPTLB2 (GUEST_TLB_END + 2 + 2 * get_hw_thread_id())
 
 #define DYN_TLB_START 50
 #define DYN_TLB_END 54
@@ -147,8 +148,11 @@ void tlbsync(void);
 /** Real physical address of start of CCSR */
 extern phys_addr_t CCSRBAR_PA;
 
+#define TEMP_MAPPING1	temp_mapping[2 * get_hw_thread_id()]
+#define TEMP_MAPPING2	temp_mapping[2 * get_hw_thread_id() + 1]
+
 /** Permanent 16MiB chunk of valloc space for temporary local mappings */
-extern void *temp_mapping[2];
+extern void *temp_mapping[2 * CONFIG_LIBOS_MAX_HW_THREADS];
 
 void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
                 void *vpage, size_t *len, int maxtsize, register_t mas2flags,
