@@ -33,6 +33,7 @@
 #include <libos/bitops.h>
 #include <libos/list.h>
 #include <libos/alloc.h>
+#include <libos/cache.h>
 
 #include <percpu.h>
 #include <paging.h>
@@ -69,37 +70,6 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 	restore_int(saved);
 }
 
-/* function to synchronize caches when modifying instructions
- * This follows the recommended sequence in the EREF for
- * self modifying code.
- */
-int icache_range_sync(void *ptr, size_t len)
-{
-	uintptr_t start, end, addr;
-
-	start = (uintptr_t)ptr & ~(cache_block_size - 1);
-	end = ((uintptr_t)ptr + len - 1) & ~(cache_block_size - 1);
-
-	for (addr = start; addr >= start && addr <= end;
-	     addr += cache_block_size)
-		icache_block_sync((char *)addr);
-
-	return 0;
-}
-
-static int dcache_range_flush(void *ptr, size_t len)
-{
-	uintptr_t start, end, addr;
-
-	start = (uintptr_t)ptr & ~(cache_block_size - 1);
-	end = ((uintptr_t)ptr + len - 1) & ~(cache_block_size - 1);
-
-	for (addr = start; addr >= start && addr <= end;
-	     addr += cache_block_size)
-		dcache_block_flush((char *)addr);
-
-	return 0;
-}
 
 static void free_tlb1(unsigned int entry)
 {

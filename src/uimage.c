@@ -34,6 +34,7 @@
 #include <malloc.h>
 
 #include <libos/endian.h>
+#include <libos/cache.h>
 #include <percpu.h>
 #include <errors.h>
 #include <devtree.h>

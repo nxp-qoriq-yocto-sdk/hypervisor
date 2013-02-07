@@ -257,6 +257,4 @@ int patch_guest_intmaps(struct dev_owner *owner);
 unsigned long get_rpn(struct guest *guest, unsigned long grpn,
 			unsigned long pages);
 
-int icache_range_sync(void *ptr, size_t len);
-
 #endif
