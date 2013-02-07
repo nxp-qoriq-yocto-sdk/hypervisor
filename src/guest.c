@@ -37,6 +37,7 @@
 #include <libos/thread.h>
 #include <libos/alloc.h>
 #include <libos/fsl_hcalls.h>
+#include <libos/cache.h>
 
 #include <hv.h>
 #include <paging.h>
@@ -977,10 +978,7 @@ static int create_guest_spin_table(guest_t *guest)
 	if (!guest->spintbl)
 		return ERR_NOMEM;
 
-	/* FIXME: hardcoded cache line size */
-	for (i = 0; i < guest->cpucnt * sizeof(struct boot_spin_table); i += 32)
-		asm volatile("dcbf 0, %0" : : "r" ((unsigned long)guest->spintbl + i ) :
-		             "memory");
+	dcache_range_flush(guest->spintbl, guest->cpucnt * sizeof(struct boot_spin_table));
 
 	rpn = virt_to_phys(guest->spintbl) >> PAGE_SHIFT;
 
@@ -2104,8 +2102,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	atomic_add(&guest->active_cpus, 1);
 
 	while (guest->spintbl[gpir].addr_lo & 1) {
-		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir]) : "memory");
-		asm volatile("dcbf 0, %0" : : "r" (&guest->spintbl[gpir + 1]) : "memory");
+		dcache_range_flush(&guest->spintbl[gpir], sizeof(struct boot_spin_table));
 		smp_mbar();
 
 		if (gcpu->gevent_pending & (1 << gev_stop)) {
