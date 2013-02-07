@@ -37,6 +37,7 @@
 #include <libos/interrupts.h>
 #include <libos/alloc.h>
 #include <libos/queue.h>
+#include <libos/cache.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -573,6 +574,8 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 		text_phys = virt_to_phys(new_text);
 		barrier();
 		memcpy(new_text, (void *)PHYSBASE, (uintptr_t)&_end - PHYSBASE);
+		icache_range_sync(new_text, (uintptr_t)&_end - PHYSBASE);
+
 		branch_to_reloc(new_text, (text_phys & MAS3_RPN) | TLB_MAS3_KERN,
 		                text_phys >> 32);
 	}
