@@ -37,6 +37,7 @@ static int fail;
 #define NOFAULT 0xdead0000
 #define DTLB 1
 #define DSI 2
+#define MCHECK 3
 #define PMAS_MAX_COUNT 12
 
 struct pma {
@@ -73,6 +74,21 @@ void dsi_handler(trapframe_t *frameptr)
 
 	frameptr->gpregs[0] = DSI;
 	frameptr->srr0 += 4;
+}
+
+void mcheck_interrupt(trapframe_t *frameptr)
+{
+	if ((uint32_t)frameptr->gpregs[0] != NOFAULT) {
+		dump_regs(frameptr);
+
+		printf("BROKEN\n");
+		fh_partition_stop(-1);
+		BUG();
+	}
+
+	frameptr->gpregs[0] = MCHECK;
+	frameptr->srr0 += 4;
+
 }
 
 #define NUM_CORES 2
