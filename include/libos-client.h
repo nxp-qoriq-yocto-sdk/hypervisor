@@ -132,6 +132,8 @@ void watchdog_trap(struct trapframe *regs);
 void hcall(struct trapframe *regs);
 void align_trap(struct trapframe *regs);
 void fpunavail(struct trapframe *regs);
+void altivecunavail(struct trapframe *regs);
+void altivecassist(struct trapframe  *regs);
 void perfmon_int(struct trapframe *regs);
 void lrat_miss(struct trapframe *regs);
 #endif
@@ -156,6 +158,8 @@ void lrat_miss(struct trapframe *regs);
 #define EXC_DOORBELLC_HANDLER crit_dbell_int
 #define EXC_DEBUG_HANDLER debug_trap
 #define EXC_WDOG_HANDLER watchdog_trap
+#define EXC_ALTIVECUNAVAIL_HANDLER altivecunavail
+#define EXC_ALTIVECASSIST_HANDLER  altivecassist
 #define EXC_PERFMON_HANDLER perfmon_int
 #define EXC_LRAT_HANDLER lrat_miss
 

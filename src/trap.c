@@ -73,6 +73,18 @@ void fpunavail(trapframe_t *regs)
 	reflect_trap(regs);
 }
 
+void altivecunavail(trapframe_t *regs)
+{
+	set_stat(bm_stat_altivecunavail, regs);
+	reflect_trap(regs);
+}
+
+void altivecassist(trapframe_t *regs)
+{
+	set_stat(bm_stat_altivecassist, regs);
+	reflect_trap(regs);
+}
+
 /* Do not use this when entering via guest doorbell, since that saves
  * state in gsrr rather than srr, despite being directed to the
  * hypervisor.

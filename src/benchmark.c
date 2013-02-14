@@ -74,6 +74,8 @@ const char *benchmark_names[num_benchmarks] = {
 	"tlb miss count",
 	"tlb miss reflected",
 	"tlb miss",
+	"altivec unavail",
+	"altivec assist",
 	/* microbenchmarks go here */
 	"tlbinv by PID",
 	"tlbcache inv all",
