@@ -81,11 +81,11 @@ const char *benchmark_names[num_benchmarks] = {
 	"tlb write",
 };
 
-void statistics_stop(unsigned long start, int bmnum)
+void statistics_stop(uint32_t start, int bmnum)
 {
-	unsigned long end = mfspr(SPR_TBL);
+	uint32_t end = mfspr(SPR_TBL);
 	benchmark_t *bm = &get_gcpu()->benchmarks[bmnum];
-	unsigned long diff = end - start;
+	uint32_t diff = end - start;
 
 	bm->accum += diff;
 	bm->num++;

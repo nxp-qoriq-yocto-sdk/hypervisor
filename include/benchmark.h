@@ -94,13 +94,13 @@ static inline void set_stat(int stat, struct trapframe *regs)
 
 }
 
-void statistics_stop(unsigned long start, int bmnum);
+void statistics_stop(uint32_t start, int bmnum);
 #else
 static inline void set_stat(int stat, struct trapframe *regs)
 {
 }
 
-static inline void statistics_stop(unsigned long start, int bmnum)
+static inline void statistics_stop(uint32_t start, int bmnum)
 {
 }
 #endif
