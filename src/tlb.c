@@ -1807,6 +1807,8 @@ void lrat_miss(trapframe_t *regs)
 	disable_int();
 	save_mas(gcpu);
 
+	set_stat(bm_stat_lrat_miss, regs);
+
 	if (pt)
 		grpn = (mfspr(SPR_LPER) & LPER_ALPN) >> LPER_ALPN_SHIFT;
 	else

@@ -75,6 +75,7 @@ typedef enum benchmark_num {
 	bm_stat_tlb_miss, /**< TLB miss exceptions */
 	bm_stat_altivecunavail, /**< altivec unavailable */
 	bm_stat_altivecassist, /**< altivec assist */
+	bm_stat_lrat_miss, /**< lrat miss */
 	/* microbenchmarks go here */
 	bm_tlb0_inv_pid, /**< microbenchmarks */
 	bm_tlb0_inv_all,
