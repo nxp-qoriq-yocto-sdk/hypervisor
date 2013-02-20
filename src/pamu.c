@@ -1703,6 +1703,13 @@ int configure_dma(dt_node_t *hwnode, dev_owner_t *owner)
 	for (i = 0; i < liodn_cnt; i++) {
 		search_liodn_ctx_t ctx;
 
+		if (liodn[i] >= PAACE_NUMBER_ENTRIES) {
+			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+			         "%s: Invalid LIODN value %d \n", __func__, liodn[i]);
+			free(dma_handles);
+			return 0;
+		}
+
 		/* search for an liodn-index that matches this liodn */
 		ctx.liodn_index = i;
 		ctx.cfgnode = cfgnode;  /* default */
