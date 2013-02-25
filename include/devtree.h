@@ -253,7 +253,11 @@ int dt_node_is_compatible(dt_node_t *node, const char *compat);
 int dt_for_each_compatible(dt_node_t *tree, const char *compat,
                            dt_callback_t callback, void *arg);
 
+int dt_for_each_compatible_list(dt_node_t *tree, const char **compat,
+                                dt_callback_t callback, void *arg);
+
 dt_node_t *dt_get_first_compatible(dt_node_t *tree, const char *compat);
+dt_node_t *dt_get_first_compatible_list(dt_node_t *tree, const char **compat);
 
 int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
                            const void *value, size_t len,

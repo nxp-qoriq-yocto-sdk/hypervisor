@@ -1146,6 +1146,24 @@ static int compat_callback(dt_node_t *node, void *arg)
 	return 0;
 }
 
+typedef struct compat_list_ctx {
+	dt_callback_t callback;
+	const char **compat;
+	void *arg;
+} compat_list_ctx_t;
+
+static int compat_list_callback(dt_node_t *node, void *arg)
+{
+	compat_list_ctx_t *ctx = arg;
+
+	for (int i = 0; ctx->compat[i]; i++) {
+		if (dt_node_is_compatible(node, ctx->compat[i]))
+			return ctx->callback(node, ctx->arg);
+	}
+
+	return 0;
+}
+
 /** Iterate over each compatible node.
  *
  * @param[in] tree root of tree to search
@@ -1168,6 +1186,28 @@ int dt_for_each_compatible(dt_node_t *tree, const char *compat,
 	return dt_for_each_node(tree, &ctx, compat_callback, NULL);
 }
 
+/** Iterate over each compatible node searching for a list of compatibles.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] compat compatible string list to search for
+ * @param[in] callback function to call for each compatible node
+ * @param[in] arg opaque argument to callback function
+ * @return if non-zero, the return value of the final callback function
+ *
+ * If a callback returns non-zero, the iteration will be aborted.
+ */
+int dt_for_each_compatible_list(dt_node_t *tree, const char **compat,
+                                dt_callback_t callback, void *arg)
+{
+	compat_list_ctx_t ctx = {
+		.callback = callback,
+		.compat = compat,
+		.arg = arg
+	};
+
+	return dt_for_each_node(tree, &ctx, compat_list_callback, NULL);
+}
+
 static int first_callback(dt_node_t *node, void *arg)
 {
 	dt_node_t **ret = arg;
@@ -1185,6 +1225,21 @@ dt_node_t *dt_get_first_compatible(dt_node_t *tree, const char *compat)
 {
 	dt_node_t *ret = NULL;
 	dt_for_each_compatible(tree, compat, first_callback, &ret);
+	return ret;
+}
+
+/** Return the first compatible node from a list of compatibles,
+ * when only one is expected.
+ *
+ * @param[in] tree root of tree to search
+ * @param[in] compat list of compatible strings to search for
+ * @return the first compatible node, or NULL if none found
+ */
+
+dt_node_t *dt_get_first_compatible_list(dt_node_t *tree, const char **compat)
+{
+	dt_node_t *ret = NULL;
+	dt_for_each_compatible_list(tree, compat, first_callback, &ret);
 	return ret;
 }
 
