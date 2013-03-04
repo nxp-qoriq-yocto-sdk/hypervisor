@@ -38,6 +38,7 @@
 #include <greg.h>
 #include <events.h>
 #include <benchmark.h>
+#include <doorbell.h>
 
 static unsigned long get_ea_indexed(trapframe_t *regs, uint32_t insn)
 {
@@ -68,8 +69,8 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 	unsigned int rb = (insn >> 11) & 31;
 	uint32_t msg = regs->gpregs[rb];
 	guest_t *guest = get_gcpu()->guest;
-	unsigned long lpid = guest->lpid;
 	unsigned int type = msg >> 27;
+	int i;
 
 	set_stat(bm_stat_msgsnd, regs);
 
@@ -117,11 +118,9 @@ static int emu_msgsnd(trapframe_t *regs, uint32_t insn)
 			atomic_or(&gcpu->gdbell_pending, GCPU_PEND_MSGSND);
 	}
 
-	/* Clear the reserved bits and oerwrite the LPIDTAG field with
-	   the current lpid */
-	msg = (msg & 0xfc003fff) | (lpid << 14);
-
-	asm volatile("msgsnd %0" : : "r" (msg) : "memory");
+	/* Repeat the doorbell for each lpid in this guest's lpid group */
+	for (i = 0; i < cpu_caps.threads_per_core; i++)
+		send_lpid_doorbell_msg(msg, guest->id * cpu_caps.threads_per_core + i);
 
 	return 0;
 }
@@ -646,7 +645,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
 	} else {
-		unsigned long mas8 = guest->lpid | MAS8_GTS;
+		unsigned long mas8 = gcpu->lpid | MAS8_GTS;
 		unsigned long attr, gmas3;
 		unsigned long rpn = vptbl_xlate(guest->gphys, grpn,
 		                                &attr, PTE_PHYS_LEVELS, 0);

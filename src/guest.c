@@ -1729,7 +1729,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 		guests[i].name = name;
 		guests[i].state = guest_starting_uninit;
 		guests[i].partition = partition;
-		guests[i].lpid = ghandle;
+		guests[i].id = ghandle;
 
 		num_guests++;
 
@@ -1775,8 +1775,8 @@ static void guest_core_init(guest_t *guest)
 	mtspr(SPR_TCR, mfspr(SPR_TCR) & ~GCPU_TCR_HW_BITS);
 	mtspr(SPR_TSR, TSR_DIS);
 
-	mtspr(SPR_MAS5, MAS5_SGS | guest->lpid);
-	mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+	mtspr(SPR_MAS5, MAS5_SGS | get_gcpu()->lpid);
+	mtspr(SPR_MAS8, get_gcpu()->lpid | MAS8_GTS);
 
 	mtspr(SPR_PID, 0);
 
@@ -2005,7 +2005,7 @@ static void start_guest_primary_noload(trapframe_t *regs, void *arg)
 	regs->gpregs[6] = 0x45504150; // ePAPR Magic for Book-E
 
 	regs->srr1 = MSR_GS;
-	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
+	regs->eplc = regs->epsc = (gcpu->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
 
 	if (guest->wd_autostart != -1) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_NORMAL,
@@ -2146,7 +2146,7 @@ static void start_guest_secondary(trapframe_t *regs, void *arg)
 	setup_ima(regs, entry, 1);
 
 	regs->srr1 = MSR_GS;
-	regs->eplc = regs->epsc = (guest->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
+	regs->eplc = regs->epsc = (gcpu->lpid << EPC_ELPID_SHIFT) | EPC_EGS;
 
 	if (guest->wd_autostart != -1)
 		set_tcr(TCR_INT_TO_WP(guest->wd_autostart) | TCR_WRC_RESET);
@@ -3089,7 +3089,7 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
-	ret = dt_set_prop(node, "guest-id", &guest->lpid, 4);
+	ret = dt_set_prop(node, "guest-id", &guest->id, 4);
 	if (ret < 0)
 		goto fail;
 
@@ -3356,10 +3356,10 @@ __attribute__((noreturn)) void init_guest(void)
 
 		gcpu->guest = guest;
 
-		mtspr(SPR_LPIDR, guest->lpid);
-
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_DEBUG,
 		         "guest at %s on core %d\n", guest->name, pir);
+		gcpu->lpid = guest->id * cpu_caps.threads_per_core + get_hw_thread_id();
+		mtspr(SPR_LPIDR, gcpu->lpid);
 
 		configure_tlb_mgt(guest);
 

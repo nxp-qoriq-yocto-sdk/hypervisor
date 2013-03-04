@@ -125,7 +125,7 @@ typedef struct guest {
 	unsigned int cpucnt;    /**< The number of entries in gcpus[] */
 	uint32_t *cpulist;
 	uint32_t cpulist_len;
-	uint32_t lpid;
+	uint32_t id;
 
 	/** guest debug mode **/
 	int guest_debug_mode;
@@ -258,6 +258,8 @@ typedef struct gcpu {
 	unsigned long dbell_pending;
 	unsigned long gevent_pending;
 	unsigned int gcpu_num;
+	/* lpid used by this cpu / thread */
+	uint32_t lpid;
 	vpic_cpu_t vpic;
 	uint32_t watchdog_tsr;	// Upon watchdog reset, TSR[WRS] <- TCR[WRC]
 #ifdef CONFIG_DEBUG_STUB

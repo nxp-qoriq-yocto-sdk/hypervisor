@@ -214,8 +214,8 @@ void gdb_stub_start(trapframe_t *trap_frame)
 			"setting breakpoint on 1st instruction\n");
 
 		/* set up EPLC and EPSC so we can set our breakpoint */
-		mtspr(SPR_EPLC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
-		mtspr(SPR_EPSC, EPC_EGS | (gcpu->guest->lpid << EPC_ELPID_SHIFT));
+		mtspr(SPR_EPLC, EPC_EGS | (gcpu->lpid << EPC_ELPID_SHIFT));
+		mtspr(SPR_EPSC, EPC_EGS | (gcpu->lpid << EPC_ELPID_SHIFT));
 
 		breakpoint = set_breakpoint(stub->breakpoint_table, trap_frame, (uint32_t *)trap_frame->srr0, internal_1st_inst);
 		if (!breakpoint) {

@@ -520,7 +520,7 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		               mapsize, entry->mas2,
 		               (entry->mas3 & ~MAS3_RPN)
 				& (attr & PTE_MAS3_MASK),
-		               pid, space, MAS8_GTS | gcpu->guest->lpid,
+		               pid, space, MAS8_GTS | gcpu->lpid,
 		               (entry->mas1 >> MAS1_IND_SHIFT) & 1);
 
 		restore_mas(gcpu);
@@ -652,7 +652,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		mas3flags &= attr & PTE_MAS3_MASK;
 
-		unsigned long mas8 = guest->lpid;
+		unsigned long mas8 = gcpu->lpid;
 		mas8 |= (attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK;
 
 		size_rpn = min(size_rpn, attr >> PTE_SIZE_SHIFT);
@@ -768,7 +768,7 @@ void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 				}
 
 				/* restore MAS8 as it might have been changed */
-				mtspr(SPR_MAS8, get_gcpu()->guest->lpid | MAS8_GTS);
+				mtspr(SPR_MAS8, get_gcpu()->lpid | MAS8_GTS);
 			} else {
 				assert((mfspr(SPR_MAS6) & MAS6_SPID_MASK) ==
 				       ((unsigned int)pid << MAS6_SPID_SHIFT));
@@ -1876,7 +1876,7 @@ void lrat_miss(trapframe_t *regs)
 		mas2 = gcpu->mas2;
 		mas3 = gcpu->mas3;
 		mas7 = gcpu->mas7;
-		mas8 = guest->lpid | MAS8_GTS | MAS8_VF;
+		mas8 = gcpu->lpid | MAS8_GTS | MAS8_VF;
 		mas3 &= (attr & PTE_MAS3_MASK) | MAS3_USER;
 
 		/* VF does not prevent instruction execution */
@@ -1892,7 +1892,7 @@ void lrat_miss(trapframe_t *regs)
 		mtspr(SPR_MAS8, mas8);
 		asm volatile("isync; tlbwe" : : : "memory");
 
-		mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+		mtspr(SPR_MAS8, gcpu->lpid | MAS8_GTS);
 		restore_mas(gcpu);
 		enable_int();
 
@@ -1919,7 +1919,7 @@ void lrat_miss(trapframe_t *regs)
 	mas2 = grpn << PAGE_SHIFT;
 	mas3 = (rpn << PAGE_SHIFT) & MAS3_RPN;
 	mas7 = rpn >> (32 - PAGE_SHIFT);
-	mas8 = guest->lpid;
+	mas8 = gcpu->lpid;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE, "LPN: %lx, RPN: %lx,"
 	         "MAS0: %lx, MAS1: %lx, MAS2: %lx, MAS3: %lx, MAS7: %lx, MAS8: %lx\n",
@@ -1937,7 +1937,7 @@ void lrat_miss(trapframe_t *regs)
 	if (shared_cpu->lrat_next_entry == cpu->client.lrat_nentries)
 		shared_cpu->lrat_next_entry = 0;
 
-	mtspr(SPR_MAS8, guest->lpid | MAS8_GTS);
+	mtspr(SPR_MAS8, gcpu->lpid | MAS8_GTS);
 	restore_mas(gcpu);
 
 	tlb_unlock(saved);

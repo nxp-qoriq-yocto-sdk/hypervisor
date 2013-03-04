@@ -746,12 +746,12 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 
 	case SPR_EPLC:
 		regs->eplc = (val & ~EPC_ELPID) | EPC_EGS |
-		             (gcpu->guest->lpid << EPC_ELPID_SHIFT);
+		             (gcpu->lpid << EPC_ELPID_SHIFT);
 		break;
 
 	case SPR_EPSC:
 		regs->epsc = (val & ~EPC_ELPID) | EPC_EGS |
-		             (gcpu->guest->lpid << EPC_ELPID_SHIFT);
+		             (gcpu->lpid << EPC_ELPID_SHIFT);
 		break;
 
 	case SPR_HID0:

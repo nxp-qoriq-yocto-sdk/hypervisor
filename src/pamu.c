@@ -1128,7 +1128,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 
 	guest_t *guest = liodn_data[av_liodn].guest;
 	if (guest) {
-		pamu->lpid = guest->lpid;
+		pamu->lpid = guest->id;
 		pamu->liodn_handle = liodn_data[av_liodn].pamu_handle->user.id;
 		dt_node_t *node = get_dev_node(pamu->liodn_handle, guest);
 		if (node)

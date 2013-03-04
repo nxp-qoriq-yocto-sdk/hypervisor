@@ -50,6 +50,18 @@ static inline void send_doorbell_msg(unsigned long msg)
 	asm volatile("msync; msgsnd %0" : : "r" (msg) : "memory");
 }
 
+/** Send guest doorbell.
+ *
+ *  Broadcast a guest doorbell to the given LPID.
+ */
+static inline void send_lpid_doorbell_msg(unsigned long msg, unsigned long lpid)
+{
+	/* Clear the reserved bits and overwrite the LPIDTAG field with
+	 * the given lpid
+	 */
+	send_doorbell_msg((msg & 0xfc003fff) | (lpid << 14));
+}
+
 /** Send local guest doorbell.
  *
  *  Sends a guest doorbell to the current
@@ -57,7 +69,7 @@ static inline void send_doorbell_msg(unsigned long msg)
  */
 static inline void send_local_guest_doorbell(void)
 {
-	send_doorbell_msg(MSG_GBELL | (get_gcpu()->guest->lpid << 14) |
+	send_doorbell_msg(MSG_GBELL | (get_gcpu()->lpid << 14) |
 	                  mfspr(SPR_GPIR));
 }
 
@@ -67,13 +79,13 @@ static inline void send_local_guest_doorbell(void)
  */
 static inline void send_local_crit_guest_doorbell(void)
 {
-	send_doorbell_msg(MSG_GBELL_CRIT | (get_gcpu()->guest->lpid << 14) |
+	send_doorbell_msg(MSG_GBELL_CRIT | (get_gcpu()->lpid << 14) |
 	                  mfspr(SPR_GPIR));
 }
 
 static inline void send_local_mchk_guest_doorbell(void)
 {
-	send_doorbell_msg(MSG_GBELL_MCHK | (get_gcpu()->guest->lpid << 14) |
+	send_doorbell_msg(MSG_GBELL_MCHK | (get_gcpu()->lpid << 14) |
 	                  mfspr(SPR_GPIR));
 }
 
