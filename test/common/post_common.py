@@ -37,6 +37,13 @@ def bootprep():
 			print "Loading guest " + guest + " to address " + str(hex(addr))
 			assert True == top.ifc.exts.loadImageToBank(guest, 0, addr)
 
+	top.i2c1.exts.attachEEPROM(0x51, 0x400)
+	top.i2c1.exts.attachEEPROM(0x52, 0x400)
+	top.i2c1.exts.attachEEPROM(0x53, 0x400)
+	top.i2c1.exts.loadImageToEEPROM(SPD_FILE, 0x51, 0)
+	top.i2c1.exts.loadImageToEEPROM(SPD_FILE, 0x52, 0)
+	top.i2c1.exts.loadImageToEEPROM(SPD_FILE, 0x53, 0)
+
 	# Boot release
 	top.configunit.regs.BRRL.write(0x1)
 

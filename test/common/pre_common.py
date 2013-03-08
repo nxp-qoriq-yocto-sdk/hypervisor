@@ -29,9 +29,11 @@ DTB_FILE    = IMAGES_PATH + 't4240ds.dtb'
 GUEST_FILE  = ['', '', '']
 GUEST_ADDR  = [0x0a00000, 0x0b00000, 0]
 RCW_FILE    = IMAGES_PATH + 'T4240_RCW.bin'
+SPD_FILE    = IMAGES_PATH + 'spd_2133.bin'
 #mux server base port
 BASE_PORT   = 40001
 #number of consoles to be opened
 TOTAL_PORTS = 2
 #serial used
 SERIAL = 'duart1_0'
+
