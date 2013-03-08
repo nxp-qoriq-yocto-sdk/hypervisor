@@ -39,6 +39,7 @@ static int fail;
 #define DSI 2
 #define MCHECK 3
 #define PMAS_MAX_COUNT 12
+#define PASSES 1000000
 
 struct pma {
 	phys_addr_t addr, size;
@@ -48,8 +49,21 @@ struct pma pmas[PMAS_MAX_COUNT];
 int pmas_count;
 static int *vaddrs[PMAS_MAX_COUNT + 1];
 
+static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa,
+                           int tsize, int pid, int space);
+
 void dtlb_handler(trapframe_t *frameptr)
 {
+	for (int i = 0; i < pmas_count; i++) {
+		if ((int *)frameptr->dear >= vaddrs[i] &&
+		    (int *)frameptr->dear < (vaddrs[i] + 4096))
+		{
+			create_mapping(0, 0, vaddrs[i], pmas[i].addr,
+			               TLB_TSIZE_4K, 0, 0);
+			return;
+		}
+	}
+
 	if ((uint32_t)frameptr->gpregs[0] != NOFAULT) {
 		dump_regs(frameptr);
 
@@ -126,7 +140,7 @@ static void sync_cores(int secondary)
 static void create_mapping(int tlb, int entry, void *va, phys_addr_t pa,
                            int tsize, int pid, int space)
 {
-	mtspr(SPR_MAS0, MAS0_TLBSEL(tlb) | MAS0_ESEL(entry));
+	mtspr(SPR_MAS0, MAS0_TLBSEL(tlb) | (tlb ? MAS0_ESEL(entry) : MAS0_HES));
 	mtspr(SPR_MAS1, MAS1_VALID | (tsize << MAS1_TSIZE_SHIFT) |
 	                (pid << MAS1_TID_SHIFT) | (space << MAS1_TS_SHIFT));
 	mtspr(SPR_MAS2, ((register_t)va) | MAS2_M);
@@ -166,15 +180,15 @@ static void store(const char *name, int pass, int num,
 
 		if (faults[i]) {
 			if (r0 == NOFAULT) {
-				printf("%s, %lu: pass %d, val %d: expected "
+				printf("%s, %lu: pass %d vaddr %p (paddr %llx), val %d: expected "
 				       "store fault but got none\n",
-				       name, mfspr(SPR_PIR), pass, i);
+				       name, mfspr(SPR_PIR), pass, addrs[i], pmas[i].addr, i);
 				fail = 1;
 			}
 		} else if (r0 != NOFAULT) {
-			printf("%s, %lu: pass %d, val %d: got "
+			printf("%s, %lu: pass %d vaddr %p (paddr %llx), val %d: got "
 			       "unexpected store fault %d\n",
-			       name, mfspr(SPR_PIR), pass, i, r0);
+			       name, mfspr(SPR_PIR), pass, addrs[i], pmas[i].addr, i, r0);
 			fail = 1;
 		}
 	}
@@ -211,18 +225,18 @@ static void expect(const char *name, int pass, int num,
 
 		if (faults[i]) {
 			if (r0 == NOFAULT) {
-				printf("%s, %lu: pass %d, val %d: expected fault but got val %x\n",
-				       name, mfspr(SPR_PIR), pass, i, val);
+				printf("%s, %lu: pass %d, vaddr %p (paddr %llx), val %d: expected fault but got val %x\n",
+				       name, mfspr(SPR_PIR), pass, addrs[i], pmas[i].addr, i, val);
 				fail = 1;
 			}
 		} else {
 			if (r0 != NOFAULT) {
-				printf("%s, %lu: pass %d, val %d: expected val %x but got fault %d\n",
-				       name, mfspr(SPR_PIR), pass, i, vals[i], r0);
+				printf("%s, %lu: pass %d, vaddr %p (paddr %llx), val %d: expected val %x but got fault %d\n",
+				       name, mfspr(SPR_PIR), pass, addrs[i], pmas[i].addr, i, vals[i], r0);
 				fail = 1;
 			} else if (val != vals[i]) {
-				printf("%s, %lu: pass %d, val %d: expected val %x but got %x\n",
-				       name, mfspr(SPR_PIR), pass, i, vals[i], val);
+				printf("%s, %lu: pass %d, vaddr %p (paddr %llx), val %d: expected val %x but got %x\n",
+				       name, mfspr(SPR_PIR), pass, addrs[i], pmas[i].addr, i, vals[i], val);
 				fail = 1;
 			}
 		}
@@ -324,7 +338,7 @@ static int test_bad_mapping(void)
 
 	create_bad_tlb_mapping();
 
-	store("test bad mapping", 1, 10, vaddrs, vals, faults, NULL);
+	store("test bad mapping", 1, pmas_count + 1, vaddrs, vals, faults, NULL);
 
 	/* clear entries for the next test */
 	tlbilx_inv_all(2);
@@ -332,25 +346,31 @@ static int test_bad_mapping(void)
 	return 0;
 }
 
-static int test1(int secondary)
+static int test1(int secondary, int passes)
 {
-	int ret;
+	int ret, i;
 
-	printf("Test 1\n");
+	printf("%lu: Test 1 (x%d) on %d PMAs\n", mfspr(SPR_PIR), passes, pmas_count);
 
-	ret = create_tlb_mappings();
-	if (ret < 0) {
-		printf("FAILED\n");
-		return -1;
+	for (i = 0; i < passes; i++) {
+		ret = create_tlb_mappings();
+		if (ret < 0) {
+			printf("FAILED\n");
+			return -1;
+		}
+		if (!secondary) {
+			store("test1", i + 1, pmas_count, vaddrs, vals, nofaults, NULL);
+		}
+
+		sync_cores(secondary);
+
+		expect("test1", i + 1, pmas_count, vaddrs, vals, nofaults, NULL);
+
+		sync_cores(secondary);
+
+		/* clear entries for the next test */
+		tlbilx_inv_all(2);
 	}
-	if (!secondary)
-		store("test1", 1, 9, vaddrs, vals, nofaults, NULL);
-
-	sync_cores(secondary);
-
-	expect("test1", 1, 9, vaddrs, vals, nofaults, NULL);
-
-	sync_cores(secondary);
 
 	return 0;
 }
@@ -359,12 +379,11 @@ static void secondary_entry(void)
 {
 	int ret;
 
-	ret = test1(SECONDARY);
+	ret = test1(SECONDARY, PASSES);
 	if (ret < 0) {
 		printf("FAILED\n");
 		return;
 	}
-
 }
 
 static int read_pmas(void)
@@ -415,6 +434,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("LRAT test:\n");
 
+	uint64_t start_tb = get_tb();
 	ret = test_bad_mapping();
 	if (ret < 0) {
 		printf("FAILED\n");
@@ -424,11 +444,13 @@ void libos_client_entry(unsigned long devtree_ptr)
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
 
-	ret = test1(PRIMARY);
+	ret = test1(PRIMARY, PASSES);
 	if (ret < 0) {
 		printf("FAILED\n");
 		return;
 	}
+	printf("test duration (%d passes): %llu TB ticks\n",
+		PASSES, get_tb() - start_tb);
 
 	if (fail)
 		printf("FAILED\n");
