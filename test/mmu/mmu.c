@@ -28,9 +28,11 @@
 #include <libos/trapframe.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/io.h>
+#include <libos/cpu_caps.h>
 #include <hvtest.h>
 
 static int fail;
+static int mcheck;
 
 #define NOFAULT 0xdead0000
 #define DTLB 1
@@ -61,6 +63,12 @@ void dsi_handler(trapframe_t *frameptr)
 	}
 
 	frameptr->gpregs[0] = DSI;
+	frameptr->srr0 += 4;
+}
+
+void mcheck_interrupt(trapframe_t *frameptr)
+{
+	mcheck = 1;
 	frameptr->srr0 += 4;
 }
 
@@ -612,11 +620,56 @@ static void tlbilx_test(int secondary)
 	inv_pid_test("tlbilx.pid", tlbilx_inv_pid, secondary);
 }
 
+static void thread_shared_tlb_test(int secondary)
+{
+	if (cpu_has_ftr(CPU_FTR_THREADS)) {
+		mcheck = 0;
+
+		mtspr(SPR_HID0, mfspr(SPR_HID0) | HID0_L2MMU_MHD);
+
+		if (secondary) {
+			printf("%s[%lu]: v:%p -> p:%llx\n",
+			       __func__, mfspr(SPR_PIR),
+			       tlb0, virt_to_phys(paddrs[1]));
+			create_mapping(0, 1, tlb0, virt_to_phys(paddrs[1]),
+			               TLB_TSIZE_4K, 0, 0);
+		} else {
+			printf("%s[%lu]: v:%p -> p:%llx\n",
+			       __func__, mfspr(SPR_PIR),
+			        tlb0, virt_to_phys(paddrs[1]));
+			create_mapping(0, 0, tlb0, virt_to_phys(paddrs[0]),
+			               TLB_TSIZE_4K, 0, 0);
+		}
+		sync_cores(secondary);
+
+		for (int i = 0; i < 4096 / 4; i++) {
+			tlb0[i] = 0;
+
+			if (fail)
+				break;
+		}
+
+		sync_cores(secondary);
+
+		/* Clean the ground for the remaining tests */
+		tlbilx_inv(tlb0, 0, 0);
+
+		if (mcheck) {
+			printf("%s[%lu]: unexpected machine check\n",
+			       __func__, mfspr(SPR_PIR));
+			fail = 1;
+		}
+
+		sync_cores(secondary);
+	}
+}
+
 static void secondary_entry(void)
 {
 	mmucsr_test(SECONDARY_NOINVAL);
 	tlbivax_test(SECONDARY_INVAL);
 	tlbilx_test(SECONDARY_NOINVAL);
+	thread_shared_tlb_test(SECONDARY_NOINVAL);
 }
 
 /*
@@ -703,6 +756,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	mmucsr_test(PRIMARY);
 	tlbivax_test(PRIMARY);
 	tlbilx_test(PRIMARY);
+	thread_shared_tlb_test(PRIMARY);
 	
 	if (fail)
 		printf("FAILED\n");

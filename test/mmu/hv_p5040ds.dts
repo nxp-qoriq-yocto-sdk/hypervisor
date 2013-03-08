@@ -22,13 +22,3 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /include/ "hv.dts"
-
-/ {
-
-part1 {
-	cpus = <0 2>;
-	direct-guest-tlb-management;
-	direct-guest-tlb-miss;
-};
-
-};
