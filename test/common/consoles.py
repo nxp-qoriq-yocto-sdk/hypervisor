@@ -77,9 +77,9 @@ def run_mux_server():
 
 	try:
 		for i in range(0, TOTAL_PORTS):
-			console = shlex.split('xterm -sl 5000 -title console' + str(i) + ' -e socat -,raw,echo=0 tcp:localhost:' + str(BASE_PORT + i))
-			subprocess.Popen(console, preexec_fn=setParentSignalGroup)
+			cmd  = 'unset LD_LIBRARY_PATH; xterm -sl 5000 -title console' + str(i) + ' -e socat -,raw,echo=0 tcp:localhost:' + str(BASE_PORT + i)
+			subprocess.Popen(cmd, shell=True, preexec_fn=setParentSignalGroup)
 	except:
 		print 'ERROR: Could not connect to mux_server'
-		print "		Console launch command: " + ' '.join(console)
+		print "		Console launch command: " + cmd
 		traceback.print_exc(file=sys.stdout)
