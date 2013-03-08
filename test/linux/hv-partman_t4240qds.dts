@@ -1,0 +1,497 @@
+/*
+ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	pma0:pma0 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x00000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+
+	pma1:pma1 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x20000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+
+	pma2:pma2 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x40000000>;
+		size = <0x0 0x20000000>;  // 512MB
+	};
+
+	pma3:pma3 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x60000000>;
+		size = <0x0 0x10000000>;  // 256MB
+	};
+
+	pma4:pma4 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x70000000>;
+		size = <0x0 0x00001000>;  // 4KB
+	};
+
+	pma5:pma5 {
+		compatible = "phys-mem-area";
+		addr = <0x0 0x70001000>;
+		size = <0x0 0x00001000>;  // 4KB
+	};
+
+	images_pma: images_pma {    //boot from RAM
+		compatible = "phys-mem-area";
+		addr = <0x0 0x78000000>;
+		size = <0x0 0x04000000>;
+	};
+	dma-windows {
+		window0: window0 {
+			compatible = "dma-window";
+			guest-addr = <0 0x0>;
+			size = <0 0x20000000>;
+		};
+		dw_dqrr_qportal0: window1 {	// DMA window for stash_dqrr for qman-portal0
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4200000>;
+			size = <0 0x4000>;
+		};
+		dw_dqrr_qportal1: window2 {	// DMA window for stash_dqrr for qman-portal1
+			compatible = "dma-window";
+			guest-addr = <0xf 0xf4204000>;
+			size = <0 0x4000>;
+		};
+	};
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv:hypervisor-config {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+		sysreset-on-partition-stop;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+
+		hv-memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma3>;
+		};
+
+		uart0:serial0 {
+			device = "serial0";
+		};
+
+		serial1:serial1 {
+			device = "serial1";
+		};
+
+		serial2:serial2 {
+			device = "serial2";
+		};
+
+		serial3:serial3 {
+			device = "serial3";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
+	doorbells {
+		dbell0: doorbell0 {
+			compatible = "doorbell";
+		};
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1 {
+		compatible = "partition";
+		label = "p1-linux";
+		cpus = <0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1>;
+		guest-image = <0xf 0xe8020000 0 0 0 0x00e00000>;
+		//linux-rootfs = <0xf 0xe9300000 0 0x01300000 0 0x04000000>;
+		//on hardware load rootfs from RAM
+		linux-rootfs = <0x0 0x78000000 0 0x01300000 0 0x05A00000>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+		no-dma-disable;
+
+		aliases {
+			stdout = <&console1>;
+		};
+
+		console1: console {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		bc1: bc-p2 {
+			compatible = "byte-channel";
+			endpoint = <&bcp2>;
+		};
+
+		bc2: bc-p3 {
+			compatible = "byte-channel";
+			endpoint = <&bcp3>;
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma0>;
+			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				/* We need to delete the "device_type" property
+				   otherwise Linux will use the memory buffer
+				   as regular memory. */
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
+		};
+
+/*
+		qman {
+			device = "qman";
+			dma-window = <&window0>;
+		};
+
+		bman {
+			device = "bman";
+			dma-window = <&window0>;
+		};
+
+		bman-portalA {
+			device = "/bman-portals/bman-portal@0";
+		};
+
+		bman-portalB {
+			device = "/bman-portals/bman-portal@4000";
+		};
+
+		portal-devices {
+			fman0 {
+				device = "fman0";
+				dma-window = <&window0>;
+			};
+			fman1 {
+				device = "fman1";
+				dma-window = <&window0>;
+			};
+			caam {
+				device = "crypto";
+				dma-window = <&window0>;
+			};
+			pme {
+				device = "pme";
+				dma-window = <&window0>;
+			};
+		};
+
+		qman-portalA {
+			device = "/qman-portals@ff4200000/qman-portal@0";
+
+			stash-mem {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+			};
+
+			stash-dqrr {
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal0>;
+				operation-mapping = <0>;  // OMI_QMAN
+			};
+		};
+
+		qman-portalB {
+			device = "/qman-portals@ff4200000/qman-portal@4000";
+
+			stash-mem {
+				liodn-index = <1>;
+				dma-window = <&window0>;
+				operation-mapping = <0>;  // OMI_QMAN
+				stash-dest = <3>;
+			};
+
+			stash-dqrr {
+				liodn-index = <0>;
+				dma-window = <&dw_dqrr_qportal1>;
+				operation-mapping = <0>;  // OMI_QMAN
+			};
+		};
+
+		// FMAN0 eth1 -- ethernet 1 assigned to this partition
+		dpa-ethernet@1 {
+			device = "/fsl,dpaa/ethernet@1";
+		};
+
+		// FMAN1 eth0 -- ethernet 5 assigned to this partition
+		dpa-ethernet@5 {
+			device = "/fsl,dpaa/ethernet@5";
+
+		};
+*/
+
+		gpio {
+			device = "/soc/gpio";
+		};
+
+		flash {
+			device = "/localbus";
+		};
+
+/*
+		fman0 {
+			device = "fman0";
+			dma-window = <&window0>;
+		};
+
+		fman1 {
+			device = "fman1";
+			dma-window = <&window0>;
+		};
+
+		bman-bpids {
+			device = "/bman-portals@ff4000000/bman-bpids@0";
+		};
+
+		qman-fqids {
+			device = "qman-portals@ff4200000/qman-fqids@0";
+		};
+
+		qman-pools {
+			device = "/qman-portals@ff4200000/qman-pools@0";
+		};
+
+		qman-cgrids {
+			device = "/qman-portals@ff4200000/qman-cgrids@0";
+		};
+*/
+		p2-linux {
+			compatible = "managed-partition";
+			partition = <&part2>;
+		};
+
+		p3-linux {
+			compatible = "managed-partition";
+			partition = <&part3>;
+		};
+		node-update {
+			chosen {
+				bootargs = "ramdisk_size=344064";
+			};
+		};
+
+	};
+
+	// =====================================================
+	// Partition 2
+	// =====================================================
+	part2:part2 {
+		compatible = "partition";
+		label = "p2-linux";
+		cpus = <9 1 11 1 13 1 15 1 17 1 19 1 21 1 23 1>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+		no-dma-disable;
+
+		aliases {
+			stdout = <&console2>;
+		};
+
+		console2: console {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <2>;
+		};
+
+		bcp2: bc {
+			compatible = "byte-channel";
+			endpoint = <&bc1>;
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
+		};
+
+	};
+
+	// =====================================================
+	// Partition 3
+	// =====================================================
+	part3:part3 {
+		compatible = "partition";
+		label = "p3-linux";
+		cpus = <1 1 3 1 5 1 7 1 16 1 18 1 20 1 22 1>;
+		dtb-window = <0 0x1000000 0 0x10000>;
+		no-dma-disable;
+
+
+		aliases {
+			stdout = <&console3>;
+		};
+
+		console3: console {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <3>;
+		};
+
+		bcp3: bc {
+			compatible = "byte-channel";
+		};
+
+		doorbell-in {
+			compatible = "receive-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		doorbell-out {
+			compatible = "send-doorbell";
+			global-doorbell = <&dbell0>;
+		};
+
+		gpma0 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma2>;
+			guest-addr = <0 0>;
+		};
+
+		gpma1 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma4>;
+			guest-addr = <0 0x20000000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-shmem";
+				delete-prop = "device_type";
+			};
+		};
+
+		gpma2 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma5>;
+			guest-addr = <0 0x20001000>;
+			node-update {
+				prepend-stringlist = "compatible", "fsl-deco";
+				delete-prop = "device_type";
+			};
+		};
+
+	};
+};
