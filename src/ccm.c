@@ -462,7 +462,7 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 		num = guest->cpulist[i + 1];
 
 		for (core = base; core < base + num; core++) {
-			assert(core < MAX_CORES);
+			assert(core < CONFIG_LIBOS_MAX_CPUS);
 			cpus |= 1 << (31 - core);
 		}
 	}

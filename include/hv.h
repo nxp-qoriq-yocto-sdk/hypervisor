@@ -29,8 +29,6 @@
 #include <libos/thread.h>
 #include <libos/trapframe.h>
 
-#define MAX_CORES 8
-
 typedef struct {
 	const char *name;
 	void *ctx;
@@ -123,7 +121,7 @@ int flush_disable_l1_cache(void *disp_addr, uint32_t timeout);
 int check_perfmon(trapframe_t *regs);
 void gcov_config(struct dt_node *hvconfig);
 
-extern char *displacement_flush_area[MAX_CORES];
+extern char *displacement_flush_area[CONFIG_LIBOS_MAX_CPUS];
 
 #define set_cache_reg(reg, val) do { \
 	sync(); \

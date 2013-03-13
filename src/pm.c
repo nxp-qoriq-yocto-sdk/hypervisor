@@ -144,7 +144,7 @@ void sync_nap(trapframe_t *regs)
 	 */
 	prev_cnapcrl = in32(&rcpm[CNAPCRL]);
 
-	for (i = 0; i < MAX_CORES - 1; i++) {
+	for (i = 0; i < CONFIG_LIBOS_MAX_CPUS - 1; i++) {
 		cpu_t *c = &secondary_cpus[i];
 
 		if (c->client.nap_request &&

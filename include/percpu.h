@@ -42,7 +42,7 @@
 #include <handle.h>
 #endif
 
-extern cpu_t secondary_cpus[MAX_CORES - 1];
+extern cpu_t secondary_cpus[CONFIG_LIBOS_MAX_CPUS - 1];
 
 #define TLB1_GSIZE 16 /* As seen by the guest */
 

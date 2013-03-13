@@ -61,7 +61,7 @@ uint32_t hv_queue_prod_lock;
 uint32_t hv_queue_cons_lock;
 static phys_addr_t devtree_ptr;
 
-static gcpu_t noguest[MAX_CORES] = {
+static gcpu_t noguest[CONFIG_LIBOS_MAX_CPUS] = {
 	{
 		.cpu = &cpu0,   /* link back to cpu */
 	}
@@ -74,8 +74,8 @@ cpu_t cpu0 = {
 	.client.gcpu = &noguest[0],
 };
 
-cpu_t secondary_cpus[MAX_CORES - 1];
-static uint8_t secondary_stacks[MAX_CORES - 1][KSTACK_SIZE];
+cpu_t secondary_cpus[CONFIG_LIBOS_MAX_CPUS - 1];
+static uint8_t secondary_stacks[CONFIG_LIBOS_MAX_CPUS - 1][KSTACK_SIZE];
 
 static void core_init(void);
 static void release_secondary_cores(void);
@@ -90,7 +90,7 @@ void *temp_mapping[2];
 extern char _end, _start;
 uint64_t text_phys, bigmap_phys;
 
-char *displacement_flush_area[MAX_CORES];
+char *displacement_flush_area[CONFIG_LIBOS_MAX_CPUS];
 
 int auto_sys_reset_on_stop;
 
@@ -833,7 +833,7 @@ static int count_cores(dt_node_t *node, void *arg)
 	if (prop && prop->len >= 4) {
 		uint32_t reg = *(const uint32_t *)prop->data;
 
-		if (reg <= MAX_CORES) {
+		if (reg <= CONFIG_LIBOS_MAX_CPUS) {
 			partition_init_counter++;
 			cpus_mask |= 1 << (31 - reg);
 		}
@@ -1159,10 +1159,10 @@ static int release_secondary(dt_node_t *node, void *arg)
 	}
 	reg = *(const uint32_t *)prop->data;
 
-	if (reg > MAX_CORES) {
+	if (reg > CONFIG_LIBOS_MAX_CPUS) {
 		printlog(LOGTYPE_MP, LOGLEVEL_NORMAL,
 		         "%s: Ignoring core %d, max cores %d\n",
-		         __func__, reg, MAX_CORES);
+		         __func__, reg, CONFIG_LIBOS_MAX_CPUS);
 		return 0;
 	}
 

@@ -34,7 +34,7 @@
 #include <hv.h>
 #include <events.h>
 
-static sched_t scheds[MAX_CORES];
+static sched_t scheds[CONFIG_LIBOS_MAX_CPUS];
 
 #ifdef CONFIG_LIBOS_64BIT
 extern unsigned long toc_start;
