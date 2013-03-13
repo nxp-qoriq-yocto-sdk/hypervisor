@@ -28,6 +28,7 @@
 #include <hv.h>
 #include <libos/trapframe.h>
 #include <libos/console.h>
+#include <libos/cpu_caps.h>
 #include <guestmemio.h>
 #include <percpu.h>
 #include <libos/trap_booke.h>
@@ -771,6 +772,38 @@ static int emu_mtpmr(trapframe_t *regs, uint32_t insn)
 	return 0;
 }
 
+static int emu_mftmr(trapframe_t *regs, uint32_t insn)
+{
+	int tmr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+	register_t ret;
+
+	if (tmr == TMR_TMCFG0) {
+		/* advertise one hw thread per core */
+		regs->gpregs[reg] = 1 | (1 << TMCFG0_NATHRD_SHIFT);
+		return 0;
+	} else {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		         "mftmr@0x%08lx: invalid reg %d\n",
+		         regs->srr0, tmr);
+	}
+
+	return 1;
+}
+
+static int emu_mttmr(trapframe_t *regs, uint32_t insn)
+{
+	int tmr = get_spr(insn);
+	int reg = (insn >> 21) & 31;
+	register_t val = regs->gpregs[reg];
+
+	printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+	         "mttmr@0x%08lx: unsupported (reg %d, val 0x%lx)\n",
+	         regs->srr0, tmr, val);
+
+	return 1;
+}
+
 static int emu_rfci(trapframe_t *regs, uint32_t insn)
 {
 	gcpu_t *gcpu = get_gcpu();
@@ -1140,6 +1173,16 @@ void hvpriv(trapframe_t *regs)
 
 		case 462:
 			fault = emu_mtpmr(regs, insn);
+			break;
+
+		case 366:
+			if (cpu_has_ftr(CPU_FTR_THREADS))
+				fault = emu_mftmr(regs, insn);
+			break;
+
+		case 494:
+			if (cpu_has_ftr(CPU_FTR_THREADS))
+				fault = emu_mttmr(regs, insn);
 			break;
 		}
 		

@@ -31,6 +31,7 @@
 #include <libos/core-regs.h>
 #include <libos/fsl-booke-tlb.h>
 #include <libos/queue.h>
+#include <libos/cpu_caps.h>
 #include <percpu.h>
 #include <greg.h>
 #include <timers.h>
@@ -255,6 +256,13 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		*val |= TLB1_GSIZE;
 		break;
 
+	case SPR_LRATCFG:
+		if (cpu_has_ftr(CPU_FTR_LRAT)) {
+			*val = 0;
+			break;
+		}
+		return 1;
+
 	case SPR_TLB0PS:
 		*val = mfspr(SPR_TLB0PS);
 		break;
@@ -454,6 +462,23 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 #else
 		return 1;
 #endif
+	case SPR_TENSR:
+	case SPR_TENS:
+	case SPR_TENC:
+		if (cpu_has_ftr(CPU_FTR_THREADS)) {
+			/* Advertise thread0 as enabled */
+			*val = 1;
+			break;
+		}
+		return 1;
+
+	case SPR_TIR:
+		if (cpu_has_ftr(CPU_FTR_THREADS)) {
+			/* Always running from thread0, thus return TIR = 0 */
+			*val = 0;
+			break;
+		}
+		return 1;
 
 	/* Removed Registers are not part of the vcpu and should fail. */
 	case SPR_MSRP:
@@ -882,6 +907,17 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 		}
 		mtspr(SPR_DAC2, val);
 		break;
+
+	case SPR_TENSR:
+	case SPR_TENS:
+	case SPR_TENC:
+	case SPR_TIR:
+		if (cpu_has_ftr(CPU_FTR_THREADS)) {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			         "mtspr@0x%08lx: unsupported write to thread spr %d, val = %lx\n",
+			         regs->srr0, spr, val);
+		}
+		return 1;
 
 	default:
 		return 1;
