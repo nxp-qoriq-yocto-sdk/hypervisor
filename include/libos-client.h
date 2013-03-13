@@ -97,6 +97,9 @@ typedef struct {
 
 	/* the supported number of lrat entries */
 	int lrat_nentries;
+
+	/* link to primary thread's cpu_t or NULL if this is the primary thread */
+	struct cpu *primary;
 } client_cpu_t;
 
 extern unsigned long CCSRBAR_VA; /**< Deprecated virtual base of CCSR */

@@ -934,9 +934,11 @@ static int get_cpu_node_callback(dt_node_t *node, void *arg)
 		return 0;
 	}
 
-	if (*(const uint32_t *)prop->data == ctx->cpunum) {
-		ctx->ret = node;
-		return 1;
+	for (int i = 0; i < prop->len / 4; i++) {
+		if (((const uint32_t *)prop->data)[i] == ctx->cpunum) {
+			ctx->ret = node;
+			return 1;
+		}
 	}
 
 	return 0;

@@ -38,6 +38,8 @@
 #include <libos/alloc.h>
 #include <libos/queue.h>
 #include <libos/cache.h>
+#include <libos/cpu_caps.h>
+#include <libos/mp.h>
 
 #include <hv.h>
 #include <percpu.h>
@@ -79,6 +81,7 @@ static uint8_t secondary_stacks[CONFIG_LIBOS_MAX_CPUS - 1][KSTACK_SIZE];
 
 static void core_init(void);
 static void release_secondary_cores(void);
+static void release_secondary_threads(void);
 static void partition_init(void);
 
 #define UART_OFFSET		0x11c500
@@ -831,11 +834,14 @@ static int count_cores(dt_node_t *node, void *arg)
 {
 	dt_prop_t *prop = dt_get_prop(node, "reg", 0);
 	if (prop && prop->len >= 4) {
-		uint32_t reg = *(const uint32_t *)prop->data;
+		const uint32_t *reg = (const uint32_t *)prop->data;
+		int i;
 
-		if (reg <= CONFIG_LIBOS_MAX_CPUS) {
-			partition_init_counter++;
-			cpus_mask |= 1 << (31 - reg);
+		for (i = 0; i < min(prop->len / 4, cpu_caps.threads_per_core); i++) {
+			if (reg[i] < CONFIG_LIBOS_MAX_CPUS) {
+				partition_init_counter++;
+				cpus_mask |= 1 << (31 - reg[i]);
+			}
 		}
 	}
 
@@ -1108,16 +1114,28 @@ void libos_client_entry(unsigned long treephys)
 
 	/* Main device tree must be const after this point. */
 	release_secondary_cores();
+
+	release_secondary_threads();
+
 	partition_init();
 }
 
 void secondary_init(void)
 {
-	secondary_map_mem();
-	cpu->console_ok = 1;
+	if (get_hw_thread_id() == 0) {
+		secondary_map_mem();
+		cpu->console_ok = 1;
 
-	core_init();
-	mpic_reset_core();
+		core_init();
+		mpic_reset_core();
+
+		release_secondary_threads();
+	} else {
+		cpu->console_ok = 1;
+
+		core_init();
+	}
+
 	enable_int();
 	enable_mcheck();
 #ifdef CONFIG_HV_WATCHDOG
@@ -1214,6 +1232,47 @@ static void release_secondary_cores(void)
 {
 	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4,
 	                       release_secondary, NULL);
+}
+
+static void release_secondary_threads(void)
+{
+	dt_node_t *cpu_node;
+	dt_prop_t *prop;
+	const uint32_t *reg;
+
+	cpu_node = get_cpu_node(hw_devtree, cpu->coreid);
+	if (!cpu_node) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			 "%s: couldn't get device tree node for CPU%u\n",
+			 __func__, cpu->coreid);
+		return;
+	}
+	prop = dt_get_prop(cpu_node, "reg", 0);
+	if (!prop) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+			 "%s: Missing/bad reg property for CPU%u node\n",
+			 __func__, cpu->coreid);
+		return;
+	}
+	reg = (const uint32_t *)prop->data;
+	assert(prop->len / sizeof(uint32_t) >= cpu_caps.threads_per_core);
+
+	for (int i = 1; i < cpu_caps.threads_per_core; i++) {
+		cpu_t *newcpu = &secondary_cpus[reg[i] - 1];
+		newcpu->kstack = secondary_stacks[reg[i] - 1] + KSTACK_SIZE - FRAMELEN;
+
+		newcpu->client.primary = cpu;
+		newcpu->client.gcpu = &noguest[reg[i]];
+		newcpu->client.gcpu->cpu = newcpu;  /* link back to cpu */
+		newcpu->coreid = reg[i];
+
+		sched_core_init(newcpu);
+
+		/* Terminate the callback chain. */
+		newcpu->kstack[KSTACK_SIZE - FRAMELEN] = 0;
+
+		start_hw_thread(i, mfmsr() & ~(MSR_EE | MSR_CE | MSR_ME | MSR_DE), newcpu);
+	}
 }
 
 static void partition_init(void)
