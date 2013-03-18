@@ -25,14 +25,34 @@
 -------------------------------------------------------
 Freescale Hypervisor Release Notes
 
-Topaz Version: 1.2
-Revision: 003
-Date: 04/12/2012
+Topaz Version: 1.3
+Revision: 001
+Date: 03/18/2013
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-001 bug fixes and changes
+       -initial e6500 core support featuring MMUv2, LRAT, hw pagewalk
+       -e6500 support known limitations:
+        * most of the SoC hw blocks are unsupported (cpc, ddr, l2 cache a.s.o.)
+        * threads are not supported
+        * ccm must be explicitly disabled either by removing the nodes from
+          hv config dts or by tweaking the code
+       -added options in the HV config file to configure TLB behavior:
+        * direct-guest-tlb-miss: tlb misses directed to the guest
+        * direct-guest-tlb-mgt: tlb management instructions (tlbwe, tlbilx)
+          are allowed in guest
+       -tlb0 caching was disabled on e6500 cores (support for this is not useful
+        and would impact performance on other platforms)
+       -add support for cache-able spin-table, epapr conformance
+       -add support to handle altivec exceptions
+       -libos: simple thread api and example
+       -libos: introduced a cpu capability querying api
+       -fixed a long-standing l2 flush timeout issue on 64 bit
+       -lots of e6500 related unit test updates
+
    -v1.2-003 bug fixes and changes
        -added work-around for A-004510 erratum
        -fixes in pamu and ccm handling
