@@ -28,6 +28,7 @@
 
 #include <libos/printlog.h>
 #include <libos/io.h>
+#include <libos/cpu_caps.h>
 
 #include <guts.h>
 #include <devtree.h>
@@ -36,6 +37,8 @@
 static uint32_t *guts_rstcr;  /* reset control register */
 static uint32_t *guts_crstr0;  /* core reset status register */
 static uint32_t *guts_rstrqmr;  /* reset request mask register */
+static uint32_t *guts_tp_cluster; /* topology registers */
+static uint32_t *guts_tp_init; /* topology registers */
 
 static int guts_devconfig_probe(device_t *dev, const dev_compat_t *compat_id);
 
@@ -65,8 +68,33 @@ static int guts_devconfig_probe(device_t *dev, const dev_compat_t *compat_id)
 	guts_rstcr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTCR);
 	guts_crstr0 = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_CRSTR0);
 	guts_rstrqmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTRQMR);
+	guts_tp_cluster = (uint32_t *)((uintptr_t)dev->regs[0].virt + GUTS_TP_CLUSTER);
+	guts_tp_init = (uint32_t *)((uintptr_t)dev->regs[0].virt + GUTS_TP_INIT);
 
 	return 0;
+}
+
+int get_cluster_for_cpu_id(int cpu_id)
+{
+	int cpu_count = 0, cluster_id = 0;
+	uint32_t cluster;
+
+	do {
+		cluster = in32(guts_tp_cluster + 2 * cluster_id);
+		for (int i = 0; i < TP_ITYPE_PER_CLUSTER; i++) {
+			uint32_t index = (cluster >> (i * 8)) & TP_CLUSTER_ITYPE_MASK;
+			uint32_t type = in32(guts_tp_init + index);
+			if (type & TP_IDX_CPU) {
+				if (cpu_id == cpu_count * cpu_caps.threads_per_core)
+					return cluster_id;
+				cpu_count++;
+			}
+
+		}
+		cluster_id++;
+	} while (!(cluster & TP_CLUSTER_EOC));
+
+	return -1;
 }
 
 /**

@@ -29,6 +29,14 @@
 #define GUTS_RSTCR  0xB0
 #define GUTS_CRSTR0 0x400
 #define GUTS_RSTRQMR 0xC0
+#define GUTS_TP_INIT 0x740
+#define GUTS_TP_CLUSTER 0x844
+
+
+#define TP_ITYPE_PER_CLUSTER 4
+#define TP_CLUSTER_ITYPE_MASK 0x0000003f
+#define TP_IDX_CPU 0x2
+#define TP_CLUSTER_EOC 0x80000000 /* end of clusters */
 
 #define RSTCR_RESET_REQ 0x2
 
@@ -40,6 +48,7 @@
 int system_reset(void);
 int get_sys_reset_status(void);
 int set_reset_mask(uint32_t mask);
+int get_cluster_for_cpu_id(int cpu_id);
 
 #define SYS_RESET_STATUS_POR  1
 #define SYS_RESET_STATUS_HARD 2
