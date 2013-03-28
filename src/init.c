@@ -595,33 +595,56 @@ static int init_hv_mem(phys_addr_t cfg_addr)
 	return 0;
 }
 
+#define EARLY_DEVICES_COUNT 3
+
 static void early_bind_devices(void)
 {
 	dt_prop_t *prop;
 	dt_node_t *node;
-	const char *compat_srch_str[] = {
-		"fsl,qoriq-device-config-1.0",
-		 "fsl,corenet-law",	/* before corenet-cf driver */
-		 "fsl,corenet-cf"
+	dt_node_t *sorted[EARLY_DEVICES_COUNT] = {};
+	const dev_compat_t *compat_id;
+
+	const dev_compat_t early_dev_compats[] = {
+		/* qoriq-device-config compatibles */
+		{
+			.compatible	= "fsl,qoriq-device-config-1.0",
+			.data = &sorted[0]
+		},
+		{
+			.compatible = "fsl,t4240-device-config",
+			.data = &sorted[0]
+		},
+		/* corenet law compatibles */
+		{
+			.compatible = "fsl,corenet-law",
+			.data = &sorted[1]
+		},
+		/* corenet cf compatibles */
+		{
+			.compatible = "fsl,corenet-cf",
+			.data = &sorted[2]
+		},
+		{
+			.compatible = "fsl,corenet2-cf",
+			.data = &sorted[2]
+		},
+		{}
 	};
-	dt_node_t *sorted[sizeof(compat_srch_str) / sizeof(compat_srch_str[0])] = {};
 
 	list_for_each(&hv_devs, i) {
 		dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
 		prop = dt_get_prop(owner->hwnode, "compatible", 0);
 		if (!prop)
 			continue;
-		if (!strcmp((const char *)prop->data, compat_srch_str[0]))
-			sorted[0] = owner->hwnode;
-		else if (!strcmp((const char *)prop->data, compat_srch_str[1]))
-			sorted[1] = owner->hwnode;
-		else if (!strcmp((const char *)prop->data, compat_srch_str[2]))
-			sorted[2] = owner->hwnode;
+		compat_id = match_compat(prop->data, prop->len, early_dev_compats);
+		if (!compat_id)
+			continue;
+
+		*(struct dt_node **)compat_id->data = owner->hwnode;
 	}
 
 	/* Execution dependence: law driver before ccm driver */
-	for (int i = 0; i < sizeof(compat_srch_str) / sizeof(compat_srch_str[0]);
-	     i++) {
+	for (int i = 0; i < EARLY_DEVICES_COUNT; i++) {
 		if (!sorted[i])
 			continue;
 
