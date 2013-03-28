@@ -611,7 +611,7 @@ static void early_bind_devices(void)
 			.data = &sorted[0]
 		},
 		{
-			.compatible = "fsl,t4240-device-config",
+			.compatible = "fsl,qoriq-device-config-2.0",
 			.data = &sorted[0]
 		},
 		/* corenet law compatibles */

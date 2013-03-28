@@ -1248,7 +1248,7 @@ static driver_t __driver pamu = {
 
 static const char *qoriq_device_config[] = {
 	"fsl,qoriq-device-config-1.0",
-	"fsl,t4240-device-config",
+	"fsl,qoriq-device-config-2.0",
 	NULL
 };
 

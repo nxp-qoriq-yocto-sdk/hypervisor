@@ -43,6 +43,9 @@ static const dev_compat_t guts_devconfig_compats[] = {
 	{
 		.compatible = "fsl,qoriq-device-config-1.0"
 	},
+	{
+		.compatible = "fsl,qoriq-device-config-2.0"
+	},
 	{}
 };
 
