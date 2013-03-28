@@ -49,15 +49,20 @@ static struct ddr_error_info ddr_err[DDR_ERROR_COUNT] = {
 	[ddr_address_parity] = {NULL, DDR_ERR_DET_APE},
 };
 
-static int ddr_probe(driver_t *drv, device_t *dev);
+static int ddr_probe(device_t *dev, const dev_compat_t *compat_id);
 
-static driver_t __driver ddr_4080 = {
-	.compatible = "fsl,p4080-memory-controller",
-	.probe = ddr_probe
+static const dev_compat_t ddr_compat[] = {
+	{
+		.compatible = "fsl,p4080-memory-controller"
+	},
+	{
+		.compatible = "fsl,qoriq-memory-controller"
+	},
+	{}
 };
 
 static driver_t __driver ddr = {
-	.compatible = "fsl,qoriq-memory-controller",
+	.compatibles = ddr_compat,
 	.probe = ddr_probe
 };
 
@@ -136,7 +141,7 @@ static int ddr_error_isr(void *arg)
 	return 0;
 }
 
-static int ddr_probe(driver_t *drv, device_t *dev)
+static int ddr_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	ddr_err_reg_t *ddr_err_regs;
 
@@ -180,8 +185,6 @@ static int ddr_probe(driver_t *drv, device_t *dev)
 			out32(&ddr_err_regs->ddr_err_int_en, val);
 		}
 	}
-
-	dev->driver = &ddr;
 
 	return 0;
 }

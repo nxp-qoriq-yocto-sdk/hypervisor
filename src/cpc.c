@@ -138,10 +138,17 @@ int reset_cpc(mem_tgts_t mem_tgt)
 }
 
 
-static int cpc_probe(driver_t *drv, device_t *dev);
+static int cpc_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t cpc_compats[] = {
+	{
+		.compatible = "fsl,p4080-l3-cache-controller",
+	},
+	{}
+};
 
 static driver_t __driver cpc = {
-	.compatible = "fsl,p4080-l3-cache-controller",
+	.compatibles = cpc_compats,
 	.probe = cpc_probe
 };
 
@@ -220,7 +227,7 @@ static int cpc_error_isr(void *arg)
 	return 0;
 }
 
-static int cpc_probe(driver_t *drv, device_t *dev)
+static int cpc_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	dt_node_t *cpc_node;
 	dt_prop_t *prop;
@@ -328,8 +335,6 @@ static int cpc_probe(driver_t *drv, device_t *dev)
 			}
 		}
 	}
-
-	dev->driver = &cpc;
 
 	return 0;
 }

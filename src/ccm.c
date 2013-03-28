@@ -60,16 +60,31 @@ static uint32_t *err_det_reg, *err_enb_reg;
 static uint32_t csdid_map, pma_lock;
 static uint32_t numcsds, numlaws;
 
-static int ccm_probe(driver_t *drv, device_t *dev);
-static int law_probe(driver_t *drv, device_t *dev);
+static int ccm_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static int law_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t ccm_compats[] = {
+	{
+		.compatible = "fsl,corenet-cf",
+	},
+	{}
+};
 
 static driver_t __driver ccm = {
-	.compatible = "fsl,corenet-cf",
+	.compatibles = ccm_compats,
 	.probe = ccm_probe
 };
 
+static const dev_compat_t law_compats[] = {
+	{
+		.compatible = "fsl,corenet-law",
+	},
+	{}
+};
+
 static driver_t __driver law = {
-	.compatible = "fsl,corenet-law",
+	.compatibles = law_compats,
 	.probe = law_probe
 };
 
@@ -167,7 +182,7 @@ static int ccm_error_isr(void *arg)
 	return 0;
 }
 
-static int ccm_probe(driver_t *drv, device_t *dev)
+static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
@@ -284,12 +299,10 @@ static int ccm_probe(driver_t *drv, device_t *dev)
 		}
 	}
 
-	dev->driver = &ccm;
-
 	return 0;
 }
 
-static int law_probe(driver_t *drv, device_t *dev)
+static int law_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
@@ -311,8 +324,6 @@ static int law_probe(driver_t *drv, device_t *dev)
 	}
 
 	laws = (law_t *) ((uintptr_t)dev->regs[0].virt + 0xc00);
-
-	dev->driver = &law;
 
 #ifndef CONFIG_WARM_REBOOT
 	return 0;

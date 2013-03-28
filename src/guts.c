@@ -37,14 +37,21 @@ static uint32_t *guts_rstcr;  /* reset control register */
 static uint32_t *guts_crstr0;  /* core reset status register */
 static uint32_t *guts_rstrqmr;  /* reset request mask register */
 
-static int guts_devconfig_probe(driver_t *drv, device_t *dev);
+static int guts_devconfig_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t guts_devconfig_compats[] = {
+	{
+		.compatible = "fsl,qoriq-device-config-1.0"
+	},
+	{}
+};
 
 static driver_t __driver guts_devconfig = {
-	.compatible = "fsl,qoriq-device-config-1.0",
+	.compatibles = guts_devconfig_compats,
 	.probe = guts_devconfig_probe
 };
 
-static int guts_devconfig_probe(driver_t *drv, device_t *dev)
+static int guts_devconfig_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
@@ -55,8 +62,6 @@ static int guts_devconfig_probe(driver_t *drv, device_t *dev)
 	guts_rstcr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTCR);
 	guts_crstr0 = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_CRSTR0);
 	guts_rstrqmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTRQMR);
-
-	dev->driver = &guts_devconfig;
 
 	return 0;
 }

@@ -57,14 +57,21 @@ sleep_status_t sleep_regs[] = {
 
 static uint32_t *rcpm; /* run control and power management */
 
-static int rcpm_probe(driver_t *drv, device_t *dev);
+static int rcpm_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t rcpm_compats[] = {
+	{
+		.compatible	= "fsl,qoriq-rcpm-1.0"
+	},
+	{}
+};
 
 static driver_t __driver rcpm_driver = {
-	.compatible = "fsl,qoriq-rcpm-1.0",
+	.compatibles = rcpm_compats,
 	.probe = rcpm_probe,
 };
 
-static int rcpm_probe(driver_t *drv, device_t *dev)
+static int rcpm_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_PM, LOGLEVEL_ERROR, "rcpm: bad regs\n");
@@ -72,7 +79,6 @@ static int rcpm_probe(driver_t *drv, device_t *dev)
 	}
 
 	rcpm = (uint32_t *)dev->regs[0].virt;
-	dev->driver = &rcpm_driver;
 
 	/* Make sure timebase runs while napping, to preserve sync */
 	out32(&rcpm[CTBHLTCRL], 0xffffffff);

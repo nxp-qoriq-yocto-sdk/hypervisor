@@ -1228,15 +1228,21 @@ static int pamu_av_isr(void *arg)
 	return ret;
 }
 
-static int pamu_probe(driver_t *drv, device_t *dev);
+static int pamu_probe(device_t *dev, const dev_compat_t *compat_id);
 
-static driver_t __driver pamu_4080 = {
-	.compatible = "fsl,p4080-pamu",
-	.probe = pamu_probe
+static const dev_compat_t pamu_compat[] = {
+	{
+		.compatible = "fsl,p4080-pamu"
+	},
+	{
+		.compatible = "fsl,pamu"
+	},
+	{}
+
 };
 
 static driver_t __driver pamu = {
-	.compatible = "fsl,pamu",
+	.compatibles = pamu_compat,
 	.probe = pamu_probe
 };
 
@@ -1247,7 +1253,7 @@ static const char *qoriq_device_config[] = {
 };
 
 #define PAMUBYPENR 0x604
-static int pamu_probe(driver_t *drv, device_t *dev)
+static int pamu_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	int ret;
 	void *vaddr;

@@ -34,10 +34,17 @@
 
 static const char *sram_err_policy;
 
-static int sram_probe(driver_t *drv, device_t *dev);
+static int sram_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t sram_compats[] = {
+	{
+		.compatible = "fsl,soc-sram-error"
+	},
+	{}
+};
 
 static driver_t __driver sram = {
-	.compatible = "fsl,soc-sram-error",
+	.compatibles = sram_compats,
 	.probe = sram_probe
 };
 
@@ -63,7 +70,7 @@ static int sram_error_isr(void *arg)
 	return 0;
 }
 
-static int sram_probe(driver_t *drv, device_t *dev)
+static int sram_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	printlog(LOGTYPE_MISC, LOGLEVEL_DEBUG, "SOC SRAM probe routine\n");
 
@@ -79,8 +86,6 @@ static int sram_probe(driver_t *drv, device_t *dev)
 				set_reset_mask(RSTRQMR_MBEE_MSK);
 		}
 	}
-
-	dev->driver = &sram;
 
 	return 0;
 }

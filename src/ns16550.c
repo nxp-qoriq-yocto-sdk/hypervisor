@@ -34,14 +34,21 @@
 
 struct chardev;
 
-static int ns16550_probe(driver_t *drv, device_t *dev);
+static int ns16550_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t ns16550_compats[] = {
+	{
+		.compatible = "ns16550"
+	},
+	{}
+};
 
 static driver_t __driver ns16550 = {
-	.compatible = "ns16550",
+	.compatibles = ns16550_compats,
 	.probe = ns16550_probe
 };
 
-static int ns16550_probe(driver_t *drv, device_t *dev)
+static int ns16550_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	struct chardev *cd;
 	interrupt_t *irq = NULL;
@@ -96,7 +103,6 @@ static int ns16550_probe(driver_t *drv, device_t *dev)
 
 	cd = ns16550_init(dev->regs[0].virt, irq, freq, 16, baud);
 
-	dev->driver = &ns16550;
 	dev->chardev = cd;
 	return 0;
 }

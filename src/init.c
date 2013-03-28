@@ -217,14 +217,21 @@ static void exclude_memrsv(void *fdt)
 	}
 }
 
-static int mpic_probe(driver_t *drv, device_t *dev);
+static int mpic_probe(device_t *dev, const dev_compat_t *compat_id);
+
+static const dev_compat_t pic_compats[] = {
+	{
+		.compatible = "chrp,open-pic",
+	},
+	{},
+};
 
 static driver_t __driver mpic_driver = {
-	.compatible = "chrp,open-pic",
+	.compatibles = pic_compats,
 	.probe = mpic_probe
 };
 
-static int mpic_probe(driver_t *drv, device_t *dev)
+static int mpic_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	int coreint = 1;
 	dt_node_t *node;
@@ -235,7 +242,6 @@ static int mpic_probe(driver_t *drv, device_t *dev)
 
 	mpic_init(coreint);
 
-	dev->driver = &mpic_driver;
 	dev->irqctrl = &mpic_ops;
 	return 0;
 }
