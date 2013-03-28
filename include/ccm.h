@@ -39,5 +39,6 @@ void add_cpus_to_csd(struct guest *guest, struct dt_node *node);
 void add_all_cpus_to_csd(struct dt_node *node);
 int setup_pamu_law(struct dt_node *node);
 struct dt_node *get_pma_node(struct dt_node *node);
+int ccf_get_snoop_id(uint32_t cpu);
 
 #endif

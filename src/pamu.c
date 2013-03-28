@@ -229,7 +229,7 @@ static uint32_t get_snoop_id(dt_node_t *gnode, guest_t *guest)
 		          __func__, node->name);
 		return ~(uint32_t)0;
 	}
-	return *(const uint32_t *)prop->data;
+	return ccf_get_snoop_id(*(const uint32_t *)prop->data);
 }
 
 #define PEXIWBAR 0xDA8
@@ -727,7 +727,8 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 			goto skip_snoop_id;
 		}
 
-		snpid = get_snoop_id(gnode, guest) + 1;
+		snpid = get_snoop_id(gnode, guest);
+
 	}
 skip_snoop_id:
 

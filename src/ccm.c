@@ -31,6 +31,7 @@
 #include <libos/alloc.h>
 #include <libos/platform_error.h>
 
+#include <guts.h>
 #include <p4080.h>
 #include <ccm.h>
 #include <cpc.h>
@@ -50,15 +51,24 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
 };
 
+static int ccf_cc_type_core = 1;
+static int ccf_cc_type_cluster = 2;
+
+static const dev_compat_t *drv_compat_id;
+
 #ifdef CONFIG_WARM_REBOOT
 int *ddr_laws_found;
 #endif
 
 static law_t *laws;
 static uint32_t *csdids;
+uint32_t *sidmr; /* Snoop ID Port mapping register */
 static uint32_t *err_det_reg, *err_enb_reg;
 static uint32_t csdid_map, pma_lock;
 static uint32_t numcsds, numlaws;
+static int num_snoopids;
+
+static uint32_t get_cc_id(uint32_t cpus);
 
 static int ccm_probe(device_t *dev, const dev_compat_t *compat_id);
 
@@ -67,6 +77,11 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id);
 static const dev_compat_t ccm_compats[] = {
 	{
 		.compatible = "fsl,corenet-cf",
+		.data = &ccf_cc_type_core
+	},
+	{
+		.compatible	= "fsl,corenet2-cf",
+		.data = &ccf_cc_type_cluster
 	},
 	{}
 };
@@ -186,8 +201,7 @@ static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
-	uint32_t i, *sidmr; /* Snoop ID Port mapping register */
-	int num_snoopids;
+	uint32_t i;
 
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
@@ -204,6 +218,8 @@ static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 		         __func__, node->name);
 		return ERR_BADTREE;
 	}
+
+	drv_compat_id = compat_id;
 
 	csdids = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x600);
 
@@ -259,18 +275,6 @@ static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 	}
 
 	sidmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x200);
-
-	/*
-	 * NOTE: Looks like SIDMR00 is used for snoop-id 0, i.e, to enable
-	 * snooping on all cores, hence program SIDMR01 onwards
-	 */
-#ifdef CONFIG_WARM_REBOOT
-	if (!warm_reboot)
-#endif
-	{
-		for (int i = 1; i < num_snoopids; i++)
-			out32(&sidmr[i], (0x80000000 >> (i - 1)));
-	}
 
 	err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEDR);
 	err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEER);
@@ -438,14 +442,14 @@ static void pma_setup_cpc(dt_node_t *node)
 	}
 }
 
-static void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
+static void set_csd(csd_info_t *csd, uint32_t csd_mask)
 {
 	uint32_t val;
 
 	disable_law(csd->law_id);
 
 	val = in32(&csdids[csd->csd_id]);
-	val |= cpus;
+	val |= csd_mask;
 	out32(&csdids[csd->csd_id], val);
 
 	enable_law(csd->law_id);
@@ -453,16 +457,27 @@ static void set_csd_cpus(csd_info_t *csd, uint32_t cpus)
 
 void add_all_cpus_to_csd(dt_node_t *node)
 {
+	uint32_t csd_mask = 0;
+	uint32_t cpus = cpus_mask;
+	uint32_t cpu, cc_id;
+
 	if (!node->csd)
 		return;
 
-	set_csd_cpus(node->csd, cpus_mask);
+	while (cpus) {
+		cpu = count_msb_zeroes_32(cpus);
+		cc_id = get_cc_id(cpu);
+		cpus &= ~(1 << (31 - cpu));
+		csd_mask |= 1 << (31 - cc_id);
+	}
+
+	set_csd(node->csd, csd_mask);
 }
 
 void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 {
 	uint32_t i, core, base, num;
-	uint32_t cpus = 0;
+	uint32_t csd_mask = 0;
 	register_t saved;
 
 	if (!node->csd)
@@ -474,13 +489,22 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 
 		for (core = base; core < base + num; core++) {
 			assert(core < CONFIG_LIBOS_MAX_CPUS);
-			cpus |= 1 << (31 - core);
+			csd_mask |= 1 << (31 - get_cc_id(core));
 		}
 	}
 
 	saved = spin_lock_intsave(&node->csd->csd_lock);
-	set_csd_cpus(node->csd, cpus);
+	set_csd(node->csd, csd_mask);
 	spin_unlock_intsave(&node->csd->csd_lock, saved);
+}
+
+static uint32_t get_cc_id(uint32_t cpu)
+{
+	if (*(int *)drv_compat_id->data == ccf_cc_type_core)
+		return cpu;
+	else
+		return get_cluster_for_cpu_id(cpu);
+
 }
 
 static int get_sizebit(phys_addr_t size)
@@ -768,12 +792,29 @@ int setup_pamu_law(dt_node_t *node)
 		}
 #endif
 
-		set_csd_cpus(node->csd, csd_port_id);
+		set_csd(node->csd, csd_port_id);
 	}
 
 	return ret;
 }
 #endif
+
+int ccf_get_snoop_id(uint32_t cpu)
+{
+	int cc_id = get_cc_id(cpu);
+
+	if (cc_id >= num_snoopids)
+		return -1;
+	
+	/*
+	 * NOTE: Looks like SIDMR00 is used for snoop-id 0, i.e, to enable
+	 * snooping on all cores, hence program SIDMR01 onwards
+	 */
+
+	out32(&sidmr[cc_id + 1], (0x80000000 >> cc_id));
+
+	return cc_id + 1;
+}
 
 static int setup_csd(dt_node_t *node, void *arg)
 {
