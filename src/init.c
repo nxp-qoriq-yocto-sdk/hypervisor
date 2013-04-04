@@ -1139,6 +1139,7 @@ void secondary_init(void)
 		cpu->console_ok = 1;
 
 		core_init();
+		mpic_reset_core();
 	}
 
 	enable_int();
