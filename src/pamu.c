@@ -703,7 +703,7 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 
 		// Convert the physical CPU number to a guest CPU number
 		for (unsigned i = 0; i < guest->cpucnt; i++) {
-			if (guest->gcpus[i]->cpu->coreid == pcpu) {
+			if (vcpu_to_cpu(guest->cpulist, guest->cpulist_len, i) == pcpu) {
 				liodn_data[liodn].stash_vcpu = i;
 				break;
 			}
