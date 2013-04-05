@@ -39,7 +39,9 @@
 /* Define LAW targets here */
 #define LAW_TRGT_DDR1	0x10
 #define LAW_TRGT_DDR2	0x11
-#define LAW_TRGT_INTLV	0x14
+#define LAW_TRGT_DDR3   0x12
+#define LAW_TRGT_INTLV_12	0x14
+#define LAW_TRGT_INTLV_123  0x17
 
 typedef struct {
 	uint32_t high, low, attr, reserved;

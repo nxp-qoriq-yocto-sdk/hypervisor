@@ -144,6 +144,9 @@ static const dev_compat_t cpc_compats[] = {
 	{
 		.compatible = "fsl,p4080-l3-cache-controller",
 	},
+	{
+		.compatible = "fsl,t4240-l3-cache-controller"
+	},
 	{}
 };
 
@@ -403,27 +406,53 @@ void allocate_cpc_ways(dt_prop_t *prop, uint32_t tgt, uint32_t csdid, dt_node_t 
 	case LAW_TRGT_DDR1:
 		node->cpc_reg[mem_tgt_ddr1] = allocate_ways(mem_tgt_ddr1, prop, csdid);
 		node->cpc_reg[mem_tgt_ddr2] = NULL;
+		node->cpc_reg[mem_tgt_ddr3] = NULL;
 		break;
 	case LAW_TRGT_DDR2:
 		if (num_cpcs > 1) {
 			node->cpc_reg[mem_tgt_ddr1] = NULL;
 			node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+			node->cpc_reg[mem_tgt_ddr3] = NULL;
 		} else {
 			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
 			         "%s: ERROR: only 1 CPC available\n",
 			         __func__);
 		}
 		break;
-	case LAW_TRGT_INTLV:
+	case LAW_TRGT_DDR3:
+		if (num_cpcs > 2) {
+			node->cpc_reg[mem_tgt_ddr1] = NULL;
+			node->cpc_reg[mem_tgt_ddr2] = NULL;
+			node->cpc_reg[mem_tgt_ddr3] = allocate_ways(mem_tgt_ddr3, prop, csdid);
+		} else {
+			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			         "%s: ERROR: not enough CPCs available\n",
+			         __func__);
+		}
+		break;
+	case LAW_TRGT_INTLV_12:
 		if (num_cpcs > 1) {
 			node->cpc_reg[mem_tgt_ddr1] = allocate_ways(mem_tgt_ddr1, prop, csdid);
 			node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+			node->cpc_reg[mem_tgt_ddr3] = NULL;
 		} else {
 			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
 			         "%s: ERROR: only 1 CPC available\n",
 			         __func__);
 		}
 		break;
+	case LAW_TRGT_INTLV_123:
+		if (num_cpcs > 2) {
+			node->cpc_reg[mem_tgt_ddr1] = allocate_ways(mem_tgt_ddr1, prop, csdid);
+			node->cpc_reg[mem_tgt_ddr2] = allocate_ways(mem_tgt_ddr2, prop, csdid);
+			node->cpc_reg[mem_tgt_ddr3] = allocate_ways(mem_tgt_ddr3, prop, csdid);
+		} else {
+			printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
+			         "%s: ERROR: not enough CPCs available\n",
+			         __func__);
+		}
+		break;
+
 	default:
 		printlog(LOGTYPE_CPC, LOGLEVEL_ERROR,
 		        "Invalid target for CPC\n");

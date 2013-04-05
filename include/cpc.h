@@ -54,6 +54,7 @@ typedef struct cpc_dev {
 typedef enum mem_tgts {
 	mem_tgt_ddr1,
 	mem_tgt_ddr2,
+	mem_tgt_ddr3,
 	max_num_mem_tgts
 } mem_tgts_t;
 

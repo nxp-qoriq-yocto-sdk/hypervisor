@@ -333,7 +333,7 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id)
 	return 0;
 #else
 	phys_addr_t addr;
-	int ddr1_pos, ddr2_pos, ddrint_pos;
+	int ddr1_pos, ddr2_pos, ddr3_pos, ddrint12_pos, ddrint123_pos;
 	uint32_t tgt = 0, val;
 	int lawidx, found_hv_laws = 0;
 
@@ -366,7 +366,7 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id)
 	 * Alg: find the rightmost LAW for each of the three target IDs and
 	 * delete any LAW to the left of that target.
 	 */
-	ddr1_pos = ddr2_pos = ddrint_pos = numlaws;
+	ddr1_pos = ddr2_pos = ddr3_pos = ddrint12_pos = ddrint123_pos = numlaws;
 
 	for (lawidx = numlaws - 1; lawidx >= 0; lawidx--) {
 		val = in32(&laws[lawidx].attr);
@@ -380,7 +380,9 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id)
 			 */
 			if ((ddr1_pos < numlaws && tgt == LAW_TRGT_DDR1) ||
 			    (ddr2_pos < numlaws && tgt == LAW_TRGT_DDR2) ||
-			    (ddrint_pos < numlaws && tgt == LAW_TRGT_INTLV)) {
+				(ddr3_pos < numlaws && tgt == LAW_TRGT_DDR3) ||
+			    (ddrint12_pos < numlaws && tgt == LAW_TRGT_INTLV_12) ||
+				(ddrint123_pos < numlaws && tgt == LAW_TRGT_INTLV_123)) {
 				found_hv_laws = 1;
 				disable_law(lawidx);
 				ddr_laws_found[lawidx] = (val & LAWAR_CSDID_MASK)
@@ -394,8 +396,12 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id)
 				ddr1_pos = lawidx;
 			else if (ddr2_pos == numlaws && tgt == LAW_TRGT_DDR2)
 				ddr2_pos = lawidx;
-			else if (ddrint_pos == numlaws && tgt == LAW_TRGT_INTLV)
-				ddrint_pos = lawidx;
+			else if (ddr3_pos == numlaws && tgt == LAW_TRGT_DDR3)
+				ddr3_pos = lawidx;
+			else if (ddrint12_pos == numlaws && tgt == LAW_TRGT_INTLV_12)
+				ddrint12_pos = lawidx;
+			else if (ddrint123_pos == numlaws && tgt == LAW_TRGT_INTLV_123)
+				ddrint123_pos = lawidx;
 		}
 	}
 

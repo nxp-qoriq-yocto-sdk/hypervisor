@@ -84,7 +84,7 @@ static void dump_mcheck_error(hv_error_t *err)
 
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
 	[error_mcheck] = {(const char *[]){NULL}, "machine check", NULL, 0, dump_mcheck_error},
-	[error_cpc] = {(const char *[]){"fsl,p4080-l3-cache-controller", NULL}, "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL},
+	[error_cpc] = {(const char *[]){"fsl,p4080-l3-cache-controller", "fsl,t4240-l3-cache-controller", NULL}, "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL},
 	[error_ccf] = {(const char *[]){"fsl,corenet-cf", "fsl,corenet2-cf", NULL}, "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL},
 	[error_misc] = {(const char *[]){"fsl,soc-sram-error", NULL}, "misc", misc_error_policy, MISC_ERROR_COUNT, NULL},
 	[error_pamu] = {(const char *[]){"fsl,pamu", "fsl,p4080-pamu", NULL}, "pamu", pamu_error_policy, PAMU_ERROR_COUNT, NULL},
