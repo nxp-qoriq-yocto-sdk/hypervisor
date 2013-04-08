@@ -29,7 +29,7 @@
 #include <libos/io.h>
 #include <libos/platform_error.h>
 
-#include <p4080.h>
+#include <corenet.h>
 #include <cpc.h>
 #include <devtree.h>
 #include <percpu.h>

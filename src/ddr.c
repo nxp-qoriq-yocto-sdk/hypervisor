@@ -27,7 +27,7 @@
 
 #include <libos/platform_error.h>
 
-#include <p4080.h>
+#include <corenet.h>
 #include <percpu.h>
 #include <errors.h>
 #include <error_log.h>

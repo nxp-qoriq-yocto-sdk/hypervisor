@@ -32,7 +32,7 @@
 #include <libos/platform_error.h>
 
 #include <guts.h>
-#include <p4080.h>
+#include <corenet.h>
 #include <ccm.h>
 #include <cpc.h>
 #include <devtree.h>
