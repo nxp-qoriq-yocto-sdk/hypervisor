@@ -1,0 +1,9 @@
+This test requires DDR interleaving be disabled.
+
+To disable it make sure that the hwconfig environment variable in u-boot
+includes:
+	fsl_ddr:ctlr_intlv=null
+
+Example:
+	setenv hwconfig "fsl_ddr:ctlr_intlv=null;fsl_fm1_xaui_phy:xfi"
+
