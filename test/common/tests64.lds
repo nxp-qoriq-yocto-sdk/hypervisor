@@ -28,37 +28,37 @@ OUTPUT_ARCH(powerpc:common64)
 
 SECTIONS
 {
-    . = 0x420000000;
+	. = 0x420000000;
 
-    .text : {
-        *(.text)
-    }
+	.text : {
+		*(.text)
+	}
 
-    . = ALIGN(4096);
-    .rodata : {
-        *(.rodata)
-        *(.rodata.*)
-    }
+	. = ALIGN(4096);
+	.rodata : {
+		*(.rodata)
+		*(.rodata.*)
+	}
 
-    . = ALIGN(4096);
-    .data : {
-        *(.data)
-        *(.sdata)
-    }
+	. = ALIGN(4096);
+	.data : {
+		*(.data)
+		*(.sdata)
+	}
 
-    . = ALIGN(8);
-    toc_start = .;
-    .got : {
-        *(.got)
-        *(.toc)
-    }
+	. = ALIGN(8);
+	toc_start = .;
+	.got : {
+		*(.got)
+		*(.toc)
+	}
 
-    bss_start = .;
-    .bss : {
-        *(.sbss)
-        *(.bss)
-    }
-    bss_end = .;
-    _end = .;
+	bss_start = .;
+	.bss : {
+		*(.sbss)
+		*(.bss)
+	}
+	bss_end = .;
+	_end = .;
 
 }
