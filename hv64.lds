@@ -34,6 +34,10 @@ SECTIONS
 		*(.text)
 	}
 
+	.notes : {
+		*(.note.*)
+	}
+
 	.rodata : {
 		*(.rodata)
 		*(.rodata.*)
