@@ -47,6 +47,7 @@
 #include <limits.h>
 #include <error_log.h>
 #include <error_mgmt.h>
+#include <guts.h>
 
 static const char *pamu_err_policy[PAMU_ERROR_COUNT];
 
@@ -1247,12 +1248,6 @@ static driver_t __driver pamu = {
 	.probe = pamu_probe
 };
 
-static const char *qoriq_device_config[] = {
-	"fsl,qoriq-device-config-1.0",
-	"fsl,qoriq-device-config-2.0",
-	NULL
-};
-
 #define PAMUBYPENR 0x604
 static int pamu_probe(device_t *dev, const dev_compat_t *compat_id)
 {
@@ -1284,7 +1279,7 @@ static int pamu_probe(device_t *dev, const dev_compat_t *compat_id)
 	vaddr = dev->regs[0].virt;
 	size = dev->regs[0].size;
 
-	guts_node = dt_get_first_compatible_list(hw_devtree, qoriq_device_config);
+	guts_node = get_guts_node();
 	if (!guts_node) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 		         "%s: pamu present, but no guts node found\n", __func__);

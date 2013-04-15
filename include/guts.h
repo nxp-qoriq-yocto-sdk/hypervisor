@@ -45,10 +45,13 @@
 
 #define RSTRQMR_MBEE_MSK 0x4000
 
+struct dt_node;
+
 int system_reset(void);
 int get_sys_reset_status(void);
 int set_reset_mask(uint32_t mask);
 int get_cluster_for_cpu_id(int cpu_id);
+struct dt_node *get_guts_node(void);
 
 #define SYS_RESET_STATUS_POR  1
 #define SYS_RESET_STATUS_HARD 2

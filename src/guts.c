@@ -154,3 +154,18 @@ int set_reset_mask(uint32_t mask)
 
 	return 0;
 }
+
+struct dt_node *get_guts_node(void)
+{
+	const dev_compat_t *dev_compat;
+	dt_node_t *guts_node = NULL;
+
+	for (dev_compat = guts_devconfig_compats; dev_compat->compatible; dev_compat++) {
+		guts_node = dt_get_first_compatible(hw_devtree, dev_compat->compatible);
+		if (guts_node)
+			break;
+	}
+
+	return guts_node;
+}
+
