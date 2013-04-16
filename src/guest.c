@@ -1022,6 +1022,11 @@ static int config_cpus(guest_t *guest)
 	if (prop)
 		dt_delete_prop(prop);
 
+	/* remove Embedded.Hypervisor.LRAT category */
+	prop = dt_get_prop(gnode, "power-isa-e.hv.lrat", 0);
+	if (prop)
+		dt_delete_prop(prop);
+
 	/* remove Embedded.Enhanced Debug category if necessary */
 	if (!guest->guest_debug_mode) {
 		prop = dt_get_prop(gnode, "power-isa-e.ed", 0);
