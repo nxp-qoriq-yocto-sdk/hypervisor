@@ -63,11 +63,7 @@ uint32_t hv_queue_prod_lock;
 uint32_t hv_queue_cons_lock;
 static phys_addr_t devtree_ptr;
 
-static gcpu_t noguest[CONFIG_LIBOS_MAX_CPUS] = {
-	{
-		.cpu = &cpu0,   /* link back to cpu */
-	}
-};
+static gcpu_t noguest[CONFIG_LIBOS_MAX_CPUS];
 
 extern uint8_t init_stack_top;
 
@@ -1053,6 +1049,7 @@ void libos_client_entry(unsigned long treephys)
 		 "Freescale Hypervisor %s\n", CONFIG_HV_VERSION);
 #endif
 
+	noguest[0].cpu = &cpu0;
 	cpu->client.shared = &shared_cpus[0];
 	shared_cpu_init(cpu->client.shared);
 
