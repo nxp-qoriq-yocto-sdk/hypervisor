@@ -307,6 +307,9 @@ typedef struct shared_cpu {
 
 	/* lrat entries are allocated in a round robin fashion */
 	int lrat_next_entry;
+
+	/** Spinlock used to synchronize L1 flushes done on hw threads */
+	uint32_t cachelock;
 } shared_cpu_t;
 
 #define get_shared_cpu() (cpu->client.shared)

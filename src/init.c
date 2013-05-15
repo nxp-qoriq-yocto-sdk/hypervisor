@@ -1448,6 +1448,14 @@ int flush_disable_core_caches(core_cache_state_t *state)
 	/* Arbitrary 100ms timeout for cache to flush */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
 	int ret;
+	register_t saved = -1;
+
+	ret = pause_other_hw_threads(timeout, &get_shared_cpu()->cachelock, &saved);
+	if (ret < 0) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "%s: timeout pausing other threads\n", __func__);
+		return ret;
+	}
 
 	if (core_local_l2)
 		flush_disable_l2_cache(timeout, 1, &state->l2csr0);
@@ -1458,6 +1466,7 @@ int flush_disable_core_caches(core_cache_state_t *state)
 
 	ret = flush_disable_l1_cache(displacement_flush_area[cpu->coreid],
 	                             timeout);
+	resume_other_hw_threads(&get_shared_cpu()->cachelock, saved);
 
 	if (ret < 0)
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
@@ -1473,6 +1482,14 @@ int restore_core_caches(const core_cache_state_t *state)
 	uint32_t timeout = dt_get_timebase_freq() / 10;
 	register_t tb = mfspr(SPR_TBL);
 	int ret = 0;
+	register_t saved = -1;
+
+	ret = pause_other_hw_threads(timeout, &get_shared_cpu()->cachelock, &saved);
+	if (ret < 0) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "%s: timeout pausing other threads\n", __func__);
+		return ret;
+	}
 
 	if (core_local_l2) {
 		set_cache_reg(SPR_L2CSR0, state->l2csr0);
@@ -1490,6 +1507,7 @@ int restore_core_caches(const core_cache_state_t *state)
 	set_cache_reg(SPR_L1CSR0, state->l1csr0);
 	set_cache_reg(SPR_L1CSR1, state->l1csr1);
 	set_cache_reg(SPR_L1CSR2, state->l1csr2);
+	resume_other_hw_threads(&get_shared_cpu()->cachelock, saved);
 
 	return ret;
 }
