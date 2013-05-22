@@ -26,13 +26,23 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 002
-Date: 04/18/2013
+Revision: 003
+Date: 05/22/2013
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-003 bug fixes and changes
+       -reduced hypervisor's binary image footprint by ~400KB
+       -fixed a memory corruption happening on 64-bit targets
+       -e6500 l1 cache is shared but no synchronization was in place causing
+        core hangs. Fixed by implementing "shared resource synchronization" as
+        defined and required in "e6500 Core RefMan, chapter 3.3.3.1"
+       -added two new hw thread APIs in libos:
+        * pause_other_hw_threads()
+        * resume_other_hw_threads()
+
    -v1.3-002 bug fixes and changes
        -introducing multi-threading support on e6500 cores
         * each thread shows up in guest as a single threaded e6500 core
