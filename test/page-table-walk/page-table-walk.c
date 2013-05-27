@@ -807,7 +807,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	/* allocate 32M per PMA virtual space. The start address is 128M aligned
 	   to allow creating large mappings */
-	valloc_init(PHYSBASE + 0x20000000, PHYSBASE + 0x120000000);
+	valloc_init(PHYSBASE + 0x20000000, PHYSBASE + 0x40000000);
 
 	test_map = valloc(MAX_SIZE_PER_PMA * (pmas_count + 1), 128 * 1024 * 1024);
 	if (test_map == NULL) {
