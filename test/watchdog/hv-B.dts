@@ -156,14 +156,14 @@
 
 		watchdog-timeout = "manager-notify";
 
-		p3bc: byte-channel {
+		p2bc: byte-channel {
 			compatible = "byte-channel";
 			endpoint = <&uartmux>;
-			mux-channel = <3>;
+			mux-channel = <2>;
 		};
 
 		aliases {
-			stdout = <&p3bc>;
+			stdout = <&p2bc>;
 		};
 
 		gpma {

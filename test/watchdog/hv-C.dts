@@ -156,14 +156,14 @@
 
 		watchdog-timeout = "partition-stop";
 
-		p4bc: byte-channel {
+		p2bc: byte-channel {
 			compatible = "byte-channel";
 			endpoint = <&uartmux>;
-			mux-channel = <4>;
+			mux-channel = <2>;
 		};
 
 		aliases {
-			stdout = <&p4bc>;
+			stdout = <&p2bc>;
 		};
 
 		gpma {
