@@ -35,6 +35,10 @@ SECTIONS
         *(.text)
     }
 
+	.notes : {
+		*(.note.*)
+	}
+
     . = ALIGN(4096);
     .rodata : {
         *(.rodata)
