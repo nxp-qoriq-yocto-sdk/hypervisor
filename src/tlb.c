@@ -750,7 +750,7 @@ void guest_inv_tlb(register_t ivax, int pid, int ind, int flags)
 				 */
 
 				register_t mas1;
-				int ways = mfspr(SPR_TLB0CFG) & TLBCFG_NENTRY_MASK;
+				int ways = cpu_caps.tlb0_assoc;
 				int way;
 
 				mtspr(SPR_MAS2, va);
@@ -1711,7 +1711,7 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 	if (cpu->client.tlbcache_enable)
 		tlb0_nentries = 1 << (cpu->client.tlbcache_bits);
 	else
-		tlb0_nentries = (mfspr(SPR_TLB0CFG) & 0xFFF) >> 2;
+		tlb0_nentries = cpu_caps.tlb0_nentries >> 2;
 
 	tlb = MAS0_GET_TLBSEL(gmas->mas0);
 
@@ -1797,7 +1797,7 @@ void inv_lrat(gcpu_t *gcpu)
 	 */
 
 	saved = tlb_lock();
-	for (int i = 0; i < cpu->client.lrat_nentries; i++) {
+	for (int i = 0; i < cpu_caps.lrat_nentries; i++) {
 		/* read the entry */
 		mas0 = MAS0_LRATSEL | MAS0_ESEL(i);
 		mtspr(SPR_MAS0, mas0);
@@ -1934,7 +1934,7 @@ void lrat_miss(trapframe_t *regs)
 	asm volatile("isync; tlbwe" : : : "memory");
 
 	shared_cpu->lrat_next_entry++;
-	if (shared_cpu->lrat_next_entry == cpu->client.lrat_nentries)
+	if (shared_cpu->lrat_next_entry == cpu_caps.lrat_nentries)
 		shared_cpu->lrat_next_entry = 0;
 
 	mtspr(SPR_MAS8, gcpu->lpid | MAS8_GTS);

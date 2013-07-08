@@ -2235,7 +2235,7 @@ void do_stop_core(trapframe_t *regs, int restart)
 
 	guest_reset_tlb();
 
-	if ((mfspr(SPR_MMUCFG) & MMUCFG_MAVN) && guest->direct_guest_tlb_mgt)
+	if (cpu_has_ftr(CPU_FTR_MMUV2) && guest->direct_guest_tlb_mgt)
 		inv_lrat(gcpu);
 
 	/* The guest can get its caches into an unpleasant state
@@ -3325,7 +3325,6 @@ static void configure_tlb_mgt(guest_t *guest)
 
 	if (guest->direct_guest_tlb_miss) {
 		epcr |= EPCR_DTLBGS | EPCR_ITLBGS;
-		cpu->client.lrat_nentries = mfspr(SPR_LRATCFG) & LRATCFG_NENTRY_MASK;
 	} else {
 		epcr |= EPCR_DMIUH;
 		cpu->client.tlb1_virt = 1;

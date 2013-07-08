@@ -218,7 +218,7 @@ void tlbivax_ipi(trapframe_t *regs)
 	 * all matching TLB entries in all TLB arrays
 	 */
 
-	if (mfspr(SPR_MMUCFG) & MMUCFG_MAVN) {
+	if (cpu_has_ftr(CPU_FTR_MMUV2)) {
 		tlb = INV_TLB1 | INV_TLB0;
 		guest->tlbivax_addr &= ~TLBIVAX_INV_ALL;
 	} else
@@ -233,7 +233,7 @@ void tlbivax_ipi(trapframe_t *regs)
 
 static inline int get_tlb_ivax_stat(unsigned long va)
 {
-	if (mfspr(SPR_MMUCFG) & MMUCFG_MAVN)
+	if (cpu_has_ftr(CPU_FTR_MMUV2))
 		return bm_stat_tlbivax;
 
 	if (va & TLBIVAX_TLB1) {

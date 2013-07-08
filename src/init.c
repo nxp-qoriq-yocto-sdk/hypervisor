@@ -101,8 +101,6 @@ phys_addr_t pamu_mem_addr, pamu_mem_size;
 pamu_hv_mem_t *pamu_mem_header;
 #endif
 
-static int core_local_l2;
-
 static int get_cfg_addr(char *args, void *ctx)
 {
 	phys_addr_t *cfg_addr = ctx;
@@ -832,19 +830,6 @@ static void watchdog_init(void)
 }
 #endif
 
-static void core_cache_init(void)
-{
-	uint32_t pvr;
-
-	pvr = mfspr(SPR_PVR) & 0xffff0000;
-
-	/*
-	 * L2 is core local on e500mc and e5500 so mark that it
-	 * needs to be flushed along with L1
-	 */
-	core_local_l2 = (pvr == 0x80230000 || pvr == 0x80240000);
-}
-
 /* partition_init_counter is atomically decremented each time a core
  * completes its partition init (or lack thereof if it has no
  * partition).  Once this reaches zero, gevents will be sent
@@ -1109,8 +1094,6 @@ void libos_client_entry(unsigned long treephys)
 
 	init_gevents();
 
-	core_cache_init();
-
 	ccm_init();
 
 	dt_for_each_prop_value(hw_devtree, "device_type", "cpu", 4, count_cores, NULL);
@@ -1318,13 +1301,11 @@ static void partition_init(void)
 
 static void core_init(void)
 {
-	int l1_cache_size = (mfspr(SPR_L1CFG0) & 0x7ff) * 1024;
-
 	/* PIR was set by firmware-- record in cpu_t struct */
 	cpu->coreid = mfspr(SPR_PIR);
 
 	displacement_flush_area[cpu->coreid] =
-		memalign(l1_cache_size, l1_cache_size);
+		memalign(cpu_caps.l1_size, cpu_caps.l1_size);
 
 	if (!displacement_flush_area[cpu->coreid]) {
 		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
@@ -1457,7 +1438,7 @@ int flush_disable_core_caches(core_cache_state_t *state)
 		return ret;
 	}
 
-	if (core_local_l2)
+	if (cpu_has_ftr(CPU_FTR_L2_CORE_LOCAL))
 		flush_disable_l2_cache(timeout, 1, &state->l2csr0);
 
 	state->l1csr0 = mfspr(SPR_L1CSR0);
@@ -1491,7 +1472,7 @@ int restore_core_caches(const core_cache_state_t *state)
 		return ret;
 	}
 
-	if (core_local_l2) {
+	if (cpu_has_ftr(CPU_FTR_L2_CORE_LOCAL)) {
 		set_cache_reg(SPR_L2CSR0, state->l2csr0);
 
 		while (mfspr(SPR_L2CSR0) != state->l2csr0) {

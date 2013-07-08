@@ -588,7 +588,7 @@ static void tlbivax_test(int secondary)
 {
 	int unified = 1;
 
-	if (!(mfspr(SPR_MMUCFG) & MMUCFG_MAVN)) {
+	if (!cpu_has_ftr(CPU_FTR_MMUV2)) {
 		inv_all_test("tlbivax.all", tlbivax_inv_all, secondary, 0);
 		unified = 0;
 	}

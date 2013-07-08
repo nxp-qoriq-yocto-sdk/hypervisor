@@ -89,9 +89,6 @@ typedef struct {
 	 */
 	int nap_request;
 
-	/* the supported number of lrat entries */
-	int lrat_nentries;
-
 	/* link to primary thread's cpu_t or NULL if this is the primary thread */
 	struct cpu *primary;
 	/* points to the shared cpu data */

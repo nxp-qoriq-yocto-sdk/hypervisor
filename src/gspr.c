@@ -247,7 +247,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		 * Mask out MMUv2 features not yet supported.
 		 * They will be unmasked as they'll be implemented.
 		 */
-		if ((mfspr(SPR_MMUCFG) & MMUCFG_MAVN))
+		if (cpu_has_ftr(CPU_FTR_MMUV2))
 			*val &= ~TLBCFG_GTWE_MASK;
 		break;
 
@@ -268,7 +268,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_TLB1PS:
-		*val = valid_tsize_mask;
+		*val = cpu_caps.valid_tsizes;
 		break;
 
 	case SPR_EPTCFG:
