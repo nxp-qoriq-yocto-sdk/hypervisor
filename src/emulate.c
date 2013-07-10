@@ -1066,7 +1066,7 @@ void hvpriv(trapframe_t *regs)
 
 	ret = guestmem_in32((uint32_t *)regs->srr0, &insn);
 	if (ret != GUESTMEM_OK) {
-		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+		printlog(LOGTYPE_EMU, LOGLEVEL_EXTRA,
 		         "guestmem in returned %d\n", ret);
 		if (ret == GUESTMEM_TLBMISS)
 			regs->exc = EXC_ITLB;
