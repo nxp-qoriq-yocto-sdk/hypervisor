@@ -636,6 +636,9 @@ __attribute__((weak, alias("bad_exception")));
 void dtlb_handler(trapframe_t *regs)
 __attribute__((weak, alias("bad_exception")));
 
+void itlb_handler(trapframe_t *regs)
+__attribute__((weak, alias("bad_exception")));
+
 void watchdog_handler(trapframe_t *regs)
 __attribute__((weak, alias("bad_exception")));
 

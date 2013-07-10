@@ -51,6 +51,7 @@ void fit_handler(struct trapframe *regs);
 void ext_doorbell_handler(struct trapframe *regs);
 void ext_critical_doorbell_handler(struct trapframe *regs);
 void dtlb_handler(struct trapframe *regs);
+void itlb_handler(struct trapframe *regs);
 void watchdog_handler(struct trapframe *regs);
 void program_handler(struct trapframe *regs);
 void dsi_handler(struct trapframe *regs);
@@ -66,6 +67,7 @@ void perfmon_handler(struct trapframe *regs);
 #define EXC_DOORBELL_HANDLER ext_doorbell_handler
 #define EXC_DOORBELLC_HANDLER ext_critical_doorbell_handler
 #define EXC_DTLB_HANDLER dtlb_handler
+#define EXC_ITLB_HANDLER itlb_handler
 #define EXC_WDOG_HANDLER watchdog_handler
 #define EXC_PROGRAM_HANDLER program_handler
 #define EXC_DSI_HANDLER dsi_handler
