@@ -1510,7 +1510,7 @@ static void read_intmap(dt_node_t *node)
 		}
 
 		if (imap + ent->parent_naddr + ent->parent_nint > imap_end) {
-			memset(ent, 0, sizeof(ent));
+			memset(ent, 0, sizeof(intmap_entry_t));
 			break;
 		}
 
