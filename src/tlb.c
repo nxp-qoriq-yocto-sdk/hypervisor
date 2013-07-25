@@ -1705,13 +1705,16 @@ int guest_tlb_read(tlb_entry_t *gmas, uint32_t *flags)
  */
 int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 {
-	uint32_t tlb_index, way, tlb0_nentries;
+	uint32_t tlb_index, way, tlb0_nentries, tlb0_nways;
 	unsigned int tlb;
 
-	if (cpu->client.tlbcache_enable)
+	if (cpu->client.tlbcache_enable) {
+		tlb0_nways = TLBC_WAYS;
 		tlb0_nentries = 1 << (cpu->client.tlbcache_bits);
-	else
-		tlb0_nentries = cpu_caps.tlb0_nentries >> 2;
+	} else {
+		tlb0_nways = cpu_caps.tlb0_assoc;
+		tlb0_nentries = cpu_caps.tlb0_nentries / tlb0_nways;
+	}
 
 	tlb = MAS0_GET_TLBSEL(gmas->mas0);
 
@@ -1724,7 +1727,8 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, gcpu_t *gcpu)
 		} else {
 			tlb_index = ((gmas->mas2 >> PAGE_SHIFT) &
 				(tlb0_nentries - 1));
-			way = (MAS0_GET_TLB0ESEL(gmas->mas0) + 1) % 4;
+			way = (MAS0_GET_TLB0ESEL(gmas->mas0) + 1) &
+				(tlb0_nways - 1);
 			if (!way)
 				++tlb_index;
 		}
