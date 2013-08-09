@@ -337,7 +337,7 @@ static int read_pmas(void)
 
 typedef uint64_t pte_t;
 
-static pte_t create_pte(unsigned long pa_pn)
+static pte_t create_pte(phys_addr_t pa_pn)
 {
 	pte_t pte;
 
@@ -373,7 +373,7 @@ static void populate_pgtable(int steps, int *faults, int *tsizes,
 {
 	pte_t *pg_table;
 	phys_addr_t pgtbl_pa;
-	unsigned long pa_pn;
+	phys_addr_t pa_pn;
 	unsigned long va_offset = 0;
 	/* entry #0 is used to map the page table */
 	unsigned int tlb_entry = 1;
@@ -433,7 +433,7 @@ static void test_pgtable_extpid(int *test_vals, int secondary)
 {
 	pte_t *pg_table;
 	phys_addr_t pgtbl_pa;
-	unsigned long pa_pn;
+	phys_addr_t pa_pn;
 	/* entry #0 is used to map the page table */
 	unsigned int tlb_entry = 1;
 	unsigned long size_pages = tsize_to_pages(TLB_TSIZE_2M);
@@ -685,7 +685,7 @@ static void test_search_invalidate(void (*inv)(void *addr,
 {
 	pte_t *pg_table;
 	phys_addr_t pgtbl_pa;
-	unsigned long pa_pn;
+	phys_addr_t pa_pn;
 	unsigned long va_offset = 0;
 	/* entry #0 is used to map the page table */
 	unsigned int tlb_entry = 1;
