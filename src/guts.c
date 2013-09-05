@@ -85,7 +85,7 @@ int get_cluster_for_cpu_id(int cpu_id)
 			uint32_t index = (cluster >> (i * 8)) & TP_CLUSTER_ITYPE_MASK;
 			uint32_t type = in32(guts_tp_init + index);
 			if (type & TP_IDX_CPU) {
-				if (cpu_id == cpu_count * cpu_caps.threads_per_core)
+				if (cpu_id / cpu_caps.threads_per_core == cpu_count)
 					return cluster_id;
 				cpu_count++;
 			}
