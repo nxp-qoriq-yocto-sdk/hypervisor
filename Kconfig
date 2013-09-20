@@ -124,6 +124,13 @@ config PAMU
 	help
 		Provides support for Peripheral Access Management Unit.
 
+config MAX_PARTITIONS
+	int "Maximum number of partitions"
+	default 24
+	help
+		Specify here the maximum number of partitions (guests)
+		that hypervisor can support.
+
 config DEVICE_VIRT
 	# Core support for device virtualization.  Enable this if you
 	# want to be able to virtual devices that share a page or

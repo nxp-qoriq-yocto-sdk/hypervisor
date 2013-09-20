@@ -66,7 +66,7 @@ queue_t global_event_queue;
 uint32_t global_event_prod_lock;
 uint32_t global_event_cons_lock;
 
-guest_t guests[MAX_PARTITIONS];
+guest_t guests[CONFIG_MAX_PARTITIONS];
 unsigned long num_guests;
 
 /* active_guests is used as counter of all guests that are not stopped in
@@ -1674,7 +1674,7 @@ guest_t *node_to_partition(dt_node_t *partition)
 	}
 
 	if (i == num_guests) {
-		if (num_guests >= MAX_PARTITIONS) {
+		if (num_guests >= CONFIG_MAX_PARTITIONS) {
 			printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			         "node_to_partition: too many partitions\n");
 			goto err;

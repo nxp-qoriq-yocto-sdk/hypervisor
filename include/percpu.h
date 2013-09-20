@@ -228,9 +228,7 @@ typedef struct guest {
 
 } guest_t;
 
-#define MAX_PARTITIONS 8
-
-extern struct guest guests[MAX_PARTITIONS];
+extern struct guest guests[CONFIG_MAX_PARTITIONS];
 extern unsigned long num_guests;
 extern unsigned long active_guests;
 
