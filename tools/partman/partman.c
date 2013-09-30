@@ -39,6 +39,7 @@
 #include <arpa/inet.h>
 #include <asm/ioctl.h>
 #include <limits.h>
+#include <inttypes.h>
 
 #include "parse_dt.h"
 
@@ -483,7 +484,7 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				 */
 				if (entry_address != ULONG_MAX) {
 					if (!quiet)
-						printf("%s: ELF entry point %#llx "
+						printf("%s: ELF entry point %" PRIx64
 						       "is in multiple segments.\n",
 						       __func__, entry);
 
@@ -498,8 +499,10 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 			}
 
 			if (verbose)
-				printf("%s: copying 0x%llx bytes from ELF image offset 0x%llx to guest physical address 0x%lx\n",
-				       __func__, filesz, offset, seg_target);
+				printf("%s: copying %" PRIx64 " bytes from ELF image
+					offset %" PRIx64 " to guest physical address %"
+					PRIx64 "\n", __func__, filesz, offset, seg_target);
+
 			ret = copy_to_partition(partition, elf + offset, seg_target, filesz);
 			if (ret) {
 				if (!quiet)
@@ -513,7 +516,8 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				unsigned long copy_offset;
 
 				if (verbose)
-					printf("%s: writing 0x%llx null bytes to guest physical address 0x%llx\n",
+					printf("%s: writing %" PRIx64 " null bytes to
+						guest physical address %"  PRIx64 "\n",
 					       __func__, memsz - filesz, seg_target + filesz);
 
 #define CHUNK_SIZE	65536
@@ -558,12 +562,12 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 
 	if (verbose) {
 		printf("%s: load address is 0x%lx\n", __func__, load_address);
-		printf("%s: physical entry address is 0x%llx\n", __func__, entry);
+		printf("%s: physical entry address is %" PRIx64 "\n", __func__, entry);
 	}
 
 	if (entryp) {
 		if (entry_address == ULONG_MAX) {
-			printf("%s: ELF image has invalid entry address %llx\n",
+			printf("%s: ELF image has invalid entry address %" PRIx64 "\n",
 			       __func__, entry);
 			return 0;
 		}
