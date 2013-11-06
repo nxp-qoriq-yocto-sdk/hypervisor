@@ -139,9 +139,25 @@ static int alloc_tlb1(unsigned int entry, int evict)
 
 none_avail:
 	if (evict) {
+		int bit;
+
 		i = shared_cpu->evict_tlb1++;
-		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
-		         "alloc_tlb1: evicting entry %d\n", i);
+
+		idx = i / LONG_BITS;
+		bit = i % LONG_BITS;
+
+		gcpu->tlb1_map[entry][idx] |= 1UL << bit;
+		for (int j = 0; j < TLB1_GSIZE; j++) {
+			if (j != entry && (gcpu->tlb1_map[j][idx] & (1UL << bit))) {
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_NORMAL,
+				         "%s[%d]: evicting entry %d used by %d\n",
+				         __func__, entry, i, j);
+
+				cpu->tlb1[i].mas1 = 0;
+				tlb1_write_entry(i);
+				gcpu->tlb1_map[j][idx] &= ~(1UL << bit);
+			}
+		}
 
 		if (shared_cpu->evict_tlb1 > GUEST_TLB_END)
 			shared_cpu->evict_tlb1 = 0;
