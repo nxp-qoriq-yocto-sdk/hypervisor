@@ -308,6 +308,10 @@ typedef struct shared_cpu {
 
 	/** Spinlock used to synchronize L1 flushes done on hw threads */
 	uint32_t cachelock;
+
+	/** PWRMGTCR0 spr for each hardware thread */
+	register_t pwrmgtcr0_sprs[CONFIG_LIBOS_MAX_HW_THREADS];
+	uint32_t pwrmgtcr0_lock;
 } shared_cpu_t;
 
 #define get_shared_cpu() (cpu->client.shared)

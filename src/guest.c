@@ -1791,6 +1791,7 @@ static void guest_core_init(guest_t *guest)
 		msrp |= MSRP_DEP;
 
 	mtspr(SPR_MSRP, msrp);
+	get_shared_cpu()->pwrmgtcr0_sprs[get_hw_thread_id()] = mfspr(SPR_PWRMGTCR0);
 }
 
 /* FIXME: better ePAPR compliance for default IMA -- need to

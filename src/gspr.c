@@ -480,6 +480,13 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		}
 		return 1;
 
+	case SPR_PWRMGTCR0:
+		if (cpu_has_ftr(CPU_FTR_PWRMGTCR0)) {
+			*val = get_shared_cpu()->pwrmgtcr0_sprs[get_hw_thread_id()];
+			break;
+		}
+		return 1;
+
 	/* Removed Registers are not part of the vcpu and should fail. */
 	case SPR_MSRP:
 	case SPR_MAS5:
@@ -512,6 +519,62 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 	default:
 		return 1;
 	}
+
+	return 0;
+}
+
+static int update_pwrmgtcr0(register_t val)
+{
+	int max_av_cnt, max_pw20_cnt, cnt, ret, i;
+	register_t av_en, pw20_en, saved, *pwrmgtcr0_sprs;
+
+	av_en = PWRMGTCR0_AV_IDLE_PD_EN;
+	pw20_en = PWRMGTCR0_PW20_WAIT;
+	max_av_cnt = max_pw20_cnt = 0;
+	pwrmgtcr0_sprs = get_shared_cpu()->pwrmgtcr0_sprs;
+
+	saved = spin_lock_intsave(&get_shared_cpu()->pwrmgtcr0_lock);
+	pwrmgtcr0_sprs[get_hw_thread_id()] = val;
+	for (i = 0; i < cpu_caps.threads_per_core; i++) {
+		if (pwrmgtcr0_sprs[i] & PWRMGTCR0_AV_IDLE_PD_EN) {
+			cnt = (pwrmgtcr0_sprs[i] & PWRMGTCR0_AV_IDLE_CNT_P) >>
+			       PWRMGTCR0_AV_IDLE_CNT_P_SHIFT;
+			max_av_cnt = max(max_av_cnt, cnt);
+		} else {
+			av_en = 0;
+		}
+		if (pwrmgtcr0_sprs[i] & PWRMGTCR0_PW20_WAIT) {
+			cnt = (pwrmgtcr0_sprs[i] & PWRMGTCR0_PW20_ENT_P) >>
+			       PWRMGTCR0_PW20_ENT_P_SHIFT;
+			max_pw20_cnt = max(max_pw20_cnt, cnt);
+		} else {
+			pw20_en = 0;
+		}
+	}
+	spin_unlock_intsave(&get_shared_cpu()->pwrmgtcr0_lock, saved);
+
+	ret = pause_other_hw_threads(dt_get_timebase_freq() / 10,
+	                             &get_shared_cpu()->pwrmgtcr0_lock,
+	                             &saved);
+	if (ret < 0) {
+		printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
+		         "%s: timeout pausing other threads\n", __func__);
+		return 1;
+	}
+	mtspr(SPR_PWRMGTCR0,
+	      av_en | (max_av_cnt << PWRMGTCR0_AV_IDLE_CNT_P_SHIFT) |
+	      pw20_en | (max_pw20_cnt << PWRMGTCR0_PW20_ENT_P_SHIFT));
+	resume_other_hw_threads(&get_shared_cpu()->pwrmgtcr0_lock, saved);
+
+	printlog(LOGTYPE_EMU, LOGLEVEL_DEBUG,
+	         "%s: Setting PWRMGTCR0 - av_en: %d (%d) av_cnt: %x (%lx) "
+	         "pw20_en: %d (%d) pw20_cnt: %x (%lx)\n", __func__,
+	         av_en ? 1 : 0, (val & PWRMGTCR0_AV_IDLE_PD_EN) ? 1 : 0,
+	         max_av_cnt,
+	         (val & PWRMGTCR0_AV_IDLE_CNT_P) >> PWRMGTCR0_AV_IDLE_CNT_P_SHIFT,
+	         pw20_en ? 1 : 0, (val & PWRMGTCR0_PW20_WAIT) ? 1 : 0,
+	         max_pw20_cnt,
+	         (val & PWRMGTCR0_PW20_ENT_P) >> PWRMGTCR0_PW20_ENT_P_SHIFT);
 
 	return 0;
 }
@@ -916,6 +979,13 @@ int write_gspr(trapframe_t *regs, int spr, register_t val)
 			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
 			         "mtspr@0x%08lx: unsupported write to thread spr %d, val = %lx\n",
 			         regs->srr0, spr, val);
+		}
+		return 1;
+
+	case SPR_PWRMGTCR0:
+		if (cpu_has_ftr(CPU_FTR_PWRMGTCR0)) {
+			update_pwrmgtcr0(val);
+			break;
 		}
 		return 1;
 
