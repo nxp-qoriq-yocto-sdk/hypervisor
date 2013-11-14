@@ -26,13 +26,24 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 005
-Date: 09/13/2013
+Revision: 006
+Date: 11/14/2013
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-006 bug fixes and changes
+       -support for t4240 / e6500rev2 core
+         * emulate power management control register 0 (PWRMGTCR0 SPR)
+         * update libos to recognize e6500rev2 found in t4240
+       -added Kconfig option for maximum number of supported partitions,
+        defaulting to 24
+       -introducing tools/hv-np.sh: script to generate configuration device
+        trees with a given number of partitions each with a given memory size.
+        The partitions are very basic and don't have any device assigned.
+       -fixed issue with guest tlb1 management structures state becoming
+        out-of-sync. The issue triggered when a tlb1 entry was evicted.
    -v1.3-005 bug fixes and changes
        -adding a secondary thread to a coherency subdomain broke the subdomain
         causing random kernel hangs
