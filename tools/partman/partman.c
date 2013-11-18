@@ -499,9 +499,10 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 			}
 
 			if (verbose)
-				printf("%s: copying %" PRIx64 " bytes from ELF image
-					offset %" PRIx64 " to guest physical address %"
-					PRIx64 "\n", __func__, filesz, offset, seg_target);
+				printf("%s: copying %" PRIx64 " bytes from "
+				       "ELF image offset %" PRIx64 " to guest "
+				       "physical address %lx\n",
+				       __func__, filesz, offset, seg_target);
 
 			ret = copy_to_partition(partition, elf + offset, seg_target, filesz);
 			if (ret) {
@@ -516,8 +517,8 @@ static int parse_and_copy_elf(unsigned int partition, void *elf,
 				unsigned long copy_offset;
 
 				if (verbose)
-					printf("%s: writing %" PRIx64 " null bytes to
-						guest physical address %"  PRIx64 "\n",
+					printf("%s: writing %" PRIx64 " null bytes to "
+					       "guest physical address %"  PRIx64 "\n",
 					       __func__, memsz - filesz, seg_target + filesz);
 
 #define CHUNK_SIZE	65536
