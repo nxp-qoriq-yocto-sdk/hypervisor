@@ -1294,6 +1294,35 @@ int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
 	return dt_for_each_node(tree, &ctx, propvalue_callback, NULL);
 }
 
+static int first_prop_value_callback(dt_node_t *node, void *arg)
+{
+	*(dt_node_t **)arg = node;
+
+	return 1;
+}
+
+/** Return the first node containing the property with the specified
+ * name and value.
+ *
+ * @param[in] tree root of tree to search
+ * @paramlin] propname property name to search for
+ * @param[in] value value the property must hold, or NULL to find any
+ *   instance of the property
+ * @param[in] len length of value
+ * @return first node containing the matching property, NULL if no match
+ */
+dt_node_t *dt_get_first_prop_value(dt_node_t *tree, const char *propname,
+                                   const void *value, int len)
+{
+	dt_node_t *ctx;
+
+	if (dt_for_each_prop_value(tree, propname, value, len,
+	                           first_prop_value_callback, &ctx))
+		return ctx;
+
+	return NULL;
+}
+
 /** Return the node associated with an alias or path.
  *
  * @param[in] tree root of tree to search

@@ -262,6 +262,8 @@ dt_node_t *dt_get_first_compatible_list(dt_node_t *tree, const char **compat);
 int dt_for_each_prop_value(dt_node_t *tree, const char *propname,
                            const void *value, size_t len,
                            dt_callback_t callback, void *arg);
+dt_node_t *dt_get_first_prop_value(dt_node_t *tree, const char *propname,
+                                   const void *value, int len);
 
 size_t dt_get_path(dt_node_t *tree, dt_node_t *node, char *buf, size_t buflen);
 int dt_copy_properties(dt_node_t *source, dt_node_t *target);
