@@ -2814,6 +2814,35 @@ nomem:
 	         "%s: out of memory\n", __func__);
 }
 
+static void setup_soc_properties(guest_t *guest)
+{
+	dt_node_t *soc;
+	dt_prop_t *prop;
+
+	soc = dt_get_first_prop_value(hw_devtree, "device_type", "soc", 4);
+	if (!soc) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: 'soc' node not found\n",
+		         __func__, guest->partition->name);
+		return;
+	}
+
+	prop = dt_get_prop(soc, "bus-frequency", 0);
+	if (!prop) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: 'bus-frequency' property not found in 'soc' node\n",
+		         __func__, guest->partition->name);
+		return;
+	}
+	if (dt_set_prop(guest->devices, "device_type", "soc", 4) < 0 ||
+	    dt_set_prop(guest->devices, "bus-frequency",
+	                 prop->data, prop->len) < 0) {
+		printlog(LOGTYPE_DEVTREE, LOGLEVEL_ERROR,
+		         "%s: %s: out of memory\n",
+		         __func__, guest->partition->name);
+	}
+}
+
 typedef struct {
 	dt_node_t *first;
 	dt_node_t *portal;
@@ -2946,6 +2975,7 @@ static int init_guest_devs(guest_t *guest)
 	int ret;
 
 	init_dev_ranges(guest);
+	setup_soc_properties(guest);
 
 	vmpic_partition_init(guest);
 
