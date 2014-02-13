@@ -131,10 +131,10 @@ flush_disable_l1_cache:
 	isync
 
 	li	%r3, -1
-	mfspr	%r11, SPR_TBL
+	GET_TBL %r11, 99
 1:	mfspr	%r10, SPR_L1CSR0 /* Wait for the lock clear to finish */
 
-	mfspr	%r12, SPR_TBL
+	GET_TBL %r12, 99
 	sub	%r12, %r12, %r11
 	cmplw	%r12, %r4
 	bgelr
@@ -179,12 +179,12 @@ flush_disable_l1_cache:
 	mtspr	SPR_L1CSR0, %r10
 	isync
 
-	mfspr	%r11, SPR_TBL
+	GET_TBL %r11, 99
 	li	%r3, -1
 
 1:	mfspr	%r10, SPR_L1CSR0 /* Wait for the invalidate to finish */
 
-	mfspr	%r12, SPR_TBL
+	GET_TBL %r12, 99
 	sub	%r12, %r12, %r11
 	cmplw	%r12, %r4
 	bgelr
@@ -217,12 +217,12 @@ flush_disable_l1_cache:
 	mtspr	SPR_L1CSR1, %r10
 	isync
 
-	mfspr	%r11, SPR_TBL
+	GET_TBL %r11, 99
 	li	%r3, -1
 
 1:	mfspr	%r10, SPR_L1CSR1 /* Wait for the invalidate to finish */
 
-	mfspr	%r12, SPR_TBL
+	GET_TBL %r12, 99
 	sub	%r12, %r12, %r11
 	cmplw	%r12, %r4
 	bgelr

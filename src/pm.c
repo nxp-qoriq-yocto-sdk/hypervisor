@@ -270,7 +270,7 @@ void idle_loop(void)
 		cpu->client.nap_request = 1;
 
 		while (gcpu->napping && !gcpu->gevent_pending) {
-			register_t tb;
+			uint64_t tb;
 			setevent(cpu0.client.gcpu, EV_SYNC_NAP);
 
 			/* We can't use "wait", at least with doorbells
@@ -281,10 +281,10 @@ void idle_loop(void)
 			 * calling sync_nap() every 1 second.
 			 */
 
-			tb = mfspr(SPR_TBL);
-			while (mfspr(SPR_TBL) - tb < tb_freq) {
-				register_t tb2 = mfspr(SPR_TBL);
-				while (mfspr(SPR_TBL) - tb2 < tb_freq / 10000)
+			tb = get_tb();
+			while (get_tb() - tb < tb_freq) {
+				uint64_t tb2 = get_tb();
+				while (get_tb() - tb2 < tb_freq / 10000)
 					;
 
 				if (!gcpu->napping || gcpu->gevent_pending)

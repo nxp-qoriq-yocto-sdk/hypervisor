@@ -132,7 +132,7 @@ static int claim_int(claim_action_t *action, dev_owner_t *owner,
 	
 	/* Arbitrary 100ms timeout for active bit to deassert */
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	register_t time;
+	uint64_t time;
 
 	/* NOTE: This sequence is designed around what the MPIC
 	 * expects.  It assumes that get_activity will return
@@ -148,9 +148,9 @@ static int claim_int(claim_action_t *action, dev_owner_t *owner,
 	/* Wait until active bit clears -- has most likely already
 	 * happened.
 	 */
-	time = mfspr(SPR_TBL);
+	time = get_tb();
 	while (irq->ops->is_active(irq)) {
-		if (mfspr(SPR_TBL) - time > timeout) {
+		if (get_tb() - time > timeout) {
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 			         "%s: %s: IRQ failed to become inactive\n",
 			         __func__, owner->hwnode->name);

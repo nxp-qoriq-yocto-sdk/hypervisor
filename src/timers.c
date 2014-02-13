@@ -143,7 +143,7 @@ void fit(trapframe_t *regs)
 	 * need to be an atomic read because we only care about one bit at a
 	 * time.
 	 */
-	tb = ((uint64_t)mfspr(SPR_TBU) << 32) | mfspr(SPR_TBL);
+	tb = get_tb();
 
 	/* Determine whether the TB bit that we care about has changed from
 	 * 0 to 1.  If guest FIT period is *equal* to the hardware FIT period,

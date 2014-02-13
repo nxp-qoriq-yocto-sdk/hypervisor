@@ -1363,7 +1363,7 @@ static int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2
 		inval |= L2CSR0_L2LFC;
 
 	if (l2csr0 & L2CSR0_L2E) {
-		register_t tb = mfspr(SPR_TBL);
+		uint64_t tb = get_tb();
 		int lock = L2CSR0_L2IO | L2CSR0_L2DO;
 
 		/* The lock bits need to be set, with a read-back
@@ -1372,7 +1372,7 @@ static int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2
 		set_cache_reg(SPR_L2CSR0, l2csr0 | lock);
 
 		while ((mfspr(SPR_L2CSR0) & lock) != lock) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
+			if (get_tb() - tb > timeout) {
 				mtspr(SPR_L2CSR0, l2csr0);
 				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 				         "%s: L2 cache flush timeout\n",
@@ -1384,7 +1384,7 @@ static int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2
 		set_cache_reg(SPR_L2CSR0, l2csr0 | L2CSR0_L2FL | lock);
 
 		while ((mfspr(SPR_L2CSR0) & (L2CSR0_L2FL | lock)) != lock) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
+			if (get_tb() - tb > timeout) {
 				mtspr(SPR_L2CSR0, l2csr0);
 				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 				         "%s: L2 cache flush timeout\n",
@@ -1396,7 +1396,7 @@ static int flush_disable_l2_cache(uint32_t timeout, int unlock, uint32_t *old_l2
 		set_cache_reg(SPR_L2CSR0, l2csr0 | inval | lock);
 
 		while ((mfspr(SPR_L2CSR0) & (inval | lock)) != lock) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
+			if (get_tb() - tb > timeout) {
 				mtspr(SPR_L2CSR0, l2csr0);
 				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 				         "%s: L2 cache invalidate timeout\n",
@@ -1461,7 +1461,7 @@ int flush_disable_core_caches(core_cache_state_t *state)
 int restore_core_caches(const core_cache_state_t *state)
 {
 	uint32_t timeout = dt_get_timebase_freq() / 10;
-	register_t tb = mfspr(SPR_TBL);
+	uint64_t tb = get_tb();
 	int ret = 0;
 	register_t saved = -1;
 
@@ -1476,7 +1476,7 @@ int restore_core_caches(const core_cache_state_t *state)
 		set_cache_reg(SPR_L2CSR0, state->l2csr0);
 
 		while (mfspr(SPR_L2CSR0) != state->l2csr0) {
-			if (mfspr(SPR_TBL) - tb > timeout) {
+			if (get_tb() - tb > timeout) {
 				printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
 				         "%s: L2 cache enable timeout\n",
 				         __func__);
