@@ -101,7 +101,7 @@ static int ns16550_probe(device_t *dev, const dev_compat_t *compat_id)
 		         __func__, node->name);
 	}
 
-	cd = ns16550_init(dev->regs[0].virt, irq, freq, 16, baud);
+	cd = ns16550_init(dev->regs[0].virt, irq, freq, 8, baud);
 
 	dev->chardev = cd;
 	return 0;
