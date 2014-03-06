@@ -1130,6 +1130,25 @@ int dt_node_is_compatible(dt_node_t *node, const char *compat)
 	}
 }
 
+/** Check whether a given node is compatible with any of the strings
+ * given in a list.
+ *
+ * @param[in] node node to check
+ * @param[in] compats NULL ended compatible string list to search for
+ * @return non-zero if the node is compatible
+ */
+int dt_node_is_compatible_list(dt_node_t *node, const char **compats)
+{
+	const char **compat;
+
+	for (compat = compats; compat; compat++) {
+		if (dt_node_is_compatible(node, *compat))
+			return 1;
+	}
+
+	return 0;
+}
+
 typedef struct compat_ctx {
 	dt_callback_t callback;
 	const char *compat;

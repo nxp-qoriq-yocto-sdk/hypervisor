@@ -250,6 +250,7 @@ void dt_run_deferred_phandle_updates(struct guest *guest);
 void dt_print_tree(dt_node_t *tree, struct queue *out);
 
 int dt_node_is_compatible(dt_node_t *node, const char *compat);
+int dt_node_is_compatible_list(dt_node_t *node, const char **compats);
 int dt_for_each_compatible(dt_node_t *tree, const char *compat,
                            dt_callback_t callback, void *arg);
 
