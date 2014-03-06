@@ -48,6 +48,7 @@
 #include <error_log.h>
 #include <error_mgmt.h>
 #include <guts.h>
+#include <devtree.h>
 
 static const char *pamu_err_policy[PAMU_ERROR_COUNT];
 
@@ -257,6 +258,11 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	uint8_t *pci_ctrl = NULL;
 	phys_addr_t pcie_addr, pcie_size;
 	int i;
+	const char *mpic_msi_compats[] = {
+		"fsl,mpic-msi",
+		"fsl,mpic-msi-v4.3",
+		NULL
+	};
 
 	prop = dt_get_prop(node, "device_type", 0);
 	if (!prop || strcmp(prop->data, "pci"))
@@ -290,7 +296,8 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	if (!msi_gnode)
 		list_for_each(&guest->dev_list, i) {
 			dev_owner_t *owner = to_container(i, dev_owner_t, guest_node);
-			if (dt_node_is_compatible(owner->hwnode, "fsl,mpic-msi")) {
+			if (dt_node_is_compatible_list(owner->hwnode,
+			                               mpic_msi_compats)) {
 				msi_node = owner->hwnode;
 				msi_gnode = owner->gnode;
 				dt_set_prop(gnode, "fsl,msi", &owner->cfgnode->guest_phandle, 4);
@@ -302,7 +309,7 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 		return ULONG_MAX;
 
 	if (!msi_node ||
-	    !dt_node_is_compatible(msi_node, "fsl,mpic-msi")) {
+	    !dt_node_is_compatible_list(msi_node, mpic_msi_compats)) {
 		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				 "%s: bad fsl,msi phandle in %s\n",
 				 __func__, node->name);

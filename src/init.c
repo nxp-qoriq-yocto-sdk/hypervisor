@@ -217,6 +217,9 @@ static const dev_compat_t pic_compats[] = {
 	{
 		.compatible = "chrp,open-pic",
 	},
+	{
+		.compatible = "fsl,mpic",
+	},
 	{},
 };
 

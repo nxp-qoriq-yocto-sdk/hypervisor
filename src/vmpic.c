@@ -306,9 +306,14 @@ void vmpic_partition_init(guest_t *guest)
 		uint32_t pd[4];
 		phys_addr_t addr;
 		uint32_t naddr, nsize;
+		const char *mpic_compats[] = {
+			"chrp,open-pic",
+			"fsl,mpic",
+			NULL
+		};
 
-		dt_node_t *node = dt_get_first_compatible(hw_devtree,
-							 "chrp,open-pic");
+		dt_node_t *node = dt_get_first_compatible_list(hw_devtree,
+		                                               mpic_compats);
 		if (!node) {
 			printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
 				"%s: no open-pic node in hw_devtree\n",
