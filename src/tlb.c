@@ -149,7 +149,7 @@ none_avail:
 		gcpu->tlb1_map[entry][idx] |= 1UL << bit;
 		for (int j = 0; j < TLB1_GSIZE; j++) {
 			if (j != entry && (gcpu->tlb1_map[j][idx] & (1UL << bit))) {
-				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_NORMAL,
+				printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 				         "%s[%d]: evicting entry %d used by %d\n",
 				         __func__, entry, i, j);
 
