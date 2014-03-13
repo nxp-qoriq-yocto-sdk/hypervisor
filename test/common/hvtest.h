@@ -69,7 +69,6 @@ int init_error_queues(void);
 int get_number32(const char *numstr, uint32_t *num);
 char *nextword(char **str);
 
-uint64_t get_tb(void);
 uint32_t dt_get_timebase_freq(void);
 
 static inline void delay_timebase(uint64_t ticks)

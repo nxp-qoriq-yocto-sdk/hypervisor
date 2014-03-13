@@ -388,19 +388,6 @@ static int get_stdout(void)
 	return node;
 }
 
-uint64_t get_tb(void)
-{
-        register_t tbl, tbu;
-
-again:
-	tbu = mfspr(SPR_TBU);
-	tbl = mfspr(SPR_TBL);
-	if (tbu != mfspr(SPR_TBU))
-		goto again;
-
-        return ((uint64_t) tbu << 32 | tbl);
-}
-
 uint32_t dt_get_timebase_freq(void)
 {
 	int node;
