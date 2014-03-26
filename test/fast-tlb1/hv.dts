@@ -1,0 +1,324 @@
+/*
+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "fsl,hv-config";
+
+	// =====================================================
+	// Hypervisor Config
+	// =====================================================
+	hv: hv-config {
+		compatible = "hv-config";
+		stdout = <&hvbc>;
+
+		hvbc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <0>;
+		};
+
+		memory {
+			compatible = "hv-memory";
+			phys-mem = <&pma0>;
+		};
+
+		uart0: uart0 {
+			device = "serial0";
+		};
+
+		uart1: uart1 {
+			device = "serial1";
+		};
+
+		mpic {
+			device = "/soc/pic";
+		};
+
+		iommu {
+			device = "/soc/iommu";
+		};
+
+		cpc {
+			device = "/soc/l3-cache-controller";
+		};
+/*
+		corenet-law {
+			device = "/soc/corenet-law";
+		};
+
+		corenet-cf {
+			device = "/soc/corenet-cf";
+		};
+*/
+		guts {
+			device = "/soc/global-utilities@e0000";
+		};
+	};
+
+	// =====================================================
+	// Physical Memory Areas
+	// =====================================================
+	phys-mem {
+		pma0: pma0 {
+			compatible = "phys-mem-area";
+			addr = <0 0>;
+			size = <0 0x01000000>;
+		};
+
+		pma1: pma1 {
+			compatible = "phys-mem-area";
+			addr = <0 0x10000000>;
+			size = <0 0x10000000>;
+		};
+
+		pma00: pma00 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40000000>;
+			size = <0 0x00001000>;
+		};
+
+		pma01: pma01 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40002000>;
+			size = <0 0x00001000>;
+		};
+
+		pma02: pma02 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40004000>;
+			size = <0 0x00001000>;
+		};
+
+		pma03: pma03 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4006000>;
+			size = <0 0x00001000>;
+		};
+
+		pma04: pma04 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40008000>;
+			size = <0 0x00001000>;
+		};
+
+		pma05: pma05 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4000a000>;
+			size = <0 0x00001000>;
+		};
+
+		pma06: pma06 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4000c000>;
+			size = <0 0x00001000>;
+		};
+
+		pma07: pma07 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4000e000>;
+			size = <0 0x00001000>;
+		};
+
+		pma08: pma08 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40010000>;
+			size = <0 0x00001000>;
+		};
+
+		pma09: pma09 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40012000>;
+			size = <0 0x00001000>;
+		};
+
+		pma10: pma10 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40014000>;
+			size = <0 0x00001000>;
+		};
+
+		pma11: pma11 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40016000>;
+			size = <0 0x00001000>;
+		};
+
+		pma12: pma12 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40018000>;
+			size = <0 0x00001000>;
+		};
+
+		pma13: pma13 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4001a000>;
+			size = <0 0x00001000>;
+		};
+
+		pma14: pma14 {
+			compatible = "phys-mem-area";
+			addr = <0 0x4001e000>;
+			size = <0 0x00001000>;
+		};
+
+		pma15: pma15 {
+			compatible = "phys-mem-area";
+			addr = <0 0x40020000>;
+			size = <0 0x00001000>;
+		};
+	};
+
+	uartmux: uartmux {
+		compatible = "byte-channel-mux";
+		endpoint = <&uart0>;
+	};
+
+	// =====================================================
+	// Partition 1
+	// =====================================================
+	part1: part1 {
+		compatible = "partition";
+		cpus = <0 2>;
+		guest-image = <0xf 0xe8a00000 0 0 0 0x200000>;
+		dtb-window = <0 0x01000000 0 0x10000>;
+
+		direct-guest-tlb-miss;
+		direct-guest-tlb-management;
+
+		p1bc: byte-channel {
+			compatible = "byte-channel";
+			endpoint = <&uartmux>;
+			mux-channel = <1>;
+		};
+
+		aliases {
+			stdout = <&p1bc>;
+		};
+
+		gpma {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma1>;
+			guest-addr = <0 0>;
+		};
+
+		gpma00 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma00>;
+			guest-addr = <0 0x80000000>;
+		};
+
+		gpma01 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma01>;
+			guest-addr = <0 0x80002000>;
+		};
+
+		gpma02 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma02>;
+			guest-addr = <0 0x80004000>;
+		};
+
+		gpma03 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma03>;
+			guest-addr = <0 0x80006000>;
+		};
+
+		gpma04 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma04>;
+			guest-addr = <0 0x80008000>;
+		};
+
+		gpma05 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma05>;
+			guest-addr = <0 0x8000a000>;
+		};
+
+		gpma06 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma06>;
+			guest-addr = <0 0x8000c000>;
+		};
+
+		gpma07 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma07>;
+			guest-addr = <0 0x8000e000>;
+		};
+
+		gpma08 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma08>;
+			guest-addr = <0 0x80010000>;
+		};
+
+		gpma09 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma09>;
+			guest-addr = <0 0x80012000>;
+		};
+
+		gpma10 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma10>;
+			guest-addr = <0 0x80014000>;
+		};
+
+		gpma11 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma11>;
+			guest-addr = <0 0x80016000>;
+		};
+
+		gpma12 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma12>;
+			guest-addr = <0 0x80018000>;
+		};
+
+		gpma13 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma13>;
+			guest-addr = <0 0x8001a000>;
+		};
+
+		gpma14 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma14>;
+			guest-addr = <0 0x8001c000>;
+		};
+
+		gpma15 {
+			compatible = "guest-phys-mem-area";
+			phys-mem = <&pma15>;
+			guest-addr = <0 0x80020000>;
+		};
+	};
+};
+
