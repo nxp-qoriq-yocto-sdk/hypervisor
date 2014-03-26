@@ -356,7 +356,8 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 
 	set_stat(bm_stat_tlbsx, regs);
 	disable_int();
-	guest_tlb_search_mas(va);
+	if (fast_guest_tlbsx(va))
+		guest_tlb_search_mas(va);
 	enable_int();
 
 	return 0;
@@ -400,10 +401,15 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 		return 1;
 	}
 
-	mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
-	mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
-	mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
-	mtspr(SPR_MAS7, gcpu->gtlb1[entry].mas7);
+	disable_int();
+	if (fast_guest_tlbre()) {
+		mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
+		mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
+		mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
+		mtspr(SPR_MAS7, gcpu->gtlb1[entry].mas7);
+	}
+	enable_int();
+
 	return 0;
 }
 
@@ -1139,7 +1145,15 @@ void hvpriv(trapframe_t *regs)
 			break;
 
 		case 0x3d2:
-			fault = emu_tlbwe(regs, insn);
+			{
+				register_t mas0 = mfspr(SPR_MAS0);
+				register_t mas1 = mfspr(SPR_MAS1);
+				fault = 1;
+				if ((mas0 & MAS0_TLBSEL1) && !(mas1 & MAS1_IPROT))
+					fault = fast_guest_set_tlb1(mas0, mas1);
+				if (fault)
+					fault = emu_tlbwe(regs, insn);
+			}
 			break;
 
 		case 0x153:

@@ -3377,6 +3377,8 @@ static void configure_tlb_mgt(guest_t *guest)
 	if (!guest->direct_guest_tlb_miss && !guest->direct_guest_tlb_mgt &&
 		((mfspr(SPR_PVR) & 0xffff0000) < 0x80400000))
 		tlbcache_init();
+
+	fast_guest_tlb1_init();
 }
 
 /* init_guest() is called once per CPU

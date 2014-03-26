@@ -133,6 +133,41 @@ unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
 int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
 unsigned long update_dgtmi(register_t mas0, register_t mas1);
 
+#ifdef CONFIG_FAST_TLB1
+
+void fast_guest_tlb1_init(void);
+int fast_guest_set_tlb1(register_t mas0, register_t mas1);
+int fast_guest_tlbsx(unsigned long va);
+int fast_guest_tlbre(void);
+void fast_guest_inv_tlb1(register_t va, int pid, int ind, int flags, int global);
+
+#else
+
+static inline void fast_guest_tlb1_init(void)
+{
+}
+
+static inline int fast_guest_set_tlb1(register_t mas0, register_t mas1)
+{
+	return 1;
+}
+
+static inline int fast_guest_tlbsx(unsigned long va)
+{
+	return 1;
+}
+
+static inline int fast_guest_tlbre(void)
+{
+	return 1;
+}
+
+static void fast_guest_inv_tlb1(register_t va, int pid, int ind, int flags, int global)
+{
+}
+
+#endif /* CONFIG_FAST_TLB1 */
+
 #define INV_IPROT 1
 #define INV_TLB0  MMUCSR_L2TLB0_FI
 #define INV_TLB1  MMUCSR_L2TLB1_FI

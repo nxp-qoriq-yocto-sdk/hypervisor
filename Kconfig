@@ -279,3 +279,11 @@ config WARM_REBOOT
 		PAMU tables and skips its initialization during a warm reboot.
 		If the argument is missing, a cold boot is assumed and PAMU is
 		reconfigured.
+
+config FAST_TLB1
+	bool "Enable fast TLB1"
+	default y
+	help
+		Enable fast tlb1 feature. This optimization provides a
+		faster code path for TLB1 emulation. It's especially useful
+		on platforms using hardware page table walk (e.g. e6500 cores).

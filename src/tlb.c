@@ -71,7 +71,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 }
 
 
-static void free_tlb1(unsigned int entry)
+static void free_tlb1(unsigned int entry, int write_tlb)
 {
 	gcpu_t *gcpu = get_gcpu();
 	int i = 0;
@@ -90,7 +90,9 @@ static void free_tlb1(unsigned int entry)
 			         idx + bit, entry, mfspr(SPR_PIR));
 
 			cpu->tlb1[idx + bit].mas1 = 0;
-			tlb1_write_entry(idx + bit);
+
+			if (write_tlb)
+				tlb1_write_entry(idx + bit);
 
 			gcpu->tlb1_map[entry][i] &= ~(1UL << bit);
 			shared_cpu->tlb1_inuse[i] &= ~(1UL << bit);
@@ -623,7 +625,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 	         "gtlb1[%d] mapping from %lx to %lx, grpn %lx, mas1 %lx\n",
 	         entry, epn, end, grpn, mas1);
 
-	free_tlb1(entry);
+	free_tlb1(entry, 1);
 
 	gcpu->gtlb1[entry].mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(entry);
 	gcpu->gtlb1[entry].mas1 = mas1;
@@ -684,6 +686,10 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 			// FIXME: reflect machine check
 			BUG();
 		}
+
+#ifdef CONFIG_FAST_TLB1
+		gcpu->fast_tlb1_to_gtlb1[real_entry] = -1;
+#endif
 
 		tlb1_set_entry_safe(real_entry, epn << PAGE_SHIFT,
 		                    ((phys_addr_t)rpn) << PAGE_SHIFT, size_epn,
@@ -826,6 +832,35 @@ unsigned long update_dgtmi(register_t mas0, register_t mas1)
 	return new_split_gtlb1_map;
 }
 
+static int guest_tlb1_match(register_t mas1, register_t mas2, register_t va,
+                            int pid, int ind, int flags, int global)
+{
+	if (!(mas1 & MAS1_VALID))
+		return 0;
+
+	if ((flags & INV_IPROT) || !(mas1 & MAS1_IPROT)) {
+		register_t begin = mas2 & MAS2_EPN;
+		register_t end = begin;
+
+		end += (tsize_to_pages(MAS1_GETTSIZE(mas1)) - 1) * PAGE_SIZE;
+
+		if (!global && (va < begin || va > end))
+			return 0;
+
+		if (pid >= 0 &&
+		    (unsigned int)pid != (mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
+			return 0;
+
+		if (ind >= 0 &&
+		    (unsigned int)ind != (mas1 & MAS1_IND) >> MAS1_IND_SHIFT)
+			return 0;
+
+		return 1;
+	}
+
+	return 0;
+}
+
 static void guest_inv_tlb1(register_t va, int pid, int ind,
                            int flags, int global)
 {
@@ -833,33 +868,16 @@ static void guest_inv_tlb1(register_t va, int pid, int ind,
 	gcpu_t *gcpu = get_gcpu();
 	unsigned int i;
 
+	fast_guest_inv_tlb1(va, pid, ind, flags, global);
+
 	for (i = 0; i < TLB1_GSIZE; i++) {
 		tlb_entry_t *tlbe = &gcpu->gtlb1[i];
 
-		if (!(tlbe->mas1 & MAS1_VALID))
-			continue;
-
-		if ((flags & INV_IPROT) || !(tlbe->mas1 & MAS1_IPROT)) {
-			register_t begin = tlbe->mas2 & MAS2_EPN;
-			register_t end = begin;
+		if (guest_tlb1_match(tlbe->mas1, tlbe->mas2, va, pid,
+		                     ind, flags, global)) {
 			int iprot = tlbe->mas1 & MAS1_IPROT;
 
-			end += (tsize_to_pages(MAS1_GETTSIZE(tlbe->mas1)) - 1) * PAGE_SIZE;
-
-			if (!global && (va < begin || va > end))
-				continue;
-
-			if (pid >= 0 &&
-			    (unsigned int)pid !=
-			    (tlbe->mas1 & MAS1_TID_MASK) >> MAS1_TID_SHIFT)
-				continue;
-
-			if (ind >= 0 &&
-				(unsigned int)ind !=
-				(tlbe->mas1 & MAS1_IND) >> MAS1_IND_SHIFT)
-				continue;
-
-			free_tlb1(i);
+			free_tlb1(i, 1);
 
 			if (!iprot)
 				update_dgtmi(tlbe->mas0, tlbe->mas1);
@@ -1034,8 +1052,6 @@ void fixup_tlb_sx_re(void)
 		                (mas3 & (MAS3_FLAGS | MAS3_USER)));
 		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
 	}
-
-	assert(MAS0_GET_TLBSEL(mfspr(SPR_MAS0)) == 0);
 }
 
 int guest_tlb_search_mas(uintptr_t va)
@@ -2098,3 +2114,201 @@ void lrat_miss(trapframe_t *regs)
 	enable_int();
 
 }
+
+#ifdef CONFIG_FAST_TLB1
+
+void fast_guest_tlb1_init(void)
+{
+	for (int i = 0; i <= GUEST_TLB_END; i++)
+		get_gcpu()->fast_tlb1_to_gtlb1[i] = -1;
+}
+
+int fast_guest_set_tlb1(register_t mas0, register_t mas1)
+{
+	gcpu_t *gcpu = get_gcpu();
+	unsigned long pages, grpn = 0, attr = 0, rpn = 0;
+	int tsize = 0, entry, real_entry = -1;
+	register_t mas3, saved_mas0, saved_mas3, saved_mas7;
+
+	saved_mas0 = mas0;
+	saved_mas3 = mas3 = mfspr(SPR_MAS3);
+	saved_mas7 = mfspr(SPR_MAS7);
+
+	entry = MAS0_GET_TLB1ESEL(mas0);
+
+	if (mas1 & MAS1_VALID) {
+		tsize = MAS1_GETTSIZE(mas1);
+		pages = tsize_to_pages(tsize);
+		if (mas1 & MAS1_IND)
+			tsize -= MAS3_GETSPSIZE(mas3) + 7;
+		grpn = (mfspr(SPR_MAS7) << (32 - PAGE_SHIFT)) | (mas3 >> MAS3_RPN_SHIFT);
+
+		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
+		if (!(attr & PTE_VALID) || (attr >> PTE_SIZE_SHIFT) < tsize) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+			         "%s: xlate error entry = %d grpn: %lx "
+			         "attr: %lx tsize: %d xtsize: %ld\n",
+			          __func__, entry, grpn, attr, tsize,
+			         (attr >> PTE_SIZE_SHIFT));
+			return 1;
+		}
+
+		free_tlb1(entry, 0);
+		real_entry = alloc_tlb1(entry, 0);
+		if (real_entry < 0) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_ALWAYS,
+				 "%s: Out of TLB1 entries!\n", __func__);
+			return 1;
+		}
+		gcpu->fast_tlb1_to_gtlb1[real_entry] = entry;
+
+		mas0 &= ~MAS0_ESEL_TLB1MASK;
+		mas0 |= MAS0_ESEL(real_entry);
+
+		mas3 &= attr & PTE_MAS3_MASK;
+		mas3 = ((rpn << PAGE_SHIFT) & MAS3_RPN) | (attr & PTE_MAS3_MASK);
+
+		mtspr(SPR_MAS0, mas0);
+		mtspr(SPR_MAS3, mas3);
+		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
+		mtspr(SPR_MAS8, gcpu->lpid | ((attr << PTE_MAS8_SHIFT) & PTE_MAS8_MASK));
+
+		asm volatile("isync; tlbwe; isync; msync" : : : "memory");
+
+		mtspr(SPR_MAS0, saved_mas0);
+		mtspr(SPR_MAS3, saved_mas3);
+		mtspr(SPR_MAS7, saved_mas7);
+	} else {
+		int i = 0, idx = 0;
+
+		save_mas(gcpu);
+		real_entry = nonsplit_gtlb1_to_tlb1(entry);
+		if (real_entry >= 0 && gcpu->fast_tlb1_to_gtlb1[real_entry] > 0) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+			         "%s@0x%lx clearing gentry = %d real_entry = %d\n",
+			         __func__, mfspr(SPR_GSRR0), entry, real_entry);
+
+			gcpu->fast_tlb1_to_gtlb1[real_entry] = -1;
+		} else {
+			update_dgtmi(mas0, mas1);
+		}
+
+		free_tlb1(entry, 1);
+		restore_mas(gcpu);
+	}
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "%s@0x%lx: V=%d eaddr = %lx gaddr = %lx raddr = %lx entry = %u "
+	         "real_entry = %u attr = %lx tsize = %d (xtsize = %lu)\n",
+	         __func__, mfspr(SPR_GSRR0), (mas1 & MAS1_VALID) ? 1 : 0,
+	         mfspr(SPR_MAS2) & MAS2_EPN, grpn << PAGE_SHIFT, rpn << PAGE_SHIFT,
+	         entry, real_entry, attr, tsize, (attr >> PTE_SIZE_SHIFT));
+
+	return 0;
+}
+
+int fast_guest_tlbsx(unsigned long va)
+{
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "%s: va = %lx\n", __func__, va);
+
+	asm volatile("isync; tlbsx 0, %0" : : "r" (va) : "memory");
+
+	if (mfspr(SPR_MAS1) & MAS1_VALID) {
+		register_t mas0 = mfspr(SPR_MAS0);
+		unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
+
+		if (get_gcpu()->fast_tlb1_to_gtlb1[entry] > 0) {
+			mas0 &= ~MAS0_ESEL_TLB1MASK;
+			mas0 |=  get_gcpu()->fast_tlb1_to_gtlb1[entry];
+			mtspr(SPR_MAS0, mas0);
+			fixup_tlb_sx_re();
+
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+int fast_guest_tlbre(void)
+{
+	register_t mas0 = mfspr(SPR_MAS0);
+	unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
+	int i = 0, real_entry = 0;
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "%s: entry = %u\n", __func__, entry);
+
+	real_entry = nonsplit_gtlb1_to_tlb1(entry);
+	if (real_entry < 0)
+		return 1;
+
+	if (get_gcpu()->fast_tlb1_to_gtlb1[real_entry] >= 0) {
+		mas0 &= ~MAS0_ESEL_TLB1MASK;
+		mas0 |= MAS0_ESEL(real_entry);
+		mtspr(SPR_MAS0, mas0);
+
+		asm volatile("tlbre" : : : "memory");
+		fixup_tlb_sx_re();
+
+		mas0 &= ~MAS0_ESEL_TLB1MASK;
+		mas0 |=  MAS0_ESEL(entry);
+		mtspr(SPR_MAS0, mas0);
+
+		return 0;
+	}
+
+	return 1;
+}
+
+void fast_guest_inv_tlb1(register_t va, int pid, int ind, int flags, int global)
+{
+	int i;
+	gcpu_t *gcpu = get_gcpu();
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "%s: va = %lx pid = %d ind = %d flags = %x global = %d\n",
+	         __func__, va, pid, ind, flags, global);
+
+	for (i = 0; i <= GUEST_TLB_END; i++) {
+		if (gcpu->fast_tlb1_to_gtlb1[i] == -1)
+			continue;
+
+		mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
+		asm volatile("isync; tlbre" : : : "memory");
+
+		/*
+		 * The entry may be purged by a previous generous tlb
+		 * invalidate done earlier with the calls to tlb_inv_addr()
+		 * in guest_inv_tlb()'s TLB0 code path, so make it
+		 * back valid so the match below has a chance to work.
+		 */
+		if (!(mfspr(SPR_MAS1) & MAS1_VALID)) {
+			mtspr(SPR_MAS1, mfspr(SPR_MAS1) | MAS1_VALID);
+			asm volatile("isync; tlbwe; isync; msync" : : : "memory");
+
+			/* ... and read it back again */
+			mtspr(SPR_MAS0, MAS0_ESEL(i) | MAS0_TLBSEL(1));
+			asm volatile("isync; tlbre" : : : "memory");
+		}
+
+		if (guest_tlb1_match(mfspr(SPR_MAS1), mfspr(SPR_MAS2),
+		                     va, pid, ind, flags, global)) {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+			         "%s: %d (real %d) ea = %lx MATCH\n",
+			         __func__, gcpu->fast_tlb1_to_gtlb1[i],
+			         i, mfspr(SPR_MAS2));
+			free_tlb1(gcpu->fast_tlb1_to_gtlb1[i], 1);
+			gcpu->fast_tlb1_to_gtlb1[i] = -1;
+		} else {
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+			         "%s: %d (real %d) mas1 = %lx ea = %lx no match\n",
+			         __func__, gcpu->fast_tlb1_to_gtlb1[i], i,
+			         mfspr(SPR_MAS1), mfspr(SPR_MAS2));
+		}
+	}
+}
+
+#endif /* CONFIG_FAST_TLB1 */
+

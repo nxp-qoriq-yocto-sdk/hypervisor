@@ -255,6 +255,11 @@ typedef struct gcpu {
 	tlb_entry_t gtlb1[TLB1_GSIZE];
 	unsigned long split_gtlb1_map;
 
+#ifdef CONFIG_FAST_TLB1
+	/* Maps a real tlb1 entry to the corresponding guest tlb1 entry */
+	int fast_tlb1_to_gtlb1[GUEST_TLB_END + 1];
+#endif
+
 	unsigned long dbell_pending;
 	unsigned long gevent_pending;
 	unsigned int gcpu_num;
