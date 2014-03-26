@@ -687,13 +687,143 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 
 		tlb1_set_entry_safe(real_entry, epn << PAGE_SHIFT,
 		                    ((phys_addr_t)rpn) << PAGE_SHIFT, size_epn,
-		                    (mas1 & (MAS1_IND | MAS1_TS)) | MAS1_IPROT,
+		                    mas1 & (MAS1_IND | MAS1_TS | MAS1_IPROT),
 		                    mas2flags, mas3flags,
 		                    (mas1 >> MAS1_TID_SHIFT) & 0xff, mas8);
 
 		epn += tsize_to_pages(size_epn);
 		grpn += tsize_to_pages_roundup(size_rpn);
 	}
+}
+
+static int nonsplit_gtlb1_to_tlb1(int entry)
+{
+	int i = 0, real_entry = 0;
+
+	do {
+		if (get_gcpu()->tlb1_map[entry][i]) {
+			real_entry += count_lsb_zeroes(get_gcpu()->tlb1_map[entry][i]);
+			return real_entry;
+		}
+
+		i++;
+		real_entry += LONG_BITS;
+	} while (real_entry <= GUEST_TLB_END);
+
+	return -1;
+}
+
+unsigned long update_dgtmi(register_t mas0, register_t mas1)
+{
+	unsigned int i, entry;
+	unsigned long  new_split_gtlb1_map;
+	gcpu_t *gcpu = get_gcpu();
+
+	/* Both "direct guest tlb management" and "direct guest tlb miss"
+	 * must be enabled. One might question: why is "direct guest tlb miss"
+	 * a must?
+	 * Consider the following case with "direct guest tlb miss" off:
+	 * - a non-split gtlb1 entry with it's associated real tlb1 entry
+	 * - the real tlb1 entry gets evicted by another newly added gtlb1 entry
+	 * - a native tlbilx on our non-split entry won't hit any real tlb1 entry
+	 * - the gtlb1 entry will remain in the hv structures even if the guest
+	 * - invalidated it, which is wrong
+	 * - since eviction happens only with "direct guest tlb miss" off,
+	 *   we must ensure it's on, in order to avoid described case
+	 */
+	if (!gcpu->guest->direct_guest_tlb_mgt ||
+	    !gcpu->guest->direct_guest_tlb_miss)
+		return 0;
+
+	assert(mas0 & MAS0_TLBSEL1);
+
+	new_split_gtlb1_map = gcpu->split_gtlb1_map;
+	entry = MAS0_GET_TLB1ESEL(mas0);
+	if ((mas1 & (MAS1_VALID | MAS1_IPROT)) == MAS1_VALID) {
+		int splits = 0;
+		unsigned long tlb1_map;
+
+		for (i = 0; i < (TLB1_SIZE + LONG_BITS - 1) / LONG_BITS; i++) {
+
+			tlb1_map = gcpu->tlb1_map[entry][i];
+
+			if (!tlb1_map)
+				continue;
+
+			/* tlb1_map != 0 => at least one split */
+			splits++;
+			/* tlb1_map not a power of 2 => multiple splits */
+			if (tlb1_map & (tlb1_map - 1))
+				splits++;
+
+			if (splits > 1) {
+				new_split_gtlb1_map |= (1 << entry);
+				break;
+			}
+		}
+	} else {
+		new_split_gtlb1_map &= ~(1 << entry);
+	}
+
+	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
+	         "%s: old_map = %lx new_map = %lx\n",
+	         __func__, gcpu->split_gtlb1_map, new_split_gtlb1_map);
+
+	if (!gcpu->split_gtlb1_map && new_split_gtlb1_map) {
+		int real_entry;
+
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+		         "%s: disabling guest tlb mgmt instrs (entry = %d)\n",
+		         __func__, entry);
+
+		/* disable "guest tlb mgmt instrs" */
+		mtspr(SPR_EPCR, mfspr(SPR_EPCR) | EPCR_DGTMI);
+
+		/* While running with DGTMI = 0 a native tlbilx instr might
+		 * have invalidated one of the tlb1 entries without hv's
+		 * knowledge.
+		 * Iterate gtlb1 entries, check if the real tlb1 entry
+		 * backing them up was invalidated and if so, also invalidate
+		 * them in hv structs.
+		 */
+		save_mas(gcpu);
+		for (i = 0; i < TLB1_GSIZE; i++) {
+			/* Skip the split entry that was just changed */
+			if (i == entry)
+				continue;
+
+			/* Skip invalid or IPROT gtlb1 entries */
+			if ((gcpu->gtlb1[i].mas1 & (MAS1_VALID | MAS1_IPROT)) != MAS1_VALID)
+				continue;
+
+			real_entry = nonsplit_gtlb1_to_tlb1(i);
+			assert(real_entry >= 0);
+
+			mtspr(SPR_MAS0, MAS0_ESEL(real_entry) | MAS0_TLBSEL(1));
+			asm volatile("isync; tlbre" : : : "memory");
+
+			/* Still valid? */
+			if (mfspr(SPR_MAS1) & MAS1_VALID)
+				continue;
+
+			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+			         "%s: invalidating gtlb1 entry %d\n",
+			         __func__, i);
+
+			gcpu->gtlb1[i].mas1 &= ~MAS1_VALID;
+		}
+		restore_mas(gcpu);
+	} else if (gcpu->split_gtlb1_map && !new_split_gtlb1_map) {
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+		         "%s: enabling guest tlb mgmt instrs (entry = %d)\n",
+		         __func__, entry);
+
+		/* enable "guest tlb mgmt instrs" */
+		mtspr(SPR_EPCR, mfspr(SPR_EPCR) & ~EPCR_DGTMI);
+	}
+	gcpu->split_gtlb1_map = new_split_gtlb1_map;
+
+	return new_split_gtlb1_map;
 }
 
 static void guest_inv_tlb1(register_t va, int pid, int ind,
@@ -712,6 +842,7 @@ static void guest_inv_tlb1(register_t va, int pid, int ind,
 		if ((flags & INV_IPROT) || !(tlbe->mas1 & MAS1_IPROT)) {
 			register_t begin = tlbe->mas2 & MAS2_EPN;
 			register_t end = begin;
+			int iprot = tlbe->mas1 & MAS1_IPROT;
 
 			end += (tsize_to_pages(MAS1_GETTSIZE(tlbe->mas1)) - 1) * PAGE_SIZE;
 
@@ -729,6 +860,9 @@ static void guest_inv_tlb1(register_t va, int pid, int ind,
 				continue;
 
 			free_tlb1(i);
+
+			if (!iprot)
+				update_dgtmi(tlbe->mas0, tlbe->mas1);
 		}
 	}
 

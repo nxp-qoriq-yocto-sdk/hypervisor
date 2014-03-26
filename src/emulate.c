@@ -644,6 +644,10 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
+
+		if (mas0 & MAS0_TLBSEL1)
+			update_dgtmi(mas0, mas1);
+
 	} else {
 		unsigned long mas8 = gcpu->lpid | MAS8_GTS;
 		unsigned long attr, gmas3;

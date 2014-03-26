@@ -1924,6 +1924,8 @@ static int setup_ima(trapframe_t *regs, phys_addr_t entry, int secondary)
 
 		vpage += pages / 2;
 		ppage += pages / 2;
+
+		update_dgtmi(MAS0_TLBSEL1, MAS1_VALID | MAS1_IPROT);
 	}
 
 	return 0;

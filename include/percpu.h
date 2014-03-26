@@ -253,6 +253,8 @@ typedef struct gcpu {
 	thread_t thread;
 	tlbmap_t tlb1_map[TLB1_GSIZE];
 	tlb_entry_t gtlb1[TLB1_GSIZE];
+	unsigned long split_gtlb1_map;
+
 	unsigned long dbell_pending;
 	unsigned long gevent_pending;
 	unsigned int gcpu_num;
