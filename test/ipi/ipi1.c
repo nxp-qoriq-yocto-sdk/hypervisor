@@ -72,7 +72,8 @@ static void rd_shm(void)
 		printf("valloc failed \n");
 		return;
 	}
-	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0, 0);
+	tlb1_set_entry(1, (unsigned long)vaddr, addr, TLB_TSIZE_4K, MAS1_IPROT,
+	               TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0);
 	memcpy(buf, vaddr, strlen("hello") + 1);
 #ifdef DEBUG
 	printf("read '%s' from shared memory on interrupt \n", buf);

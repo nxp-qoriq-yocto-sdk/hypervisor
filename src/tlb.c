@@ -42,9 +42,9 @@
 
 static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
                                 phys_addr_t pa, register_t tsize,
-                                register_t mas2flags, register_t mas3flags,
-                                unsigned int tid, unsigned int ts,
-                                register_t mas8, unsigned int ind)
+                                register_t mas1flags, register_t mas2flags,
+                                register_t mas3flags, unsigned int tid,
+                                register_t mas8)
 {
 	register_t mas0, mas1, mas2, mas3, mas7, saved_mas8;
 	register_t saved;
@@ -58,7 +58,7 @@ static void tlb1_set_entry_safe(unsigned int idx, unsigned long va,
 	mas7 = mfspr(SPR_MAS7);
 	saved_mas8 = mfspr(SPR_MAS8);
 
-	tlb1_set_entry(idx, va, pa, tsize, mas2flags, mas3flags, tid, ts, mas8, ind);
+	tlb1_set_entry(idx, va, pa, tsize, mas1flags, mas2flags, mas3flags, tid, mas8);
 
 	mtspr(SPR_MAS0, mas0);
 	mtspr(SPR_MAS1, mas1);
@@ -532,12 +532,12 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 		index = alloc_tlb1(i, 1);
 
 		tlb1_set_entry(index, epn << PAGE_SHIFT,
-		               ((phys_addr_t)rpn) << PAGE_SHIFT,
-		               mapsize, entry->mas2,
-		               (entry->mas3 & ~MAS3_RPN)
+		               ((phys_addr_t)rpn) << PAGE_SHIFT, mapsize,
+		               MAS1_IPROT | (entry->mas1 & MAS1_IND)
+		                | (space ? MAS1_TS : 0),
+		               entry->mas2, (entry->mas3 & ~MAS3_RPN)
 				& (attr & PTE_MAS3_MASK),
-		               pid, space, MAS8_GTS | gcpu->lpid,
-		               (entry->mas1 >> MAS1_IND_SHIFT) & 1);
+		               pid, MAS8_GTS | gcpu->lpid);
 
 		restore_mas(gcpu);
 		enable_int();
@@ -686,11 +686,10 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 		}
 
 		tlb1_set_entry_safe(real_entry, epn << PAGE_SHIFT,
-		                    ((phys_addr_t)rpn) << PAGE_SHIFT,
-		                    size_epn, mas2flags, mas3flags,
-		                    (mas1 >> MAS1_TID_SHIFT) & 0xff,
-		                    (mas1 >> MAS1_TS_SHIFT) & 1, mas8,
-		                    (mas1 >> MAS1_IND_SHIFT) & 1);
+		                    ((phys_addr_t)rpn) << PAGE_SHIFT, size_epn,
+		                    (mas1 & (MAS1_IND | MAS1_TS)) | MAS1_IPROT,
+		                    mas2flags, mas3flags,
+		                    (mas1 >> MAS1_TID_SHIFT) & 0xff, mas8);
 
 		epn += tsize_to_pages(size_epn);
 		grpn += tsize_to_pages_roundup(size_rpn);
@@ -1030,8 +1029,8 @@ static void insert_map_entry(map_entry_t *me, uintptr_t gaddr)
 
 	tlb1_set_entry_safe(tlbe, start_page << PAGE_SHIFT,
 	                    ((phys_addr_t)start_phys) << PAGE_SHIFT,
-	                    me->tsize, me->mas2flags, me->mas3flags,
-	                    0, 0, TLB_MAS8_HV, 0);
+	                    me->tsize, MAS1_IPROT, me->mas2flags, me->mas3flags,
+	                    0, TLB_MAS8_HV);
 }
 
 /** Try to handle a TLB miss on a hypervisor mapping
@@ -1253,8 +1252,8 @@ void *map_gphys(int tlbentry, pte_t *tbl, phys_addr_t addr,
 
 	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
 	                    physaddr & ~((phys_addr_t)bytesize - 1),
-	                    tsize, TLB_MAS2_MEM, TLB_MAS3_KERN,
-	                    0, 0, TLB_MAS8_HV, 0);
+	                    tsize, MAS1_IPROT, TLB_MAS2_MEM, TLB_MAS3_KERN,
+	                    0, TLB_MAS8_HV);
 
 	return vpage + offset;
 }
@@ -1550,7 +1549,7 @@ void *map_phys(int tlbentry, phys_addr_t paddr, void *vpage,
 
 	tlb1_set_entry_safe(tlbentry, (unsigned long)vpage,
 	                    paddr & ~((phys_addr_t)bytesize - 1),
-	                    tsize, mas2flags, mas3flags, 0, 0, TLB_MAS8_HV, 0);
+	                    tsize, MAS1_IPROT, mas2flags, mas3flags, 0, TLB_MAS8_HV);
 
 	*len = min(bytesize - offset, *len);
 	return vpage + offset;

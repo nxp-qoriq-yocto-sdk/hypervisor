@@ -71,7 +71,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 	}
 
 	/* create tlb entry for an invalid guest physical */
-	tlb1_set_entry(2, (unsigned long)vaddr, 0x20000000, TLB_TSIZE_4K, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0, 0);
+	tlb1_set_entry(2, (unsigned long)vaddr, 0x20000000, TLB_TSIZE_4K,
+	               MAS1_IPROT, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0);
 	*vaddr = 'a';
 
 	/* make sure that the data_exception is seen after the access */

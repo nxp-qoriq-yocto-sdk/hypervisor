@@ -289,8 +289,8 @@ static int dma_init(void)
 	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
 
 	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
-	               TLB_TSIZE_4K, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, 0, 0);
+	               TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0);
 
 	prop = fdt_getprop(fdt, parent, "fsl,hv-dma-handle", &len);
 	if (!prop || len != 4) {
@@ -463,8 +463,8 @@ static int map_shmem(void)
 
 	shmem = valloc(4096, 4096);
 	tlb1_set_entry(2, (uintptr_t)shmem, shmem_phys,
-	               TLB_TSIZE_4K, TLB_MAS2_MEM,
-	               TLB_MAS3_KERN, 0, 0, 0, 0);
+	               TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_MEM,
+	               TLB_MAS3_KERN, 0, 0);
 
 	return 0;
 }

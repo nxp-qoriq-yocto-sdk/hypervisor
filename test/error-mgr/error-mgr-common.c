@@ -95,8 +95,8 @@ static void map_shared_memory(void)
 {
 	if (shared_memory) {
 		tlb1_set_entry(2, (uintptr_t)shared_memory, 0x2000000,
-			       TLB_TSIZE_4K, MAS2_M | MAS2_G, TLB_MAS3_KERN,
-			       0, 0, 0, 0);
+			       TLB_TSIZE_4K, MAS1_IPROT, MAS2_M | MAS2_G,
+		               TLB_MAS3_KERN, 0, 0);
 	} else {
 		printf("Unable to map shared memory\n");
 	}
@@ -136,8 +136,8 @@ static int dma_init(void)
 	p_dma_dgsr = (void *)p_dma_dgsr + (dma_phys & (PAGE_SIZE - 1));
 
 	tlb1_set_entry(3, (uintptr_t)p_dma_dgsr, dma_phys,
-	               TLB_TSIZE_4K, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, 0, 0);
+	               TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0);
 
 	/* Get reference to a DMA channel from that controller */
 	node = fdt_node_offset_by_compatible(fdt, node, "fsl,eloplus-dma-channel");
@@ -158,8 +158,8 @@ static int dma_init(void)
 	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
 
 	tlb1_set_entry(4, (uintptr_t)dma_virt, dma_phys,
-	               TLB_TSIZE_4K, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, 0, 0);
+	               TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0);
 
 	/* Read the status of DMA channels from the current DMA controller */
 	printf("DMA DGSR: %08x\n", dma_dgsr = in32(p_dma_dgsr));

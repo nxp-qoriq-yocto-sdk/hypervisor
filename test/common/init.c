@@ -597,7 +597,7 @@ static void tlb1_init(void)
 {
 	if (uart_virt)
 		tlb1_set_entry(0, (uintptr_t)uart_virt, uart_addr, TLB_TSIZE_4K,
-		               TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0, 0, 0);
+		               MAS1_IPROT, TLB_MAS2_IO, TLB_MAS3_KERN, 0, 0);
 
 	cpu->console_ok = 1;
 }
@@ -726,8 +726,8 @@ int release_secondary_cores(void)
 
 		tlb1_set_entry(1, (unsigned long)map,
 			       (*table) & ~(PAGE_SIZE - 1),
-			       TLB_TSIZE_4K, TLB_MAS2_IO,
-			       TLB_MAS3_KERN, 0, 0, 0, 0);
+			       TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_IO,
+			       TLB_MAS3_KERN, 0, 0);
 
 		char *table_va = map;
 		table_va += *table & (PAGE_SIZE - 1);

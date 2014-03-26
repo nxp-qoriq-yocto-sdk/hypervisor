@@ -71,7 +71,8 @@ static void cpc_perf_test(void)
 		return;
 	}
 
-	tlb1_set_entry(1, (unsigned long)arr, (phys_addr_t)0x16000000, TLB_TSIZE_256K, 0, TLB_MAS3_KERN, 0, 0, 0, 0);
+	tlb1_set_entry(1, (unsigned long)arr, (phys_addr_t)0x16000000,
+	               TLB_TSIZE_256K, MAS1_IPROT, 0, TLB_MAS3_KERN, 0, 0);
 
 	init_buf(arr);
 
@@ -81,7 +82,8 @@ static void cpc_perf_test(void)
 		return;
 	}
 
-	tlb1_set_entry(2, (unsigned long)arr1, (phys_addr_t)0x26000000, TLB_TSIZE_256K, 0, TLB_MAS3_KERN, 0, 0, 0, 0);
+	tlb1_set_entry(2, (unsigned long)arr1, (phys_addr_t)0x26000000,
+	               TLB_TSIZE_256K, MAS1_IPROT, 0, TLB_MAS3_KERN, 0, 0);
 	init_buf(arr1);
 	/* Following function call ensures that the function is in instruction cache */
 	read_buf(NULL);

@@ -112,8 +112,8 @@ static int dma_init(void)
 	dma_virt = (void *)dma_virt + (dma_phys & (PAGE_SIZE - 1));
 
 	tlb1_set_entry(3, (uintptr_t)dma_virt, dma_phys,
-	               TLB_TSIZE_4K, TLB_MAS2_IO,
-	               TLB_MAS3_KERN, 0, 0, 0, 0);
+	               TLB_TSIZE_4K, MAS1_IPROT, TLB_MAS2_IO,
+	               TLB_MAS3_KERN, 0, 0);
 
 	/* FIXME: reset all channels of DMA block before enabling liodn */
 	
@@ -351,14 +351,14 @@ void libos_client_entry(unsigned long devtree_ptr)
 		 */
 
 		tlb1_set_entry(4, (unsigned long)(0x20000000 + PHYSBASE),
-			(phys_addr_t)0x20000000, TLB_TSIZE_256M, 0,
-			TLB_MAS3_KERN, 0, 0, 0, 0);
+			(phys_addr_t)0x20000000, TLB_TSIZE_256M, MAS1_IPROT,
+			0, TLB_MAS3_KERN, 0, 0);
 		tlb1_set_entry(5, (unsigned long)(0x30000000 + PHYSBASE),
-			(phys_addr_t)0x30000000, TLB_TSIZE_256M, 0,
-			TLB_MAS3_KERN, 0, 0, 0, 0);
+			(phys_addr_t)0x30000000, TLB_TSIZE_256M, MAS1_IPROT,
+			0, TLB_MAS3_KERN, 0, 0);
 		tlb1_set_entry(6, (unsigned long)(0x40000000 + PHYSBASE),
-			(phys_addr_t)0x40000000, TLB_TSIZE_256M, 0,
-			TLB_MAS3_KERN, 0, 0, 0, 0);
+			(phys_addr_t)0x40000000, TLB_TSIZE_256M, MAS1_IPROT,
+			0, TLB_MAS3_KERN, 0, 0);
 
 		if (window_test) {
 			uint32_t start;
