@@ -334,7 +334,7 @@ static void vpic_irq_unmask(interrupt_t *irq)
 	if (virq->pending)
 		__vpic_assert_vint(virq);
 
-	if (irq->parent)
+	if (irq->parent && irq->parent->ops->is_disabled(irq->parent))
 		interrupt_unmask(irq->parent);
 	
 	spin_unlock_intsave(&guest->vpic.lock, save);
