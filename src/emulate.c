@@ -356,8 +356,27 @@ static int emu_tlbsx(trapframe_t *regs, uint32_t insn)
 
 	set_stat(bm_stat_tlbsx, regs);
 	disable_int();
-	if (fast_guest_tlbsx(va))
+	if (fast_guest_tlbsx(va)) {
+		/*
+		 * When running with "direct guest tlb mgmt" on
+		 * an invalidate might have removed a TLB1 entry
+		 * from hw.
+		 * Iterate all GTLB1 entries and if the corresponding
+		 * hw entry was invalidated then invalidate in hv
+		 * structs too.
+		 *
+		 * NOTE: This check is not needed with FAST_TLB1 on
+		 * because the TLB1 entries handled on the fast path
+		 * (non-IPROT) are kept only in hw tlb1 while the others
+		 * (having IPROT set) are not affected by invalidates.
+		 */
+#ifndef CONFIG_FAST_TLB1
+		if (!get_gcpu()->split_gtlb1_map)
+			check_invalidated_gtlb1(-1);
+#endif
+
 		guest_tlb_search_mas(va);
+	}
 	enable_int();
 
 	return 0;
@@ -403,6 +422,24 @@ static int emu_tlbre(trapframe_t *regs, uint32_t insn)
 
 	disable_int();
 	if (fast_guest_tlbre()) {
+		/*
+		 * When running with "direct guest tlb mgmt" on
+		 * an invalidate might have removed a TLB1 entry
+		 * from hw.
+		 * Iterate all GTLB1 entries and if the corresponding
+		 * hw entry was invalidated then invalidate in hv
+		 * structs too.
+		 *
+		 * NOTE: This check is not needed with FAST_TLB1 on
+		 * because the TLB1 entries handled on the fast path
+		 * (non-IPROT) are kept only in hw tlb1 while the others
+		 * (having IPROT set) are not affected by invalidates.
+		 */
+#ifndef CONFIG_FAST_TLB1
+		if (!gcpu->split_gtlb1_map)
+			check_invalidated_gtlb1(-1);
+#endif
+
 		mtspr(SPR_MAS1, gcpu->gtlb1[entry].mas1);
 		mtspr(SPR_MAS2, gcpu->gtlb1[entry].mas2);
 		mtspr(SPR_MAS3, gcpu->gtlb1[entry].mas3);
@@ -546,6 +583,24 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 			tlb1esel = MAS0_GET_TLB1ESEL(mas0);
 			pages_rpn = pages;
 
+			/*
+			 * When running with "direct guest tlb mgmt" on
+			 * an invalidate might have removed a TLB1 entry
+			 * from hw.
+			 * Iterate all GTLB1 entries and if the corresponding
+			 * hw entry was invalidated then invalidate in hv
+			 * structs too.
+			 *
+			 * NOTE: This check is not needed with FAST_TLB1 on
+			 * because the TLB1 entries handled on the fast path
+			 * (non-IPROT) are kept only in hw tlb1 while the others
+			 * (having IPROT set) are not affected by invalidates.
+			 */
+#ifndef CONFIG_FAST_TLB1
+			if (!gcpu->split_gtlb1_map)
+				check_invalidated_gtlb1(-1);
+#endif
+
 			if (mas1 & MAS1_IND) {
 				if (tsize < TLB_TSIZE_512K) {
 					restore_mas(gcpu);
@@ -651,8 +706,7 @@ static int emu_tlbwe(trapframe_t *regs, uint32_t insn)
 		guest_set_tlb1(entry, mas1, epn, grpn, mas2 & MAS2_FLAGS,
 		               mas3 & (MAS3_FLAGS | MAS3_USER));
 
-		if (mas0 & MAS0_TLBSEL1)
-			update_dgtmi(mas0, mas1);
+		update_dgtmi(mas0, mas1);
 
 	} else {
 		unsigned long mas8 = gcpu->lpid | MAS8_GTS;

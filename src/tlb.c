@@ -719,6 +719,38 @@ static int nonsplit_gtlb1_to_tlb1(int entry)
 	return -1;
 }
 
+void check_invalidated_gtlb1(int skip_entry)
+{
+	gcpu_t *gcpu = get_gcpu();
+	int real_entry, i;
+
+	for (i = 0; i < TLB1_GSIZE; i++) {
+		/* Skip the split entry that was just changed */
+		if (i == skip_entry)
+			continue;
+
+		/* Skip invalid or IPROT gtlb1 entries */
+		if ((gcpu->gtlb1[i].mas1 & (MAS1_VALID | MAS1_IPROT)) != MAS1_VALID)
+			continue;
+
+		real_entry = nonsplit_gtlb1_to_tlb1(i);
+		assert(real_entry >= 0);
+
+		mtspr(SPR_MAS0, MAS0_ESEL(real_entry) | MAS0_TLBSEL(1));
+		asm volatile("isync; tlbre" : : : "memory");
+
+		/* Still valid? */
+		if (mfspr(SPR_MAS1) & MAS1_VALID)
+			continue;
+
+		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
+		         "%s: invalidating gtlb1 entry %d\n",
+		         __func__, i);
+
+		gcpu->gtlb1[i].mas1 &= ~MAS1_VALID;
+	}
+}
+
 unsigned long update_dgtmi(register_t mas0, register_t mas1)
 {
 	unsigned int i, entry;
@@ -793,31 +825,7 @@ unsigned long update_dgtmi(register_t mas0, register_t mas1)
 		 * them in hv structs.
 		 */
 		save_mas(gcpu);
-		for (i = 0; i < TLB1_GSIZE; i++) {
-			/* Skip the split entry that was just changed */
-			if (i == entry)
-				continue;
-
-			/* Skip invalid or IPROT gtlb1 entries */
-			if ((gcpu->gtlb1[i].mas1 & (MAS1_VALID | MAS1_IPROT)) != MAS1_VALID)
-				continue;
-
-			real_entry = nonsplit_gtlb1_to_tlb1(i);
-			assert(real_entry >= 0);
-
-			mtspr(SPR_MAS0, MAS0_ESEL(real_entry) | MAS0_TLBSEL(1));
-			asm volatile("isync; tlbre" : : : "memory");
-
-			/* Still valid? */
-			if (mfspr(SPR_MAS1) & MAS1_VALID)
-				continue;
-
-			printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,
-			         "%s: invalidating gtlb1 entry %d\n",
-			         __func__, i);
-
-			gcpu->gtlb1[i].mas1 &= ~MAS1_VALID;
-		}
+		check_invalidated_gtlb1(entry);
 		restore_mas(gcpu);
 	} else if (gcpu->split_gtlb1_map && !new_split_gtlb1_map) {
 		printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_DEBUG,

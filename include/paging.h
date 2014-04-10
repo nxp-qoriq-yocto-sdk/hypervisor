@@ -132,6 +132,7 @@ void guest_set_tlb1(unsigned int entry, unsigned long mas1,
 unsigned int guest_tlb1_to_gtlb1(unsigned int idx);
 int guest_find_tlb1(unsigned int entry, unsigned long mas1, unsigned long epn);
 unsigned long update_dgtmi(register_t mas0, register_t mas1);
+void check_invalidated_gtlb1(int skip_entry);
 
 #ifdef CONFIG_FAST_TLB1
 

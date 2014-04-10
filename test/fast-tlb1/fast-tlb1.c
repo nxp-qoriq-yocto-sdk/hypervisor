@@ -157,6 +157,50 @@ static void test1(int verbose)
 	tlbilx_va(BASE_VA_SPLIT);
 }
 
+static void test2(void)
+{
+	register_t va = BASE_VA_NONSPLIT + 3 * 8192;
+	int i;
+
+	create_mapping(0, (void *)BASE_VA_SPLIT, BASE_PHYS_ADDR, SPLIT_TLB_SIZE);
+	for (i = 0; i < TEST_PMA_COUNT; i++)
+		create_mapping(i + 1, (void *)(BASE_VA_NONSPLIT + i * 8192), BASE_PHYS_ADDR + i * 8192, TLB_TSIZE_4K);
+
+	tlbilx_va(va);
+
+	asm volatile("isync; tlbsx 0, %0" : : "r" (va) : "memory");
+
+	if (mfspr(SPR_MAS1) & MAS1_VALID)
+		printf("%s: FAILED\n", __func__);
+	else
+		printf("%s: PASSED\n", __func__);
+
+	for (i = 1; i <= TEST_PMA_COUNT; i++)
+		clear_mapping(i);
+}
+
+static void test3(void)
+{
+	int i;
+
+	create_mapping(0, (void *)BASE_VA_SPLIT, BASE_PHYS_ADDR, SPLIT_TLB_SIZE);
+	for (i = 0; i < TEST_PMA_COUNT; i++)
+		create_mapping(i + 1, (void *)(BASE_VA_NONSPLIT + i * 8192), BASE_PHYS_ADDR + i * 8192, TLB_TSIZE_4K);
+
+	tlbilx_va(BASE_VA_NONSPLIT + 3 * 8192);
+
+	mtspr(SPR_MAS0, MAS0_ESEL(4) | MAS0_TLBSEL(1));
+	asm volatile("isync; tlbre" : : : "memory");
+
+	if (mfspr(SPR_MAS1) & MAS1_VALID)
+		printf("%s: FAILED\n", __func__);
+	else
+		printf("%s: PASSED\n", __func__);
+
+	for (i = 1; i <= TEST_PMA_COUNT; i++)
+		clear_mapping(i);
+}
+
 static void stress_test(int verbose)
 {
 	char *p;
@@ -218,6 +262,8 @@ static void secondary_entry(void)
 	printf("Fast TLB1 test (secondary)\n");
 
 	test1(1);
+	test2();
+	test3();
 
 	stress_test(0);
 }
@@ -229,6 +275,8 @@ void libos_client_entry(unsigned long devtree_ptr)
 	printf("Fast TLB1 test (primary)\n");
 
 	test1(1);
+	test2();
+	test3();
 
 	secondary_startp = secondary_entry;
 	release_secondary_cores();
