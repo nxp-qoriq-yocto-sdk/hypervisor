@@ -90,6 +90,35 @@ static int is_subwindow_count_valid(int subwindow_cnt)
 #define L2 2
 #define L3 3
 
+static unsigned int apply_a007907_workaround(unsigned int cache_level)
+{
+	static register_t svrs[] = {
+		0x86800010, /* B4860 rev1 */
+		0x86800020, /* B4860 rev2 */
+		0x86810210, /* B4420 rev1 */
+		0x86810220, /* B4420 rev2 */
+		0x82400010, /* T4240 rev1 */
+		0x82400020, /* T4240 rev2 */
+		0x82410010, /* T4160 rev1 */
+		0x82410020, /* T4160 rev2 */
+
+		0x85300010, /* T2080 rev1 */
+		0x85310010, /* T2081 rev1 */
+		0
+	};
+
+	if (cache_level == L1) {
+		int i;
+		register_t svr = mfspr(SPR_SVR);
+
+		for (i = 0; svrs[i]; i++)
+			if ((svr & 0xfff7ffff) == svrs[i])
+				return L2;
+	}
+
+	return cache_level;
+}
+
 /*
  * Find the stash ID for the given cache level of the given CPU node
  * @cpu_node: pointer to the CPU node
@@ -99,6 +128,8 @@ static uint32_t get_stash_id(dt_node_t *cpu_node, unsigned int cache_level)
 {
 	dt_node_t *node = cpu_node;	// The cache node
 	dt_prop_t *prop;
+
+	cache_level = apply_a007907_workaround(cache_level);
 
 	/*
 	 * On the P4080, the L3 is the CPC and needs to be handled
