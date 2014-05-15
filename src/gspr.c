@@ -156,7 +156,7 @@ int read_gspr(trapframe_t *regs, int spr, register_t *val)
 		break;
 
 	case SPR_PVR:
-		*val = mfspr(SPR_PVR);
+		*val = get_pvr();
 		break;
 
 	case SPR_TSR:
