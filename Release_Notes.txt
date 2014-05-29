@@ -26,13 +26,27 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 008
-Date: 11/19/2013
+Revision: 009
+Date: 05/29/2014
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-009 bug fixes and changes
+       -introducing "fast tlb1 feature" - the performance of TLB1 emulation
+        is significantly improved by implementing a shorter code path for
+        non-IPROT TLB1 entries. This is particularly useful for guests
+        making heavy use of tlb1, for example when using indirect tlb1 entries.
+        The feature is controlled by a Kconfig option and is enabled by default.
+       -EPCR[DGTMI] (disable guest tlb management instructions) is now
+        dynamically controlled
+       -workaround A-006958 time-base erratum
+       -workaround A-007907 l1 stash on e6500 erratum
+       -workaround A-008007 t1040 pvr erratum
+       -workaround A-00598 pamu erratum
+       -workaround t1040 uart fifo erratum
+       -other misc fixes
    -v1.3-008 bug fixes and changes
        -fixed partman compilation
    -v1.3-007 bug fixes and changes
