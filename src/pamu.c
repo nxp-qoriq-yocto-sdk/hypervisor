@@ -369,7 +369,10 @@ static unsigned long setup_pcie_msi_subwin(guest_t *guest, dt_node_t *cfgnode,
 	if (*size > PAGE_SIZE)
 		*size = PAGE_SIZE;
 
-	ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi");
+	if (dt_node_is_compatible(msi_node, "fsl,mpic-msi-v4.3"))
+		ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi-v4.3");
+	else
+		ret = snprintf(buf, sizeof(buf), "fsl,vmpic-msi");
 	ret = dt_set_prop(msi_gnode, "compatible", buf, ret + 1);
 	if (ret < 0)
 		return ULONG_MAX;
