@@ -1098,7 +1098,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	 * we are not writing the register twice, so the interrupt clear handling will be
 	 * different for rev1 and rev2.
 	 */
-	rev1 = (get_pvr() & 0xfffffff0) == 0x80230010;
+	rev1 = (mfspr(SPR_PVR) & 0xfffffff0) == 0x80230010;
 #endif
 
 	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));

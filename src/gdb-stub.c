@@ -106,7 +106,7 @@ static inline arch_t cur_arch(void)
 {
 
 #define RET_ARCH(mask, val)              \
-if ((get_pvr() & (mask)) == (mask)) \
+if ((mfspr(SPR_PVR) & (mask)) == (mask)) \
 	return (val);
 
 	RET_ARCH(0x80230000, e500mc);

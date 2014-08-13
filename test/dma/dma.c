@@ -236,7 +236,7 @@ static int find_next_mapped_memory(uint32_t *begin, uint32_t *end)
 	static int i;
 	int max_subw;
 
-	if ((get_pvr() & 0xf0) == 0x20)
+	if ((mfspr(SPR_PVR) & 0xf0) == 0x20)
 		max_subw = 256;
 	else
 		max_subw = 16;
