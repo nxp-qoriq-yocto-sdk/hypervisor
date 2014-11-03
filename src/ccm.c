@@ -51,10 +51,10 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
 };
 
-static int ccf_cc_type_core = 1;
-static int ccf_cc_type_cluster = 2;
+#define CCM_REV1	1
+#define CCM_REV2	2
 
-static const dev_compat_t *drv_compat_id;
+static int ccm_rev;
 
 #ifdef CONFIG_WARM_REBOOT
 int *ddr_laws_found;
@@ -77,19 +77,19 @@ static int law_probe(device_t *dev, const dev_compat_t *compat_id);
 static const dev_compat_t ccm_compats[] = {
 	{
 		.compatible = "fsl,corenet-cf",
-		.data = &ccf_cc_type_core
+		.data = (void *)CCM_REV1
 	},
 	{
 		.compatible	= "fsl,corenet2-cf",
-		.data = &ccf_cc_type_cluster
+		.data = (void *)CCM_REV2
 	},
 	{
 		.compatible	= "fsl,b4860-corenet-cf",
-		.data = &ccf_cc_type_cluster
+		.data = (void *)CCM_REV2
 	},
 	{
 		.compatible	= "fsl,b4420-corenet-cf",
-		.data = &ccf_cc_type_cluster
+		.data = (void *)CCM_REV2
 	},
 	{}
 };
@@ -227,7 +227,7 @@ static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 		return ERR_BADTREE;
 	}
 
-	drv_compat_id = compat_id;
+	ccm_rev = (int)(uintptr_t)compat_id->data;
 
 	csdids = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x600);
 
@@ -514,7 +514,7 @@ void add_cpus_to_csd(guest_t *guest, dt_node_t *node)
 
 static uint32_t get_cc_id(uint32_t cpu)
 {
-	if (*(int *)drv_compat_id->data == ccf_cc_type_core)
+	if (ccm_rev == CCM_REV1)
 		return cpu;
 	else
 		return get_cluster_for_cpu_id(cpu);
