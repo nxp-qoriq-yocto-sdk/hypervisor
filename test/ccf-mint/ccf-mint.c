@@ -116,10 +116,20 @@ void libos_client_entry(unsigned long devtree_ptr)
 
 	printf("domain: %s, error: %s, path: %s\n", crit_err.domain, crit_err.error,
 		crit_err.hdev_tree_path);
-	printf("error detect reg: %x, error enable reg: %x, error attr: %x\n", crit_err.ccf.cedr,
-		 crit_err.ccf.ceer, crit_err.ccf.cecar);
-	printf("error attribute reg: %x, error address: %llx\n", crit_err.ccf.cmecar,
-		crit_err.ccf.cecaddr);
+	if (!strcmp(crit_err.domain, "ccf")) {
+		printf("error detect reg: %x, error enable reg: %x, error attr: %x\n", crit_err.ccf.cedr,
+			 crit_err.ccf.ceer, crit_err.ccf.cecar);
+		printf("error attribute reg: %x, error address: %llx\n", crit_err.ccf.cmecar,
+			crit_err.ccf.cecaddr);
+	} else {
+		printf("error status reg : %x, error detect disable reg : %x, "
+			"error interrupt enable reg : %x\n",
+			crit_err.ccm.cesr, crit_err.ccm.ceddr, crit_err.ccm.ceier);
+		printf("error attribute reg : %x error attribute reg 2 : %x, "
+			"error address : %llx\n",
+			crit_err.ccm.cecar, crit_err.ccm.ceca2r, crit_err.ccm.cecaddr);
+
+	}
 
 	printf("PASSED\n");
 
