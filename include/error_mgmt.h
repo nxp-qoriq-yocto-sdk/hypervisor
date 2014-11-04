@@ -47,14 +47,15 @@ typedef struct error_domain {
 	dump_error_info error_dump_callback;
 } error_domain_t;
 
-#define ERROR_DOMAIN_COUNT 6
+#define ERROR_DOMAIN_COUNT 7
 typedef enum {
 	error_mcheck,
 	error_cpc,
 	error_ccf,
 	error_misc,
 	error_pamu,
-	error_ddr
+	error_ddr,
+	error_ccm
 } domains_t;
 extern error_domain_t error_domains[];
 
@@ -76,6 +77,15 @@ typedef enum {
 	ccf_local_access
 } ccf_errors_t;
 extern error_policy_t ccf_error_policy[];
+
+#define CCM_ERROR_COUNT 4
+typedef enum {
+	ccm_mcast_stash,
+	ccm_unavailable_tgt_id,
+	ccm_illegal_coherency_response,
+	ccm_local_access
+} ccm_errors_t;
+extern error_policy_t ccm_error_policy[];
 
 #define MISC_ERROR_COUNT 1
 typedef enum {

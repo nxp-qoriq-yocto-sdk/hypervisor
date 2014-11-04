@@ -51,6 +51,14 @@ error_policy_t ccf_error_policy[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {"local access", "disable", 0},
 };
 
+error_policy_t ccm_error_policy[CCM_ERROR_COUNT] = {
+	[ccm_mcast_stash] = {"multicast stash", "disable", 0},
+	[ccm_unavailable_tgt_id] = {"unavailable target id", "disable", 0},
+	[ccm_illegal_coherency_response] = {"illegal coherency response", "disable", 0},
+	[ccm_local_access] = {"local access", "disable", 0},
+
+};
+
 error_policy_t misc_error_policy[MISC_ERROR_COUNT] = {
 	[internal_ram_multi_bit_ecc] = {"internal ram multi-bit ecc", "disable", 0}
 };
@@ -85,7 +93,8 @@ static void dump_mcheck_error(hv_error_t *err)
 error_domain_t error_domains[ERROR_DOMAIN_COUNT] = {
 	[error_mcheck] = {(const char *[]){NULL}, "machine check", NULL, 0, dump_mcheck_error},
 	[error_cpc] = {(const char *[]){"fsl,p4080-l3-cache-controller", "fsl,t4240-l3-cache-controller", NULL}, "cpc", cpc_error_policy, CPC_ERROR_COUNT, NULL},
-	[error_ccf] = {(const char *[]){"fsl,corenet-cf", "fsl,corenet2-cf", NULL}, "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL},
+	[error_ccf] = {(const char *[]){"fsl,corenet-cf", NULL}, "ccf", ccf_error_policy, CCF_ERROR_COUNT, NULL},
+	[error_ccm] = {(const char *[]){"fsl,corenet2-cf", NULL}, "ccm", ccm_error_policy, CCM_ERROR_COUNT, NULL},
 	[error_misc] = {(const char *[]){"fsl,soc-sram-error", NULL}, "misc", misc_error_policy, MISC_ERROR_COUNT, NULL},
 	[error_pamu] = {(const char *[]){"fsl,pamu", "fsl,p4080-pamu", NULL}, "pamu", pamu_error_policy, PAMU_ERROR_COUNT, NULL},
 	[error_ddr] = {(const char *[]){"fsl,qoriq-memory-controller", "fsl,p4080-memory-controller", NULL}, "ddr", ddr_error_policy, DDR_ERROR_COUNT, NULL},

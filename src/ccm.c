@@ -51,10 +51,44 @@ static struct ccf_error_info ccf_err[CCF_ERROR_COUNT] = {
 	[ccf_local_access] = {NULL, CCF_CEDR_LAE},
 };
 
+struct ccm_error_info {
+	const char *policy;
+	uint32_t det_reg_val;
+	uint32_t int_en_reg_val;
+	uint32_t err_dis_reg_val;
+};
+
+static struct ccm_error_info ccm_err[CCM_ERROR_COUNT] = {
+	[ccm_mcast_stash] = {
+		NULL,
+		CCM_CESR_MCSTDET,
+		CCM_CEIER_MCSTIE,
+		CCM_CEDDR_MCSTDIS
+	},
+	[ccm_unavailable_tgt_id] = {
+		NULL,
+		CCM_CESR_UTIDDET,
+		CCM_CEIER_UTIDIE,
+		CCM_CEDDR_UTIDDIS
+	},
+	[ccm_illegal_coherency_response] = {
+		NULL,
+		CCM_CESR_ICRDET,
+		CCM_CEIER_ICRIE,
+		CCM_CEDDR_ICRDIS
+	},
+	[ccm_local_access] = {
+		NULL,
+		CCM_CESR_LAEDET,
+		CCM_CEIER_LAEIE,
+		CCM_CEDDR_LAEDDIS
+	},
+};
+
 #define CCM_REV1	1
 #define CCM_REV2	2
 
-static int ccm_rev;
+static int ccm_rev, t10xx_ccm;
 
 #ifdef CONFIG_WARM_REBOOT
 int *ddr_laws_found;
@@ -63,7 +97,7 @@ int *ddr_laws_found;
 static law_t *laws;
 static uint32_t *csdids;
 uint32_t *sidmr; /* Snoop ID Port mapping register */
-static uint32_t *err_det_reg, *err_enb_reg;
+static uint32_t *err_det_reg, *err_enb_reg, *err_dis_reg;
 static uint32_t csdid_map, pma_lock;
 static uint32_t numcsds, numlaws;
 static int num_snoopids;
@@ -154,30 +188,35 @@ static void dump_ccf_error(hv_error_t *err)
 				err->error, ccf->cecar, ccf->cecaddr);
 }
 
-static int ccm_error_isr(void *arg)
+static void dump_ccm_error(hv_error_t *err)
 {
-	device_t *dev = arg;
+	ccm_error_t *ccm = &err->ccm;
+
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "device path : %s\n", err->hdev_tree_path);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "ccm cesr : %x, ccm ceddr : %x, ccm ceier : %x\n",
+				ccm->cesr, ccm->ceddr, ccm->ceier);
+	printlog(LOGTYPE_ERRORQ, LOGLEVEL_ERROR, "ccm %s cecar : %x ceca2r : %x, ccf cecaddr : %llx\n",
+				err->error, ccm->cecar, ccm->ceca2r, ccm->cecaddr);
+}
+
+static int ccf_error_isr(device_t *dev, hv_error_t *err)
+{
 	void *reg_base = dev->regs[0].virt;
-	interrupt_t *irq = dev->irqs[0];
 	uint32_t val;
 	uint32_t errattr = 0;
-	hv_error_t err = { };
-	dt_node_t *ccf_node;
+
+	strncpy(err->domain, get_domain_str(error_ccf), sizeof(err->domain));
 
 	val = in32(err_det_reg);
-
-	strncpy(err.domain, get_domain_str(error_ccf), sizeof(err.domain));
-	ccf_node = to_container(dev, dt_node_t, dev);
-	dt_get_path(NULL, ccf_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
 	for (int i = ccf_multiple_intervention; i < CCF_ERROR_COUNT; i++) {
 		const char *policy = ccf_err[i].policy;
 		uint32_t err_val = ccf_err[i].reg_val;
 
 		if ( val & err_val) {
-			ccf_error_t *ccf = &err.ccf;
+			ccf_error_t *ccf = &err->ccf;
 
-			strncpy(err.error, get_error_str(error_ccf, i), sizeof(err.error));
+			strncpy(err->error, get_error_str(error_ccf, i), sizeof(err->error));
 
 			ccf->cedr = val;
 			ccf->ceer = in32(err_enb_reg);
@@ -192,7 +231,7 @@ static int ccm_error_isr(void *arg)
 				out32((uint32_t *)(reg_base + CCF_CMECAR), ccf->cmecar);
 			}
 
-			error_policy_action(&err, error_ccf, policy);
+			error_policy_action(err, error_ccf, policy);
 			break;
 		}
 	}
@@ -205,11 +244,70 @@ static int ccm_error_isr(void *arg)
 	return 0;
 }
 
+static int ccm_error_isr(device_t *dev, hv_error_t *err)
+{
+	void *reg_base = dev->regs[0].virt;
+	uint32_t val;
+	ccm_errors_t ccm_first_err;
+
+	val = in32(err_det_reg);
+	if (!(val & CCM_CESR_CAP))
+		return 0;
+
+	strncpy(err->domain, get_domain_str(error_ccm), sizeof(err->domain));
+
+
+	ccm_first_err = t10xx_ccm ? ccm_mcast_stash : ccm_illegal_coherency_response;
+	for (int i = ccm_first_err; i < CCM_ERROR_COUNT; i++) {
+		const char *policy = ccm_err[i].policy;
+		uint32_t err_val = ccm_err[i].det_reg_val;
+
+		if (val & err_val) {
+			ccm_error_t *ccm = &err->ccm;
+
+			strncpy(err->error, get_error_str(error_ccm, i), sizeof(err->error));
+
+			ccm->cesr = val;
+			ccm->ceddr = in32(err_dis_reg);
+			ccm->ceier = in32(err_enb_reg);
+			if (val & CCM_CESR_LAEDET) {
+				ccm->cecar = in32((uint32_t *)(reg_base + CCM_CECAR));
+				ccm->cecaddr = ((phys_addr_t) in32((uint32_t *)(reg_base + CCM_CECADRH)) << 32) |
+						in32((uint32_t *)(reg_base + CCM_CECADRL));
+			}
+			ccm->ceca2r = in32((uint32_t *)(reg_base + CCM_CECA2R));
+
+			error_policy_action(err, error_ccm, policy);
+			break;
+		}
+	}
+	out32(err_det_reg, val & ~CCM_CESR_CETYPE);
+
+	return 0;
+}
+
+static int ccm_common_error_isr(void *arg)
+{
+	device_t *dev = arg;
+	uint32_t val;
+	uint32_t errattr = 0;
+	hv_error_t err = { };
+	dt_node_t *ccf_node;
+
+	ccf_node = to_container(dev, dt_node_t, dev);
+	dt_get_path(NULL, ccf_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
+
+	return (ccm_rev == CCM_REV2)
+			? ccm_error_isr(dev, &err)
+			: ccf_error_isr(dev, &err);
+}
+
 static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 {
 	dt_prop_t *prop;
 	dt_node_t *node = to_container(dev, dt_node_t, dev);
 	uint32_t i;
+	interrupt_t *irq;
 
 	if (dev->num_regs < 1 || !dev->regs[0].virt) {
 		printlog(LOGTYPE_CCM, LOGLEVEL_ERROR,
@@ -284,32 +382,69 @@ static int ccm_probe(device_t *dev, const dev_compat_t *compat_id)
 
 	sidmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + 0x200);
 
-	err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEDR);
-	err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEER);
+	if (ccm_rev == CCM_REV1) {
+		err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEDR);
+		err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCF_CEER);
+	} else {
+		err_det_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCM_CESR);
+		err_enb_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCM_CEIER);
+		err_dis_reg = (uint32_t *) ((uintptr_t)dev->regs[0].virt + CCM_CEDDR);
+	}
 	/* clear all error interrupts */
 	out32(err_enb_reg, 0);
 
-	if (dev->num_irqs >= 1) {
+	if (dev->num_irqs < 1 || dev->irqs[0] == NULL ||
+	    dev->irqs[0]->ops->register_irq == NULL)
+		return 0;
+
+	irq = dev->irqs[0];
+
+	if (ccm_rev == CCM_REV1) {
 		uint32_t val = 0;
 
-		interrupt_t *irq = dev->irqs[0];
-		if (irq && irq->ops->register_irq) {
-			for (int i = ccf_multiple_intervention; i < CCF_ERROR_COUNT; i++) {
-				ccf_err[i].policy = get_error_policy(error_ccf, i);
+		for (int i = ccf_multiple_intervention; i < CCF_ERROR_COUNT; i++) {
+			ccf_err[i].policy = get_error_policy(error_ccf, i);
 
-				if (!strcmp(ccf_err[i].policy, "disable"))
-					continue;
+			if (!strcmp(ccf_err[i].policy, "disable"))
+				continue;
 
-				val |= ccf_err[i].reg_val;
+			val |= ccf_err[i].reg_val;
+		}
+
+		register_error_dump_callback(error_ccf, dump_ccf_error);
+
+		out32(err_enb_reg, val);
+	} else {
+		uint32_t int_en_val = 0, err_dis_val = 0, ccm_ip_id;
+		ccm_errors_t ccm_first_err;
+
+		ccm_ip_id = in32((uint32_t *) ((uintptr_t)dev->regs[0].virt + CCM_IPBRR1));
+		ccm_ip_id >>= CCM_IPBRR1_IP_ID_SHIFT;
+
+		t10xx_ccm = (ccm_ip_id == CCM_IPBRR1_IP_ID_T10XX);
+
+		ccm_first_err = t10xx_ccm ? ccm_mcast_stash : ccm_illegal_coherency_response;
+		for (int i = ccm_first_err; i < CCM_ERROR_COUNT; i++) {
+			ccm_err[i].policy = get_error_policy(error_ccm, i);
+
+			if (!strcmp(ccm_err[i].policy, "disable")) {
+				err_dis_val |= ccm_err[i].err_dis_reg_val;
+				continue;
 			}
 
-			register_error_dump_callback(error_ccf, dump_ccf_error);
-
-			irq->ops->register_irq(irq, ccm_error_isr, dev, TYPE_MCHK);
-
-			out32(err_enb_reg, val);
+			int_en_val |= ccm_err[i].int_en_reg_val;
 		}
+
+		register_error_dump_callback(error_ccm, dump_ccm_error);
+
+		out32(err_enb_reg, int_en_val);
+		out32(err_dis_reg, err_dis_val);
 	}
+	irq->ops->register_irq(irq, ccm_common_error_isr, dev, TYPE_MCHK);
+
+	printlog(LOGTYPE_CCM, LOGLEVEL_DEBUG,
+		 "%s: CCM rev%d%s probed\n", __func__, ccm_rev,
+		 t10xx_ccm ? " (t10xx)" : "");
 
 	return 0;
 }
