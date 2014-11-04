@@ -91,6 +91,50 @@ typedef struct {
 #define   CCF_CMECAR_MINT     0x00000200 // MINT detected
 #define   CCF_CMECAR_SOLE     0x00000100 // SOLE data and intervention detected
 
+/* CCM (replaces original CCF) registers */
+#define CCM_IPBRR1      0xBF8 // IP Block Revision Register 1
+#define   CCM_IPBRR1_IP_ID         0xFFFF0000 // IP Identifier
+#define   CCM_IPBRR1_IP_ID_SHIFT   16
+#define   CCM_IPBRR1_MAJ_REV       0x0000FF00 // Major Revision Number
+#define   CCM_IPBRR1_MAJ_REV_SHIFT 8
+#define   CCM_IPBRR1_MIN_REV       0x000000FF // Minor Revision Number
+
+#define   CCM_IPBRR1_IP_ID_T10XX  0x931 // value of IPBRR1[IP_ID] on T10xx SoCs
+
+/* CCM error registers */
+#define CCM_CESR        0xE40 // CCM Error Status Register
+#define   CCM_CESR_CAP       0x80000000 // Error Captured
+#define   CCM_CESR_CETYPE    0x7C000000 // Captured Error Type
+#define   CCM_CESR_MCSTDET   0x00000008 // Multicast Stash Error Detected
+#define   CCM_CESR_UTIDDET   0x00000004 // Unavailable Target Id Error Detected
+#define   CCM_CESR_ICRDET    0x00000002 // Illegal Coherency Response Detected
+#define   CCM_CESR_LAEDET    0x00000001 // Local Access Error Detected
+
+#define CCM_CEDDR       0xE44 // CCM Error Detect Disable Register
+#define   CCM_CEDDR_MCSTDIS  0x00000008 // Multicast Stash error disable
+#define   CCM_CEDDR_UTIDDIS  0x00000004 // Unavailable Target Id error disable
+#define   CCM_CEDDR_ICRDIS   0x00000002 // Illegal Coherency Response error disable
+#define   CCM_CEDDR_LAEDDIS  0x00000001 // Local Access Error disable
+
+#define CCM_CEIER       0xE48 // CCM Error Interrupt Enable Register
+#define   CCM_CEIER_MCSTIE   0x00000008 // Multicast Stash Interrupt Enable
+#define   CCM_CEIER_UTIDIE   0x00000004 // Unavailable Target Id Interrupt Enable
+#define   CCM_CEIER_ICRIE    0x00000002 // Illegal Coherency Response Interrupt Enable
+#define   CCM_CEIER_LAEIE    0x00000001 // Local Access Error Interrupt Enable
+
+#define CCM_CECAR       0xE4C // CCM Error Capture Attributes Register
+#define   CCM_CECAR_LAE_SRC  0x03FC0000 // Transaction system source ID
+
+#define CCM_CECADRH     0xE50 // CCM Error Capture Address Register High
+#define CCM_CECADRL     0xE54 // CCM Error Capture Address Register High
+
+#define CCM_CECA2R      0xE58 // CCM Error Capture Attributes 2 Register
+#define   CMM_CECA2R_ICR_CPU_GRP 0xFC000000 // (ICR) Processor Group X Response
+#define   CCM_CECA2R_ICR_MINT    0x00000200 // (ICR) Multiple interventions
+#define   CCM_CECA2R_ICR_SOLE    0x00000100 // (ICR) Sole Data and Intervention
+#define   CCM_CECA2R_LAE_TCLASS  0x0000FC00 // (LAE) Type Class Field
+#define   CCM_CECA2R_REF_NUM     0x000000FF // Transaction Reference Number
+
 /* CPC error registers */
 #define CPC_CAPTDATAHI     0xE20 //CPC Error capture data high register
 #define CPC_CAPTDATALO     0xE24 //CPC Error capture data low register
