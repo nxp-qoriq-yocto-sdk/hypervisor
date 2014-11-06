@@ -140,7 +140,6 @@ void libos_client_entry(unsigned long devtree_ptr)
 	const uint32_t *prop;
 	int node, part2;
 	int i, len, ret;
-	uint32_t time;
 
 	init(devtree_ptr);
 
@@ -243,17 +242,13 @@ void libos_client_entry(unsigned long devtree_ptr)
 	 * The delay should be large enough that DEC/FIT/watchdog
 	 * will have expired.
 	 */
-	time = mfspr(SPR_TBL);
-	while (mfspr(SPR_TBL) - time < 25000000)
-		;
+	delay_ms(250);
 
 	asm volatile("tlbivax 0, %0" : :
 	             "r" (TLBIVAX_TLB0 | TLBIVAX_INV_ALL) :
 	             "memory");
 
-	time = mfspr(SPR_TBL);
-	while (mfspr(SPR_TBL) - time < 25000000)
-		;
+	delay_ms(250);
 
 	printf("Checking nap status...\n");
 	sync();
@@ -319,9 +314,7 @@ void libos_client_entry(unsigned long devtree_ptr)
 	 * The delay should be large enough that DEC/FIT/watchdog
 	 * will have expired.
 	 */
-	time = mfspr(SPR_TBL);
-	while (mfspr(SPR_TBL) - time < 50000000)
-		;
+	delay_ms(250);
 
 	printf("Checking nap status...\n");
 	sync();
