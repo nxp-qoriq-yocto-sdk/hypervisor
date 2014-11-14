@@ -91,9 +91,15 @@
 
 		corenet-cf {
 			device = "/soc/corenet-cf";
-			error-config{
+			error-config-ccf{
 				compatible = "error-config";
 				domain = "ccf";
+				error = "local access";
+				policy = "notify";
+			};
+			error-config-ccm{
+				compatible = "error-config";
+				domain = "ccm";
 				error = "local access";
 				policy = "notify";
 			};
