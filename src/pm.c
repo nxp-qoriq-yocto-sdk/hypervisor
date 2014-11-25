@@ -41,27 +41,52 @@
 #include <events.h>
 #include <doorbell.h>
 
-#define CNAPSRL   (0x014 / 4)	/* Core Nap Status */
-#define CNAPCRL   (0x01c / 4)	/* Core Nap Control */
-#define CWAITSRL  (0x034 / 4)	/* Core Wait Status */
-#define CTBHLTCRL (0x094 / 4)   /* Core Timebase Halt Control */
+#define RCPM_REV1	1
+#define RCPM_REV2	2
+
+#define RCPM1_CNAPSRL    (0x014 / 4)	/* Core Nap Status */
+#define RCPM1_CNAPCRL    (0x01c / 4)	/* Core Nap Control */
+#define RCPM1_CWAITSRL   (0x034 / 4)	/* Core Wait Status */
+#define RCPM1_CTBHLTCRL  (0x094 / 4)	/* Core Timebase Halt Control */
+
+#define RCPM2_TPH10SRL   (0x00c / 4)	/* Thread PH10 Status Register */
+#define RCPM2_TPH10SETRL (0x01c / 4)	/* Thread PH10 Set Control Register */
+#define RCPM2_TPH10CLRRL (0x02c / 4)	/* hread PH10 Clear Control Register */
+#define RCPM2_TPH15SRL   (0x0b0 / 4)	/* Thread PH15 Status Register */
+#define RCPM2_TPH15SETRL (0x0b4 / 4)	/* Thread PH15 Set Control Register */
+#define RCPM2_TPH15CLRRL (0x0b8 / 4)	/* hread PH15 Clear Control Register */
+#define RCPM2_TWAITSRL   (0x04c / 4)	/* Thread Wait Status Register */
+#define RCPM2_TTBHLTCRL  (0x1bc / 4)	/* Thread Time Base Halt Control */
 
 typedef struct {
 	int reg, state;
 } sleep_status_t;
 
-sleep_status_t sleep_regs[] = {
-	{ CNAPSRL, FH_VCPU_NAP },
-	{ CWAITSRL, FH_VCPU_IDLE },
+sleep_status_t sleep_regs_rev1[] = {
+	{ RCPM1_CNAPSRL, FH_VCPU_NAP },
+	{ RCPM1_CWAITSRL, FH_VCPU_IDLE },
+	{ -1, -1 }
+};
+
+sleep_status_t sleep_regs_rev2[] = {
+	{ RCPM2_TPH15SRL, FH_VCPU_NAP },
+	{ RCPM2_TWAITSRL, FH_VCPU_IDLE },
+	{ -1, -1 }
 };
 
 static uint32_t *rcpm; /* run control and power management */
+int rcpm_rev;
 
 static int rcpm_probe(device_t *dev, const dev_compat_t *compat_id);
 
 static const dev_compat_t rcpm_compats[] = {
 	{
-		.compatible	= "fsl,qoriq-rcpm-1.0"
+		.compatible	= "fsl,qoriq-rcpm-1.0",
+		.data		= (void *)RCPM_REV1
+	},
+	{
+		.compatible	= "fsl,qoriq-rcpm-2.0",
+		.data		= (void *)RCPM_REV2
 	},
 	{}
 };
@@ -79,9 +104,13 @@ static int rcpm_probe(device_t *dev, const dev_compat_t *compat_id)
 	}
 
 	rcpm = (uint32_t *)dev->regs[0].virt;
+	rcpm_rev = (int)(uintptr_t)compat_id->data;
 
 	/* Make sure timebase runs while napping, to preserve sync */
-	out32(&rcpm[CTBHLTCRL], 0xffffffff);
+	if (rcpm_rev == RCPM_REV2)
+		out32(&rcpm[RCPM2_TTBHLTCRL], 0xffffffff);
+	else
+		out32(&rcpm[RCPM1_CTBHLTCRL], 0xffffffff);
 
 	return 0;
 }
@@ -90,6 +119,7 @@ int get_vcpu_state(guest_t *guest, unsigned int vcpu)
 {
 	gcpu_t *gcpu;
 	int core, i;
+	sleep_status_t *p;
 
 	if (!rcpm || !guest || vcpu >= guest->cpucnt)
 		return -EV_EINVAL;
@@ -99,9 +129,11 @@ int get_vcpu_state(guest_t *guest, unsigned int vcpu)
 
 	assert(core < 32);
 
-	for (i = 0; i < sizeof(sleep_regs) / sizeof(sleep_regs[0]); i++)
-		if (in32(&rcpm[sleep_regs[i].reg]) & (1 << core))
-			return sleep_regs[i].state;
+	p = rcpm_rev == RCPM_REV2 ? sleep_regs_rev2 : sleep_regs_rev1;
+
+	for (; p->state != -1; p++)
+		if (in32(&rcpm[p->reg]) & (1 << core / cpu_caps.threads_per_core))
+			return p->state;
 
 	return FH_VCPU_RUN;
 }
@@ -134,38 +166,87 @@ typedef struct nap_state {
  */
 void sync_nap(trapframe_t *regs)
 {
-	uint32_t cnapcrl = 0, prev_cnapcrl;
-	int i;
+	int i, j;
 
 	if (!rcpm)
 		return;
 
-	/* Used the algorithm from ref man to put multiple cores into nap
-	 * mode:
-	 * 1. Write 1 to the bit corresponding to the first core to be
-	 *    put in nap
-	 * 2. Read CNAPCR to push the previous write
-	 * 3. Repeat steps 1 and 2 for all desired cores.
-	 * The same algorithm applies when waking up a core from nap.
-	 */
-	prev_cnapcrl = in32(&rcpm[CNAPCRL]);
+	if (rcpm_rev == RCPM_REV2) {
+		uint32_t sleep_mask = 0, nap_mask = 0, mask;
 
-	for (i = 0; i < CONFIG_LIBOS_MAX_CPUS - 1; i++) {
-		cpu_t *c = &secondary_cpus[i];
+		/* Used the following algorithm to put multiple cores into nap:
+		 * 1. build a mask with all the cpus (threads) requested to sleep
+		 * 2. build a mask with cores that have all threads requested
+		 *    to sleep
+		 * 3. using the mask built at #2, nap the cores
+		 * 4. additionally, doze the remaining scattered threads
+		 * 5. to ensure cores / threads not having a pending nap
+		 *    request are awake, clear their nap / doze state
+		 */
+		for (i = 0; i < CONFIG_LIBOS_MAX_CPUS - 1; i++) {
+			cpu_t *c = &secondary_cpus[i];
 
-		if (c->client.nap_request &&
-		    c->client.gcpu->napping &&
-		    !c->client.gcpu->gevent_pending)
-			cnapcrl = prev_cnapcrl | 1 << c->coreid;
-		else
-			cnapcrl = prev_cnapcrl & ~(1 << c->coreid);
+			if (c->client.nap_request &&
+			    c->client.gcpu->napping &&
+			    !c->client.gcpu->gevent_pending)
+				sleep_mask |= 1 << c->coreid;
+		}
 
-		if (cnapcrl != prev_cnapcrl) {
-			out32(&rcpm[CNAPCRL], cnapcrl);
-			prev_cnapcrl = in32(&rcpm[CNAPCRL]);
+		/* boot core should never have a nap request */
+		assert(!(sleep_mask & 1));
+
+		for (i = 0;
+		     i < CONFIG_LIBOS_MAX_CPUS / cpu_caps.threads_per_core;
+		     i++) {
+			/* this just builds a mask with all the threads in
+			 * core 'i' so, for dual threaded cores core0 will
+			 * have 11b, core1 1100b core1 110000b a.s.o.
+			 */
+			mask = (1 << cpu_caps.threads_per_core) - 1;
+			mask <<= i * cpu_caps.threads_per_core;
+
+			/* Are all threads in this core requested to sleep?
+			 * If so mark it down to put the whole core in nap.
+			 */
+			if ((sleep_mask & mask) == mask) {
+				sleep_mask &= ~mask;
+				nap_mask |= 1 << i;
+			}
+		}
+
+		out32(&rcpm[RCPM2_TPH10SETRL], sleep_mask);  /* doze threads */
+		out32(&rcpm[RCPM2_TPH15SETRL], nap_mask);    /* nap cores */
+		out32(&rcpm[RCPM2_TPH15CLRRL], ~nap_mask);   /* wake cores */
+		out32(&rcpm[RCPM2_TPH10CLRRL], ~sleep_mask); /* wake threads */
+	} else {
+		uint32_t cnapcrl = 0, prev_cnapcrl;
+
+		/* Used the algorithm from ref man to put multiple cores into nap
+		 * mode:
+		 * 1. Write 1 to the bit corresponding to the first core to be
+		 *    put in nap
+		 * 2. Read CNAPCR to push the previous write
+		 * 3. Repeat steps 1 and 2 for all desired cores.
+		 * The same algorithm applies when waking up a core from nap.
+		 */
+		prev_cnapcrl = in32(&rcpm[RCPM1_CNAPCRL]);
+
+		for (i = 0; i < CONFIG_LIBOS_MAX_CPUS - 1; i++) {
+			cpu_t *c = &secondary_cpus[i];
+
+			if (c->client.nap_request &&
+			    c->client.gcpu->napping &&
+			    !c->client.gcpu->gevent_pending)
+				cnapcrl = prev_cnapcrl | 1 << c->coreid;
+			else
+				cnapcrl = prev_cnapcrl & ~(1 << c->coreid);
+
+			if (cnapcrl != prev_cnapcrl) {
+				out32(&rcpm[RCPM1_CNAPCRL], cnapcrl);
+				prev_cnapcrl = in32(&rcpm[RCPM1_CNAPCRL]);
+			}
 		}
 	}
-
 }
 
 void hcall_enter_nap(trapframe_t *regs)
