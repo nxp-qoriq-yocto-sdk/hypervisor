@@ -83,6 +83,14 @@ static const dev_compat_t ccm_compats[] = {
 		.compatible	= "fsl,corenet2-cf",
 		.data = &ccf_cc_type_cluster
 	},
+	{
+		.compatible	= "fsl,b4860-corenet-cf",
+		.data = &ccf_cc_type_cluster
+	},
+	{
+		.compatible	= "fsl,b4420-corenet-cf",
+		.data = &ccf_cc_type_cluster
+	},
 	{}
 };
 
