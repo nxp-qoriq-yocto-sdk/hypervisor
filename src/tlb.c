@@ -2176,6 +2176,17 @@ int fast_guest_set_tlb1(register_t mas0, register_t mas1)
 		mas3 &= attr & PTE_MAS3_MASK;
 		mas3 = ((rpn << PAGE_SHIFT) & MAS3_RPN) | (attr & PTE_MAS3_MASK);
 
+
+		register_t saved_mas1, saved_mas2;
+
+		saved_mas1 = mfspr(SPR_MAS1);
+		saved_mas2 = mfspr(SPR_MAS2);
+
+		apply_a008139_workaround(real_entry);
+
+		mtspr(SPR_MAS1, saved_mas1);
+		mtspr(SPR_MAS2, saved_mas2);
+
 		mtspr(SPR_MAS0, mas0);
 		mtspr(SPR_MAS3, mas3);
 		mtspr(SPR_MAS7, rpn >> (32 - PAGE_SHIFT));
