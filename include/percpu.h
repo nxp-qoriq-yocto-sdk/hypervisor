@@ -92,6 +92,7 @@ typedef struct guest {
 	vpic_t vpic;
 	struct pte *gphys;      /**< guest phys to real phys mapping */
 	struct pte *gphys_rev;	/**< real phys to guest phys mapping */
+	phys_addr_t end_of_gphys;
 	const char *name;
 	struct dt_node *devtree;
 	struct dt_node *partition; /**< Partition node in config tree. */

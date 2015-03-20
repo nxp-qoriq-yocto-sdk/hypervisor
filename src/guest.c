@@ -306,6 +306,9 @@ static int map_gpma_callback(dt_node_t *node, void *arg)
 		gaddr = pma->start;
 	}
 
+	if ((gaddr + pma->size) > guest->end_of_gphys)
+		guest->end_of_gphys = gaddr + pma->size;
+
 	map_guest_addr_range(guest, gaddr, pma->start, pma->size, exclude_flags);
 
 	if (!(exclude_flags & PTE_VALID)) {
@@ -943,9 +946,8 @@ static int copy_cpu_node(guest_t *guest, uint32_t vcpu,
 	return 0;
 }
 
-static int create_guest_spin_table_cpu(guest_t *guest, int vcpu)
+static int create_guest_spin_table_cpu(guest_t *guest, uint64_t spin_addr, int vcpu)
 {
-	uint64_t spin_addr;
 	dt_node_t *node;
 	int ret;
 
@@ -964,7 +966,7 @@ static int create_guest_spin_table_cpu(guest_t *guest, int vcpu)
 	if (ret < 0)
 		return ret;
 
-	spin_addr = 0xfffff000 + vcpu * sizeof(struct boot_spin_table);
+	spin_addr += vcpu * sizeof(struct boot_spin_table);
 	return dt_set_prop(node, "cpu-release-addr", &spin_addr, 8);
 }
 
@@ -973,6 +975,7 @@ static int create_guest_spin_table(guest_t *guest)
 	unsigned long rpn;
 	int ret;
 	unsigned int i;
+	phys_addr_t guest_rpn;
 
 	guest->spintbl = alloc(PAGE_SIZE, PAGE_SIZE);
 	if (!guest->spintbl)
@@ -982,11 +985,16 @@ static int create_guest_spin_table(guest_t *guest)
 
 	rpn = virt_to_phys(guest->spintbl) >> PAGE_SHIFT;
 
-	vptbl_map(guest->gphys, 0xfffff, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
-	vptbl_map(guest->gphys_rev, rpn, 0xfffff, 1, PTE_ALL, PTE_PHYS_LEVELS);
+	guest_rpn = max(guest->end_of_gphys, 0xfffff000) >> PAGE_SHIFT;
+
+	printlog(LOGTYPE_MP, LOGLEVEL_DEBUG,
+		 "%s: spin table placed @ guest rpn 0x%llx\n", __func__, guest_rpn);
+
+	vptbl_map(guest->gphys, guest_rpn, rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
+	vptbl_map(guest->gphys_rev, rpn, guest_rpn, 1, PTE_ALL, PTE_PHYS_LEVELS);
 
 	for (i = 0; i < guest->cpucnt; i++) {
-		ret = create_guest_spin_table_cpu(guest, i);
+		ret = create_guest_spin_table_cpu(guest, guest_rpn << PAGE_SHIFT, i);
 
 		if (ret < 0) {
 			printlog(LOGTYPE_MP, LOGLEVEL_ERROR,
@@ -3182,6 +3190,12 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	if (ret < 0)
 		goto fail;
 
+	map_guest_mem(guest);
+
+	/*
+	 * This must be called *after* map_guest_mem() because it needs
+	 * guest->end_of_gphys which is calculated in it.
+	 */
 	ret = create_guest_spin_table(guest);
 	if (ret < 0)
 		goto fail;
@@ -3189,7 +3203,6 @@ static int __attribute__((noinline)) init_guest_primary(guest_t *guest)
 	list_init(&guest->dev_list);
 	list_init(&guest->phandle_update_list);
 
-	map_guest_mem(guest);
  	read_phandle_aliases(guest);
 
 #ifdef CONFIG_DEVICE_VIRT
