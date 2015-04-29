@@ -436,27 +436,18 @@ void data_storage(trapframe_t *regs)
 	 * fault.  Currently, we only use that for bad mappings.
 	 * This includes emulated devices that do not have page table entries.
 	 */
-
 	if (regs->srr1 & MSR_GS) {
 #ifdef CONFIG_DEVICE_VIRT
 		guest_t *guest = get_gcpu()->guest;
 		unsigned long vaddr = regs->dear;
 		phys_addr_t paddr;
-		vf_range_t *vf;
 
 		// Get the guest physical address from the TLB
 		asm volatile("tlbsx 0, %0" : : "r" (vaddr));
-		paddr = (mfspr(SPR_MAS3) & MAS3_RPN) | (vaddr & ~MAS3_RPN);
+		paddr = (mfspr(SPR_MAS3) & MAS3_RPN) | ((uint64_t)mfspr(SPR_MAS7) << 32) | (vaddr & ~MAS3_RPN);
 
-		// Scan our listed of virtualized device ranges
-		list_for_each(&guest->vf_list, list) {
-			vf = to_container(list, vf_range_t, list);
-
-			if ((paddr >= vf->start) && (paddr <= vf->end)) {
-				vf->callback(vf, regs, paddr);
-				return;
-			}
-		}
+		if (check_virtualized_addr(regs, paddr))
+			return;
 #endif
 		// If we get here, then it's a bad mapping
 
@@ -516,7 +507,7 @@ void tlb_miss(trapframe_t *regs)
 			}
 
 			if (guest || (epc & EPC_EGS)) {
-				ret = guest_tlb1_miss(vaddr, space, pid);
+				ret = guest_tlb1_miss(regs, vaddr, space, pid);
 				if (likely(ret == TLB_MISS_HANDLED))
 					return;
 			}

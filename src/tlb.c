@@ -477,7 +477,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
  * @param[in] pid The value of SPR_PID.
  * @return TLB_MISS_REFLECT, TLB_MISS_HANDLED, or TLB_MISS_MCHECK
  */
-int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
+int guest_tlb1_miss(trapframe_t *regs, register_t vaddr, unsigned int space, unsigned int pid)
 {
 	gcpu_t *gcpu = get_gcpu();
 	unsigned long epn = vaddr >> PAGE_SHIFT;
@@ -515,8 +515,16 @@ int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid)
 
 		rpn = vptbl_xlate(gcpu->guest->gphys, grpn, &attr, PTE_PHYS_LEVELS, 0);
 
-		if (unlikely(!(attr & PTE_VALID)))
-			return TLB_MISS_MCHECK;
+		if (unlikely(!(attr & PTE_VALID))) {
+			guest_t *guest = gcpu->guest;
+			phys_addr_t paddr = (grpn << PAGE_SHIFT) +
+						(vaddr & (PAGE_SIZE - 1));
+
+#ifdef CONFIG_DEVICE_VIRT
+			if (check_virtualized_addr(regs, paddr))
+				return TLB_MISS_HANDLED;
+#endif
+		}
 
 		tsize_rpn = tsize - offset;
 
@@ -2032,6 +2040,14 @@ void lrat_miss(trapframe_t *regs)
 			register_t vaddr;
 
 			vaddr = mfspr(SPR_DEAR);
+			phys_addr_t paddr = (grpn << PAGE_SHIFT) +
+						(vaddr & (PAGE_SIZE - 1));
+
+#ifdef CONFIG_DEVICE_VIRT
+			if (check_virtualized_addr(regs, paddr))
+				return;
+#endif
+
 			if (esr & ESR_ST)
 				mcsr |= MCSR_ST;
 			else

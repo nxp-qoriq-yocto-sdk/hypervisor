@@ -221,7 +221,7 @@ int guest_tlb_read_vcpu(tlb_entry_t *gmas, uint32_t *flags, struct gcpu *gcpu);
 #define TLB_MISS_REFLECT 1
 #define TLB_MISS_MCHECK  2
 
-int guest_tlb1_miss(register_t vaddr, unsigned int space, unsigned int pid);
+int guest_tlb1_miss(trapframe_t *regs, register_t vaddr, unsigned int space, unsigned int pid);
 int guest_tlb_isi(register_t vaddr, unsigned int space, unsigned int pid);
 
 struct trapframe;
@@ -267,6 +267,7 @@ typedef struct vf_range {
 vf_range_t *register_vf_handler(struct guest *guest, phys_addr_t phys_start,
 				size_t size, phys_addr_t gphys_start,
 				vf_callback_t callback, void *data);
+int check_virtualized_addr(trapframe_t *regs, phys_addr_t paddr);
 
 int emu_load_store(struct trapframe *regs, uint32_t insn, void *vaddr,
 		   int *store, unsigned int *reg);

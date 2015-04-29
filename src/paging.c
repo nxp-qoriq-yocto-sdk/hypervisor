@@ -251,6 +251,25 @@ vf_range_t *register_vf_handler(guest_t *guest, phys_addr_t phys_start,
 	return vf;
 }
 
+int check_virtualized_addr(trapframe_t *regs, phys_addr_t paddr)
+{
+	vf_range_t *vf;
+	gcpu_t *gcpu = get_gcpu();
+	guest_t *guest = gcpu->guest;
+
+	list_for_each(&guest->vf_list, list) {
+		vf = to_container(list, vf_range_t, list);
+		if ((paddr >= vf->start) && (paddr <= vf->end)) {
+			vf->callback(vf, regs, paddr);
+			regs->srr0 += 4;
+
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 #endif
 
 /*
