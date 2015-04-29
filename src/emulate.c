@@ -1086,10 +1086,12 @@ int emu_load_store(trapframe_t *regs, uint32_t insn, void *vaddr,
 
 	case 0x20:	// lwz
 		regs->gpregs[rSD] = in32(vaddr);
+		*store = 0;
 		break;
 
 	case 0x28:	// lhz
 		regs->gpregs[rSD] = in16(vaddr);
+		*store = 0;
 		break;
 
 	case 0x2c:	// sth
