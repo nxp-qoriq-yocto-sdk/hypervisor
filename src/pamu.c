@@ -1038,10 +1038,10 @@ static int pamu_error_isr(void *arg)
 
 		pics = in32(reg + PAMU_PICS);
 		if (pics & PAMU_OPERATION_ERROR_INT_STAT) {
-			strncpy(err.domain, get_domain_str(error_pamu),
-				sizeof(err.domain));
-			strncpy(err.error, get_error_str(error_pamu, pamu_operation),
-				sizeof(err.error));
+			snprintf(err.domain, sizeof(err.domain), "%s",
+				 get_domain_str(error_pamu));
+			snprintf(err.error, sizeof(err.error), "%s",
+				 get_error_str(error_pamu, pamu_operation));
 			dt_get_path(NULL, pamu_node, err.hdev_tree_path,
 				    sizeof(err.hdev_tree_path));
 			poes1 = in32(reg + PAMU_POES1);
@@ -1104,7 +1104,7 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 	rev1 = (mfspr(SPR_PVR) & 0xfffffff0) == 0x80230010;
 #endif
 
-	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+	snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_pamu));
 	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
 		    sizeof(err.hdev_tree_path));
 
@@ -1157,8 +1157,8 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 		return -1;
 	}
 
-	strncpy(err.error, get_error_str(error_pamu, pamu_access_violation),
-			sizeof(err.error));
+	snprintf(err.error, sizeof(err.error), "%s",
+		 get_error_str(error_pamu, pamu_access_violation));
 	pamu->avs1 = avs1;
 	pamu->access_violation_addr = ((phys_addr_t) in32(reg + PAMU_AVAH)) << 32 |
 				       in32(reg + PAMU_AVAL);
@@ -1206,7 +1206,7 @@ static int handle_ecc_error(pamu_ecc_err_reg_t *ecc_regs, dt_node_t *pamu_node)
 	hv_error_t err = { };
 	pamu_error_t *pamu = &err.pamu;
 
-	strncpy(err.domain, get_domain_str(error_pamu), sizeof(err.domain));
+	snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_pamu));
 	dt_get_path(NULL, pamu_node, err.hdev_tree_path,
 		    sizeof(err.hdev_tree_path));
 
@@ -1224,16 +1224,16 @@ static int handle_ecc_error(pamu_ecc_err_reg_t *ecc_regs, dt_node_t *pamu_node)
 	}
 
 	if (val & PAMU_SB_ECC_ERR) {
-		strncpy(err.error, get_error_str(error_pamu, pamu_single_bit_ecc),
-				sizeof(err.error));
+		snprintf(err.error, sizeof(err.error), "%s",
+			 get_error_str(error_pamu, pamu_single_bit_ecc));
 		out32(&ecc_regs->eccctl, ctlval & ~PAMU_EECTL_CNT_MASK);
 		error_policy_action(&err, error_pamu,
 				    pamu_err_policy[pamu_single_bit_ecc]);
 	}
 
 	if (val & PAMU_MB_ECC_ERR) {
-		strncpy(err.error, get_error_str(error_pamu, pamu_multi_bit_ecc),
-				sizeof(err.error));
+		snprintf(err.error, sizeof(err.error), "%s",
+			 get_error_str(error_pamu, pamu_multi_bit_ecc));
 		error_policy_action(&err, error_pamu,
 				    pamu_err_policy[pamu_multi_bit_ecc]);
 	}

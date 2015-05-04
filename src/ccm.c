@@ -205,7 +205,7 @@ static int ccf_error_isr(device_t *dev, hv_error_t *err)
 	uint32_t val;
 	uint32_t errattr = 0;
 
-	strncpy(err->domain, get_domain_str(error_ccf), sizeof(err->domain));
+	snprintf(err->domain, sizeof(err->domain), "%s", get_domain_str(error_ccf));
 
 	val = in32(err_det_reg);
 
@@ -216,7 +216,8 @@ static int ccf_error_isr(device_t *dev, hv_error_t *err)
 		if ( val & err_val) {
 			ccf_error_t *ccf = &err->ccf;
 
-			strncpy(err->error, get_error_str(error_ccf, i), sizeof(err->error));
+			snprintf(err->error, sizeof(err->error), "%s",
+				 get_error_str(error_ccf, i));
 
 			ccf->cedr = val;
 			ccf->ceer = in32(err_enb_reg);
@@ -254,7 +255,7 @@ static int ccm_error_isr(device_t *dev, hv_error_t *err)
 	if (!(val & CCM_CESR_CAP))
 		return 0;
 
-	strncpy(err->domain, get_domain_str(error_ccm), sizeof(err->domain));
+	snprintf(err->domain, sizeof(err->domain), "%s", get_domain_str(error_ccm));
 
 
 	ccm_first_err = t10xx_ccm ? ccm_mcast_stash : ccm_illegal_coherency_response;
@@ -265,7 +266,8 @@ static int ccm_error_isr(device_t *dev, hv_error_t *err)
 		if (val & err_val) {
 			ccm_error_t *ccm = &err->ccm;
 
-			strncpy(err->error, get_error_str(error_ccm, i), sizeof(err->error));
+			snprintf(err->error, sizeof(err->error), "%s",
+				 get_error_str(error_ccm, i));
 
 			ccm->cesr = val;
 			ccm->ceddr = in32(err_dis_reg);

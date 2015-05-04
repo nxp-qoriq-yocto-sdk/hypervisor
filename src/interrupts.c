@@ -178,8 +178,8 @@ void powerpc_mchk_interrupt(trapframe_t *frameptr)
 		dump_and_halt(mcsr, frameptr);
 
 	if (mcsr & ~MCSR_MCP) {
-		strncpy(err.domain, get_domain_str(error_mcheck), sizeof(err.domain));
-		strcpy(err.error, get_domain_str(error_mcheck));
+		snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_mcheck));
+		snprintf(err.error, sizeof(err.error), "%s", get_domain_str(error_mcheck));
 		err.mcheck.mcsr = mcsr;
 		err.mcheck.mcar = mcsr & MCSR_MAV ? mfspr(SPR_MCAR) : 0;
 		err.mcheck.mcsrr0 = mfspr(SPR_MCSRR0);

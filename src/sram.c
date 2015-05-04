@@ -62,8 +62,8 @@ static int sram_error_isr(void *arg)
 	dt_node_t *sram_node;
 
 	sram_node = to_container(dev, dt_node_t, dev);
-	strncpy(err.domain, get_domain_str(error_misc), sizeof(err.domain));
-	strncpy(err.error, get_error_str(error_misc, internal_ram_multi_bit_ecc), sizeof(err.error));
+	snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_misc));
+	snprintf(err.error, sizeof(err.error), "%s", get_error_str(error_misc, internal_ram_multi_bit_ecc));
 	dt_get_path(NULL, sram_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 	error_policy_action(&err, error_misc, sram_err_policy);
 

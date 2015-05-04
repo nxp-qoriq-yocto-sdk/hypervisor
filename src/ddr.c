@@ -109,7 +109,7 @@ static int ddr_error_isr(void *arg)
 
 	val = in32(&ddr_err_regs->ddr_err_det);
 
-	strncpy(err.domain, get_domain_str(error_ddr), sizeof(err.domain));
+	snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_ddr));
 	ddr_node = to_container(dev, dt_node_t, dev);
 	dt_get_path(NULL, ddr_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
@@ -120,7 +120,7 @@ static int ddr_error_isr(void *arg)
 		if (val & err_val) {
 			ddr_error_t *ddr = &err.ddr;
 
-			strncpy(err.error, get_error_str(error_ddr, i), sizeof(err.error));
+			snprintf(err.error, sizeof(err.error), "%s", get_error_str(error_ddr, i));
 
 			ddr->ddrerrdet = val;
 			ddr->ddrerrinten =

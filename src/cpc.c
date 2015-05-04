@@ -181,7 +181,7 @@ static int cpc_error_isr(void *arg)
 
 	val = in32(&cpc->cpc_err_base->cpcerrdet);
 
-	strncpy(err.domain, get_domain_str(error_cpc), sizeof(err.domain));
+	snprintf(err.domain, sizeof(err.domain), "%s", get_domain_str(error_cpc));
 
 	dt_get_path(NULL, cpc->cpc_node, err.hdev_tree_path, sizeof(err.hdev_tree_path));
 
@@ -193,7 +193,8 @@ static int cpc_error_isr(void *arg)
 			cpc_error_t *hv_cpc_err = &err.cpc;
 			uint32_t errctlval;
 
-			strncpy(err.error, get_error_str(error_cpc, i), sizeof(err.error));
+			snprintf(err.error, sizeof(err.error), "%s",
+				 get_error_str(error_cpc, i));
 
 			hv_cpc_err->cpcerrdet = val;
 			hv_cpc_err->cpcerrinten = in32(&cpc->cpc_err_base->cpcerrinten);
