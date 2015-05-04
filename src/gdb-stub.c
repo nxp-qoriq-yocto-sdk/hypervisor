@@ -1300,7 +1300,7 @@ static int handle_debug_event(trapframe_t *trap_frame)
 	gdb_stub_core_context_t *stub = gcpu->dbgstub_cpu_data;
 	register_t nip_reg_value = 0;
 	breakpoint_t *breakpoint = NULL;
-	breakpoint_type_t bptype = breakpoint->type;
+	breakpoint_type_t bptype;
 	int trap = 0;
 
 	INFO("DBSR=%08lx, srr0=%08lx, srr1=%08lx\n",stub->dbsr,trap_frame->srr0,trap_frame->srr1);
