@@ -776,7 +776,7 @@ unsigned long update_dgtmi(register_t mas0, register_t mas1)
 	assert(mas0 & MAS0_TLBSEL1);
 
 	new_split_gtlb1_map = gcpu->split_gtlb1_map;
-	entry = MAS0_GET_TLB1ESEL(mas0);
+	entry = MAS0_GET_TLB1ESEL(mas0) & (TLB1_GSIZE - 1);
 	if ((mas1 & (MAS1_VALID | MAS1_IPROT)) == MAS1_VALID) {
 		int splits = 0;
 		unsigned long tlb1_map;
@@ -2142,7 +2142,7 @@ int fast_guest_set_tlb1(register_t mas0, register_t mas1)
 	saved_mas3 = mas3 = mfspr(SPR_MAS3);
 	saved_mas7 = mfspr(SPR_MAS7);
 
-	entry = MAS0_GET_TLB1ESEL(mas0);
+	entry = MAS0_GET_TLB1ESEL(mas0) & (TLB1_GSIZE - 1);
 
 	if (mas1 & MAS1_VALID) {
 		tsize = MAS1_GETTSIZE(mas1);
@@ -2235,7 +2235,7 @@ int fast_guest_tlbsx(unsigned long va)
 
 	if (mfspr(SPR_MAS1) & MAS1_VALID) {
 		register_t mas0 = mfspr(SPR_MAS0);
-		unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
+		unsigned int entry = MAS0_GET_TLB1ESEL(mas0) & (TLB1_GSIZE - 1);
 
 		if (get_gcpu()->fast_tlb1_to_gtlb1[entry] > 0) {
 			mas0 &= ~MAS0_ESEL_TLB1MASK;
@@ -2253,7 +2253,7 @@ int fast_guest_tlbsx(unsigned long va)
 int fast_guest_tlbre(void)
 {
 	register_t mas0 = mfspr(SPR_MAS0);
-	unsigned int entry = MAS0_GET_TLB1ESEL(mas0);
+	unsigned int entry = MAS0_GET_TLB1ESEL(mas0) & (TLB1_GSIZE - 1);
 	int i = 0, real_entry = 0;
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
