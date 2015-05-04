@@ -141,6 +141,8 @@ static error_policy_t *get_policy_by_str(const char *domain, const char *error)
 		if (!strcmp(domain, error_domains[i].domain))
 			break;
 	}
+	if (i == ERROR_DOMAIN_COUNT)
+		return NULL; /* domain not found */
 
 	error_p = error_domains[i].errors;
 
