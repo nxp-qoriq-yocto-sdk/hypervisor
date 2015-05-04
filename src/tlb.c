@@ -429,7 +429,7 @@ static int guest_set_tlbcache(register_t mas0, register_t mas1,
 		return ERR_BUSY;
 	}
 
-	way = MAS0_GET_TLB0ESEL(mas0);
+	way = MAS0_GET_TLB0ESEL(mas0) & (TLBC_WAYS - 1);
 
 	printlog(LOGTYPE_GUEST_MMU, LOGLEVEL_VERBOSE,
 	         "setting TLB0 for 0x%08lx (%#lx), way %d\n", vaddr, rpn, way);
