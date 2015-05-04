@@ -1195,7 +1195,7 @@ static int release_secondary(dt_node_t *node, void *arg)
 	}
 	reg = *(const uint32_t *)prop->data;
 
-	if (reg > CONFIG_LIBOS_MAX_CPUS) {
+	if (reg >= CONFIG_LIBOS_MAX_CPUS) {
 		printlog(LOGTYPE_MP, LOGLEVEL_NORMAL,
 		         "%s: Ignoring core %d, max cores %d\n",
 		         __func__, reg, CONFIG_LIBOS_MAX_CPUS);
