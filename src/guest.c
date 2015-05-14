@@ -2617,7 +2617,7 @@ static int assign_child(dt_node_t *node, void *arg)
 	owner->handle.dev_owner = owner;
 
 
-	uint32_t handle = alloc_guest_handle(guest, &owner->handle);
+	int32_t handle = alloc_guest_handle(guest, &owner->handle);
 	if (handle < 0) {
 		printlog(LOGTYPE_PARTITION, LOGLEVEL_ERROR,
 			 "%s: guest %s: too many handles\n",
