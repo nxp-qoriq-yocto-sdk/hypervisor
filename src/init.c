@@ -115,6 +115,11 @@ static int get_cfg_addr(char *args, void *ctx)
 
 	str += strlen("config-addr=");
 	numstr = nextword(NULL, &str);
+	if (!numstr) {
+		printlog(LOGTYPE_MISC, LOGLEVEL_ERROR,
+		         "invalid config-addr in bootargs\n");
+		return ERR_INVALID;
+	}
 
 	*cfg_addr = get_number64(numstr);
 	if (cpu->errno) {
