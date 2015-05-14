@@ -758,7 +758,7 @@ int hv_pamu_config_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode, dt_n
 	/* configure snoop-id if needed */
 	prop = dt_get_prop(cfgnode, "snoop-cpu-only", 0);
 	if (prop && ~stash_dest != 0) {
-		if ((*(const uint32_t *)stash_prop->data) >= L3) {
+		if (stash_prop && (*(const uint32_t *)stash_prop->data) >= L3) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 				"%s: %s snoop-cpu-only property must have stash-dest as L1 or L2 cache\n",
 				 __func__, cfgnode->name);
