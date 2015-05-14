@@ -518,6 +518,9 @@ int hv_pamu_reconfig_liodn(guest_t *guest, uint32_t liodn, dt_node_t *hwnode)
 	int ret = 0;
 
 	ppaace = pamu_get_ppaace(liodn);
+	if (!ppaace)
+		return ERR_INVALID;
+
 	subwindow_cnt = 1 << (get_bf(ppaace->impl_attr, PAACE_IA_WCE) + 1);
 	window_addr = ((phys_addr_t) ppaace->wbah << 32) |
 		       ((uint32_t) get_bf(ppaace->addr_bitfields, PPAACE_AF_WBAL)
@@ -962,11 +965,23 @@ static void setup_omt(void)
 
 	/* Configure OMI_FMAN */
 	ome = pamu_get_ome(OMI_FMAN);
+	if (!ome) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: failed to read operation mapping table\n", __func__);
+		return;
+	}
+
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 
 	/* Configure OMI_QMAN private */
 	ome = pamu_get_ome(OMI_QMAN_PRIV);
+	if (!ome) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: failed to read operation mapping table\n", __func__);
+		return;
+	}
+
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READ;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 	ome->moe[IOE_EREAD0_IDX] = EOE_VALID | EOE_RSA;
@@ -974,6 +989,12 @@ static void setup_omt(void)
 
 	/* Configure OMI_CAAM */
 	ome = pamu_get_ome(OMI_CAAM);
+	if (!ome) {
+		printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
+		         "%s: failed to read operation mapping table\n", __func__);
+		return;
+	}
+
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
 	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
 }
@@ -1144,6 +1165,9 @@ static int handle_access_violation(void *reg, dt_node_t *pamu_node, uint32_t pic
 #endif
 
 	ppaace = pamu_get_ppaace(av_liodn);
+	if (!ppaace)
+		return -1;
+
 	/* We may get access violations for invalid LIODNs, just ignore them */
 	if (!get_bf(ppaace->addr_bitfields, PAACE_AF_V))
 	{
