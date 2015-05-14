@@ -1668,7 +1668,7 @@ ssize_t copy_string_from_gphys(pte_t *tbl, phys_addr_t src,
 		return len;
 
 	*buf = malloc(len);
-	if (!buf)
+	if (!(*buf))
 		return -EV_ENOMEM;
 
 	ret = copy_from_gphys(tbl, *buf, src, len);
