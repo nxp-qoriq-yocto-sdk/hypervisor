@@ -209,8 +209,11 @@ int vmpic_alloc_mpic_handle(dev_owner_t *owner, interrupt_t *irq, int standby)
 	}
 
 	vmirq = vmpic_alloc_handle(guest, irq, irq->config, standby);
-	if (!vmirq)
-		goto out;
+	if (!vmirq) {
+		spin_unlock_intsave(&vmpic_lock, saved);
+
+		return ERR_NOMEM;
+	}
 
 #ifdef CONFIG_CLAIMABLE_DEVICES
 	vmirq->claim_action.claim = claim_int;
@@ -227,7 +230,6 @@ int vmpic_alloc_mpic_handle(dev_owner_t *owner, interrupt_t *irq, int standby)
 	if (!standby)
 		mpic_irq_set_vector(irq, vmirq->handle);
 
-out:
 	spin_unlock_intsave(&vmpic_lock, saved);
 	return vmirq->handle;
 }
