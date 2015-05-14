@@ -187,6 +187,9 @@ int doorbell_attach_guest(ipi_doorbell_t *dbell, guest_t *guest)
 	struct ipi_doorbell_handle *db_handle;
 
 	db_handle = alloc_type(struct ipi_doorbell_handle);
+	if (!db_handle) {
+		return ERR_NOMEM;
+	}
 	db_handle->user.db = db_handle;
 	db_handle->dbell = dbell;
 
