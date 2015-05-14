@@ -126,7 +126,7 @@ static unsigned int apply_a007907_workaround(unsigned int cache_level)
  */
 static uint32_t get_stash_id(dt_node_t *cpu_node, unsigned int cache_level)
 {
-	dt_node_t *node = cpu_node;	// The cache node
+	dt_node_t *node = cpu_node, *next_node = NULL;	// The cache node
 	dt_prop_t *prop;
 
 	cache_level = apply_a007907_workaround(cache_level);
@@ -175,8 +175,8 @@ static uint32_t get_stash_id(dt_node_t *cpu_node, unsigned int cache_level)
 
 		phandle = *(const uint32_t *)prop->data;
 
-		node = dt_lookup_phandle(hw_devtree, phandle);
-		if (!node) {
+		next_node = dt_lookup_phandle(hw_devtree, phandle);
+		if (!next_node) {
 			// Invalid phandle
 			printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
 				 "%s: 'next-level-cache' property for node %s is an invalid phandle\n",
@@ -185,14 +185,17 @@ static uint32_t get_stash_id(dt_node_t *cpu_node, unsigned int cache_level)
 		}
 	}
 
+	if (!next_node)
+		return ~(uint32_t)0;
+
 	// We've found a matching cache node.  Get the stash ID and exit.
 
-	prop = dt_get_prop(node, "cache-stash-id", 0);
+	prop = dt_get_prop(next_node, "cache-stash-id", 0);
 	if (!prop || (prop->len != sizeof(uint32_t))) {
 		// Missing or invalid cache-stash-id property
 		printlog(LOGTYPE_DEVTREE, LOGLEVEL_WARN,
 			 "%s: 'cache-stash-id' property for node %s is missing or invalid\n",
-			__func__, node->name);
+			__func__, next_node->name);
 		return ~(uint32_t)0;
 	}
 
