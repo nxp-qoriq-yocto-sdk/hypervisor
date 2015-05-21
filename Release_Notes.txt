@@ -26,13 +26,22 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 009
-Date: 05/29/2014
+Revision: 010
+Date: 05/21/2015
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-010 bug fixes and changes
+       -mpic 4.3 support
+       -support for ccm (former ccf) error management found in newer chips
+       -power management support found in rcpm rev2 (included in newer chips)
+       -fixed spin table issue that didn't allow booting guests with >=4GB
+        of memory
+       -fixed multiple issues found with the help of a static code analysis tool
+       -erratum A-008139 workaround
+       -(libos) important fixes in interrupt handling
    -v1.3-009 bug fixes and changes
        -introducing "fast tlb1 feature" - the performance of TLB1 emulation
         is significantly improved by implementing a shorter code path for
