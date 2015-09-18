@@ -565,6 +565,8 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 		uint64_t gaddr, size;
 		unsigned long rpn;
 		int subwin;
+		dt_prop_t *pcie_subwin;
+		dt_prop_t *srio_subwin;
 
 		prop = dt_get_prop(node, "guest-addr", 0);
 		if (!prop || prop->len != 8) {
@@ -606,8 +608,8 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			size = *(uint64_t *)prop->data;
 		}
 
-		if (size & (size - 1) || size > subwindow_size ||
-		    size < PAGE_SIZE) {
+		/* size must be a power-of-two, no smaller than a page. */
+		if (size & (size - 1) || size < PAGE_SIZE) {
 			printlog(LOGTYPE_PAMU, LOGLEVEL_ERROR,
 			         "%s: size %llx in %s/%s "
 			         "out of range, or not a power of 2\n",
@@ -615,24 +617,47 @@ static int setup_subwins(guest_t *guest, dt_node_t *parent,
 			continue;
 		}
 
-		if (dt_get_prop(node, "pcie-msi-subwindow", 0)) {
-			rpn = setup_pcie_msi_subwin(guest, cfgnode, hwnode,
-				gnode, gaddr, &size);
+		pcie_subwin = dt_get_prop(node, "pcie-msi-subwindow", 0);
+		srio_subwin = dt_get_prop(node, "srio-ccsr-subwindow", 0);
+		if (!pcie_subwin && !srio_subwin) {
+			uint64_t paace_size;
 
-		} else if (dt_get_prop(node, "srio-ccsr-subwindow", 0)) {
-			rpn = gaddr >> PAGE_SHIFT;
-		}
-		else {
-			rpn = get_rpn(guest, gaddr >> PAGE_SHIFT,
-				size >> PAGE_SHIFT);
-		}
-		if (rpn == ULONG_MAX)
-			continue;
+			do {
+				paace_size = (size < subwindow_size) ?
+						size : subwindow_size;
+				rpn = get_rpn(guest,
+					gaddr >> PAGE_SHIFT,
+					paace_size >> PAGE_SHIFT);
 
-		ret = pamu_config_spaace(liodn, subwindow_cnt, subwin, size, omi,
-					 rpn, snoopid, stash_dest);
-		if (ret < 0)
-			return ret;
+				if (rpn == ULONG_MAX)
+					break;
+
+				ret = pamu_config_spaace(liodn, subwindow_cnt,
+						 subwin++, paace_size, omi,
+						 rpn, snoopid, stash_dest);
+				if (ret < 0)
+					return ret;
+
+				gaddr += paace_size;
+				size -= paace_size;
+			} while (size != 0);
+		} else {
+			if (pcie_subwin) {
+				rpn = setup_pcie_msi_subwin(guest, cfgnode,
+					 hwnode, gnode, gaddr, &size);
+			} else if (srio_subwin) {
+				rpn = gaddr >> PAGE_SHIFT;
+			}
+
+			if (rpn == ULONG_MAX)
+				continue;
+
+			ret = pamu_config_spaace(liodn, subwindow_cnt,
+						 subwin, size, omi,
+						 rpn, snoopid, stash_dest);
+			if (ret < 0)
+				return ret;
+		}
 	}
 
 	return 0;
