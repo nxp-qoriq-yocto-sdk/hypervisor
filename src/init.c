@@ -1496,6 +1496,15 @@ int restore_core_caches(const core_cache_state_t *state)
 	set_cache_reg(SPR_L1CSR0, state->l1csr0);
 	set_cache_reg(SPR_L1CSR1, state->l1csr1);
 	set_cache_reg(SPR_L1CSR2, state->l1csr2);
+
+	/*
+	 * Ensure caches get re-enabled if they were enabled before
+	 */
+	if (state->l1csr1 && L1CSR1_ICE)
+		icache_setup();
+	if (state->l1csr0 && L1CSR0_DCE)
+		dcache_setup();
+
 	resume_other_hw_threads(&get_shared_cpu()->cachelock, saved);
 
 	return ret;

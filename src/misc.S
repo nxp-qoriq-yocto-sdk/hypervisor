@@ -232,3 +232,45 @@ flush_disable_l1_cache:
 
 	li	%r3, 0
 	blr
+
+/*
+ * Borrowed from Linux kernel
+ */
+.global icache_setup
+icache_setup:
+	mfspr	%r0, SPR_L1CSR1
+	andi.	%r3, %r0, L1CSR1_ICE
+	bnelr				/* Already enabled */
+	oris	%r0, %r0, L1CSR1_ICPE@h
+	ori	%r0, %r0, L1CSR1_ICFI
+	ori	%r0, %r0, L1CSR1_ICLFC
+	ori	%r0, %r0, L1CSR1_ICE
+	mtspr	SPR_L1CSR1, %r0		/* Enable I-Cache */
+	isync
+	blr
+
+.global dcache_setup
+dcache_setup:
+	mfspr	%r0, SPR_L1CSR0
+	andi.	%r3, %r0, L1CSR0_DCE
+	bnelr				/* Already enabled */
+	msync
+	isync
+	li	%r0, 0
+	mtspr	SPR_L1CSR0, %r0		/* Disable */
+	msync
+	isync
+	li	%r0, L1CSR0_DCFI
+	ori	%r0, %r0, L1CSR0_DCLFC
+	mtspr	SPR_L1CSR0, %r0		/* Invalidate */
+	isync
+1:	mfspr	%r0, SPR_L1CSR0
+	andi.	%r3, %r0, L1CSR0_DCLFC
+	bne+	1b			/* Wait for lock bits reset */
+	oris	%r0, %r0, L1CSR0_DCPE@h
+	ori	%r0, %r0, L1CSR0_DCE
+	msync
+	isync
+	mtspr	SPR_L1CSR0, %r0		/* Enable */
+	isync
+	blr

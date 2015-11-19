@@ -120,6 +120,8 @@ static void wake_hcall_nap(struct gcpu *gcpu)
 int flush_disable_l1_cache(void *disp_addr, uint32_t timeout);
 int check_perfmon(trapframe_t *regs);
 void gcov_config(struct dt_node *hvconfig);
+void icache_setup(void);
+void dcache_setup(void);
 
 extern char *displacement_flush_area[CONFIG_LIBOS_MAX_CPUS];
 
