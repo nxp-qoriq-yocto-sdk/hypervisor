@@ -26,13 +26,17 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 010
-Date: 05/21/2015
+Revision: 011
+Date: 03/30/2016
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-011 bug fixes and changes
+       -l1 cache handling fixes
+       -support dma subwindow coalescing
+       -40-bit hardware address support
    -v1.3-010 bug fixes and changes
        -mpic 4.3 support
        -support for ccm (former ccf) error management found in newer chips
