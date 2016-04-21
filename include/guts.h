@@ -25,13 +25,19 @@
 #ifndef GUTS_H
 #define GUTS_H
 
+#define GUTS_PHYS_BASE 0xFFE0E0000ULL
+#define GUTS_PHYS_SIZE 0x1000
+
 /* offsets in guts dev config */
+#define GUTS_SVR 0xA4
 #define GUTS_RSTCR  0xB0
+#define GUTS_RCWSR_BASE 0x100
 #define GUTS_CRSTR0 0x400
 #define GUTS_RSTRQMR 0xC0
 #define GUTS_TP_INIT 0x740
 #define GUTS_TP_CLUSTER 0x844
 
+#define GUTS_RCWSR_CNT 16
 
 #define TP_ITYPE_PER_CLUSTER 4
 #define TP_CLUSTER_ITYPE_MASK 0x0000003f
@@ -46,12 +52,14 @@
 #define RSTRQMR_MBEE_MSK 0x4000
 
 struct dt_node;
+struct guest;
 
 int system_reset(void);
 int get_sys_reset_status(void);
 int set_reset_mask(uint32_t mask);
 int get_cluster_for_cpu_id(int cpu_id);
 struct dt_node *get_guts_node(void);
+void virtualized_guts_init(struct guest *guest);
 
 #define SYS_RESET_STATUS_POR  1
 #define SYS_RESET_STATUS_HARD 2

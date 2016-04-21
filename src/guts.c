@@ -29,11 +29,15 @@
 #include <libos/printlog.h>
 #include <libos/io.h>
 #include <libos/cpu_caps.h>
+#include <libos/trap_booke.h>
 
 #include <guts.h>
 #include <devtree.h>
 #include <errors.h>
+#include <percpu.h>
+#include <guestmemio.h>
 
+static uint32_t *guts_base; /* base address of guts registers */
 static uint32_t *guts_rstcr;  /* reset control register */
 static uint32_t *guts_crstr0;  /* core reset status register */
 static uint32_t *guts_rstrqmr;  /* reset request mask register */
@@ -65,6 +69,7 @@ static int guts_devconfig_probe(device_t *dev, const dev_compat_t *compat_id)
 		return ERR_INVALID;
 	}
 
+	guts_base = dev->regs[0].virt;
 	guts_rstcr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTCR);
 	guts_crstr0 = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_CRSTR0);
 	guts_rstrqmr = (uint32_t *) ((uintptr_t)dev->regs[0].virt + GUTS_RSTRQMR);
@@ -167,5 +172,110 @@ struct dt_node *get_guts_node(void)
 	}
 
 	return guts_node;
+}
+
+static void guts_callback(vf_range_t *vf, trapframe_t *regs, phys_addr_t paddr)
+{
+	void *vaddr;
+	uint32_t insn;
+	int ret;
+	int store;
+	unsigned int reg, ofs;
+
+	vaddr = vf->vaddr + (paddr & 0x0FFF);
+
+	guestmem_set_insn(regs);
+	ret = guestmem_in32((uint32_t *)regs->srr0, &insn);
+	if (ret != GUESTMEM_OK) {
+		if (ret == GUESTMEM_TLBMISS) {
+			regs->exc = EXC_ITLB;
+		} else {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				 "%s: guestmem_in32() returned %d\n",
+				 __func__, ret);
+			regs->exc = EXC_ISI;
+		}
+		reflect_trap(regs);
+		return;
+	}
+
+	register_t saved = disable_int_save();
+
+	ret = emu_load_store(regs, insn, vaddr, &store, &reg);
+	if (unlikely(ret)) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			 "%s: emu_load_store() returned %d\n", __func__, ret);
+
+		restore_int(saved);
+		regs->exc = EXC_PROGRAM;
+		mtspr(SPR_ESR, ESR_PIL);
+		reflect_trap(regs);
+		return;
+	}
+
+	ofs = paddr - GUTS_PHYS_BASE;
+
+	if (!store) {
+		if (ofs == GUTS_SVR) {
+			regs->gpregs[reg] = guts_base[ofs / 4];
+			goto done;
+		} else if (ofs >= GUTS_RCWSR_BASE &&
+			   ofs < (GUTS_RCWSR_BASE + GUTS_RCWSR_CNT * 4)) {
+			regs->gpregs[reg] = guts_base[ofs / 4];
+			goto done;
+		}
+	}
+	printlog(LOGTYPE_EMU, LOGLEVEL_WARN,
+		 "%s@0x%lx (lr: 0x%lx): unsupported %s of reg %d, offset 0x%x\n",
+		 __func__, regs->srr0, regs->lr, store ? "store" : "load",
+		 ofs / 4, ofs);
+done:
+	restore_int(saved);
+	regs->srr0 += 4;
+}
+
+void virtualized_guts_init(guest_t *guest)
+{
+	dt_node_t *guts, *node;
+	dt_prop_t *prop;
+	static const uint32_t guts_reg[] = {
+		GUTS_PHYS_BASE >> 32, GUTS_PHYS_BASE & 0xffffffff,
+		0x0, GUTS_PHYS_SIZE
+	};
+
+	guts = dt_get_subnode(guest->devices, "guts", 1);
+	if (!guts)
+		goto fail;
+
+	/* copy compatible prop value from the hardware device tree */
+	node = get_guts_node();
+	if (node) {
+		prop = dt_get_prop(node, "compatible", 0);
+		if (prop) {
+			if (dt_set_prop(guts, "compatible", prop->data, prop->len))
+				goto fail;
+		} else {
+			printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+				 "%s: failed to get guts compatible\n", __func__);
+			goto fail;
+		}
+	} else {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			 "%s: guts node not found\n", __func__);
+		goto fail;
+	}
+	if (dt_set_prop(guts, "reg", guts_reg, sizeof(guts_reg)) < 0)
+		goto fail;
+
+	if (!register_vf_handler(guest, GUTS_PHYS_BASE, GUTS_PHYS_SIZE,
+	    GUTS_PHYS_BASE, guts_callback, NULL)) {
+		printlog(LOGTYPE_EMU, LOGLEVEL_ERROR,
+			 "%s: register_vf_handler() failed\n", __func__);
+	}
+
+	return;
+fail:
+	printlog(LOGTYPE_IRQ, LOGLEVEL_ERROR,
+		 "%s: virtualized guts initialization failed\n", __func__);
 }
 

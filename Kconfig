@@ -136,6 +136,7 @@ config DEVICE_VIRT
 	# want to be able to virtual devices that share a page or
 	# interrupt, like I2C.
 	bool
+	default y
 
 config VIRTUAL_I2C
 	bool "I2C virtualization"

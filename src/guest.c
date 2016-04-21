@@ -2992,6 +2992,8 @@ static int init_guest_devs(guest_t *guest)
 	dt_assign_devices(guest->partition, guest);
 	qman_portal_liodn_fixup(guest);
 
+	virtualized_guts_init(guest);
+
 	/* First, merge each assigned device and its sub-tree, and
 	 * apply node-update.  It is done with dt_for_each_node rather
 	 * than traversing the device list, so that parents are processed
