@@ -26,13 +26,16 @@
 Freescale Hypervisor Release Notes
 
 Topaz Version: 1.3
-Revision: 011
-Date: 03/30/2016
+Revision: 012
+Date: 05/11/2016
 
 This document identifies changes between Embedded
 Hypervisor releases.
 
 Detailed List of Changes
+   -v1.3-012 bug fixes and changes
+       -fixed device virtualization support
+       -add virtualization for a basic guts device
    -v1.3-011 bug fixes and changes
        -l1 cache handling fixes
        -support dma subwindow coalescing
